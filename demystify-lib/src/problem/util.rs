@@ -1,38 +1,40 @@
+use super::{parse::DimacsParse, VarID};
 use anyhow::bail;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn parse_savile_row_name(
-    vars: &BTreeSet<String>,
-    auxvars: &BTreeSet<String>,
+    dimacs: &DimacsParse,
+    //    vars: &BTreeSet<String>,
+    //    auxvars: &BTreeSet<String>,
     n: &str,
-) -> anyhow::Result<Option<(String, Vec<i32>)>> {
-    let varmatch: Vec<&String> = vars.iter().filter(|&v| n.starts_with(v)).collect();
-    if varmatch.is_empty() {
-        if !auxvars.iter().any(|v| n.starts_with(v)) {
-            bail!(
-                "Cannot find {} in the VAR list {:?} -- should it be AUX?",
-                n,
-                vars
-            );
+) -> anyhow::Result<Option<VarID>> {
+    let mut matches: Vec<&String> = dimacs.vars.iter().filter(|&v| n.starts_with(v)).collect();
+    let conmatch: Vec<&String> = dimacs.cons.keys().filter(|&v| n.starts_with(v)).collect();
+
+    matches.extend(conmatch);
+
+    if matches.is_empty() {
+        if !dimacs.auxvars.iter().any(|v| n.starts_with(v)) {
+            bail!("{} is not defined -- should it be AUX?", n);
         }
         return Ok(None);
     }
-    if varmatch.len() > 1 {
+    if matches.len() > 1 {
         bail!(
             "Variables cannot have a common prefix: Can't tell if {} is {:?}",
             n,
-            varmatch
+            matches
         );
     }
 
-    let varmatch = varmatch[0].clone();
+    let name = matches[0].clone();
 
     // The variable has no indices, so we are done
-    if varmatch == n {
-        return Ok(Some((varmatch, vec![])));
+    if name == n {
+        return Ok(Some(VarID::new(&name, vec![])));
     }
 
-    let n = &n[varmatch.len() + 1..];
+    let n = &n[name.len() + 1..];
 
     let splits: Vec<&str> = n.split("_").collect();
     let mut args = Vec::new();
@@ -46,77 +48,78 @@ pub fn parse_savile_row_name(
             args.push(c);
         }
     }
-    Ok(Some((varmatch, args)))
+    Ok(Some(VarID::new(&name, args)))
 }
 
 #[cfg(test)]
 mod tests {
+    use rustsat::instances::SatInstance;
+
     use super::*;
 
     #[test]
     fn test_parse_savile_row_name() {
-        let variables: BTreeSet<String> = ["var1", "var2", "var3", "var3x"]
+        let vars: BTreeSet<String> = ["var1", "var2", "var3", "var3x"]
             .iter()
             .map(|s| s.to_string())
             .collect();
-        let aux_variables: BTreeSet<String> = ["aux1", "aux2", "aux3"]
+        let auxvars: BTreeSet<String> = ["aux1", "aux2", "aux3"]
             .iter()
             .map(|s| s.to_string())
             .collect();
+
+        let mut cons: BTreeMap<String, String> = BTreeMap::new();
+        cons.insert("con1".to_string(), "test1".to_string());
+        cons.insert("con2".to_string(), "test2".to_string());
+
+        let satinstance = SatInstance::new();
+
+        let dp = DimacsParse {
+            vars,
+            auxvars,
+            cons,
+            satinstance,
+        };
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_1_2_3";
-        let expected1 = Some(("var1".to_string(), vec![1, 2, 3]));
-        assert_eq!(
-            parse_savile_row_name(&variables, &aux_variables, n1).unwrap(),
-            expected1
-        );
+        let expected1 = Some(VarID::new("var1", vec![1, 2, 3]));
+        assert_eq!(parse_savile_row_name(&dp, n1).unwrap(), expected1);
 
         let n1b = "var1_00001_00002_00010";
-        let expected1b = Some(("var1".to_string(), vec![1, 2, 10]));
-        assert_eq!(
-            parse_savile_row_name(&variables, &aux_variables, n1b).unwrap(),
-            expected1b
-        );
+        let expected1b = Some(VarID::new("var1", vec![1, 2, 10]));
+        assert_eq!(parse_savile_row_name(&dp, n1b).unwrap(), expected1b);
 
         let n1c = "var1_n00001_00002_n00010";
-        let expected1c = Some(("var1".to_string(), vec![-1, 2, -10]));
-        assert_eq!(
-            parse_savile_row_name(&variables, &aux_variables, n1c).unwrap(),
-            expected1c
-        );
+        let expected1c = Some(VarID::new("var1", vec![-1, 2, -10]));
+        assert_eq!(parse_savile_row_name(&dp, n1c).unwrap(), expected1c);
 
         let n1d = "var1";
-        let expected1d = Some(("var1".to_string(), vec![]));
-        assert_eq!(
-            parse_savile_row_name(&variables, &aux_variables, n1d).unwrap(),
-            expected1d
-        );
+        let expected1d = Some(VarID::new("var1", vec![]));
+        assert_eq!(parse_savile_row_name(&dp, n1d).unwrap(), expected1d);
+
+        let ncon = "con1";
+        let expectedcon = Some(VarID::new("con1", vec![]));
+        assert_eq!(parse_savile_row_name(&dp, ncon).unwrap(), expectedcon);
 
         let ne = "var3x";
-        assert!(parse_savile_row_name(&variables, &aux_variables, ne).is_err());
+        assert!(parse_savile_row_name(&dp, ne).is_err());
 
         // Test case 2: n starts with a variable in aux_variables
         let n2 = "aux2_4_5_6";
-        assert_eq!(
-            parse_savile_row_name(&variables, &aux_variables, n2).unwrap(),
-            None
-        );
+        assert_eq!(parse_savile_row_name(&dp, n2).unwrap(), None);
 
         // Test case 3: n does not start with any variable
         let n3 = "not_found_7_8_9";
-        assert!(parse_savile_row_name(&variables, &aux_variables, n3).is_err());
+        assert!(parse_savile_row_name(&dp, n3).is_err());
 
         // Test case 4: n starts with multiple variables
         let n4 = "var1_var2_10_11_12";
-        assert!(parse_savile_row_name(&variables, &aux_variables, n4).is_err());
+        assert!(parse_savile_row_name(&dp, n4).is_err());
 
         // Test case 5: n starts with a variable, but the remaining part is empty
         let n5 = "var1_";
-        let expected5 = Some(("var1".to_string(), vec![]));
-        assert_eq!(
-            parse_savile_row_name(&variables, &aux_variables, n5).unwrap(),
-            expected5
-        );
+        let expected5 = Some(VarID::new("var1", vec![]));
+        assert_eq!(parse_savile_row_name(&dp, n5).unwrap(), expected5);
     }
 }

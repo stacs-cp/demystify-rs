@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod problem;
 
 pub fn add(left: usize, right: usize) -> usize {

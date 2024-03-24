@@ -16,14 +16,16 @@ use tracing::info;
 use std::fs::File;
 use std::io;
 
-struct DimacsParse {
-    vars: BTreeSet<String>,
-    auxvars: BTreeSet<String>,
-    cons: BTreeMap<String, String>,
-    satinstance: SatInstance,
+use crate::problem::Lit;
+
+pub struct DimacsParse {
+    pub vars: BTreeSet<String>,
+    pub auxvars: BTreeSet<String>,
+    pub cons: BTreeMap<String, String>,
+    pub satinstance: SatInstance,
 }
 
-fn parse_dimacs(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
+fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
     info!(target: "parser", "reading DIMACS {:?}", in_path);
 
     let mut vars: BTreeSet<String> = BTreeSet::new();
@@ -31,7 +33,7 @@ fn parse_dimacs(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
 
     let mut cons: BTreeMap<String, String> = BTreeMap::new();
 
-    let mut satinstance = instances::SatInstance::<BasicVarManager>::from_dimacs_path(in_path)?;
+    let satinstance = instances::SatInstance::<BasicVarManager>::from_dimacs_path(in_path)?;
 
     let conmatch = Regex::new(r#"\$\#CON (.*) \"(.*)\""#).unwrap();
 
@@ -84,15 +86,15 @@ fn parse_dimacs(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
     })
 }
 
-fn read_savilerow_annotations(in_path: &PathBuf, dimacs: &DimacsParse) -> anyhow::Result<()> {
+fn read_dimacs(in_path: &PathBuf, dimacs: &DimacsParse) -> anyhow::Result<()> {
     let dvarmatch = Regex::new(r"c Var '(.*)' direct represents '(.*)' with '(.*)'").unwrap();
     let ovarmatch = Regex::new(r"c Var '(.*)' order represents '(.*)' with '(.*)'").unwrap();
 
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
 
-    let mut varmap = HashMap::new();
-    let mut ordervarmap = HashMap::new();
+    let mut varmap: HashMap<Lit, i32> = HashMap::new();
+    let mut ordervarmap: HashMap<Lit, i32> = HashMap::new();
 
     for line in reader.lines() {
         let line = line?;
@@ -110,22 +112,11 @@ fn read_savilerow_annotations(in_path: &PathBuf, dimacs: &DimacsParse) -> anyhow
             };
 
             if !match_[1].starts_with("aux") {
-                let var = crate::problem::util::parse_savile_row_name(
-                    &dimacs.vars,
-                    &dimacs.auxvars,
-                    &match_[1], // TODO: dimacs.vars should include constraints
-                )?;
+                let varid = crate::problem::util::parse_savile_row_name(&dimacs, &match_[1])?;
 
-                if let Some((var0, var1)) = var {
-                    fillmap
-                        .entry(var0)
-                        .or_insert_with(HashMap::new)
-                        .entry(var1)
-                        .or_insert_with(HashMap::new)
-                        .insert(
-                            match_[2].parse::<i32>().unwrap(),
-                            match_[3].parse::<i32>().unwrap(),
-                        );
+                if let Some(varid) = varid {
+                    let lit = Lit::new_eq_val(&varid, match_[2].parse::<i32>().unwrap());
+                    fillmap.insert(lit, match_[3].parse::<i32>().unwrap());
                 }
             }
         }
@@ -234,7 +225,7 @@ pub fn parse_essence(eprime: &str, eprimeparam: &str) -> anyhow::Result<()> {
 
     let in_path = PathBuf::from(finaleprimeparam + ".dimacs");
 
-    let dimacs = parse_dimacs(&in_path);
+    let eprimeparse = parse_eprime(&in_path)?;
 
     Ok(())
 }
