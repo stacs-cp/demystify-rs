@@ -55,64 +55,67 @@ mod tests {
 
     #[test]
     fn test_parse_savile_row_name() {
-        let vars: BTreeSet<String> = ["var1", "var2", "var3", "var3x"]
+        let variables: BTreeSet<String> = ["var1", "var2", "var3", "var3x"]
             .iter()
             .map(|s| s.to_string())
             .collect();
-        let auxvars: BTreeSet<String> = ["aux1", "aux2", "aux3"]
+        let aux_variables: BTreeSet<String> = ["aux1", "aux2", "aux3"]
             .iter()
             .map(|s| s.to_string())
             .collect();
 
-        // Test case 1: n starts with a variable in vars
+        // Test case 1: n starts with a variable in variables
         let n1 = "var1_1_2_3";
         let expected1 = Some(("var1".to_string(), vec![1, 2, 3]));
         assert_eq!(
-            parse_savile_row_name(&vars, &auxvars, n1).unwrap(),
+            parse_savile_row_name(&variables, &aux_variables, n1).unwrap(),
             expected1
         );
 
         let n1b = "var1_00001_00002_00010";
         let expected1b = Some(("var1".to_string(), vec![1, 2, 10]));
         assert_eq!(
-            parse_savile_row_name(&vars, &auxvars, n1b).unwrap(),
+            parse_savile_row_name(&variables, &aux_variables, n1b).unwrap(),
             expected1b
         );
 
         let n1c = "var1_n00001_00002_n00010";
         let expected1c = Some(("var1".to_string(), vec![-1, 2, -10]));
         assert_eq!(
-            parse_savile_row_name(&vars, &auxvars, n1c).unwrap(),
+            parse_savile_row_name(&variables, &aux_variables, n1c).unwrap(),
             expected1c
         );
 
         let n1d = "var1";
         let expected1d = Some(("var1".to_string(), vec![]));
         assert_eq!(
-            parse_savile_row_name(&vars, &auxvars, n1d).unwrap(),
+            parse_savile_row_name(&variables, &aux_variables, n1d).unwrap(),
             expected1d
         );
 
         let ne = "var3x";
-        assert!(parse_savile_row_name(&vars, &auxvars, ne).is_err());
+        assert!(parse_savile_row_name(&variables, &aux_variables, ne).is_err());
 
-        // Test case 2: n starts with a variable in auxvars
+        // Test case 2: n starts with a variable in aux_variables
         let n2 = "aux2_4_5_6";
-        assert_eq!(parse_savile_row_name(&vars, &auxvars, n2).unwrap(), None);
+        assert_eq!(
+            parse_savile_row_name(&variables, &aux_variables, n2).unwrap(),
+            None
+        );
 
         // Test case 3: n does not start with any variable
         let n3 = "not_found_7_8_9";
-        assert!(parse_savile_row_name(&vars, &auxvars, n3).is_err());
+        assert!(parse_savile_row_name(&variables, &aux_variables, n3).is_err());
 
         // Test case 4: n starts with multiple variables
         let n4 = "var1_var2_10_11_12";
-        assert!(parse_savile_row_name(&vars, &auxvars, n4).is_err());
+        assert!(parse_savile_row_name(&variables, &aux_variables, n4).is_err());
 
         // Test case 5: n starts with a variable, but the remaining part is empty
         let n5 = "var1_";
         let expected5 = Some(("var1".to_string(), vec![]));
         assert_eq!(
-            parse_savile_row_name(&vars, &auxvars, n5).unwrap(),
+            parse_savile_row_name(&variables, &aux_variables, n5).unwrap(),
             expected5
         );
     }
