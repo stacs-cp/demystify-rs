@@ -40,9 +40,9 @@ pub fn parse_savile_row_name(
     for arg in splits {
         if !arg.is_empty() {
             let c = if let Some(strip) = arg.strip_prefix('n') {
-                -(strip.parse::<i32>()?)
+                -(strip.parse::<i64>()?)
             } else {
-                arg.parse::<i32>()?
+                arg.parse::<i64>()?
             };
             args.push(c);
         }
@@ -53,7 +53,6 @@ pub fn parse_savile_row_name(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustsat::instances::SatInstance;
     use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
@@ -71,14 +70,7 @@ mod tests {
         cons.insert("con1".to_string(), "test1".to_string());
         cons.insert("con2".to_string(), "test2".to_string());
 
-        let satinstance = SatInstance::new();
-
-        let dp = DimacsParse {
-            vars,
-            auxvars,
-            cons,
-            satinstance,
-        };
+        let dp = DimacsParse::new_from_eprime(vars, auxvars, cons);
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_1_2_3";

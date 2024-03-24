@@ -2,7 +2,7 @@ use anyhow::bail;
 use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, SatInstance};
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use std::fs;
 use std::io::prelude::*;
@@ -11,18 +11,109 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
-use tracing::info;
+use tracing::{debug, info};
 
 use std::fs::File;
 use std::io;
 
-use crate::problem::Lit;
+use crate::problem::{Lit, VarID};
 
+use super::ConID;
+
+/// Represents the result of parsing a DIMACS file.
 pub struct DimacsParse {
+    /// The set of variables in the DIMACS file.
     pub vars: BTreeSet<String>,
+    /// The set of auxiliary variables in the DIMACS file.
     pub auxvars: BTreeSet<String>,
+    /// The constraints in the DIMACS file, represented as a mapping from constraint name to constraint expression.
     pub cons: BTreeMap<String, String>,
+    /// The SAT instance parsed from the DIMACS file.
     pub satinstance: SatInstance,
+    /// A mapping from literals in the direct representation to their corresponding SAT integer.
+    pub litmap: HashMap<Lit, i64>,
+    /// A mapping from each variable to its domain
+    pub domainmap: HashMap<VarID, BTreeSet<i64>>,
+    /// A mapping from literals in the order representation to their corresponding SAT integer.
+    pub ordervarmap: HashMap<Lit, i64>,
+    /// A mapping from SAT integers to the direct representation.
+    pub invlitmap: HashMap<i64, Lit>,
+    /// List of all constraints in the problem
+    pub conset: BTreeSet<ConID>,
+}
+
+impl DimacsParse {
+    pub fn new_from_eprime(
+        vars: BTreeSet<String>,
+        auxvars: BTreeSet<String>,
+        cons: BTreeMap<String, String>,
+    ) -> DimacsParse {
+        DimacsParse {
+            vars: vars,
+            auxvars,
+            cons,
+            satinstance: SatInstance::new(),
+            litmap: HashMap::new(),
+            domainmap: HashMap::new(),
+            ordervarmap: HashMap::new(),
+            invlitmap: HashMap::new(),
+            conset: BTreeSet::new(),
+        }
+    }
+
+    fn finalise(&mut self) -> anyhow::Result<()> {
+        for (key, value) in &self.litmap {
+            assert!(!self.invlitmap.contains_key(value));
+            self.invlitmap.insert(*value, key.clone());
+        }
+
+        for (lit, _) in &self.litmap {
+            let var_id = lit.var();
+            assert!(lit.sign());
+            self.domainmap
+                .entry(var_id)
+                .or_insert_with(BTreeSet::new)
+                .insert(lit.val());
+        }
+
+        let mut usedconstraintnames: HashSet<String> = HashSet::new();
+
+        // Tidy up and check constraints
+        for (varid, vals) in &self.domainmap {
+            if let Some(template_string) = self.cons.get(varid.name()) {
+                debug!(target: "parser", "Found {:?} in constraint {:?}", varid, varid.name());
+
+                if !vals.contains(&0) {
+                    bail!(format!("CON {:?} cannot be made false", varid));
+                }
+
+                if !vals.contains(&1) {
+                    bail!(format!("CON {:?} cannot be made true", varid));
+                }
+
+                if !vals.len() != 2 {
+                    bail!(format!("CON {:?} domain is not (0,1)", varid));
+                }
+
+                // TODO: Complete template
+                let constraintname = format!("{:?} in {:?}", template_string, varid);
+
+                // Check is we have used this name before
+                if usedconstraintnames.contains(&constraintname) {
+                    bail!(format!("CON name {:?} used twice", constraintname))
+                }
+                usedconstraintnames.insert(constraintname.clone());
+
+                // TODO: Skip constraints which are already parsed,
+                // or trivial (parse.py 270 -- 291)
+
+                self.conset
+                    .insert(ConID::new(Lit::new_eq_val(varid, 1), constraintname));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
@@ -33,9 +124,8 @@ fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
 
     let mut cons: BTreeMap<String, String> = BTreeMap::new();
 
-    let satinstance = instances::SatInstance::<BasicVarManager>::from_dimacs_path(in_path)?;
-
-    let conmatch = Regex::new(r#"\$\#CON (.*) \"(.*)\""#).unwrap();
+    let conmatch = Regex::new(r#"\$#CON (.*) \"(.*)\""#).unwrap();
+    println!("{:?}", conmatch);
 
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
@@ -43,24 +133,25 @@ fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
     for line in reader.lines() {
         let line = line?;
         if line.contains("$#") {
+            debug!(target: "parser", "line {:?}", line);
             let parts: Vec<&str> = line.split_whitespace().collect();
 
             if line.starts_with("$#VAR") {
                 let v = parts[1].to_string();
-                println!("Found VAR: '{}'", v);
+                info!(target: "parser", "Found VAR: '{}'", v);
 
                 if vars.contains(&v) || auxvars.contains(&v) {
                     bail!(format!("variable {} defined twice", v));
                 }
                 vars.insert(v);
             } else if line.starts_with("$#CON") {
-                println!("{}", line);
+                info!(target: "parser", "{}", line);
                 let captures = conmatch.captures(&line).unwrap();
 
                 let con_name = captures.get(1).unwrap().as_str().to_string();
                 let con_value = captures.get(2).unwrap().as_str().to_string();
 
-                println!("Found CON: '{}' '{}'", con_name, con_value);
+                info!(target: "parser", "Found CON: '{}' '{}'", con_name, con_value);
 
                 if cons.contains_key(&con_name) {
                     bail!(format!("{} defined twice", con_name));
@@ -78,23 +169,16 @@ fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
         }
     }
 
-    Ok(DimacsParse {
-        vars,
-        auxvars,
-        cons,
-        satinstance,
-    })
+    info!(target: "parser", "Names parsed from ESSENCE': vars: {:?} auxvars: {:?} cons {:?}", vars, auxvars, cons);
+    Ok(DimacsParse::new_from_eprime(vars, auxvars, cons))
 }
 
-fn read_dimacs(in_path: &PathBuf, dimacs: &DimacsParse) -> anyhow::Result<()> {
+fn read_dimacs(in_path: &PathBuf, dimacs: &mut DimacsParse) -> anyhow::Result<()> {
     let dvarmatch = Regex::new(r"c Var '(.*)' direct represents '(.*)' with '(.*)'").unwrap();
     let ovarmatch = Regex::new(r"c Var '(.*)' order represents '(.*)' with '(.*)'").unwrap();
 
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
-
-    let mut varmap: HashMap<Lit, i32> = HashMap::new();
-    let mut ordervarmap: HashMap<Lit, i32> = HashMap::new();
 
     for line in reader.lines() {
         let line = line?;
@@ -105,30 +189,36 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &DimacsParse) -> anyhow::Result<()> {
                 bail!("Failed to parse '{:?}'", line);
             }
 
-            let (fillmap, match_) = if let Some(dmatch) = dmatch {
-                (&mut varmap, dmatch)
+            if let Some(match_) = dmatch {
+                if !match_[1].starts_with("aux") {
+                    let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
+
+                    if let Some(varid) = varid {
+                        let lit = Lit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        dimacs.litmap.insert(lit, match_[3].parse::<i64>().unwrap());
+                    }
+                }
             } else {
-                (&mut ordervarmap, omatch.unwrap())
-            };
+                let match_ = omatch.unwrap();
+                info!(target: "parser", "matches: {:?}", match_);
+                if !match_[1].starts_with("aux") {
+                    let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
-            if !match_[1].starts_with("aux") {
-                let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
-
-                if let Some(varid) = varid {
-                    let lit = Lit::new_eq_val(&varid, match_[2].parse::<i32>().unwrap());
-                    fillmap.insert(lit, match_[3].parse::<i32>().unwrap());
+                    if let Some(varid) = varid {
+                        let lit = Lit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        dimacs
+                            .ordervarmap
+                            .insert(lit, match_[3].parse::<i64>().unwrap());
+                    }
                 }
             }
         }
     }
-
-    println!("{:?}", varmap);
-
     Ok(())
 }
 
 pub fn parse_essence(eprime: &str, eprimeparam: &str) -> anyhow::Result<()> {
-    //let mut varmap = HashMap::new();
+    //let mut litmap = HashMap::new();
     //let mut varlist = Vec::new();
 
     let tdir = TempDir::new().unwrap();
@@ -223,9 +313,17 @@ pub fn parse_essence(eprime: &str, eprimeparam: &str) -> anyhow::Result<()> {
         );
     }
 
-    let in_path = PathBuf::from(finaleprimeparam + ".dimacs");
+    let in_eprime_path = PathBuf::from(&finaleprime);
 
-    let _eprimeparse = parse_eprime(&in_path)?;
+    let in_dimacs_path = PathBuf::from(finaleprimeparam + ".dimacs");
 
+    let mut eprimeparse = parse_eprime(&in_eprime_path)?;
+
+    eprimeparse.satinstance =
+        instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)?;
+
+    read_dimacs(&in_dimacs_path, &mut eprimeparse)?;
+
+    eprimeparse.finalise();
     Ok(())
 }
