@@ -1,13 +1,13 @@
 use anyhow::bail;
 use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, SatInstance};
-use serde_json::Value;
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::env;
+
 use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::path::Path;
+
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
@@ -43,7 +43,7 @@ fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
     for line in reader.lines() {
         let line = line?;
         if line.contains("$#") {
-            let parts: Vec<&str> = line.trim().split_whitespace().collect();
+            let parts: Vec<&str> = line.split_whitespace().collect();
 
             if line.starts_with("$#VAR") {
                 let v = parts[1].to_string();
@@ -112,7 +112,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &DimacsParse) -> anyhow::Result<()> {
             };
 
             if !match_[1].starts_with("aux") {
-                let varid = crate::problem::util::parse_savile_row_name(&dimacs, &match_[1])?;
+                let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                 if let Some(varid) = varid {
                     let lit = Lit::new_eq_val(&varid, match_[2].parse::<i32>().unwrap());
@@ -225,7 +225,7 @@ pub fn parse_essence(eprime: &str, eprimeparam: &str) -> anyhow::Result<()> {
 
     let in_path = PathBuf::from(finaleprimeparam + ".dimacs");
 
-    let eprimeparse = parse_eprime(&in_path)?;
+    let _eprimeparse = parse_eprime(&in_path)?;
 
     Ok(())
 }

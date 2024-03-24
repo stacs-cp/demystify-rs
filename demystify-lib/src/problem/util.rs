@@ -1,6 +1,5 @@
 use super::{parse::DimacsParse, VarID};
 use anyhow::bail;
-use std::collections::{BTreeMap, BTreeSet};
 
 pub fn parse_savile_row_name(
     dimacs: &DimacsParse,
@@ -36,12 +35,12 @@ pub fn parse_savile_row_name(
 
     let n = &n[name.len() + 1..];
 
-    let splits: Vec<&str> = n.split("_").collect();
+    let splits: Vec<&str> = n.split('_').collect();
     let mut args = Vec::new();
     for arg in splits {
         if !arg.is_empty() {
-            let c = if arg.starts_with("n") {
-                -1 * arg[1..].parse::<i32>()?
+            let c = if let Some(strip) = arg.strip_prefix('n') {
+                -(strip.parse::<i32>()?)
             } else {
                 arg.parse::<i32>()?
             };
@@ -53,9 +52,9 @@ pub fn parse_savile_row_name(
 
 #[cfg(test)]
 mod tests {
-    use rustsat::instances::SatInstance;
-
     use super::*;
+    use rustsat::instances::SatInstance;
+    use std::collections::{BTreeMap, BTreeSet};
 
     #[test]
     fn test_parse_savile_row_name() {
