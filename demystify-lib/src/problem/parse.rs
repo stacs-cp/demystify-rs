@@ -20,15 +20,21 @@ use crate::problem::{Lit, VarID};
 
 use super::ConID;
 
+#[derive(Debug)]
+pub struct EPrimeAnnotations {
+    /// The set of variables in the Essence' file.
+    pub vars: BTreeSet<String>,
+    /// The set of auxiliary variables in the Essence'file.
+    pub auxvars: BTreeSet<String>,
+    /// The constraints in the Essence' file, represented as a mapping from constraint name to constraint expression.
+    pub cons: BTreeMap<String, String>,
+}
 /// Represents the result of parsing a DIMACS file.
+
 #[derive(Debug)]
 pub struct DimacsParse {
-    /// The set of variables in the DIMACS file.
-    pub vars: BTreeSet<String>,
-    /// The set of auxiliary variables in the DIMACS file.
-    pub auxvars: BTreeSet<String>,
-    /// The constraints in the DIMACS file, represented as a mapping from constraint name to constraint expression.
-    pub cons: BTreeMap<String, String>,
+    /// The annotations from the Essence' file
+    pub eprime: EPrimeAnnotations,
     /// The SAT instance parsed from the DIMACS file.
     pub satinstance: SatInstance,
     /// A mapping from literals in the direct representation to their corresponding SAT integer.
@@ -50,9 +56,11 @@ impl DimacsParse {
         cons: BTreeMap<String, String>,
     ) -> DimacsParse {
         DimacsParse {
-            vars,
-            auxvars,
-            cons,
+            eprime: EPrimeAnnotations {
+                vars,
+                auxvars,
+                cons,
+            },
             satinstance: SatInstance::new(),
             litmap: HashMap::new(),
             domainmap: HashMap::new(),
@@ -80,7 +88,7 @@ impl DimacsParse {
 
         // Tidy up and check constraints
         for (varid, vals) in &self.domainmap {
-            if let Some(template_string) = self.cons.get(varid.name()) {
+            if let Some(template_string) = self.eprime.cons.get(varid.name()) {
                 debug!(target: "parser", "Found {:?} in constraint {:?}", varid, varid.name());
 
                 if !vals.contains(&0) {

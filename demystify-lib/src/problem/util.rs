@@ -7,13 +7,23 @@ pub fn parse_savile_row_name(
     //    auxvars: &BTreeSet<String>,
     n: &str,
 ) -> anyhow::Result<Option<VarID>> {
-    let mut matches: Vec<&String> = dimacs.vars.iter().filter(|&v| n.starts_with(v)).collect();
-    let conmatch: Vec<&String> = dimacs.cons.keys().filter(|&v| n.starts_with(v)).collect();
+    let mut matches: Vec<&String> = dimacs
+        .eprime
+        .vars
+        .iter()
+        .filter(|&v| n.starts_with(v))
+        .collect();
+    let conmatch: Vec<&String> = dimacs
+        .eprime
+        .cons
+        .keys()
+        .filter(|&v| n.starts_with(v))
+        .collect();
 
     matches.extend(conmatch);
 
     if matches.is_empty() {
-        if !dimacs.auxvars.iter().any(|v| n.starts_with(v)) {
+        if !dimacs.eprime.auxvars.iter().any(|v| n.starts_with(v)) {
             bail!("{} is not defined -- should it be AUX?", n);
         }
         return Ok(None);
