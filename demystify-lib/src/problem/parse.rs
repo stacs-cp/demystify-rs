@@ -50,7 +50,7 @@ impl DimacsParse {
         cons: BTreeMap<String, String>,
     ) -> DimacsParse {
         DimacsParse {
-            vars: vars,
+            vars,
             auxvars,
             cons,
             satinstance: SatInstance::new(),
@@ -63,18 +63,17 @@ impl DimacsParse {
     }
 
     fn finalise(&mut self) -> anyhow::Result<()> {
+        // Set up inverse of 'litmap', mapping from integers to Lit objects
         for (key, value) in &self.litmap {
             assert!(!self.invlitmap.contains_key(value));
             self.invlitmap.insert(*value, key.clone());
         }
 
-        for (lit, _) in &self.litmap {
+        // Get the domain of each variable quickly
+        for lit in self.litmap.keys() {
             let var_id = lit.var();
             assert!(lit.sign());
-            self.domainmap
-                .entry(var_id)
-                .or_insert_with(BTreeSet::new)
-                .insert(lit.val());
+            self.domainmap.entry(var_id).or_default().insert(lit.val());
         }
 
         let mut usedconstraintnames: HashSet<String> = HashSet::new();
