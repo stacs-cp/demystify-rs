@@ -1,6 +1,7 @@
 use anyhow::bail;
 use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, SatInstance};
+use rustsat::types::Lit;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -38,13 +39,13 @@ pub struct PuzzleParse {
     /// The SAT instance parsed from the DIMACS file.
     pub satinstance: SatInstance,
     /// A mapping from literals in the direct representation to their corresponding SAT integer.
-    pub litmap: HashMap<PuzLit, i64>,
+    pub litmap: HashMap<PuzLit, Lit>,
     /// A mapping from SAT integers to the direct representation.
-    pub invlitmap: HashMap<i64, BTreeSet<PuzLit>>,
+    pub invlitmap: HashMap<Lit, BTreeSet<PuzLit>>,
     /// A mapping from each variable to its domain
     pub domainmap: HashMap<PuzVar, BTreeSet<i64>>,
     /// A mapping from literals in the order representation to their corresponding SAT integer.
-    pub ordervarmap: HashMap<PuzLit, i64>,
+    pub ordervarmap: HashMap<PuzLit, Lit>,
     /// List of all constraints in the problem
     pub conset: BTreeSet<ConID>,
 }
@@ -74,7 +75,7 @@ impl PuzzleParse {
         {
             let mut newlitmap = HashMap::new();
             // Make sure 'litmap' contains both positive and negative version of every problem literal
-            for (key, value) in &self.litmap {
+            for (key, &value) in &self.litmap {
                 if let Some(&val) = self.litmap.get(&key.neg()) {
                     if val != -value {
                         bail!(
@@ -223,25 +224,28 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
             }
 
             if let Some(match_) = dmatch {
-                if !match_[1].starts_with("aux") {
+                let litval = match_[3].parse::<i64>().unwrap();
+
+                if !match_[1].starts_with("aux") && litval != 9223372036854775807 {
+                    let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
-                        let lit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
-                        dimacs.litmap.insert(lit, match_[3].parse::<i64>().unwrap());
+                        let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        dimacs.litmap.insert(puzlit, satlit);
                     }
                 }
             } else {
                 let match_ = omatch.unwrap();
+                let litval = match_[3].parse::<i64>().unwrap();
                 info!(target: "parser", "matches: {:?}", match_);
-                if !match_[1].starts_with("aux") {
+                if !match_[1].starts_with("aux") && litval != 9223372036854775807 {
+                    let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
-                        let lit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
-                        dimacs
-                            .ordervarmap
-                            .insert(lit, match_[3].parse::<i64>().unwrap());
+                        let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        dimacs.ordervarmap.insert(puzlit, satlit);
                     }
                 }
             }
