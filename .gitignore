@@ -8,3 +8,5 @@
 #/target
 demystify.trace
 .vscode
+*.dimacs
+*.minion
