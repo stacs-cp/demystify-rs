@@ -1,5 +1,5 @@
 use demystify_lib::problem;
-use std::fs::File;
+use std::{fs::File, path::PathBuf};
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan; // Add the missing import statement
 
@@ -18,7 +18,10 @@ fn main() -> anyhow::Result<()> {
             .init();
     }
 
-    let _ = problem::parse::parse_essence("eprime/binairo.eprime", "eprime/binairo-1.param")?;
+    let _ = problem::parse::parse_essence(
+        &PathBuf::from("eprime/binairo.eprime"),
+        &PathBuf::from("eprime/binairo-1.param"),
+    )?;
 
     Ok(())
 }
