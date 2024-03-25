@@ -4,14 +4,14 @@ pub mod util;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct VarID {
+pub struct PuzVar {
     name: String,
     indices: Vec<i64>,
 }
 
-impl VarID {
-    pub fn new(name: &str, indices: Vec<i64>) -> VarID {
-        VarID {
+impl PuzVar {
+    pub fn new(name: &str, indices: Vec<i64>) -> PuzVar {
+        PuzVar {
             name: name.to_string(),
             indices,
         }
@@ -23,30 +23,30 @@ impl VarID {
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Lit {
-    var: VarID,
+pub struct PuzLit {
+    var: PuzVar,
     val: i64,
     equal: bool,
 }
 
-impl Lit {
-    pub fn new_eq_val(var: &VarID, val: i64) -> Lit {
-        Lit {
+impl PuzLit {
+    pub fn new_eq_val(var: &PuzVar, val: i64) -> PuzLit {
+        PuzLit {
             var: var.clone(),
             val,
             equal: true,
         }
     }
 
-    pub fn new_neq_val(var: &VarID, val: i64) -> Lit {
-        Lit {
+    pub fn new_neq_val(var: &PuzVar, val: i64) -> PuzLit {
+        PuzLit {
             var: var.clone(),
             val,
             equal: false,
         }
     }
 
-    pub fn var(&self) -> VarID {
+    pub fn var(&self) -> PuzVar {
         self.var.clone()
     }
 
@@ -58,8 +58,8 @@ impl Lit {
         self.equal
     }
 
-    pub fn neg(&self) -> Lit {
-        Lit {
+    pub fn neg(&self) -> PuzLit {
+        PuzLit {
             var: self.var.clone(),
             val: self.val,
             equal: !self.equal,
@@ -69,26 +69,26 @@ impl Lit {
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConID {
-    pub lit: Lit,
+    pub lit: PuzLit,
     pub name: String,
 }
 
 impl ConID {
-    fn new(lit: Lit, name: String) -> ConID {
+    fn new(lit: PuzLit, name: String) -> ConID {
         ConID { lit, name }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Lit, VarID};
+    use super::{PuzLit, PuzVar};
     use std::sync::Arc;
 
     #[test]
     fn var() {
-        let v = VarID::new("v", vec![]);
-        let v2 = VarID::new("v", vec![2]);
-        let w = VarID::new("w", vec![]);
+        let v = PuzVar::new("v", vec![]);
+        let v2 = PuzVar::new("v", vec![2]);
+        let w = PuzVar::new("w", vec![]);
         assert_eq!(v, v);
         assert!(v != w);
         assert!(v2 != w);
@@ -97,11 +97,11 @@ mod tests {
 
     #[test]
     fn lit() {
-        let v = Arc::new(VarID::new("v", vec![]));
-        let w = Arc::new(VarID::new("w", vec![]));
-        let l = Lit::new_eq_val(&v, 2);
-        let nl = Lit::new_neq_val(&v, 2);
-        let lw = Lit::new_eq_val(&w, 2);
+        let v = Arc::new(PuzVar::new("v", vec![]));
+        let w = Arc::new(PuzVar::new("w", vec![]));
+        let l = PuzLit::new_eq_val(&v, 2);
+        let nl = PuzLit::new_neq_val(&v, 2);
+        let lw = PuzLit::new_eq_val(&w, 2);
         assert_eq!(l, l);
         assert_eq!(l, l.neg().neg());
         assert_eq!(l, nl.neg());

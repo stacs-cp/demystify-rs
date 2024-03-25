@@ -16,7 +16,7 @@ use tracing::{debug, info};
 use std::fs::File;
 use std::io;
 
-use crate::problem::{Lit, VarID};
+use crate::problem::{PuzLit, PuzVar};
 
 use super::ConID;
 
@@ -32,30 +32,30 @@ pub struct EPrimeAnnotations {
 /// Represents the result of parsing a DIMACS file.
 
 #[derive(Debug)]
-pub struct DimacsParse {
+pub struct PuzzleParse {
     /// The annotations from the Essence' file
     pub eprime: EPrimeAnnotations,
     /// The SAT instance parsed from the DIMACS file.
     pub satinstance: SatInstance,
     /// A mapping from literals in the direct representation to their corresponding SAT integer.
-    pub litmap: HashMap<Lit, i64>,
+    pub litmap: HashMap<PuzLit, i64>,
     /// A mapping from each variable to its domain
-    pub domainmap: HashMap<VarID, BTreeSet<i64>>,
+    pub domainmap: HashMap<PuzVar, BTreeSet<i64>>,
     /// A mapping from literals in the order representation to their corresponding SAT integer.
-    pub ordervarmap: HashMap<Lit, i64>,
+    pub ordervarmap: HashMap<PuzLit, i64>,
     /// A mapping from SAT integers to the direct representation.
-    pub invlitmap: HashMap<i64, Lit>,
+    pub invlitmap: HashMap<i64, PuzLit>,
     /// List of all constraints in the problem
     pub conset: BTreeSet<ConID>,
 }
 
-impl DimacsParse {
+impl PuzzleParse {
     pub fn new_from_eprime(
         vars: BTreeSet<String>,
         auxvars: BTreeSet<String>,
         cons: BTreeMap<String, String>,
-    ) -> DimacsParse {
-        DimacsParse {
+    ) -> PuzzleParse {
+        PuzzleParse {
             eprime: EPrimeAnnotations {
                 vars,
                 auxvars,
@@ -71,7 +71,7 @@ impl DimacsParse {
     }
 
     fn finalise(&mut self) -> anyhow::Result<()> {
-        // Set up inverse of 'litmap', mapping from integers to Lit objects
+        // Set up inverse of 'litmap', mapping from integers to PuzLit objects
         for (key, value) in &self.litmap {
             assert!(!self.invlitmap.contains_key(value));
             self.invlitmap.insert(*value, key.clone());
@@ -119,7 +119,7 @@ impl DimacsParse {
                 // or trivial (parse.py 270 -- 291)
 
                 self.conset
-                    .insert(ConID::new(Lit::new_eq_val(varid, 1), constraintname));
+                    .insert(ConID::new(PuzLit::new_eq_val(varid, 1), constraintname));
 
                 // TODO: Find the literals in every constraint
             }
@@ -129,7 +129,7 @@ impl DimacsParse {
     }
 }
 
-fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
+fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<PuzzleParse> {
     info!(target: "parser", "reading DIMACS {:?}", in_path);
 
     let mut vars: BTreeSet<String> = BTreeSet::new();
@@ -182,10 +182,10 @@ fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<DimacsParse> {
     }
 
     info!(target: "parser", "Names parsed from ESSENCE': vars: {:?} auxvars: {:?} cons {:?}", vars, auxvars, cons);
-    Ok(DimacsParse::new_from_eprime(vars, auxvars, cons))
+    Ok(PuzzleParse::new_from_eprime(vars, auxvars, cons))
 }
 
-fn read_dimacs(in_path: &PathBuf, dimacs: &mut DimacsParse) -> anyhow::Result<()> {
+fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()> {
     let dvarmatch = Regex::new(r"c Var '(.*)' direct represents '(.*)' with '(.*)'").unwrap();
     let ovarmatch = Regex::new(r"c Var '(.*)' order represents '(.*)' with '(.*)'").unwrap();
 
@@ -206,7 +206,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut DimacsParse) -> anyhow::Result<()
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
-                        let lit = Lit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        let lit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
                         dimacs.litmap.insert(lit, match_[3].parse::<i64>().unwrap());
                     }
                 }
@@ -217,7 +217,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut DimacsParse) -> anyhow::Result<()
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
-                        let lit = Lit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        let lit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
                         dimacs
                             .ordervarmap
                             .insert(lit, match_[3].parse::<i64>().unwrap());
@@ -229,7 +229,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut DimacsParse) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<DimacsParse> {
+pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
     //let mut litmap = HashMap::new();
     //let mut varlist = Vec::new();
 
