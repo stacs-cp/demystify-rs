@@ -1,4 +1,5 @@
 pub mod parse;
+pub mod solver;
 pub mod util;
 
 use serde::{Deserialize, Serialize};

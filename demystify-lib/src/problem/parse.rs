@@ -39,12 +39,12 @@ pub struct PuzzleParse {
     pub satinstance: SatInstance,
     /// A mapping from literals in the direct representation to their corresponding SAT integer.
     pub litmap: HashMap<PuzLit, i64>,
+    /// A mapping from SAT integers to the direct representation.
+    pub invlitmap: HashMap<i64, BTreeSet<PuzLit>>,
     /// A mapping from each variable to its domain
     pub domainmap: HashMap<PuzVar, BTreeSet<i64>>,
     /// A mapping from literals in the order representation to their corresponding SAT integer.
     pub ordervarmap: HashMap<PuzLit, i64>,
-    /// A mapping from SAT integers to the direct representation.
-    pub invlitmap: HashMap<i64, PuzLit>,
     /// List of all constraints in the problem
     pub conset: BTreeSet<ConID>,
 }
@@ -63,25 +63,46 @@ impl PuzzleParse {
             },
             satinstance: SatInstance::new(),
             litmap: HashMap::new(),
+            invlitmap: HashMap::new(),
             domainmap: HashMap::new(),
             ordervarmap: HashMap::new(),
-            invlitmap: HashMap::new(),
             conset: BTreeSet::new(),
         }
     }
 
     fn finalise(&mut self) -> anyhow::Result<()> {
+        {
+            let mut newlitmap = HashMap::new();
+            // Make sure 'litmap' contains both positive and negative version of every problem literal
+            for (key, value) in &self.litmap {
+                if let Some(&val) = self.litmap.get(&key.neg()) {
+                    if val != -value {
+                        bail!(
+                            "Malformed Savilerow DIMACS output: Issue with {:?}",
+                            (key, value)
+                        );
+                    }
+                } else {
+                    newlitmap.insert(key.neg(), -value);
+                }
+            }
+            self.litmap.extend(newlitmap.drain());
+        }
+
         // Set up inverse of 'litmap', mapping from integers to PuzLit objects
         for (key, value) in &self.litmap {
-            assert!(!self.invlitmap.contains_key(value));
-            self.invlitmap.insert(*value, key.clone());
+            self.invlitmap
+                .entry(*value)
+                .or_default()
+                .insert(key.clone());
         }
 
         // Get the domain of each variable quickly
         for lit in self.litmap.keys() {
             let var_id = lit.var();
-            assert!(lit.sign());
-            self.domainmap.entry(var_id).or_default().insert(lit.val());
+            if lit.sign() {
+                self.domainmap.entry(var_id).or_default().insert(lit.val());
+            }
         }
 
         let mut usedconstraintnames: HashSet<String> = HashSet::new();
@@ -340,6 +361,15 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
 
     eprimeparse.satinstance =
         instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)?;
+    for clause in eprimeparse.satinstance.clone().as_cnf().0.iter() {
+        print!("clause: {}", clause);
+        for c in clause {
+            print!("lit: {}", c);
+        }
+    }
+
+    print!("bonus: {}", rustsat::types::Lit::new(5, true));
+    print!("bonus: {}", rustsat::types::Lit::new(5, false));
 
     read_dimacs(&in_dimacs_path, &mut eprimeparse)?;
 

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod problem;
+pub mod satcore;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
