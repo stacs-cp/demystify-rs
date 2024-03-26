@@ -20,5 +20,6 @@ serde = { version = "1.0", features=["rc", "derive"]}
 serde_json = "1.0"
 regex = "1.0"
 tempfile = "3.10"
-rustsat = "0.4"
-rustsat-glucose = "0.2.4"
+rustsat = { path = "../../rustsat/rustsat" }
+rustsat-glucose = { path = "../../rustsat/glucose" }
+test-log = "0.2"

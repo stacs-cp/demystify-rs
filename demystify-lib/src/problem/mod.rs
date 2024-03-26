@@ -2,6 +2,8 @@ pub mod parse;
 pub mod solver;
 pub mod util;
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -23,11 +25,27 @@ impl PuzVar {
     }
 }
 
+impl fmt::Display for PuzVar {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{:?}", self.name, self.indices)
+    }
+}
+
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PuzLit {
     var: PuzVar,
     val: i64,
     equal: bool,
+}
+
+impl fmt::Display for PuzLit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.equal {
+            write!(f, "{}={}", self.var, self.val)
+        } else {
+            write!(f, "{}!={}", self.var, self.val)
+        }
+    }
 }
 
 impl PuzLit {

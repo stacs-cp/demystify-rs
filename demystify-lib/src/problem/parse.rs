@@ -19,8 +19,6 @@ use std::io;
 
 use crate::problem::{PuzLit, PuzVar};
 
-use super::ConID;
-
 #[derive(Debug)]
 pub struct EPrimeAnnotations {
     /// The set of variables in the Essence' file.
@@ -46,8 +44,14 @@ pub struct PuzzleParse {
     pub domainmap: HashMap<PuzVar, BTreeSet<i64>>,
     /// A mapping from literals in the order representation to their corresponding SAT integer.
     pub ordervarmap: HashMap<PuzLit, Lit>,
-    /// List of all constraints in the problem
-    pub conset: BTreeSet<ConID>,
+    /// List of all constraints in the problem, and their English-readable name
+    pub conset: BTreeMap<PuzLit, String>,
+    /// List of all literals in a VAR
+    pub varset_lits: BTreeSet<Lit>,
+    /// List of all literals which turn on CON
+    pub conset_lits: BTreeSet<Lit>,
+    /// List of all literals in an AUX
+    pub auxset_lits: BTreeSet<Lit>,
 }
 
 impl PuzzleParse {
@@ -67,7 +71,10 @@ impl PuzzleParse {
             invlitmap: HashMap::new(),
             domainmap: HashMap::new(),
             ordervarmap: HashMap::new(),
-            conset: BTreeSet::new(),
+            conset: BTreeMap::new(),
+            varset_lits: BTreeSet::new(),
+            conset_lits: BTreeSet::new(),
+            auxset_lits: BTreeSet::new(),
         }
     }
 
@@ -140,10 +147,25 @@ impl PuzzleParse {
                 // TODO: Skip constraints which are already parsed,
                 // or trivial (parse.py 270 -- 291)
 
-                self.conset
-                    .insert(ConID::new(PuzLit::new_eq_val(varid, 1), constraintname));
+                let lit = PuzLit::new_eq_val(varid, 1);
+                self.conset.insert(lit.clone(), constraintname);
+                self.conset_lits.insert(*self.litmap.get(&lit).unwrap());
 
                 // TODO: Find the literals in every constraint
+            }
+        }
+
+        for (puzlit, &lit) in &self.litmap {
+            let var = puzlit.var();
+            let name = var.name();
+            if self.eprime.vars.contains(name) {
+                self.varset_lits.insert(lit);
+            } else if self.eprime.auxvars.contains(name) {
+                self.auxset_lits.insert(lit);
+            } else if self.eprime.cons.contains_key(name) {
+                // constraints are specially dealt with above
+            } else {
+                bail!("Cannot indentify {:?}", puzlit);
             }
         }
 
@@ -365,15 +387,6 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
 
     eprimeparse.satinstance =
         instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)?;
-    for clause in eprimeparse.satinstance.clone().as_cnf().0.iter() {
-        print!("clause: {}", clause);
-        for c in clause {
-            print!("lit: {}", c);
-        }
-    }
-
-    print!("bonus: {}", rustsat::types::Lit::new(5, true));
-    print!("bonus: {}", rustsat::types::Lit::new(5, false));
 
     read_dimacs(&in_dimacs_path, &mut eprimeparse)?;
 
@@ -384,11 +397,9 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_parse_essence() {
-        let eprime_path = "./tst/binairo.eprime";
-        let eprimeparam_path = "./tst/binairo-1.param";
+    use test_log::test;
 
+    fn build_puzzleparse(eprime_path: &str, eprimeparam_path: &str) -> PuzzleParse {
         // Create temporary directory for test files
         let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
 
@@ -414,5 +425,33 @@ mod tests {
         temp_dir
             .close()
             .expect("Failed to clean up temporary directory");
+
+        result.unwrap()
+    }
+
+    #[test]
+    fn test_parse_essence_binairo() {
+        let eprime_path = "./tst/binairo.eprime";
+        let eprimeparam_path = "./tst/binairo-1.param";
+
+        build_puzzleparse(eprime_path, eprimeparam_path);
+    }
+
+    #[test]
+    fn test_parse_essence_little() {
+        let eprime_path = "./tst/little1.eprime";
+        let eprimeparam_path = "./tst/little1.param";
+
+        let puz = build_puzzleparse(eprime_path, eprimeparam_path);
+
+        assert_eq!(puz.eprime.vars.len(), 1);
+        assert_eq!(puz.eprime.cons.len(), 1);
+        assert_eq!(puz.eprime.auxvars.len(), 0);
+        // These next two may become '3' at some point, when we do better
+        // at rejecting useless constraints
+        assert_eq!(puz.conset.len(), 4);
+        assert_eq!(puz.conset_lits.len(), 4);
+        assert_eq!(puz.varset_lits.len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
+        assert_eq!(puz.auxset_lits.len(), 0);
     }
 }

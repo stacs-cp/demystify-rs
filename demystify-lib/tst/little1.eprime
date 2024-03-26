@@ -1,0 +1,20 @@
+language ESSENCE' 1.0
+
+given n: int
+
+letting ndim be int(1..n)
+letting ndim2 be int(1..n-2)
+
+
+$#VAR grid
+find grid: matrix indexed by [ndim] of ndim
+
+$#CON ordered "{a[0]}<{a[0]+1}"
+find ordered: matrix indexed by [ndim] of bool
+
+such that
+
+forAll i : int(1..n-1).
+ordered[i] -> (grid[i] < grid[i+1])
+
+,false->(forAll i: ndim. ordered[i])
