@@ -1,10 +1,9 @@
-use std::borrow::BorrowMut;
 use std::sync::{Arc, Mutex};
 
-use rustsat::instances::{Cnf, SatInstance};
+use rustsat::instances::Cnf;
 use rustsat::solvers::{Solve, SolveIncremental};
-use rustsat::types::Lit;
-use tracing::info; // Import the SolverTrait trait
+use rustsat::types::{Assignment, Lit};
+use tracing::info;
 
 pub type Solver = rustsat_glucose::core::Glucose;
 
@@ -34,15 +33,14 @@ impl SatCore {
         result
     }
 
-    pub fn assumption_solve_solution(&self, lits: &[Lit]) -> bool {
+    pub fn assumption_solve_solution(&self, lits: &[Lit]) -> Option<Assignment> {
         let mut solver = self.solver.lock().unwrap();
         let solve = solver.solve_assumps(lits).unwrap();
         let result = match solve {
-            rustsat::solvers::SolverResult::Sat => true,
-            rustsat::solvers::SolverResult::Unsat => false,
+            rustsat::solvers::SolverResult::Sat => Some(solver.full_solution().unwrap()),
+            rustsat::solvers::SolverResult::Unsat => None,
             rustsat::solvers::SolverResult::Interrupted => panic!(),
         };
-        panic!();
         info!(target: "solver", "Solution to {:?} is {:?}", lits, result);
         result
     }
@@ -52,8 +50,29 @@ impl SatCore {
         let solve = solver.solve_assumps(lits).unwrap();
         match solve {
             rustsat::solvers::SolverResult::Sat => None,
-            rustsat::solvers::SolverResult::Unsat => Some(solver.core().unwrap()),
+            rustsat::solvers::SolverResult::Unsat => {
+                Some(solver.core().unwrap().into_iter().map(|l| !l).collect())
+            }
             rustsat::solvers::SolverResult::Interrupted => panic!(),
         }
+    }
+
+    pub fn quick_mus(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
+        let mut core = self.assumption_solve_with_core(dbg!(lits))?;
+        // Need to make a copy for actually searching over
+        let core_clone = dbg!(&core).clone();
+        for lit in core_clone {
+            let location = core.iter().position(|&x| x == lit);
+            if let Some(location) = location {
+                let mut check_core = core.clone();
+                check_core.remove(location);
+                let candidate = self.assumption_solve_with_core(&dbg!(check_core));
+                if let Some(found) = candidate {
+                    core = dbg!(found);
+                }
+            }
+        }
+
+        Some(core)
     }
 }

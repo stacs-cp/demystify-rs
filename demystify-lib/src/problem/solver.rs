@@ -41,6 +41,13 @@ impl PuzzleSolver {
 
         satisfied
     }
+
+    fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
+        assert!(self.puzzleparse.varset_lits.contains(&lit));
+        let mut lits: Vec<Lit> = self.puzzleparse.conset_lits.iter().cloned().collect();
+        lits.push(lit);
+        self.satcore.quick_mus(&lits)
+    }
 }
 
 #[cfg(test)]
@@ -74,7 +81,7 @@ mod tests {
         let varlits = puz.get_unsatisfiable_varlits();
 
         assert_eq!(varlits.len(), 16);
-        for lit in varlits {
+        for &lit in &varlits {
             let puzlit = puz.lit_to_puzlit(lit);
             for p in puzlit {
                 let indices = p.var().indices;
@@ -84,6 +91,23 @@ mod tests {
                 assert_eq!(indices[0] == p.val(), !p.sign());
             }
         }
+
+        // Do a basic check we get a MUS for every varlit
+        for &lit in &varlits {
+            let mus = puz.get_var_mus_quick(lit);
+            assert!(mus.is_some());
+            print!("{:?} {:?}", lit, mus);
+            assert!(mus.unwrap().contains(&lit));
+        }
+
+        // Check their negations have no mus (this isn't always true,
+        // only for puzzles with only one solution)
+        for &lit in &varlits {
+            let lit = !lit;
+            let mus = puz.get_var_mus_quick(lit);
+            assert!(mus.is_none());
+        }
+
         // Clean up temporary directory
         temp_dir
             .close()
