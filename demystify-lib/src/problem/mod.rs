@@ -1,4 +1,5 @@
 pub mod parse;
+pub mod planner;
 pub mod solver;
 pub mod util;
 

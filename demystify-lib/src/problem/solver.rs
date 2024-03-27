@@ -9,6 +9,7 @@ use super::{parse::PuzzleParse, PuzLit};
 pub struct PuzzleSolver {
     satcore: SatCore,
     puzzleparse: PuzzleParse,
+    knownlits: Vec<Lit>,
 }
 
 impl PuzzleSolver {
@@ -17,6 +18,7 @@ impl PuzzleSolver {
         Ok(PuzzleSolver {
             satcore,
             puzzleparse,
+            knownlits: Vec::new(),
         })
     }
 
@@ -28,11 +30,14 @@ impl PuzzleSolver {
         self.puzzleparse.invlitmap.get(&lit).unwrap()
     }
 
-    fn get_unsatisfiable_varlits(&self) -> Vec<Lit> {
+    pub fn get_unsatisfiable_varlits(&self) -> Vec<Lit> {
         let mut satisfied = vec![];
 
+        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().cloned().collect();
+        litorig.extend_from_slice(&self.knownlits);
+
         for &lit in &self.puzzleparse.varset_lits {
-            let mut lits: Vec<Lit> = self.puzzleparse.conset_lits.iter().cloned().collect();
+            let mut lits = litorig.clone();
             lits.push(lit);
             if !self.satcore.assumption_solve(&lits) {
                 satisfied.push(lit);
@@ -42,9 +47,14 @@ impl PuzzleSolver {
         satisfied
     }
 
-    fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
+    pub fn add_known_lit(&mut self, lit: Lit) {
+        self.knownlits.push(lit);
+    }
+
+    pub fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
         let mut lits: Vec<Lit> = self.puzzleparse.conset_lits.iter().cloned().collect();
+        lits.extend_from_slice(&self.knownlits);
         lits.push(lit);
         self.satcore.quick_mus(&lits)
     }
