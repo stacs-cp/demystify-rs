@@ -49,6 +49,8 @@ impl PuzzleSolver {
 
     pub fn add_known_lit(&mut self, lit: Lit) {
         self.knownlits.push(lit);
+        // we could add the literal to the solver, but then it can't
+        // be backtracked.. but it might be faster! Investigate later.
         //self.satcore.add_lit(lit);
     }
 
