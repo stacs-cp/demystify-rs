@@ -60,9 +60,11 @@ impl PuzzleSolver {
         lits.extend(self.puzzleparse.conset_lits.iter());
         lits.push(lit);
         let mus = self.satcore.quick_mus(&lits);
-        mus.map(|m| m.into_iter()
-                    .filter(|x| self.puzzleparse.conset_lits.contains(x))
-                    .collect())
+        mus.map(|m| {
+            m.into_iter()
+                .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                .collect()
+        })
     }
 
     pub fn puzzleparse(&self) -> &PuzzleParse {

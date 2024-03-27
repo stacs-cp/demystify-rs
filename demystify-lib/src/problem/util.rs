@@ -1,5 +1,5 @@
 use super::{parse::PuzzleParse, PuzVar};
-use anyhow::bail;
+use anyhow::{bail, Context};
 
 pub fn parse_savile_row_name(
     dimacs: &PuzzleParse,
@@ -60,6 +60,18 @@ pub fn parse_savile_row_name(
     Ok(Some(PuzVar::new(&name, args)))
 }
 
+pub fn parse_constraint_name(
+    template: &str,
+    params: &serde_json::value::Value,
+    index: &Vec<i64>,
+) -> anyhow::Result<String> {
+    let mut context = tera::Context::new();
+    context.insert("index", index);
+    context.insert("params", params);
+    tera::Tera::one_off(template, &context, false)
+        .context("Could not parse description of variable or constraint")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,7 +92,9 @@ mod tests {
         cons.insert("con1".to_string(), "test1".to_string());
         cons.insert("con2".to_string(), "test2".to_string());
 
-        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons);
+        let params = serde_json::value::Value::Null;
+
+        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, params);
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_1_2_3";
@@ -122,6 +136,37 @@ mod tests {
         let n5 = "var1_";
         let expected5 = Some(PuzVar::new("var1", vec![]));
         assert_eq!(parse_savile_row_name(&dp, n5).unwrap(), expected5);
+    }
+
+    #[test]
+    fn test_parse_constraint_name() {
+        let params = serde_json::from_str(r#"{"a":1, "b": 2, "2":7, "3": {"2": 99}}"#).unwrap();
+        let index = vec![1, 2, 3];
+        let template = r#"Constraint {{ index }} with params {{ params.a }}"#;
+        let expected = "Constraint [1, 2, 3] with params 1";
+        assert_eq!(
+            parse_constraint_name(template, &params, &index).unwrap(),
+            expected
+        );
+        let template = r#"Constraint {{ index }} with params {{ params.a + 1 }}"#;
+        let expected = "Constraint [1, 2, 3] with params 2";
+        assert_eq!(
+            parse_constraint_name(template, &params, &index).unwrap(),
+            expected
+        );
+        let template = r#"Constraint {{ index }} with params {{ params.2 }}"#;
+        let expected = "Constraint [1, 2, 3] with params 7";
+        assert_eq!(
+            parse_constraint_name(template, &params, &index).unwrap(),
+            expected
+        );
+
+        let template = r#"Constraint {{ index }} with params {{ params.3.2 }}"#;
+        let expected = "Constraint [1, 2, 3] with params 99";
+        assert_eq!(
+            parse_constraint_name(template, &params, &index).unwrap(),
+            expected
+        );
     }
 }
 

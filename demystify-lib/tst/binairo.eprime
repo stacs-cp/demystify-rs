@@ -11,28 +11,28 @@ $ 0: black, 1: white, 2=empty
 $#VAR grid
 find grid: matrix indexed by [ndim, ndim] of bool
 
-$#CON rowwhite "row {a[0]} must be at least half white"
+$#CON rowwhite "row {{index[0]}} must be at least half white"
 find rowwhite: matrix indexed by [ndim] of bool
-$#CON rowblack "row {a[0]} must be at least half black"
+$#CON rowblack "row {{index[0]}} must be at least half black"
 find rowblack: matrix indexed by [ndim] of bool
-$#CON colwhite "col {a[0]} must be at least half white"
+$#CON colwhite "col {{index[0]}} must be at least half white"
 find colwhite: matrix indexed by [ndim] of bool
-$#CON colblack "col {a[0]} must be at least half black"
+$#CON colblack "col {{index[0]}} must be at least half black"
 find colblack: matrix indexed by [ndim] of bool
 
-$#CON rowmatchwhite "row {a[0]} cannot have three white starting at {a[1]}"
+$#CON rowmatchwhite "row {{index[0]}} cannot have three white starting at {{index[1]}}"
 find rowmatchwhite: matrix indexed by [ndim, ndim2] of bool
-$#CON rowmatchblack "row {a[0]} cannot have three black starting at {a[1]}"
+$#CON rowmatchblack "row {{index[0]}} cannot have three black starting at {{index[1]}}"
 find rowmatchblack: matrix indexed by [ndim, ndim2] of bool
-$#CON colmatchwhite "col {a[0]} cannot have three white starting at {a[1]}"
+$#CON colmatchwhite "col {{index[0]}} cannot have three white starting at {{index[1]}}"
 find colmatchwhite: matrix indexed by [ndim, ndim2] of bool
-$#CON colmatchblack "col {a[0]} cannot have three black starting at {a[1]}"
+$#CON colmatchblack "col {{index[0]}} cannot have three black starting at {{index[1]}}"
 find colmatchblack: matrix indexed by [ndim, ndim2] of bool
 
 
-$#CON alldiffrow "rows {a[0]} and {a[1]} must be different"
+$#CON alldiffrow "rows {{index[0]}} and {{index[1]}} must be different"
 find alldiffrow: matrix indexed by [ndim, ndim] of bool
-$#CON alldiffcol "cols {a[0]} and {a[1]} must be different"
+$#CON alldiffcol "cols {{index[0]}} and {{index[1]}} must be different"
 find alldiffcol: matrix indexed by [ndim, ndim] of bool
 
 such that

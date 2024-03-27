@@ -9,7 +9,7 @@ letting ndim2 be int(1..n-2)
 $#VAR grid
 find grid: matrix indexed by [ndim] of ndim
 
-$#CON ordered "{a[0]}<{a[0]+1}"
+$#CON ordered "{{index[0]}}<{{index[0]+1}}"
 find ordered: matrix indexed by [ndim] of bool
 
 such that

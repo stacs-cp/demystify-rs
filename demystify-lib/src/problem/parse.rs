@@ -1,4 +1,4 @@
-use anyhow::bail;
+use anyhow::{bail, Context};
 use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, SatInstance};
 use rustsat::types::Lit;
@@ -17,6 +17,7 @@ use tracing::{debug, info};
 use std::fs::File;
 use std::io;
 
+use crate::problem::util::parse_constraint_name;
 use crate::problem::{PuzLit, PuzVar};
 
 #[derive(Debug)]
@@ -27,6 +28,8 @@ pub struct EPrimeAnnotations {
     pub auxvars: BTreeSet<String>,
     /// The constraints in the Essence' file, represented as a mapping from constraint name to constraint expression.
     pub cons: BTreeMap<String, String>,
+    // The parameters read from the param file
+    pub params: serde_json::value::Value,
 }
 /// Represents the result of parsing a DIMACS file.
 
@@ -59,12 +62,14 @@ impl PuzzleParse {
         vars: BTreeSet<String>,
         auxvars: BTreeSet<String>,
         cons: BTreeMap<String, String>,
+        params: serde_json::value::Value,
     ) -> PuzzleParse {
         PuzzleParse {
             eprime: EPrimeAnnotations {
                 vars,
                 auxvars,
                 cons,
+                params,
             },
             satinstance: SatInstance::new(),
             litmap: HashMap::new(),
@@ -135,8 +140,8 @@ impl PuzzleParse {
                     ));
                 }
 
-                // TODO: Complete template
-                let constraintname = format!("{:?} in {:?}", template_string, varid);
+                let constraintname =
+                    parse_constraint_name(&template_string, &self.eprime.params, &varid.indices)?;
 
                 // Check is we have used this name before
                 if usedconstraintnames.contains(&constraintname) {
@@ -191,7 +196,7 @@ impl PuzzleParse {
     }
 }
 
-fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<PuzzleParse> {
+fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
     info!(target: "parser", "reading DIMACS {:?}", in_path);
 
     let mut vars: BTreeSet<String> = BTreeSet::new();
@@ -244,7 +249,11 @@ fn parse_eprime(in_path: &PathBuf) -> anyhow::Result<PuzzleParse> {
     }
 
     info!(target: "parser", "Names parsed from ESSENCE': vars: {:?} auxvars: {:?} cons {:?}", vars, auxvars, cons);
-    Ok(PuzzleParse::new_from_eprime(vars, auxvars, cons))
+
+    // Read parameters in as a JSON object
+    let params = read_essence_param(eprimeparam)?;
+
+    Ok(PuzzleParse::new_from_eprime(vars, auxvars, cons, params))
 }
 
 fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()> {
@@ -299,35 +308,6 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
     //let mut varlist = Vec::new();
 
     let tdir = TempDir::new().unwrap();
-
-    // Read parameters in as a JSON object
-    let params: serde_json::Value = if eprimeparam.ends_with(".json") {
-        info!(target: "parser", "Reading params {:?} as json", eprimeparam);
-        let file = fs::File::open(eprimeparam).unwrap();
-        let reader = BufReader::new(file);
-        serde_json::from_reader(reader).unwrap()
-    } else {
-        info!(target: "parser", "Reading params {:?} as conjure param", eprimeparam);
-        let output = Command::new("conjure")
-            .arg("pretty")
-            .arg("--output-format")
-            .arg("json")
-            .arg(eprimeparam)
-            .output()
-            .expect("Failed to execute command");
-
-        if !output.status.success() {
-            bail!(format!(
-                "Conjure pretty-printing of params failed\n{}\n{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        serde_json::from_slice(&output.stdout).unwrap()
-    };
-
-    info!(target: "parser", "Read params {:?}", params);
 
     let finaleprime: PathBuf;
     let finaleprimeparam: PathBuf;
@@ -401,7 +381,7 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
     // Need to put '.dimacs' on the end in this slightly horrible way.
     let in_dimacs_path = PathBuf::from(finaleprimeparam.to_str().unwrap().to_owned() + ".dimacs");
 
-    let mut eprimeparse = parse_eprime(&in_eprime_path)?;
+    let mut eprimeparse = parse_eprime(&in_eprime_path, &finaleprimeparam)?;
 
     eprimeparse.satinstance =
         instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)?;
@@ -410,6 +390,34 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
 
     eprimeparse.finalise()?;
     Ok(eprimeparse)
+}
+
+fn read_essence_param(eprimeparam: &PathBuf) -> anyhow::Result<serde_json::value::Value> {
+    if eprimeparam.ends_with(".json") {
+        info!(target: "parser", "Reading params {:?} as json", eprimeparam);
+        let file = fs::File::open(eprimeparam).unwrap();
+        let reader = BufReader::new(file);
+        serde_json::from_reader(reader).context("Failed reading json param file")
+    } else {
+        info!(target: "parser", "Reading params {:?} as conjure param", eprimeparam);
+        let output = Command::new("conjure")
+            .arg("pretty")
+            .arg("--output-format")
+            .arg("json")
+            .arg(eprimeparam)
+            .output()
+            .expect("Failed to execute command");
+
+        if !output.status.success() {
+            bail!(format!(
+                "Conjure pretty-printing of params failed\n{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        serde_json::from_slice(&output.stdout).context("Failed to parse JSON produced by conjure")
+    }
 }
 
 #[cfg(test)]
