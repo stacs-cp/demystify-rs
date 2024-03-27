@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rustsat::types::Lit;
 
-use super::solver::PuzzleSolver;
+use super::{parse::PuzzleParse, solver::PuzzleSolver};
 
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
@@ -39,5 +39,41 @@ impl PuzzlePlanner {
             solvesteps.extend(muses);
         }
         solvesteps
+    }
+
+    fn puzzle(&self) -> &PuzzleParse {
+        self.psolve.puzzleparse()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::problem::{planner::PuzzlePlanner, solver::PuzzleSolver};
+    use test_log::test;
+
+    #[test]
+    fn test_parse_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let sequence = plan.quick_solve();
+
+        assert_eq!(sequence.len(), 16);
+
+        for (lit, cons) in sequence {
+            assert!(plan.puzzle().lit_is_var(&lit));
+            assert!(cons.iter().all(|x| plan.puzzle().lit_is_con(x)));
+            println!("{:?}", plan.puzzle().lit_to_vars(&lit));
+            // It should be trivial to prove we only need one
+            // constraint here, but MUS algorithms be tricky, if
+            // this next line starts failing, it can be commented out.
+            assert_eq!(cons.len(), 1);
+        }
     }
 }

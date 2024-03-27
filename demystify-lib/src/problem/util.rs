@@ -124,3 +124,43 @@ mod tests {
         assert_eq!(parse_savile_row_name(&dp, n5).unwrap(), expected5);
     }
 }
+
+#[cfg(test)]
+pub mod test_utils {
+    use std::fs;
+
+    use crate::problem::parse::{parse_essence, PuzzleParse};
+
+    // Here we put some utility functions used in various places
+    pub fn build_puzzleparse(eprime_path: &str, eprimeparam_path: &str) -> PuzzleParse {
+        // Create temporary directory for test files
+        let eprime_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprime_path;
+        let eprimeparam_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprimeparam_path;
+        let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
+
+        // Copy eprime file to temporary directory
+        let temp_eprime_path = temp_dir.path().join("binairo.eprime");
+        fs::copy(dbg!(eprime_path), &temp_eprime_path).expect("Failed to copy eprime file");
+
+        // Copy eprimeparam file to temporary directory
+        let temp_eprimeparam_path = temp_dir.path().join("binairo-1.param");
+        fs::copy(dbg!(eprimeparam_path), &temp_eprimeparam_path)
+            .expect("Failed to copy eprimeparam file");
+
+        // Call parse_essence function
+        let result = parse_essence(&temp_eprime_path, &temp_eprimeparam_path);
+
+        if result.is_err() {
+            panic!("Bad parse: {:?}", result);
+        }
+        // Assert that the function returns Ok
+        assert!(result.is_ok());
+
+        // Clean up temporary directory
+        temp_dir
+            .close()
+            .expect("Failed to clean up temporary directory");
+
+        result.unwrap()
+    }
+}

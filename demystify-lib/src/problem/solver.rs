@@ -13,7 +13,7 @@ pub struct PuzzleSolver {
 }
 
 impl PuzzleSolver {
-    fn new(puzzleparse: PuzzleParse) -> anyhow::Result<PuzzleSolver> {
+    pub fn new(puzzleparse: PuzzleParse) -> anyhow::Result<PuzzleSolver> {
         let satcore = SatCore::new(puzzleparse.satinstance.clone().as_cnf().0)?;
         Ok(PuzzleSolver {
             satcore,
@@ -49,42 +49,42 @@ impl PuzzleSolver {
 
     pub fn add_known_lit(&mut self, lit: Lit) {
         self.knownlits.push(lit);
+        //self.satcore.add_lit(lit);
     }
 
     pub fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
-        let mut lits: Vec<Lit> = self.puzzleparse.conset_lits.iter().cloned().collect();
-        lits.extend_from_slice(&self.knownlits);
+        let mut lits: Vec<Lit> = self.knownlits.clone();
+        lits.extend(self.puzzleparse.conset_lits.iter());
         lits.push(lit);
-        self.satcore.quick_mus(&lits)
+        let mus = self.satcore.quick_mus(&lits);
+        if let Some(m) = mus {
+            Some(
+                m.into_iter()
+                    .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                    .collect(),
+            )
+        } else {
+            None
+        }
+    }
+
+    pub fn puzzleparse(&self) -> &PuzzleParse {
+        &self.puzzleparse
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::problem::{parse::parse_essence, solver::PuzzleSolver};
-    use std::fs;
+    use crate::problem::solver::PuzzleSolver;
     use test_log::test;
 
     #[test]
     fn test_parse_essence() {
-        let eprime_path = "./tst/little1.eprime";
-        let eprimeparam_path = "./tst/little1.param";
-
-        // Create temporary directory for test files
-        let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
-
-        // Copy eprime file to temporary directory
-        let temp_eprime_path = temp_dir.path().join("little1.eprime");
-        fs::copy(eprime_path, &temp_eprime_path).expect("Failed to copy eprime file");
-
-        // Copy eprimeparam file to temporary directory
-        let temp_eprimeparam_path = temp_dir.path().join("little1.param");
-        fs::copy(eprimeparam_path, &temp_eprimeparam_path)
-            .expect("Failed to copy eprimeparam file");
-
-        // Call parse_essence function
-        let result = parse_essence(&temp_eprime_path, &temp_eprimeparam_path).unwrap();
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        );
 
         let puz = PuzzleSolver::new(result).unwrap();
 
@@ -107,7 +107,6 @@ mod tests {
             let mus = puz.get_var_mus_quick(lit);
             assert!(mus.is_some());
             print!("{:?} {:?}", lit, mus);
-            assert!(mus.unwrap().contains(&lit));
         }
 
         // Check their negations have no mus (this isn't always true,
@@ -117,10 +116,5 @@ mod tests {
             let mus = puz.get_var_mus_quick(lit);
             assert!(mus.is_none());
         }
-
-        // Clean up temporary directory
-        temp_dir
-            .close()
-            .expect("Failed to clean up temporary directory");
     }
 }

@@ -72,7 +72,17 @@ impl SatCore {
                 }
             }
         }
-
         Some(core)
+    }
+
+    pub fn add_lits(&self, lits: &[Lit]) {
+        let mut solver = self.solver.lock().unwrap();
+        for &l in lits {
+            (*solver).add_unit(l).unwrap();
+        }
+    }
+
+    pub fn add_lit(&self, lits: Lit) {
+        self.add_lits(&[lits]);
     }
 }

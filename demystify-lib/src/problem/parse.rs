@@ -45,7 +45,7 @@ pub struct PuzzleParse {
     /// A mapping from literals in the order representation to their corresponding SAT integer.
     pub ordervarmap: HashMap<PuzLit, Lit>,
     /// List of all constraints in the problem, and their English-readable name
-    pub conset: BTreeMap<PuzLit, String>,
+    pub conset: BTreeMap<Lit, String>,
     /// List of all literals in a VAR
     pub varset_lits: BTreeSet<Lit>,
     /// List of all literals which turn on CON
@@ -147,9 +147,10 @@ impl PuzzleParse {
                 // TODO: Skip constraints which are already parsed,
                 // or trivial (parse.py 270 -- 291)
 
-                let lit = PuzLit::new_eq_val(varid, 1);
+                let puzlit = PuzLit::new_eq_val(varid, 1);
+                let lit = *self.litmap.get(&puzlit).unwrap();
                 self.conset.insert(lit.clone(), constraintname);
-                self.conset_lits.insert(*self.litmap.get(&lit).unwrap());
+                self.conset_lits.insert(lit);
 
                 // TODO: Find the literals in every constraint
             }
@@ -170,6 +171,23 @@ impl PuzzleParse {
         }
 
         Ok(())
+    }
+
+    pub fn lit_is_con(&self, lit: &Lit) -> bool {
+        self.conset_lits.contains(lit)
+    }
+
+    pub fn lit_to_con(&self, lit: &Lit) -> &String {
+        assert!(self.lit_is_con(lit));
+        self.conset.get(lit).unwrap()
+    }
+
+    pub fn lit_is_var(&self, lit: &Lit) -> bool {
+        self.varset_lits.contains(lit)
+    }
+
+    pub fn lit_to_vars(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
+        self.invlitmap.get(lit).unwrap()
     }
 }
 
@@ -396,45 +414,14 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use test_log::test;
-
-    fn build_puzzleparse(eprime_path: &str, eprimeparam_path: &str) -> PuzzleParse {
-        // Create temporary directory for test files
-        let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
-
-        // Copy eprime file to temporary directory
-        let temp_eprime_path = temp_dir.path().join("binairo.eprime");
-        fs::copy(eprime_path, &temp_eprime_path).expect("Failed to copy eprime file");
-
-        // Copy eprimeparam file to temporary directory
-        let temp_eprimeparam_path = temp_dir.path().join("binairo-1.param");
-        fs::copy(eprimeparam_path, &temp_eprimeparam_path)
-            .expect("Failed to copy eprimeparam file");
-
-        // Call parse_essence function
-        let result = parse_essence(&temp_eprime_path, &temp_eprimeparam_path);
-
-        if result.is_err() {
-            panic!("Bad parse: {:?}", result);
-        }
-        // Assert that the function returns Ok
-        assert!(result.is_ok());
-
-        // Clean up temporary directory
-        temp_dir
-            .close()
-            .expect("Failed to clean up temporary directory");
-
-        result.unwrap()
-    }
 
     #[test]
     fn test_parse_essence_binairo() {
         let eprime_path = "./tst/binairo.eprime";
         let eprimeparam_path = "./tst/binairo-1.param";
 
-        build_puzzleparse(eprime_path, eprimeparam_path);
+        crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
     }
 
     #[test]
@@ -442,7 +429,8 @@ mod tests {
         let eprime_path = "./tst/little1.eprime";
         let eprimeparam_path = "./tst/little1.param";
 
-        let puz = build_puzzleparse(eprime_path, eprimeparam_path);
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
 
         assert_eq!(puz.eprime.vars.len(), 1);
         assert_eq!(puz.eprime.cons.len(), 1);
