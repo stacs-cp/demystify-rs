@@ -16,7 +16,7 @@ impl PuzzlePlanner {
     fn quick_solve(&mut self) -> Vec<(Lit, Vec<Lit>)> {
         let mut tosolve = self.psolve.get_unsatisfiable_varlits();
         let mut solvesteps = vec![];
-        while tosolve.len() > 0 {
+        while !tosolve.is_empty() {
             let muses: Vec<_> = tosolve
                 .iter()
                 .map(|&x| (x, self.psolve.get_var_mus_quick(x).unwrap()))
@@ -31,10 +31,7 @@ impl PuzzlePlanner {
             }
             let removeset: HashSet<_> = muses.iter().map(|(lit, _)| lit).collect();
             // Remove these literals from those that need to be solved
-            tosolve = tosolve
-                .into_iter()
-                .filter(|x| !removeset.contains(x))
-                .collect();
+            tosolve.retain(|x| !removeset.contains(x));
             // Add these muses to the solving steps
             solvesteps.extend(muses);
         }

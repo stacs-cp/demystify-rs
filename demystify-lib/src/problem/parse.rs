@@ -149,7 +149,7 @@ impl PuzzleParse {
 
                 let puzlit = PuzLit::new_eq_val(varid, 1);
                 let lit = *self.litmap.get(&puzlit).unwrap();
-                self.conset.insert(lit.clone(), constraintname);
+                self.conset.insert(lit, constraintname);
                 self.conset_lits.insert(lit);
 
                 // TODO: Find the literals in every constraint
