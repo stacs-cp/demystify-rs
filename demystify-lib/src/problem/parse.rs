@@ -141,7 +141,7 @@ impl PuzzleParse {
                 }
 
                 let constraintname =
-                    parse_constraint_name(&template_string, &self.eprime.params, &varid.indices)?;
+                    parse_constraint_name(template_string, &self.eprime.params, &varid.indices)?;
 
                 // Check is we have used this name before
                 if usedconstraintnames.contains(&constraintname) {

@@ -49,7 +49,7 @@ mod tests {
     use test_log::test;
 
     #[test]
-    fn test_parse_essence() {
+    fn test_plan_little_essence() {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
@@ -71,6 +71,32 @@ mod tests {
             // constraint here, but MUS algorithms be tricky, if
             // this next line starts failing, it can be commented out.
             assert_eq!(cons.len(), 1);
+        }
+    }
+
+    // This test doesn't really do any deep tests,
+    // just do a full end-to-end run
+    #[test]
+    fn test_plan_binairo_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/binairo.eprime",
+            "./tst/binairo-1.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let sequence = plan.quick_solve();
+
+        assert_eq!(sequence.len(), 36);
+
+        for (lit, cons) in sequence {
+            assert!(plan.puzzle().lit_is_var(&lit));
+            assert!(cons.iter().all(|x| plan.puzzle().lit_is_con(x)));
+            println!("{:?}", plan.puzzle().lit_to_vars(&lit));
+            // If this next line starts failing, it can be commented out.
+            assert!(cons.len() <= 2);
         }
     }
 }
