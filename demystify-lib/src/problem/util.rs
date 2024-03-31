@@ -1,5 +1,16 @@
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    rc::Rc,
+};
+
 use super::{parse::PuzzleParse, PuzVar};
 use anyhow::{bail, Context};
+use itertools::Itertools;
+use rustsat::{
+    instances::{Cnf, SatInstance},
+    types::{Clause, Lit},
+};
+use tracing::info;
 
 pub fn parse_savile_row_name(
     dimacs: &PuzzleParse,
@@ -70,6 +81,78 @@ pub fn parse_constraint_name(
     context.insert("params", params);
     tera::Tera::one_off(template, &context, false)
         .context("Could not parse description of variable or constraint")
+}
+
+pub struct FindVarConnections {
+    lit_to_clauses: HashMap<Lit, HashSet<Lit>>,
+    all_var_lits: BTreeSet<Lit>,
+}
+
+impl FindVarConnections {
+    pub fn new(sat: &SatInstance, all_var_lits: &BTreeSet<Lit>) -> FindVarConnections {
+        let (cnf, _) = sat.clone().as_cnf();
+        let mut lit_to_clauses: HashMap<Lit, HashSet<Lit>> = HashMap::new();
+        for clause in cnf.iter() {
+            for &lit in clause {
+                let s = lit_to_clauses.entry(lit).or_default();
+                for &l in clause.iter() {
+                    s.insert(l);
+                }
+            }
+        }
+
+        // Blank out any literals in unit clauses
+        for clause in cnf.iter() {
+            if clause.len() == 1 {
+                let &lit = clause.iter().next().unwrap();
+                lit_to_clauses.insert(lit, HashSet::new());
+                lit_to_clauses.insert(-lit, HashSet::new());
+            }
+        }
+
+        FindVarConnections {
+            lit_to_clauses,
+            all_var_lits: all_var_lits.clone(),
+        }
+    }
+
+    pub fn get_connections(&self, con_lit: Lit) -> Vec<Lit> {
+        let mut todo: BTreeSet<Lit> = BTreeSet::new();
+        let mut found: BTreeSet<Lit> = BTreeSet::new();
+
+        if !self.lit_to_clauses.contains_key(&-con_lit) {
+            return vec![];
+        }
+
+        found.insert(con_lit);
+        found.insert(-con_lit);
+        todo.insert(-con_lit);
+        todo.insert(con_lit);
+
+        while let Some(todo_lit) = todo.pop_first() {
+            info!("Todo: {}", todo_lit);
+            let litset = self.lit_to_clauses.get(&todo_lit);
+            if let Some(litset) = litset {
+                for &lit in litset {
+                    let lit = -lit;
+                    info!("Considering {}\n", lit);
+                    if !found.contains(&lit) {
+                        info!("Found {}\n", lit);
+                        found.insert(lit);
+                        if !self.all_var_lits.contains(&lit) {
+                            info!("Add to todo: {}\n", lit);
+                            todo.insert(lit);
+                        }
+                    }
+                }
+            }
+        }
+
+        found
+            .intersection(&self.all_var_lits)
+            .cloned()
+            .collect_vec()
+    }
 }
 
 #[cfg(test)]
@@ -167,6 +250,35 @@ mod tests {
             parse_constraint_name(template, &params, &index).unwrap(),
             expected
         );
+    }
+
+    #[test]
+    fn test_find_var_connections() {
+        let eprime_path = "./tst/binairo.eprime";
+        let eprimeparam_path = "./tst/binairo-1.param";
+
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        let all_lits = puz
+            .varset_lits
+            .union(&puz.varset_order_lits)
+            .cloned()
+            .collect();
+
+        let fvc = FindVarConnections::new(&puz.satinstance, &all_lits);
+
+        for c in &puz.conset_lits {
+            let lits = fvc.get_connections(*c);
+            let puzlits = puz.collect_puzlits_both_direct_and_ordered(lits.clone());
+            println!("{} {:?}", c, puzlits);
+            for l in &lits {
+                println!("{:?}", l);
+                println!("{:?}", puz.invlitmap.get(l));
+                println!("{:?}", puz.invordervarmap.get(l));
+            }
+        }
+        ()
     }
 }
 

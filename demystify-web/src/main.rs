@@ -1,22 +1,19 @@
-
-use std::net::SocketAddr;
-use axum_session::{Session, SessionNullPool, SessionConfig, SessionStore, SessionLayer};
-use axum::{
-    routing::get, Json, Router
-};
+use axum::{routing::get, Json, Router};
+use axum_session::{Session, SessionConfig, SessionLayer, SessionNullPool, SessionStore};
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
 use tower_http::cors::{Any, CorsLayer};
 
-
 #[tokio::main]
 async fn main() {
-    let session_config = SessionConfig::default()
-        .with_table_name("sessions_table");
+    let session_config = SessionConfig::default().with_table_name("sessions_table");
 
     // create SessionStore and initiate the database tables
-    let session_store = SessionStore::<SessionNullPool>::new(None, session_config).await.unwrap();
+    let session_store = SessionStore::<SessionNullPool>::new(None, session_config)
+        .await
+        .unwrap();
 
     let cors = CorsLayer::new().allow_origin(Any);
 
@@ -47,7 +44,7 @@ async fn greet(session: Session<SessionNullPool>) -> String {
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 
 struct Obj {
-    val: i32
+    val: i32,
 }
 
 async fn greet_x(session: Session<SessionNullPool>, Json(obj): Json<Obj>) -> Result<Json<Obj>, ()> {
@@ -56,7 +53,9 @@ async fn greet_x(session: Session<SessionNullPool>, Json(obj): Json<Obj>) -> Res
     count += 1;
     session.set("count", count);
 
-    let o : Obj = Obj{val: obj.val * 100 + count};
+    let o: Obj = Obj {
+        val: obj.val * 100 + count,
+    };
 
     Ok(Json(o))
 }

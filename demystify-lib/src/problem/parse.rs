@@ -1,4 +1,5 @@
 use anyhow::{bail, Context};
+use itertools::Itertools;
 use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, SatInstance};
 use rustsat::types::Lit;
@@ -19,6 +20,8 @@ use std::io;
 
 use crate::problem::util::parse_constraint_name;
 use crate::problem::{PuzLit, PuzVar};
+
+use super::util::FindVarConnections;
 
 #[derive(Debug)]
 pub struct EPrimeAnnotations {
@@ -45,16 +48,29 @@ pub struct PuzzleParse {
     pub invlitmap: HashMap<Lit, BTreeSet<PuzLit>>,
     /// A mapping from each variable to its domain
     pub domainmap: HashMap<PuzVar, BTreeSet<i64>>,
-    /// A mapping from literals in the order representation to their corresponding SAT integer.
-    pub ordervarmap: HashMap<PuzLit, Lit>,
     /// List of all constraints in the problem, and their English-readable name
     pub conset: BTreeMap<Lit, String>,
+    /// Lits of all literals in each constraint
+    pub varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
     /// List of all literals in a VAR
     pub varset_lits: BTreeSet<Lit>,
     /// List of all literals which turn on CON
     pub conset_lits: BTreeSet<Lit>,
     /// List of all literals in an AUX
     pub auxset_lits: BTreeSet<Lit>,
+
+    /// A mapping from variables in the order representation to their corresponding SAT integers.
+    /// These are generally not useful, but are sometimes used when scanning
+    /// the entire problem
+    pub ordervarmap: HashMap<PuzVar, HashSet<Lit>>,
+    /// A mapping from lits to the order representation they represent.
+    /// These are generally not useful, but are sometimes used when scanning
+    /// the entire problem
+    pub invordervarmap: HashMap<Lit, PuzVar>,
+    /// List of all literals in tbe order encoding of a VAR
+    /// These are generally not useful, but are sometimes used when scanning
+    /// the entire problem
+    pub varset_order_lits: BTreeSet<Lit>,
 }
 
 impl PuzzleParse {
@@ -76,7 +92,10 @@ impl PuzzleParse {
             invlitmap: HashMap::new(),
             domainmap: HashMap::new(),
             ordervarmap: HashMap::new(),
+            invordervarmap: HashMap::new(),
+            varset_order_lits: BTreeSet::new(),
             conset: BTreeMap::new(),
+            varlits_in_con: BTreeMap::new(),
             varset_lits: BTreeSet::new(),
             conset_lits: BTreeSet::new(),
             auxset_lits: BTreeSet::new(),
@@ -120,6 +139,15 @@ impl PuzzleParse {
 
         let mut usedconstraintnames: HashSet<String> = HashSet::new();
 
+        // Gather all lits, for use gathering connections between constraints and variables
+        let all_lits = self
+            .varset_lits
+            .union(&self.varset_order_lits)
+            .cloned()
+            .collect();
+
+        let fvc = FindVarConnections::new(&self.satinstance, &all_lits);
+
         // Tidy up and check constraints
         for (varid, vals) in &self.domainmap {
             if let Some(template_string) = self.eprime.cons.get(varid.name()) {
@@ -156,6 +184,7 @@ impl PuzzleParse {
                 let lit = *self.litmap.get(&puzlit).unwrap();
                 self.conset.insert(lit, constraintname);
                 self.conset_lits.insert(lit);
+                self.varlits_in_con.insert(lit, fvc.get_connections(lit));
 
                 // TODO: Find the literals in every constraint
             }
@@ -193,6 +222,31 @@ impl PuzzleParse {
 
     pub fn lit_to_vars(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
         self.invlitmap.get(lit).unwrap()
+    }
+
+    /// Given a collection of Lits representing both direct and ordered
+    /// representations, collect them into a collection of PuzLits
+    pub fn collect_puzlits_both_direct_and_ordered(&self, lits: Vec<Lit>) -> Vec<PuzLit> {
+        let mut collected: BTreeSet<PuzLit> = BTreeSet::new();
+
+        for l in lits {
+            if let Some(found_lits) = self.invlitmap.get(&l) {
+                for f in found_lits {
+                    if f.sign() {
+                        collected.insert(f.clone());
+                    } else {
+                        collected.insert(f.neg());
+                    }
+                }
+            }
+            if let Some(found_var) = self.invordervarmap.get(&l) {
+                for &val in self.domainmap.get(found_var).unwrap() {
+                    collected.insert(PuzLit::new_eq_val(found_var, val));
+                }
+            }
+        }
+
+        collected.into_iter().collect_vec()
     }
 }
 
@@ -238,7 +292,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 cons.insert(con_name, con_value);
             } else if line.starts_with("$#AUX") {
                 let v = parts[1].to_string();
-                println!("Found Aux VAR: '{}'", v);
+                info!(target: "parser", "Found Aux VAR: '{}'", v);
 
                 if vars.contains(&v) || auxvars.contains(&v) {
                     bail!(format!("{} defined twice", v));
@@ -293,8 +347,27 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
-                        let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
-                        dimacs.ordervarmap.insert(puzlit, satlit);
+                        // Not currently using exact literal
+                        // let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        dimacs
+                            .ordervarmap
+                            .entry(varid.clone())
+                            .or_default()
+                            .insert(satlit);
+                        dimacs
+                            .ordervarmap
+                            .entry(varid.clone())
+                            .or_default()
+                            .insert(-satlit);
+                        dimacs.varset_order_lits.insert(satlit);
+                        dimacs.varset_order_lits.insert(-satlit);
+                        if let Some(val) = dimacs.invordervarmap.get(&satlit) {
+                            if *val != varid {
+                                bail!("{} used for two variables: {} {}", satlit, val, varid);
+                            }
+                        }
+                        dimacs.invordervarmap.insert(satlit, varid.clone());
+                        dimacs.invordervarmap.insert(-satlit, varid.clone());
                     }
                 }
             }
