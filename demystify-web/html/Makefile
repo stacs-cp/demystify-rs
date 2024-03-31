@@ -1,5 +1,8 @@
-serve: website/puzzle-bundle.js
-	python -m http.server
+serve: website/puzzle.js
+	python -m http.server -d website
 
-website/puzzle-bundle.js: website/puzzle.tsx
-	npx esbuild website/puzzle.tsx --bundle --sourcemap > website/puzzle-bundle.js
+website/puzzle.js: puzzle.tsx
+	npx esbuild puzzle.tsx --bundle --sourcemap --outdir=website
+
+update:
+	npx esbuild puzzle.tsx --bundle --sourcemap --outdir=website --watch --servedir=website

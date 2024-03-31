@@ -1,4 +1,5 @@
 import { SVG } from "@svgdotjs/svg.js";
+import { assert } from "console";
 
 // G, Path, Line, Text
 const _puzzle_decorations = {
@@ -7,21 +8,22 @@ const _puzzle_decorations = {
 
 class PuzzleDraw {
   base_width: number;
+  mid_width: number;
   thick_width: number;
-  colours_list: string[];
+  
 
   constructor({
     base_width = 0.005,
-    thick_width = 0.02,
-    colours_list = ["red", "blue", "yellow", "green", "purple"],
+    mid_width = 0.01,
+    thick_width = 0.02
   }: {
     base_width?: number;
+    mid_width?: number;
     thick_width?: number;
-    colours_list?: string[];
   }) {
     this.base_width = base_width;
+    this.mid_width = mid_width;
     this.thick_width = thick_width;
-    this.colours_list = colours_list;
   }
 
   fillMissing(puzdef: any) {
@@ -31,6 +33,7 @@ class PuzzleDraw {
     if ("startGrid" in puz) {
       grid = puz["startGrid"];
     }
+
     if ("solution" in puzdef) {
       grid = puzdef["solutionGrid"];
     }
@@ -62,11 +65,16 @@ class PuzzleDraw {
 
     const puzzle = puzjson["puzzle"];
 
-    const out = this.drawGrid(puzzle);
+    const out = this.drawGrid(puzzle, puzjson["decorations"]);
 
     if ("startGrid" in puzzle) {
       console.log("startGrid");
-      this.fillCells(out, puzzle["startGrid"]);
+      this.fillFixedState(out, puzzle["startGrid"]);
+    }
+
+    if ("knowledgeGrid" in puzzle) {
+      console.log("knowledgeGrid");
+      this.fillKnowledge(out, puzzle["knowledgeGrid"]);
     }
 
     if ("solutionGrid" in puzzle) {
@@ -81,16 +89,16 @@ class PuzzleDraw {
           }
         }
       }
-      this.fillCells(out, solutionCpy, { color: "grey" });
+      this.fillFixedState(out, solutionCpy, { color: "grey" });
     }
 
     return out;
   }
 
-  drawGrid(puzzle: any) {
+  drawGrid(puzzle: any, decorations: any) {
     const svg = SVG();
     const topgrp = svg.group();
-    topgrp.transform({ scale: 300 });
+    topgrp.transform({ translateX: 25, translateY: 25, scale: 450 });
 
     const grp = topgrp.group();
 
@@ -103,16 +111,14 @@ class PuzzleDraw {
     }
 
     let sudoku_decorations = false;
-    if ("decorations" in puzzle) {
-      if ("sudoku" in puzzle["decorations"]) {
-        sudoku_decorations = true;
-      }
+    if ("sudoku" in decorations) {
+      sudoku_decorations = true;
     }
 
     const wstep = 1.0 / width;
     const hstep = 1.0 / height;
 
-    const colours_list = ["red", "blue", "yellow", "green", "purple"];
+    const colours_list = ["#FFB3B3", "#B3B3FF", "#FFFFB3", "#B3FFB3", "#E6B3FF"];
     if (cages) {
       const colours = Array.from(
         new Set(
@@ -127,7 +133,7 @@ class PuzzleDraw {
             const path = `M ${wstep * i} ${hstep * j} H ${wstep * (i + 1)} V ${
               wstep * (j + 1)
             } H ${wstep * i} Z`;
-            const p = SVG().path(path).fill(this.colours_list[col]);
+            const p = SVG().path(path).fill(colours_list[col]);
 
             grp.add(p);
           }
@@ -142,7 +148,7 @@ class PuzzleDraw {
           stroke = this.thick_width;
         } else {
           if (sudoku_decorations && i % 3 === 0) {
-            stroke = this.thick_width;
+            stroke = this.mid_width;
           }
           if (cages && cages[j][i] !== cages[j][i - 1]) {
             stroke = this.thick_width;
@@ -154,6 +160,7 @@ class PuzzleDraw {
             .stroke({
               color: "black",
               width: stroke,
+              linecap: "round",
             })
         );
       }
@@ -166,7 +173,7 @@ class PuzzleDraw {
           stroke = this.thick_width;
         } else {
           if (sudoku_decorations && j % 3 === 0) {
-            stroke = this.thick_width;
+            stroke = this.mid_width;
           }
           if (cages && cages[j][i] !== cages[j - 1][i]) {
             stroke = this.thick_width;
@@ -210,7 +217,7 @@ class PuzzleDraw {
     return { svg: svg, cells };
   }
 
-  fillCells(gridobj: any, contents: any, { color = "black" } = {}) {
+  fillFixedState(gridobj: any, contents: any, { color = "black" } = {}) {
     const cells = gridobj["cells"];
     console.log(contents);
     for (let i = 0; i < contents.length; i++) {
@@ -218,35 +225,41 @@ class PuzzleDraw {
         const cell = contents[i][j];
         console.log(cell);
         if (cell) {
-          if (Number.isFinite(cell)) {
-            const s = String(cell);
-            const p = cells[i][j].line(0, 0, 1, 1).stroke({
-              color: "blue",
-              width: 0.01,
-            });
-            cells[i][j]
-              .text(s)
-              .font({ size: 1 })
-              .transform({ translateX: 0.2, translateY: 0.9 });
-          } else {
-            // Find the right size of grid to fit our values in
-            let sqrtLength = Math.floor(Math.sqrt(cell.length));
-            if (sqrtLength * sqrtLength < cell.length) {
-              sqrtLength += 1;
-            }
-            const littleStep = 0.9 / sqrtLength;
-            for (let a = 0; a < sqrtLength; ++a) {
-              for (let b = 0; b < sqrtLength; ++b) {
-                if (a * sqrtLength + b < cell.length) {
-                  cells[i][j]
-                    .text(String(cell[a * sqrtLength + b]))
-                    .font({ size: littleStep })
-                    .transform({
-                      translateX: 0.1 + b * littleStep,
-                      translateY: (a + 1.2) * littleStep,
-                    })
-                    .id(`D_${j}_${i}_${cell[a * sqrtLength + b]}`);
-                }
+          const s = String(cell);
+          cells[i][j]
+            .text(s)
+            .font({ size: 1 })
+            .transform({ translateX: 0.2, translateY: 0.9 });
+        }
+      }
+    }
+  }
+
+  fillKnowledge(gridobj: any, contents: any, { color = "black" } = {}) {
+    const cells = gridobj["cells"];
+    console.log(contents);
+    for (let i = 0; i < contents.length; i++) {
+      for (let j = 0; j < contents[i].length; j++) {
+        const cell = contents[i][j];
+        console.log(cell);
+        if (cell) {
+          // Find the right size of grid to fit our values in
+          let sqrtLength = Math.floor(Math.sqrt(cell.length));
+          if (sqrtLength * sqrtLength < cell.length) {
+            sqrtLength += 1;
+          }
+          const littleStep = 0.9 / sqrtLength;
+          for (let a = 0; a < sqrtLength; ++a) {
+            for (let b = 0; b < sqrtLength; ++b) {
+              if (a * sqrtLength + b < cell.length) {
+                cells[i][j]
+                  .text(String(cell[a * sqrtLength + b]))
+                  .font({ size: littleStep })
+                  .transform({
+                    translateX: 0.1 + b * littleStep,
+                    translateY: (a + 1.2) * littleStep,
+                  })
+                  .id(`D_${j}_${i}_${cell[a * sqrtLength + b]}`);
               }
             }
           }
@@ -254,6 +267,8 @@ class PuzzleDraw {
       }
     }
   }
+
+
 }
 
 
@@ -271,7 +286,7 @@ async function setupPuzzle() {
   let sudoku = puzdraw.drawPuzzle(j);
   let puzzle = document.getElementById("puzzle");
   if (puzzle) {
-    sudoku.svg.addTo(puzzle).size(300, 300);
+    sudoku.svg.addTo(puzzle).size(500, 500);
   }
 }
 
