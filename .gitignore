@@ -10,3 +10,4 @@ demystify.trace
 .vscode
 *.dimacs
 *.minion
+dist

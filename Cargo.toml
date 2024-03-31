@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "demystify",
-    "demystify-lib"
+    "demystify-lib",
+    "demystify-web",
 ]
-resolver= "2"
+resolver = "2"
