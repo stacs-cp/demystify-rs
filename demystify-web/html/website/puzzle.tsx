@@ -47,7 +47,7 @@ class PuzzleDraw {
     }
 
     if (puzdef["type"] && puzdef["type"] in _puzzle_decorations) {
-      for (const [k, v] of Object.entries(_puzzle_decorations)) {
+      for (const [k, v] of Object.entries(_puzzle_decorations) as [string, any][]) {
         if (!(k in puzdef["decorations"])) {
           puzdef["decorations"][k] = v;
         }
@@ -256,42 +256,23 @@ class PuzzleDraw {
   }
 }
 
-window.PuzzleDraw = PuzzleDraw;
-window.SVG = SVG;
-let puzdraw = new PuzzleDraw({});
 
-let j = JSON.parse(`
-          {
-  "$schema": "puzschema.json",
-  "type": "sudoku",
-  "puzzle": {
-    "width": 9,
-    "height": 9,
-    "startGrid": [
-      [null, null, 3, null, [1,2,3,4], null, [1,2,3,4,5,6,7], null, null],
-      [9, null, null, 3, null, 5, null, null, 1],
-      [null, null, 1, 8, null, 6, 4, null, null],
-      [null, null, 8, 1, null, 2, 9, null, null],
-      [7, null, null, null, null, null, null, null, 8],
-      [null, null, 6, 7, null, 8, 2, null, null],
-      [null, null, 2, 6, null, 9, 5, null, null],
-      [8, null, null, 2, null, 3, null, null, 9],
-      [null, null, 5, null, 1, null, 3, null, null]
-    ],
-    "cages": [
-        [0,0,1,1,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0],
-        [0,0,0,0,0,0,0,0,0]
-    ]
+//window.PuzzleDraw = PuzzleDraw;
+//window.SVG = SVG;
+
+async function setupPuzzle() {
+  let puzdraw = new PuzzleDraw({});
+
+  let request = await fetch("sudoku.json");
+  console.log(request);
+  let j = await request.json();
+  console.log(j);
+
+  let sudoku = puzdraw.drawPuzzle(j);
+  let puzzle = document.getElementById("puzzle");
+  if (puzzle) {
+    sudoku.svg.addTo(puzzle).size(300, 300);
   }
-}`);
+}
 
-let sudoku = puzdraw.drawPuzzle(j);
-let puzzle = document.getElementById("puzzle");
-sudoku.svg.addTo(puzzle).size(300, 300);
+setupPuzzle();
