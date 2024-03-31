@@ -1,14 +1,13 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
-    rc::Rc,
 };
 
 use super::{parse::PuzzleParse, PuzVar};
 use anyhow::{bail, Context};
 use itertools::Itertools;
 use rustsat::{
-    instances::{Cnf, SatInstance},
-    types::{Clause, Lit},
+    instances::{SatInstance},
+    types::{Lit},
 };
 use tracing::info;
 
@@ -278,7 +277,7 @@ mod tests {
                 println!("{:?}", puz.invordervarmap.get(l));
             }
         }
-        ()
+        
     }
 }
 
