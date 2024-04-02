@@ -309,7 +309,7 @@ const quickSolveButton = async () => {
   const text = await response.text();
   const infoBox = document.getElementById("infoBox");
   if (infoBox) {
-    infoBox.innerHTML += text += "<br>";
+    infoBox.innerHTML += (text + "<br>");
   }
 };
 
