@@ -1,7 +1,7 @@
-use anyhow::{bail, Context};
+use anyhow::{Context};
 use axum::extract::Multipart;
-use axum_session::{Session, SessionConfig, SessionLayer, SessionNullPool, SessionStore};
-use serde_json::Value;
+use axum_session::{Session, SessionNullPool};
+
 use std::{fs::File, io::Write, path::PathBuf};
 
 use anyhow::anyhow;
@@ -11,7 +11,7 @@ use crate::util;
 use demystify_lib::problem;
 
 pub async fn upload_files(
-    session: Session<SessionNullPool>,
+    _session: Session<SessionNullPool>,
     mut multipart: Multipart,
 ) -> Result<String, util::AppError> {
     let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
@@ -91,7 +91,7 @@ pub async fn upload_files(
         return Err(anyhow!("Did not upload a param file (either .eprime or .json) file").into());
     }
 
-    let puz = problem::parse::parse_essence(
+    let _puz = problem::parse::parse_essence(
         &temp_dir.path().join(model.unwrap()),
         &temp_dir.path().join(param.unwrap()),
     )?;
