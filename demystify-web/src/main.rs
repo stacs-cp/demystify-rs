@@ -25,6 +25,7 @@ async fn main() {
         .route("/greet", get(greet))
         .route("/greetX", get(greet_x))
         .route("/uploadPuzzle", post(wrap::upload_files))
+        .route("/quickFullSolve", get(wrap::dump_full_solve))
         .nest_service("/", ServeDir::new("html/website"))
         .layer(cors)
         .layer(SessionLayer::new(session_store));

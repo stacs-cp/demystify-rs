@@ -1,19 +1,19 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
-use rustsat::types::Lit;
+use itertools::Itertools;
 
-use super::{parse::PuzzleParse, solver::PuzzleSolver};
+use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
 }
 
 impl PuzzlePlanner {
-    fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
+    pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
         PuzzlePlanner { psolve }
     }
 
-    fn quick_solve(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn quick_solve(&mut self) -> Vec<(BTreeSet<PuzLit>, Vec<String>)> {
         let mut tosolve = self.psolve.get_unsatisfiable_varlits();
         let mut solvesteps = vec![];
         while !tosolve.is_empty() {
@@ -32,6 +32,22 @@ impl PuzzlePlanner {
             let removeset: HashSet<_> = muses.iter().map(|(lit, _)| lit).collect();
             // Remove these literals from those that need to be solved
             tosolve.retain(|x| !removeset.contains(x));
+
+            // Map the 'muses' to a user PuzLits
+
+            let muses = muses
+                .into_iter()
+                .map(|(l, x)| {
+                    (
+                        self.psolve.puzzleparse().lit_to_vars(&l).clone(),
+                        x.into_iter()
+                            .map(|c| self.psolve.puzzleparse().lit_to_con(&c))
+                            .cloned()
+                            .collect_vec(),
+                    )
+                })
+                .collect_vec();
+
             // Add these muses to the solving steps
             solvesteps.extend(muses);
         }
@@ -63,10 +79,8 @@ mod tests {
 
         assert_eq!(sequence.len(), 16);
 
-        for (lit, cons) in sequence {
-            assert!(plan.puzzle().lit_is_var(&lit));
-            assert!(cons.iter().all(|x| plan.puzzle().lit_is_con(x)));
-            println!("{:?}", plan.puzzle().lit_to_vars(&lit));
+        for (litset, cons) in sequence {
+            assert!(litset.len() > 0);
             // It should be trivial to prove we only need one
             // constraint here, but MUS algorithms be tricky, if
             // this next line starts failing, it can be commented out.
@@ -91,10 +105,8 @@ mod tests {
 
         assert_eq!(sequence.len(), 36);
 
-        for (lit, cons) in sequence {
-            assert!(plan.puzzle().lit_is_var(&lit));
-            assert!(cons.iter().all(|x| plan.puzzle().lit_is_con(x)));
-            println!("{:?}", plan.puzzle().lit_to_vars(&lit));
+        for (litset, cons) in sequence {
+            assert!(litset.len() > 0);
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
         }

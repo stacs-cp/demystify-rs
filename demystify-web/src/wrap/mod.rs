@@ -1,17 +1,30 @@
-use anyhow::{Context};
-use axum::extract::Multipart;
+use anyhow::Context;
+use axum::{extract::Multipart, Json};
 use axum_session::{Session, SessionNullPool};
+use serde_json::Value;
 
 use std::{fs::File, io::Write, path::PathBuf};
 
 use anyhow::anyhow;
 
-use crate::util;
+use crate::util::{self, get_solver_global, set_solver_global};
 
-use demystify_lib::problem;
+use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+
+pub async fn dump_full_solve(
+    session: Session<SessionNullPool>,
+) -> Result<Json<Value>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+
+    let mut solver = solver.lock().unwrap();
+
+    let solve = solver.quick_solve();
+
+    Ok(Json(serde_json::value::to_value(solve).unwrap()))
+}
 
 pub async fn upload_files(
-    _session: Session<SessionNullPool>,
+    session: Session<SessionNullPool>,
     mut multipart: Multipart,
 ) -> Result<String, util::AppError> {
     let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
@@ -91,10 +104,16 @@ pub async fn upload_files(
         return Err(anyhow!("Did not upload a param file (either .eprime or .json) file").into());
     }
 
-    let _puz = problem::parse::parse_essence(
+    let puzzle = problem::parse::parse_essence(
         &temp_dir.path().join(model.unwrap()),
         &temp_dir.path().join(param.unwrap()),
     )?;
+
+    let puz = PuzzleSolver::new(puzzle)?;
+
+    let plan = PuzzlePlanner::new(puz);
+
+    set_solver_global(&session, plan);
 
     Ok("upload successful!".to_string())
 }

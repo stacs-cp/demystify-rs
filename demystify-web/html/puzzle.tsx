@@ -303,3 +303,17 @@ setupPuzzle();
 console.log("-- Step 2");
 checkServer();
 console.log("-- Step 3");
+
+const quickSolveButton = async () => {
+  const response = await fetch("/quickFullSolve");
+  const text = await response.text();
+  const infoBox = document.getElementById("infoBox");
+  if (infoBox) {
+    infoBox.innerHTML += text += "<br>";
+  }
+};
+
+const button = document.getElementById("quickSolveButton");
+if (button) {
+  button.addEventListener("click", quickSolveButton);
+}

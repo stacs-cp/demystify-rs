@@ -16,3 +16,4 @@ serde = "1"
 anyhow = "1"
 tempfile = "3"
 demystify-lib = { path = "../demystify-lib" }
+uuid = "1"

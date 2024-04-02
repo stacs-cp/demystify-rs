@@ -614,6 +614,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+ "uuid",
 ]
 
 [[package]]
@@ -1967,9 +1968,8 @@ dependencies = [
 [[package]]
 name = "rustsat"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7face2f32c7d9fd1bca46af42960eb4789d95c8dcb799833a1c75736db3d19c"
 dependencies = [
+ "anyhow",
  "cbindgen",
  "cpu-time",
  "nom",
@@ -1981,9 +1981,8 @@ dependencies = [
 [[package]]
 name = "rustsat-glucose"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63ddea5995e80d493b3e0da28d104f81ef2f9b7f1fd9574d4a5d7df13c3f876a"
 dependencies = [
+ "anyhow",
  "cc",
  "chrono",
  "cmake",
@@ -1991,6 +1990,7 @@ dependencies = [
  "git2",
  "glob",
  "rustsat",
+ "thiserror",
 ]
 
 [[package]]
