@@ -206,7 +206,6 @@ class PuzzleDraw {
       for (let j = 0; j < height; ++j) {
         let itrans = wstep * (i + 0.05);
         let jtrans = hstep * (j + 0.05);
-        console.log(itrans, jtrans, wstep);
         cells[j][i].id(`C_${j}_${i}`);
         cells[j][i].transform({ translateX: itrans, translateY: jtrans });
         cells[j][i] = cells[j][i].group();
@@ -223,7 +222,6 @@ class PuzzleDraw {
     for (let i = 0; i < contents.length; i++) {
       for (let j = 0; j < contents[i].length; j++) {
         const cell = contents[i][j];
-        console.log(cell);
         if (cell) {
           const s = String(cell);
           cells[i][j]
@@ -237,11 +235,10 @@ class PuzzleDraw {
 
   fillKnowledge(gridobj: any, contents: any, { color = "black" } = {}) {
     const cells = gridobj["cells"];
-    console.log(contents);
+    console.log("fillKnowledge:", contents);
     for (let i = 0; i < contents.length; i++) {
       for (let j = 0; j < contents[i].length; j++) {
         const cell = contents[i][j];
-        console.log(cell);
         if (cell) {
           // Find the right size of grid to fit our values in
           let sqrtLength = Math.floor(Math.sqrt(cell.length));
@@ -290,4 +287,19 @@ async function setupPuzzle() {
   }
 }
 
+
+async function checkServer() {
+  console.log(" --- Testing server");
+  let request = await fetch("/greet");
+  console.log(request);
+  let j = await request.text();
+  console.log(j);
+  console.log(" --- Server test")
+
+}
+
+console.log("-- Step 1");
 setupPuzzle();
+console.log("-- Step 2");
+checkServer();
+console.log("-- Step 3");

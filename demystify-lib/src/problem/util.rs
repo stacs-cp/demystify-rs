@@ -1,14 +1,9 @@
-use std::{
-    collections::{BTreeSet, HashMap, HashSet},
-};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use super::{parse::PuzzleParse, PuzVar};
 use anyhow::{bail, Context};
 use itertools::Itertools;
-use rustsat::{
-    instances::{SatInstance},
-    types::{Lit},
-};
+use rustsat::{instances::SatInstance, types::Lit};
 use tracing::info;
 
 pub fn parse_savile_row_name(
@@ -277,7 +272,6 @@ mod tests {
                 println!("{:?}", puz.invordervarmap.get(l));
             }
         }
-        
     }
 }
 

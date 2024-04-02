@@ -1,10 +1,13 @@
+use axum::routing::post;
 use axum::{routing::get, Json, Router};
 use axum_session::{Session, SessionConfig, SessionLayer, SessionNullPool, SessionStore};
+use demystify_web::wrap;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 
 #[tokio::main]
 async fn main() {
@@ -21,11 +24,13 @@ async fn main() {
     let app = Router::new()
         .route("/greet", get(greet))
         .route("/greetX", get(greet_x))
+        .route("/uploadPuzzle", post(wrap::upload_files))
+        .nest_service("/", ServeDir::new("html/website"))
         .layer(cors)
         .layer(SessionLayer::new(session_store));
 
     // run it
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8008));
 
     println!("listening on {}", addr);
     let listener = TcpListener::bind(addr).await.unwrap();
