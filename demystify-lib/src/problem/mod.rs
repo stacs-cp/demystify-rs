@@ -14,6 +14,7 @@ pub struct PuzVar {
 }
 
 impl PuzVar {
+    #[must_use]
     pub fn new(name: &str, indices: Vec<i64>) -> PuzVar {
         PuzVar {
             name: name.to_string(),
@@ -21,6 +22,7 @@ impl PuzVar {
         }
     }
 
+    #[must_use]
     pub fn name(&self) -> &String {
         &self.name
     }
@@ -50,6 +52,7 @@ impl fmt::Display for PuzLit {
 }
 
 impl PuzLit {
+    #[must_use]
     pub fn new_eq_val(var: &PuzVar, val: i64) -> PuzLit {
         PuzLit {
             var: var.clone(),
@@ -58,6 +61,7 @@ impl PuzLit {
         }
     }
 
+    #[must_use]
     pub fn new_neq_val(var: &PuzVar, val: i64) -> PuzLit {
         PuzLit {
             var: var.clone(),
@@ -66,18 +70,22 @@ impl PuzLit {
         }
     }
 
+    #[must_use]
     pub fn var(&self) -> PuzVar {
         self.var.clone()
     }
 
+    #[must_use]
     pub fn val(&self) -> i64 {
         self.val
     }
 
+    #[must_use]
     pub fn sign(&self) -> bool {
         self.equal
     }
 
+    #[must_use]
     pub fn neg(&self) -> PuzLit {
         PuzLit {
             var: self.var.clone(),

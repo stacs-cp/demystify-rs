@@ -3,6 +3,7 @@
 pub mod problem;
 pub mod satcore;
 
+#[must_use]
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }

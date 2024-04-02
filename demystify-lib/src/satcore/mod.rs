@@ -45,6 +45,7 @@ impl SatCore {
         result
     }
 
+    #[must_use]
     pub fn assumption_solve_with_core(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
         let mut solver = self.solver.lock().unwrap();
         let solve = solver.solve_assumps(lits).unwrap();
@@ -57,6 +58,7 @@ impl SatCore {
         }
     }
 
+    #[must_use]
     pub fn quick_mus(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
         let mut core = self.assumption_solve_with_core(dbg!(lits))?;
         // Need to make a copy for actually searching over

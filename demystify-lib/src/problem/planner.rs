@@ -9,6 +9,7 @@ pub struct PuzzlePlanner {
 }
 
 impl PuzzlePlanner {
+    #[must_use]
     pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
         PuzzlePlanner { psolve }
     }
@@ -80,7 +81,7 @@ mod tests {
         assert_eq!(sequence.len(), 16);
 
         for (litset, cons) in sequence {
-            assert!(litset.len() > 0);
+            assert!(!litset.is_empty());
             // It should be trivial to prove we only need one
             // constraint here, but MUS algorithms be tricky, if
             // this next line starts failing, it can be commented out.
@@ -106,7 +107,7 @@ mod tests {
         assert_eq!(sequence.len(), 36);
 
         for (litset, cons) in sequence {
-            assert!(litset.len() > 0);
+            assert!(!litset.is_empty());
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
         }

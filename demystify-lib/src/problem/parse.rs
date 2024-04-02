@@ -74,6 +74,7 @@ pub struct PuzzleParse {
 }
 
 impl PuzzleParse {
+    #[must_use]
     pub fn new_from_eprime(
         vars: BTreeSet<String>,
         auxvars: BTreeSet<String>,
@@ -143,7 +144,7 @@ impl PuzzleParse {
         let all_lits = self
             .varset_lits
             .union(&self.varset_order_lits)
-            .cloned()
+            .copied()
             .collect();
 
         let fvc = FindVarConnections::new(&self.satinstance, &all_lits);
@@ -207,25 +208,30 @@ impl PuzzleParse {
         Ok(())
     }
 
+    #[must_use]
     pub fn lit_is_con(&self, lit: &Lit) -> bool {
         self.conset_lits.contains(lit)
     }
 
+    #[must_use]
     pub fn lit_to_con(&self, lit: &Lit) -> &String {
         assert!(self.lit_is_con(lit));
         self.conset.get(lit).unwrap()
     }
 
+    #[must_use]
     pub fn lit_is_var(&self, lit: &Lit) -> bool {
         self.varset_lits.contains(lit)
     }
 
+    #[must_use]
     pub fn lit_to_vars(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
         self.invlitmap.get(lit).unwrap()
     }
 
     /// Given a collection of Lits representing both direct and ordered
-    /// representations, collect them into a collection of PuzLits
+    /// representations, collect them into a collection of `PuzLits`
+    #[must_use]
     pub fn collect_puzlits_both_direct_and_ordered(&self, lits: Vec<Lit>) -> Vec<PuzLit> {
         let mut collected: BTreeSet<PuzLit> = BTreeSet::new();
 
@@ -329,7 +335,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
             if let Some(match_) = dmatch {
                 let litval = match_[3].parse::<i64>().unwrap();
 
-                if !match_[1].starts_with("aux") && litval != 9223372036854775807 {
+                if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
@@ -342,7 +348,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                 let match_ = omatch.unwrap();
                 let litval = match_[3].parse::<i64>().unwrap();
                 info!(target: "parser", "matches: {:?}", match_);
-                if !match_[1].starts_with("aux") && litval != 9223372036854775807 {
+                if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
@@ -502,7 +508,7 @@ mod tests {
         let eprime_path = "./tst/binairo.eprime";
         let eprimeparam_path = "./tst/binairo-1.param";
 
-        crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+        let _ = crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
     }
 
     #[test]

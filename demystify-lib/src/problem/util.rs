@@ -83,6 +83,7 @@ pub struct FindVarConnections {
 }
 
 impl FindVarConnections {
+    #[must_use]
     pub fn new(sat: &SatInstance, all_var_lits: &BTreeSet<Lit>) -> FindVarConnections {
         let (cnf, _) = sat.clone().as_cnf();
         let mut lit_to_clauses: HashMap<Lit, HashSet<Lit>> = HashMap::new();
@@ -144,7 +145,7 @@ impl FindVarConnections {
 
         found
             .intersection(&self.all_var_lits)
-            .cloned()
+            .copied()
             .collect_vec()
     }
 }
@@ -158,11 +159,11 @@ mod tests {
     fn test_parse_savile_row_name() {
         let vars: BTreeSet<String> = ["var1", "var2", "var3", "var3x"]
             .iter()
-            .map(|s| s.to_string())
+            .map(|s| (*s).to_string())
             .collect();
         let auxvars: BTreeSet<String> = ["aux1", "aux2", "aux3"]
             .iter()
-            .map(|s| s.to_string())
+            .map(|s| (*s).to_string())
             .collect();
 
         let mut cons: BTreeMap<String, String> = BTreeMap::new();
@@ -219,26 +220,26 @@ mod tests {
     fn test_parse_constraint_name() {
         let params = serde_json::from_str(r#"{"a":1, "b": 2, "2":7, "3": {"2": 99}}"#).unwrap();
         let index = vec![1, 2, 3];
-        let template = r#"Constraint {{ index }} with params {{ params.a }}"#;
+        let template = r"Constraint {{ index }} with params {{ params.a }}";
         let expected = "Constraint [1, 2, 3] with params 1";
         assert_eq!(
             parse_constraint_name(template, &params, &index).unwrap(),
             expected
         );
-        let template = r#"Constraint {{ index }} with params {{ params.a + 1 }}"#;
+        let template = r"Constraint {{ index }} with params {{ params.a + 1 }}";
         let expected = "Constraint [1, 2, 3] with params 2";
         assert_eq!(
             parse_constraint_name(template, &params, &index).unwrap(),
             expected
         );
-        let template = r#"Constraint {{ index }} with params {{ params.2 }}"#;
+        let template = r"Constraint {{ index }} with params {{ params.2 }}";
         let expected = "Constraint [1, 2, 3] with params 7";
         assert_eq!(
             parse_constraint_name(template, &params, &index).unwrap(),
             expected
         );
 
-        let template = r#"Constraint {{ index }} with params {{ params.3.2 }}"#;
+        let template = r"Constraint {{ index }} with params {{ params.3.2 }}";
         let expected = "Constraint [1, 2, 3] with params 99";
         assert_eq!(
             parse_constraint_name(template, &params, &index).unwrap(),
@@ -257,7 +258,7 @@ mod tests {
         let all_lits = puz
             .varset_lits
             .union(&puz.varset_order_lits)
-            .cloned()
+            .copied()
             .collect();
 
         let fvc = FindVarConnections::new(&puz.satinstance, &all_lits);
@@ -265,9 +266,9 @@ mod tests {
         for c in &puz.conset_lits {
             let lits = fvc.get_connections(*c);
             let puzlits = puz.collect_puzlits_both_direct_and_ordered(lits.clone());
-            println!("{} {:?}", c, puzlits);
+            println!("{c} {puzlits:?}");
             for l in &lits {
-                println!("{:?}", l);
+                println!("{l:?}");
                 println!("{:?}", puz.invlitmap.get(l));
                 println!("{:?}", puz.invordervarmap.get(l));
             }
@@ -282,6 +283,7 @@ pub mod test_utils {
     use crate::problem::parse::{parse_essence, PuzzleParse};
 
     // Here we put some utility functions used in various places
+    #[must_use]
     pub fn build_puzzleparse(eprime_path: &str, eprimeparam_path: &str) -> PuzzleParse {
         // Create temporary directory for test files
         let eprime_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprime_path;
@@ -300,9 +302,7 @@ pub mod test_utils {
         // Call parse_essence function
         let result = parse_essence(&temp_eprime_path, &temp_eprimeparam_path);
 
-        if result.is_err() {
-            panic!("Bad parse: {:?}", result);
-        }
+        assert!(!result.is_err(), "Bad parse: {result:?}");
         // Assert that the function returns Ok
         assert!(result.is_ok());
 

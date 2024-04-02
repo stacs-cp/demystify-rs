@@ -30,10 +30,11 @@ impl PuzzleSolver {
         self.puzzleparse.invlitmap.get(&lit).unwrap()
     }
 
+    #[must_use]
     pub fn get_unsatisfiable_varlits(&self) -> Vec<Lit> {
         let mut satisfied = vec![];
 
-        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().cloned().collect();
+        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
         litorig.extend_from_slice(&self.knownlits);
 
         for &lit in &self.puzzleparse.varset_lits {
@@ -54,6 +55,7 @@ impl PuzzleSolver {
         //self.satcore.add_lit(lit);
     }
 
+    #[must_use]
     pub fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
         let mut lits: Vec<Lit> = self.knownlits.clone();
@@ -67,6 +69,7 @@ impl PuzzleSolver {
         })
     }
 
+    #[must_use]
     pub fn puzzleparse(&self) -> &PuzzleParse {
         &self.puzzleparse
     }
@@ -104,7 +107,7 @@ mod tests {
         for &lit in &varlits {
             let mus = puz.get_var_mus_quick(lit);
             assert!(mus.is_some());
-            print!("{:?} {:?}", lit, mus);
+            print!("{lit:?} {mus:?}");
         }
 
         // Check their negations have no mus (this isn't always true,
