@@ -10,15 +10,17 @@ pub type Solver = rustsat_glucose::core::Glucose;
 
 pub struct SatCore {
     pub solver: Arc<Mutex<Solver>>,
+    pub cnf: Arc<Cnf>,
 }
 
 impl SatCore {
-    pub fn new(cnf: Cnf) -> anyhow::Result<SatCore> {
+    pub fn new(cnf: Arc<Cnf>) -> anyhow::Result<SatCore> {
         let mut solver = Solver::default();
-        solver.add_cnf(cnf.clone())?;
+        solver.add_cnf(cnf.as_ref().clone())?;
 
         Ok(SatCore {
             solver: Arc::new(Mutex::new(solver)),
+            cnf: cnf,
         })
     }
 

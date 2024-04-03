@@ -24,9 +24,8 @@ impl PuzzleSolver {
     }
 
     fn get_satcore(&self) -> &SatCore {
-        self.satcore.get_or(|| {
-            SatCore::new(self.puzzleparse.cnf.as_ref().unwrap().as_ref().clone()).unwrap()
-        })
+        self.satcore
+            .get_or(|| SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap())
     }
 
     fn puzlit_to_lit(&self, puzlit: PuzLit) -> Lit {
