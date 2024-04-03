@@ -24,3 +24,5 @@ rustsat = { version = "0.4", path = "../../rustsat/rustsat" }
 rustsat-glucose = { version = "0.2", path = "../../rustsat/glucose" }
 test-log = "0.2"
 tera = { version = "1.19", default-features = false }
+rayon = "1.0"
+thread_local = "1.1"

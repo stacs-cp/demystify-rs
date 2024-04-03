@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use itertools::Itertools;
 use rustsat::instances::Cnf;
 use rustsat::solvers::{Solve, SolveIncremental};
 use rustsat::types::{Assignment, Lit};
@@ -59,32 +60,26 @@ impl SatCore {
     }
 
     #[must_use]
-    pub fn quick_mus(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
-        let mut core = self.assumption_solve_with_core(dbg!(lits))?;
+    pub fn quick_mus(&self, known: &[Lit], in_lits: &[Lit]) -> Option<Vec<Lit>> {
+        let lits = [known, in_lits].concat();
+        let mut core = self.assumption_solve_with_core(&lits)?;
         // Need to make a copy for actually searching over
-        let core_clone = dbg!(&core).clone();
-        for lit in core_clone {
+        let core_clone = core.clone();
+        for &lit in in_lits {
             let location = core.iter().position(|&x| x == lit);
             if let Some(location) = location {
                 let mut check_core = core.clone();
                 check_core.remove(location);
-                let candidate = self.assumption_solve_with_core(&dbg!(check_core));
+                let candidate = self.assumption_solve_with_core(&check_core);
                 if let Some(found) = candidate {
-                    core = dbg!(found);
+                    core = found;
                 }
             }
         }
-        Some(core)
-    }
-
-    pub fn add_lits(&self, lits: &[Lit]) {
-        let mut solver = self.solver.lock().unwrap();
-        for &l in lits {
-            (*solver).add_unit(l).unwrap();
-        }
-    }
-
-    pub fn add_lit(&self, lits: Lit) {
-        self.add_lits(&[lits]);
+        Some(
+            core.into_iter()
+                .filter(|x| in_lits.contains(x))
+                .collect_vec(),
+        )
     }
 }

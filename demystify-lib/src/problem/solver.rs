@@ -1,25 +1,33 @@
 use std::collections::BTreeSet;
 
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustsat::types::Lit;
+use thread_local::ThreadLocal;
 
 use crate::satcore::SatCore;
 
 use super::{parse::PuzzleParse, PuzLit};
 
 pub struct PuzzleSolver {
-    satcore: SatCore,
+    satcore: ThreadLocal<SatCore>,
+    //    satcore: SatCore,
     puzzleparse: PuzzleParse,
     knownlits: Vec<Lit>,
 }
 
 impl PuzzleSolver {
     pub fn new(puzzleparse: PuzzleParse) -> anyhow::Result<PuzzleSolver> {
-        let satcore = SatCore::new(puzzleparse.satinstance.clone().as_cnf().0)?;
+        //        let satcore = SatCore::new(puzzleparse.satinstance.clone().as_cnf().0)?;
         Ok(PuzzleSolver {
-            satcore,
+            satcore: ThreadLocal::new(),
             puzzleparse,
             knownlits: Vec::new(),
         })
+    }
+
+    fn get_satcore(&self) -> &SatCore {
+        self.satcore
+            .get_or(|| SatCore::new(self.puzzleparse.satinstance.clone().as_cnf().0).unwrap())
     }
 
     fn puzlit_to_lit(&self, puzlit: PuzLit) -> Lit {
@@ -40,7 +48,7 @@ impl PuzzleSolver {
         for &lit in &self.puzzleparse.varset_lits {
             let mut lits = litorig.clone();
             lits.push(lit);
-            if !self.satcore.assumption_solve(&lits) {
+            if !self.get_satcore().assumption_solve(&lits) {
                 satisfied.push(lit);
             }
         }
@@ -52,21 +60,30 @@ impl PuzzleSolver {
         self.knownlits.push(lit);
         // we could add the literal to the solver, but then it can't
         // be backtracked.. but it might be faster! Investigate later.
-        //self.satcore.add_lit(lit);
+        //self.get_satcore().add_lit(lit);
     }
 
     #[must_use]
     pub fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
-        let mut lits: Vec<Lit> = self.knownlits.clone();
+
+        let mut lits: Vec<Lit> = vec![];
         lits.extend(self.puzzleparse.conset_lits.iter());
         lits.push(lit);
-        let mus = self.satcore.quick_mus(&lits);
+        let mus = self.get_satcore().quick_mus(&self.knownlits, &lits);
         mus.map(|m| {
             m.into_iter()
                 .filter(|x| self.puzzleparse.conset_lits.contains(x))
                 .collect()
         })
+    }
+
+    pub fn get_many_vars_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
+        let muses: Vec<_> = lits
+            .par_iter()
+            .map(|&x| (x, self.get_var_mus_quick(x).unwrap()))
+            .collect();
+        muses
     }
 
     #[must_use]

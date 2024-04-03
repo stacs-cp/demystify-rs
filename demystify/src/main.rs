@@ -1,12 +1,30 @@
-use demystify_lib::problem;
-use std::{fs::File, path::PathBuf};
+use clap::Parser;
+use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+use std::{fs::File, path::PathBuf, process::exit};
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan; // Add the missing import statement
 
+#[derive(clap::Parser, Debug)]
+struct Opt {
+    #[arg(long)]
+    model: String,
+
+    #[arg(long)]
+    param: String,
+
+    #[arg(long)]
+    quick: bool,
+
+    #[arg(long)]
+    trace: bool,
+}
+
 fn main() -> anyhow::Result<()> {
+    let opt = Opt::parse();
+
     let (non_block, _guard) = tracing_appender::non_blocking(File::create("demystify.trace")?);
 
-    if true {
+    if opt.trace {
         tracing_subscriber::fmt()
             .with_span_events(FmtSpan::ACTIVE)
             .with_max_level(Level::TRACE)
@@ -18,10 +36,19 @@ fn main() -> anyhow::Result<()> {
             .init();
     }
 
-    let _ = problem::parse::parse_essence(
-        &PathBuf::from("eprime/binairo.eprime"),
-        &PathBuf::from("eprime/binairo-1.param"),
-    )?;
+    let puzzle =
+        problem::parse::parse_essence(&PathBuf::from(opt.model), &PathBuf::from(opt.param))?;
+
+    let solver = PuzzleSolver::new(puzzle)?;
+
+    let mut planner = PuzzlePlanner::new(solver);
+
+    if opt.quick {
+        for p in planner.quick_solve() {
+            println!("{:?}", p);
+        }
+        exit(0);
+    }
 
     Ok(())
 }

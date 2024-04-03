@@ -1,6 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
@@ -18,10 +19,8 @@ impl PuzzlePlanner {
         let mut tosolve = self.psolve.get_unsatisfiable_varlits();
         let mut solvesteps = vec![];
         while !tosolve.is_empty() {
-            let muses: Vec<_> = tosolve
-                .iter()
-                .map(|&x| (x, self.psolve.get_var_mus_quick(x).unwrap()))
-                .collect();
+            let muses = self.psolve.get_many_vars_mus_quick(&tosolve);
+
             let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
             let muses: Vec<_> = muses
                 .into_iter()
@@ -51,6 +50,7 @@ impl PuzzlePlanner {
 
             // Add these muses to the solving steps
             solvesteps.extend(muses);
+            println!("{} steps, {} left", solvesteps.len(), tosolve.len());
         }
         solvesteps
     }
