@@ -122,7 +122,7 @@ mod tests {
         for &lit in &varlits {
             let mus = puz.get_var_mus_quick(lit);
             assert!(mus.is_some());
-            print!("{lit:?} {mus:?}");
+            println!("{lit:?} {mus:?}");
         }
 
         // Check their negations have no mus (this isn't always true,
