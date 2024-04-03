@@ -1,3 +1,4 @@
+/// Module containing problem-related functionality.
 pub mod parse;
 pub mod planner;
 pub mod solver;
@@ -7,6 +8,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+/// Represents a puzzle variable.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PuzVar {
     name: String,
@@ -14,6 +16,7 @@ pub struct PuzVar {
 }
 
 impl PuzVar {
+    /// Creates a new `PuzVar` instance.
     #[must_use]
     pub fn new(name: &str, indices: Vec<i64>) -> PuzVar {
         PuzVar {
@@ -22,6 +25,7 @@ impl PuzVar {
         }
     }
 
+    /// Returns the name of the variable.
     #[must_use]
     pub fn name(&self) -> &String {
         &self.name
@@ -34,6 +38,7 @@ impl fmt::Display for PuzVar {
     }
 }
 
+/// Represents a puzzle literal.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PuzLit {
     var: PuzVar,
@@ -52,6 +57,7 @@ impl fmt::Display for PuzLit {
 }
 
 impl PuzLit {
+    /// Creates a new `PuzLit` instance representing an equality constraint.
     #[must_use]
     pub fn new_eq_val(var: &PuzVar, val: i64) -> PuzLit {
         PuzLit {
@@ -61,6 +67,7 @@ impl PuzLit {
         }
     }
 
+    /// Creates a new `PuzLit` instance representing an inequality constraint.
     #[must_use]
     pub fn new_neq_val(var: &PuzVar, val: i64) -> PuzLit {
         PuzLit {
@@ -70,21 +77,25 @@ impl PuzLit {
         }
     }
 
+    /// Returns the variable associated with the literal.
     #[must_use]
     pub fn var(&self) -> PuzVar {
         self.var.clone()
     }
 
+    /// Returns the value associated with the literal.
     #[must_use]
     pub fn val(&self) -> i64 {
         self.val
     }
 
+    /// Returns the sign of the literal.
     #[must_use]
     pub fn sign(&self) -> bool {
         self.equal
     }
 
+    /// Returns the negation of the literal.
     #[must_use]
     pub fn neg(&self) -> PuzLit {
         PuzLit {
@@ -95,6 +106,7 @@ impl PuzLit {
     }
 }
 
+/// Represents a constraint identifier.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConID {
     pub lit: PuzLit,
@@ -102,6 +114,7 @@ pub struct ConID {
 }
 
 impl ConID {
+    /// Creates a new `ConID` instance.
     fn new(lit: PuzLit, name: String) -> ConID {
         ConID { lit, name }
     }

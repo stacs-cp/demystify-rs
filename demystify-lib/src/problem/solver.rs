@@ -8,6 +8,7 @@ use crate::satcore::SatCore;
 
 use super::{parse::PuzzleParse, PuzLit};
 
+/// Represents a puzzle solver.
 pub struct PuzzleSolver {
     satcore: ThreadLocal<SatCore>,
     puzzleparse: PuzzleParse,
@@ -15,6 +16,15 @@ pub struct PuzzleSolver {
 }
 
 impl PuzzleSolver {
+    /// Creates a new `PuzzleSolver` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `puzzleparse` - The `PuzzleParse` instance containing puzzle information.
+    ///
+    /// # Returns
+    ///
+    /// A `PuzzleSolver` instance.
     pub fn new(puzzleparse: PuzzleParse) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
             satcore: ThreadLocal::new(),
@@ -23,19 +33,47 @@ impl PuzzleSolver {
         })
     }
 
+    /// Retrieves the `SatCore` instance associated with the `PuzzleSolver`.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `SatCore` instance.
     fn get_satcore(&self) -> &SatCore {
         self.satcore
             .get_or(|| SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap())
     }
 
+    /// Converts a `PuzLit` instance to a `Lit`.
+    ///
+    /// # Arguments
+    ///
+    /// * `puzlit` - The `PuzLit` instance to convert.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding `Lit` instance.
     fn puzlit_to_lit(&self, puzlit: PuzLit) -> Lit {
         *self.puzzleparse.litmap.get(&puzlit).unwrap()
     }
 
+    /// Converts a `Lit` instance to a reference to the set of `PuzLit` instances it represents.
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The `Lit` instance to convert.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the set of `PuzLit` instances.
     fn lit_to_puzlit(&self, lit: Lit) -> &BTreeSet<PuzLit> {
         self.puzzleparse.invlitmap.get(&lit).unwrap()
     }
 
+    /// Retrieves the unsatisfiable variable literals.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the unsatisfiable variable literals.
     #[must_use]
     pub fn get_unsatisfiable_varlits(&self) -> Vec<Lit> {
         let mut satisfied = vec![];
@@ -54,6 +92,11 @@ impl PuzzleSolver {
         satisfied
     }
 
+    /// Adds a known literal to the `PuzzleSolver`.
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
         self.knownlits.push(lit);
         // we could add the literal to the solver, but then it can't
@@ -61,6 +104,15 @@ impl PuzzleSolver {
         //self.get_satcore().add_lit(lit);
     }
 
+    /// Retrieves the minimal unsatisfiable subset (MUS) of variables containing the given literal.
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The literal to find the MUS for.
+    ///
+    /// # Returns
+    ///
+    /// An optional vector containing the MUS of variables, or `None` if no MUS is found.
     #[must_use]
     pub fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
@@ -76,14 +128,31 @@ impl PuzzleSolver {
         })
     }
 
+    /// Retrieves the MUS for exach element of a list of literals
+    ///
+    /// # Arguments
+    ///
+    /// * `lits` - The literals to find the MUS for.
+    ///
+    /// # Returns
+    ///
+    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
+    /// Literals where no MUS was found are ommitted from the output.
     pub fn get_many_vars_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
         let muses: Vec<_> = lits
             .par_iter()
-            .map(|&x| (x, self.get_var_mus_quick(x).unwrap()))
+            .map(|&x| (x, self.get_var_mus_quick(x)))
+            .filter(|(_, mus)| mus.is_some())
+            .map(|(lit, mus)| (lit, mus.unwrap()))
             .collect();
         muses
     }
 
+    /// Retrieves a reference to the `PuzzleParse` instance associated with the `PuzzleSolver`.
+    ///
+    /// # Returns
+    ///
+    /// A reference to the `PuzzleParse` instance.
     #[must_use]
     pub fn puzzleparse(&self) -> &PuzzleParse {
         &self.puzzleparse

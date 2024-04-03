@@ -1,20 +1,22 @@
 use std::collections::{BTreeSet, HashSet};
 
 use itertools::Itertools;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
+/// Represents a puzzle planner.
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
 }
 
 impl PuzzlePlanner {
+    /// Creates a new `PuzzlePlanner` instance.
     #[must_use]
     pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
         PuzzlePlanner { psolve }
     }
 
+    /// Solves the puzzle quickly and returns a sequence of steps.
     pub fn quick_solve(&mut self) -> Vec<(BTreeSet<PuzLit>, Vec<String>)> {
         let mut tosolve = self.psolve.get_unsatisfiable_varlits();
         let mut solvesteps = vec![];
@@ -34,7 +36,6 @@ impl PuzzlePlanner {
             tosolve.retain(|x| !removeset.contains(x));
 
             // Map the 'muses' to a user PuzLits
-
             let muses = muses
                 .into_iter()
                 .map(|(l, x)| {
@@ -62,6 +63,7 @@ impl PuzzlePlanner {
         solvesteps
     }
 
+    /// Returns a reference to the puzzle being solved.
     fn puzzle(&self) -> &PuzzleParse {
         self.psolve.puzzleparse()
     }

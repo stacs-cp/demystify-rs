@@ -37,7 +37,7 @@ impl SatCore {
 
         Ok(SatCore {
             solver: Arc::new(Mutex::new(solver)),
-            cnf: cnf,
+            cnf,
             fixed: RefCell::new(HashSet::new()),
         })
     }
@@ -140,7 +140,7 @@ impl SatCore {
 
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
     /// *Not memoryless*: Uses whatever set of values are already fixed in the solver.
-    /// 
+    ///
     /// # Arguments
     ///
     /// * `lits` - The assumptions to use during solving.
@@ -175,7 +175,7 @@ impl SatCore {
     pub fn quick_mus(&self, known: &[Lit], lits: &[Lit]) -> Option<Vec<Lit>> {
         self.fix_values(known);
 
-        let mut core = self.raw_assumption_solve_with_core(&lits)?;
+        let mut core = self.raw_assumption_solve_with_core(lits)?;
         // Need to make a copy for actually searching over
         for &lit in lits {
             let location = core.iter().position(|&x| x == lit);

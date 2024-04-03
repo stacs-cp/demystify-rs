@@ -1,3 +1,10 @@
+/// This module contains the implementation of parsing and processing functions for problem files.
+/// It includes functions for parsing DIMACS files, extracting annotations from Essence' files,
+/// and creating data structures to represent the parsed information.
+///
+/// The main struct in this module is `PuzzleParse`, which represents the result of parsing a DIMACS file.
+/// It contains various fields to store the parsed information, such as the annotations from the Essence' file,
+/// the SAT instance parsed from the DIMACS file, mappings between literals and SAT integers, and more.
 use anyhow::{bail, Context};
 use itertools::Itertools;
 use regex::Regex;
