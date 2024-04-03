@@ -10,14 +10,12 @@ use super::{parse::PuzzleParse, PuzLit};
 
 pub struct PuzzleSolver {
     satcore: ThreadLocal<SatCore>,
-    //    satcore: SatCore,
     puzzleparse: PuzzleParse,
     knownlits: Vec<Lit>,
 }
 
 impl PuzzleSolver {
     pub fn new(puzzleparse: PuzzleParse) -> anyhow::Result<PuzzleSolver> {
-        //        let satcore = SatCore::new(puzzleparse.satinstance.clone().as_cnf().0)?;
         Ok(PuzzleSolver {
             satcore: ThreadLocal::new(),
             puzzleparse,
@@ -26,8 +24,9 @@ impl PuzzleSolver {
     }
 
     fn get_satcore(&self) -> &SatCore {
-        self.satcore
-            .get_or(|| SatCore::new(self.puzzleparse.satinstance.clone().as_cnf().0).unwrap())
+        self.satcore.get_or(|| {
+            SatCore::new(self.puzzleparse.cnf.as_ref().unwrap().as_ref().clone()).unwrap()
+        })
     }
 
     fn puzlit_to_lit(&self, puzlit: PuzLit) -> Lit {

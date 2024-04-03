@@ -48,9 +48,16 @@ impl PuzzlePlanner {
                 })
                 .collect_vec();
 
+            println!(
+                "{} steps, just found {} muses of size {}, {} left",
+                solvesteps.len(),
+                muses.len(),
+                minmus,
+                tosolve.len()
+            );
+
             // Add these muses to the solving steps
             solvesteps.extend(muses);
-            println!("{} steps, {} left", solvesteps.len(), tosolve.len());
         }
         solvesteps
     }

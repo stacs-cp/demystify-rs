@@ -64,7 +64,6 @@ impl SatCore {
         let lits = [known, in_lits].concat();
         let mut core = self.assumption_solve_with_core(&lits)?;
         // Need to make a copy for actually searching over
-        let core_clone = core.clone();
         for &lit in in_lits {
             let location = core.iter().position(|&x| x == lit);
             if let Some(location) = location {
