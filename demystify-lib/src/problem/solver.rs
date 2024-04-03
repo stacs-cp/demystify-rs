@@ -114,13 +114,13 @@ impl PuzzleSolver {
     ///
     /// An optional vector containing the MUS of variables, or `None` if no MUS is found.
     #[must_use]
-    pub fn get_var_mus_quick(&self, lit: Lit) -> Option<Vec<Lit>> {
+    pub fn get_var_mus_quick(&self, lit: Lit, max_size: Option<i32>) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
 
         let mut lits: Vec<Lit> = vec![];
         lits.extend(self.puzzleparse.conset_lits.iter());
         lits.push(lit);
-        let mus = self.get_satcore().quick_mus(&self.knownlits, &lits);
+        let mus = self.get_satcore().quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
         mus.map(|m| {
             m.into_iter()
                 .filter(|x| self.puzzleparse.conset_lits.contains(x))
@@ -128,7 +128,7 @@ impl PuzzleSolver {
         })
     }
 
-    /// Retrieves the MUS for exach element of a list of literals
+    /// Retrieves the MUS for each element of a list of literals
     ///
     /// # Arguments
     ///
@@ -141,11 +141,38 @@ impl PuzzleSolver {
     pub fn get_many_vars_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
         let muses: Vec<_> = lits
             .par_iter()
-            .map(|&x| (x, self.get_var_mus_quick(x)))
+            .map(|&x| (x, self.get_var_mus_quick(x, None)))
             .filter(|(_, mus)| mus.is_some())
             .map(|(lit, mus)| (lit, mus.unwrap()))
             .collect();
         muses
+    }
+
+    /// Retrieves small MUSes for each element of a list of literals
+    ///
+    /// # Arguments
+    ///
+    /// * `lits` - The literals to find the MUS for.
+    ///
+    /// # Returns
+    ///
+    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
+    /// Literals with large MUSes are skipped. The exact set of returned literals may vary.
+    pub fn get_many_vars_small_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
+        let mut mus_size: i32 = 2;
+        loop {
+        let muses: Vec<_> = lits
+            .par_iter()
+            .map(|&x| (x, self.get_var_mus_quick(x, Some(mus_size))))
+            .filter(|(_, mus)| mus.is_some())
+            .map(|(lit, mus)| (lit, mus.unwrap()))
+            .collect();
+            if mus_size > (lits.len() as i32) + 1 || !muses.is_empty() {
+                return muses;
+            }
+            mus_size *= 2;
+
+        }
     }
 
     /// Retrieves a reference to the `PuzzleParse` instance associated with the `PuzzleSolver`.
@@ -162,6 +189,7 @@ impl PuzzleSolver {
 #[cfg(test)]
 mod tests {
     use crate::problem::solver::PuzzleSolver;
+    use itertools::Itertools;
     use test_log::test;
 
     #[test]
@@ -189,8 +217,10 @@ mod tests {
 
         // Do a basic check we get a MUS for every varlit
         for &lit in &varlits {
-            let mus = puz.get_var_mus_quick(lit);
+            let mus = puz.get_var_mus_quick(lit, None);
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
             assert!(mus.is_some());
+            assert!(mus_limit.is_some());
             println!("{lit:?} {mus:?}");
         }
 
@@ -198,8 +228,46 @@ mod tests {
         // only for puzzles with only one solution)
         for &lit in &varlits {
             let lit = !lit;
-            let mus = puz.get_var_mus_quick(lit);
+            let mus = puz.get_var_mus_quick(lit, None);
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
             assert!(mus.is_none());
+            assert!(mus_limit.is_none());
         }
+    }
+
+    #[test]
+    fn test_many_lits() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let varlits = puz.get_unsatisfiable_varlits();
+
+        assert_eq!(varlits.len(), 16);
+        for &lit in &varlits {
+            let puzlit = puz.lit_to_puzlit(lit);
+            for p in puzlit {
+                let indices = p.var().indices;
+                assert_eq!(indices.len(), 1);
+                // In the solution, forAll i, x[i]=i
+                // and the lits are the 'unsatisfiable' lits
+                assert_eq!(indices[0] == p.val(), !p.sign());
+            }
+        }
+
+        let muses = puz.get_many_vars_mus_quick(&varlits);
+        let muses_quick = puz.get_many_vars_small_mus_quick(&varlits);
+
+        assert!(!muses.is_empty());
+        assert!(!muses_quick.is_empty());
+
+        let neg_muses = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
+        let neg_muses_quick = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
+
+        assert!(neg_muses.is_empty());
+        assert!(neg_muses_quick.is_empty());
     }
 }
