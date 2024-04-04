@@ -1,5 +1,6 @@
 language ESSENCE' 1.0
 
+$#KIND Tiny
 given n: int
 
 letting ndim be int(1..n)

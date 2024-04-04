@@ -30,12 +30,12 @@ class PuzzleDraw {
     puzdef = structuredClone(puzdef);
     let grid = null;
     const puz = puzdef["puzzle"];
-    if ("startGrid" in puz) {
-      grid = puz["startGrid"];
+    if ("start_grid" in puz) {
+      grid = puz["start_grid"];
     }
 
     if ("solution" in puzdef) {
-      grid = puzdef["solutionGrid"];
+      grid = puzdef["solution_grid"];
     }
 
     if (!("height" in puzdef)) {
@@ -49,7 +49,7 @@ class PuzzleDraw {
       puzdef["decorations"] = {};
     }
 
-    if (puzdef["type"] && puzdef["type"] in _puzzle_decorations) {
+    if (puzdef["kind"] && puzdef["kind"] in _puzzle_decorations) {
       for (const [k, v] of Object.entries(_puzzle_decorations) as [string, any][]) {
         if (!(k in puzdef["decorations"])) {
           puzdef["decorations"][k] = v;
@@ -67,22 +67,22 @@ class PuzzleDraw {
 
     const out = this.drawGrid(puzzle, puzjson["decorations"]);
 
-    if ("startGrid" in puzzle) {
-      console.log("startGrid");
-      this.fillFixedState(out, puzzle["startGrid"]);
+    if ("start_grid" in puzzle) {
+      console.log("start_grid");
+      this.fillFixedState(out, puzzle["start_grid"]);
     }
 
-    if ("knowledgeGrid" in puzzle) {
-      console.log("knowledgeGrid");
-      this.fillKnowledge(out, puzzle["knowledgeGrid"]);
+    if ("state" in puzjson && "knowledge_grid" in puzjson["state"]) {
+      console.log("knowledge_grid");
+      this.fillKnowledge(out, puzjson["state"]["knowledge_grid"]);
     }
 
-    if ("solutionGrid" in puzzle) {
-      const solutionCpy = structuredClone(puzzle["solutionGrid"]);
-      if ("startGrid" in puzzle) {
-        for (let i = 0; i < puzzle["startGrid"].length; i++) {
-          for (let j = 0; j < puzzle["startGrid"][i].length; j++) {
-            const cell = puzzle["startGrid"][i][j];
+    if ("solution_grid" in puzzle) {
+      const solutionCpy = structuredClone(puzzle["solution_grid"]);
+      if ("start_grid" in puzzle) {
+        for (let i = 0; i < puzzle["start_grid"].length; i++) {
+          for (let j = 0; j < puzzle["start_grid"][i].length; j++) {
+            const cell = puzzle["start_grid"][i][j];
             if (cell) {
               solutionCpy[i][j] = null;
             }

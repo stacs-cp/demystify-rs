@@ -172,7 +172,7 @@ mod tests {
 
         let params = serde_json::value::Value::Null;
 
-        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, params);
+        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, params, None);
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_1_2_3";

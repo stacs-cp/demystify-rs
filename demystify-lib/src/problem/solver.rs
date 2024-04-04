@@ -120,7 +120,9 @@ impl PuzzleSolver {
         let mut lits: Vec<Lit> = vec![];
         lits.extend(self.puzzleparse.conset_lits.iter());
         lits.push(lit);
-        let mus = self.get_satcore().quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
+        let mus = self
+            .get_satcore()
+            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
         mus.map(|m| {
             m.into_iter()
                 .filter(|x| self.puzzleparse.conset_lits.contains(x))
@@ -161,17 +163,16 @@ impl PuzzleSolver {
     pub fn get_many_vars_small_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
         let mut mus_size: i32 = 2;
         loop {
-        let muses: Vec<_> = lits
-            .par_iter()
-            .map(|&x| (x, self.get_var_mus_quick(x, Some(mus_size))))
-            .filter(|(_, mus)| mus.is_some())
-            .map(|(lit, mus)| (lit, mus.unwrap()))
-            .collect();
+            let muses: Vec<_> = lits
+                .par_iter()
+                .map(|&x| (x, self.get_var_mus_quick(x, Some(mus_size))))
+                .filter(|(_, mus)| mus.is_some())
+                .map(|(lit, mus)| (lit, mus.unwrap()))
+                .collect();
             if mus_size > (lits.len() as i32) + 1 || !muses.is_empty() {
                 return muses;
             }
             mus_size *= 2;
-
         }
     }
 
@@ -265,7 +266,8 @@ mod tests {
         assert!(!muses_quick.is_empty());
 
         let neg_muses = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
-        let neg_muses_quick = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
+        let neg_muses_quick =
+            puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
 
         assert!(neg_muses.is_empty());
         assert!(neg_muses_quick.is_empty());

@@ -39,8 +39,10 @@ pub struct EPrimeAnnotations {
     pub auxvars: BTreeSet<String>,
     /// The constraints in the Essence' file, represented as a mapping from constraint name to constraint expression.
     pub cons: BTreeMap<String, String>,
-    // The parameters read from the param file
+    /// The parameters read from the param file
     pub params: serde_json::value::Value,
+    /// The kind of puzzle
+    pub kind: Option<String>,
 }
 /// Represents the result of parsing a DIMACS file.
 
@@ -90,6 +92,7 @@ impl PuzzleParse {
         auxvars: BTreeSet<String>,
         cons: BTreeMap<String, String>,
         params: serde_json::value::Value,
+        kind: Option<String>,
     ) -> PuzzleParse {
         PuzzleParse {
             eprime: EPrimeAnnotations {
@@ -97,6 +100,7 @@ impl PuzzleParse {
                 auxvars,
                 cons,
                 params,
+                kind,
             },
             satinstance: SatInstance::new(),
             cnf: None,
@@ -275,6 +279,8 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
 
     let mut cons: BTreeMap<String, String> = BTreeMap::new();
 
+    let mut kind: Option<String> = None;
+
     let conmatch = Regex::new(r#"\$#CON (.*) \"(.*)\""#).unwrap();
 
     let file = File::open(in_path)?;
@@ -315,6 +321,12 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                     bail!(format!("{} defined twice", v));
                 }
                 auxvars.insert(v);
+            } else if line.starts_with("$#KIND") {
+                let v = parts[1].to_string();
+                if kind.is_some() {
+                    bail!("Cannot have two 'KIND' statements");
+                }
+                kind = Some(v)
             }
         }
     }
@@ -324,7 +336,9 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
     // Read parameters in as a JSON object
     let params = read_essence_param(eprimeparam)?;
 
-    Ok(PuzzleParse::new_from_eprime(vars, auxvars, cons, params))
+    Ok(PuzzleParse::new_from_eprime(
+        vars, auxvars, cons, params, kind,
+    ))
 }
 
 fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()> {
@@ -535,6 +549,8 @@ mod tests {
         assert_eq!(puz.eprime.vars.len(), 1);
         assert_eq!(puz.eprime.cons.len(), 1);
         assert_eq!(puz.eprime.auxvars.len(), 0);
+        assert_eq!(puz.eprime.kind, Some("Tiny".to_string()));
+
         // These next two may become '3' at some point, when we do better
         // at rejecting useless constraints
         assert_eq!(puz.conset.len(), 4);

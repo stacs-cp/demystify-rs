@@ -172,7 +172,12 @@ impl SatCore {
     ///
     /// The minimal unsatisfiable subset (MUS) of literals, if one exists.
     #[must_use]
-    pub fn quick_mus(&self, known: &[Lit], lits: &[Lit], max_size: Option<i32>) -> Option<Vec<Lit>> {
+    pub fn quick_mus(
+        &self,
+        known: &[Lit],
+        lits: &[Lit],
+        max_size: Option<i32>,
+    ) -> Option<Vec<Lit>> {
         self.fix_values(known);
         let mut known_size = 0;
         let mut core = self.raw_assumption_solve_with_core(lits)?;
