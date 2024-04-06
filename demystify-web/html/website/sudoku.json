@@ -3,7 +3,7 @@
       "kind": "sudoku",
       "width": 9,
       "height": 9,
-      "fixed": [
+      "start_grid": [
         [null, null, 3, null, null, null, null, null, null],
         [9, null, null, 3, null, 5, null, null, 1],
         [null, null, 1, 8, null, 6, 4, null, null],
