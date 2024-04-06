@@ -2,7 +2,7 @@ use clap::Parser;
 use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
 use std::{fs::File, path::PathBuf, process::exit};
 use tracing::Level;
-use tracing_subscriber::fmt::format::FmtSpan; // Add the missing import statement
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(clap::Parser, Debug)]
 struct Opt {

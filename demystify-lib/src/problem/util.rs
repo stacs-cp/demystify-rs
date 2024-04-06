@@ -302,7 +302,7 @@ pub mod test_utils {
         // Call parse_essence function
         let result = parse_essence(&temp_eprime_path, &temp_eprimeparam_path);
 
-        assert!(!result.is_err(), "Bad parse: {result:?}");
+        assert!(result.is_ok(), "Bad parse: {result:?}");
         // Assert that the function returns Ok
         assert!(result.is_ok());
 

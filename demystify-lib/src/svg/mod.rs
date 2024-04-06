@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+
 
 use crate::json::StateLit;
 
@@ -11,6 +11,12 @@ pub struct PuzzleDraw {
     base_width: f64,
     mid_width: f64,
     thick_width: f64,
+}
+
+impl Default for PuzzleDraw {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PuzzleDraw {
@@ -41,13 +47,13 @@ impl PuzzleDraw {
 
         if let Some(start_grid) = &puzzle.start_grid {
             println!("start_grid");
-            self.fill_fixed_state(&mut cells, &start_grid);
+            self.fill_fixed_state(&mut cells, start_grid);
         }
 
         if let Some(state) = &puzjson.state {
             if let Some(knowledge_grid) = &state.knowledge_grid {
                 println!("knowledge_grid");
-                self.fill_knowledge(&mut cells, &knowledge_grid);
+                self.fill_knowledge(&mut cells, knowledge_grid);
             }
         }
 
@@ -172,12 +178,11 @@ impl PuzzleDraw {
             let colours: Vec<_> = cages
                 .iter()
                 .flatten()
-                .filter(|&cell| cell.is_some())
-                .map(|cell| cell.unwrap())
+                .filter_map(|cell| *cell)
                 .collect();
 
-            for i in 0..width as usize {
-                for j in 0..height as usize {
+            for i in 0..width {
+                for j in 0..height {
                     if let Some(cell) = cages[j][i] {
                         let col = colours.iter().position(|&c| c == cell).unwrap();
                         let i_f = i as f64;

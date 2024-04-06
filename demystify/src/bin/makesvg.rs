@@ -1,11 +1,10 @@
 use clap::Parser;
 use demystify_lib::json::Problem;
-use demystify_lib::svg::PuzzleDraw; // Add the missing import statement
-use serde_json; // Add the missing import statement
+use demystify_lib::svg::PuzzleDraw;
 use std::io::Write;
-use std::{fs::File, path::PathBuf, process::exit};
+use std::fs::File;
 use tracing::Level;
-use tracing_subscriber::fmt::format::FmtSpan; // Add the missing import statement
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(clap::Parser, Debug)]
 struct Opt {
