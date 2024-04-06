@@ -675,6 +675,7 @@ dependencies = [
  "serde",
  "serde_json",
  "structopt",
+ "svg",
  "tempfile",
  "tera",
  "test-log",
@@ -692,6 +693,7 @@ dependencies = [
  "anyhow",
  "clap 4.5.4",
  "demystify-lib",
+ "serde_json",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -2580,6 +2582,12 @@ name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
+
+[[package]]
+name = "svg"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583e1c5c326fd6fede8797006de3b95ad6bcd60a592952952c5ba7ddd7e84c83"
 
 [[package]]
 name = "syn"

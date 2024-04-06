@@ -26,3 +26,4 @@ test-log = "0.2"
 tera = { version = "1.19", default-features = false }
 rayon = "1.0"
 thread_local = "1.1"
+svg = "0.16"
