@@ -40,10 +40,87 @@ pub struct EPrimeAnnotations {
     /// The constraints in the Essence' file, represented as a mapping from constraint name to constraint expression.
     pub cons: BTreeMap<String, String>,
     /// The parameters read from the param file
-    pub params: serde_json::value::Value,
+    params: BTreeMap<String, serde_json::value::Value>,
     /// The kind of puzzle
     pub kind: Option<String>,
 }
+
+impl EPrimeAnnotations {
+    pub fn has_param(&self, s: &str) -> bool {
+        return self.params.contains_key(s);
+    }
+
+    pub fn param_bool(&self, s: &str) -> anyhow::Result<bool> {
+        serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {}", s))?
+                .clone(),
+        )
+        .context(format!("Param {} is not bool", s))
+    }
+
+    pub fn param_i64(&self, s: &str) -> anyhow::Result<i64> {
+        serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {}", s))?
+                .clone(),
+        )
+        .context(format!("Param {} is not int", s))
+    }
+
+    pub fn param_vec_i64(&self, s: &str) -> anyhow::Result<Vec<i64>> {
+        // Conjure produces arrays as maps, so we need to fix up
+        let map: HashMap<i64, i64> = serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {}", s))?
+                .clone(),
+        )
+        .context(format!("Param {} is not an array of ints", s))?;
+
+        let mut ret: Vec<i64> = vec![0; map.len()];
+
+        for i in 0..map.len() {
+            ret[i] = *map
+                .get(&((i + 1) as i64))
+                .context(format!("Malformed param? {}", s))?;
+        }
+
+        Ok(ret)
+    }
+
+    pub fn param_vec_vec_i64(&self, s: &str) -> anyhow::Result<Vec<Vec<i64>>> {
+        // Conjure produces arrays as maps, so we need to fix up
+        let map: HashMap<i64, HashMap<i64, i64>> = serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {}", s))?
+                .clone(),
+        )
+        .context(format!("Param {} is not a 2d array of ints", s))?;
+
+        let mut ret: Vec<Vec<i64>> = vec![vec![]; map.len()];
+
+        for i in 0..map.len() {
+            let row = map
+                .get(&((i + 1) as i64))
+                .context(format!("Malformed param? {}", s))?;
+            let mut rowvec: Vec<i64> = vec![0; row.len()];
+            for j in 0..row.len() {
+                rowvec[j] = *row
+                    .get(&((j + 1) as i64))
+                    .context(format!("Malformed param? {}", s))?;
+            }
+
+            ret[i] = rowvec;
+        }
+
+        Ok(ret)
+    }
+}
+
 /// Represents the result of parsing a DIMACS file.
 
 #[derive(Debug)]
@@ -91,7 +168,7 @@ impl PuzzleParse {
         vars: BTreeSet<String>,
         auxvars: BTreeSet<String>,
         cons: BTreeMap<String, String>,
-        params: serde_json::value::Value,
+        params: BTreeMap<String, serde_json::value::Value>,
         kind: Option<String>,
     ) -> PuzzleParse {
         PuzzleParse {
@@ -498,7 +575,9 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
     Ok(eprimeparse)
 }
 
-fn read_essence_param(eprimeparam: &PathBuf) -> anyhow::Result<serde_json::value::Value> {
+fn read_essence_param(
+    eprimeparam: &PathBuf,
+) -> anyhow::Result<BTreeMap<String, serde_json::value::Value>> {
     if eprimeparam.ends_with(".json") {
         info!(target: "parser", "Reading params {:?} as json", eprimeparam);
         let file = fs::File::open(eprimeparam).unwrap();
@@ -535,7 +614,23 @@ mod tests {
         let eprime_path = "./tst/binairo.eprime";
         let eprimeparam_path = "./tst/binairo-1.param";
 
-        let _ = crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        assert!(!puz.eprime.has_param("q"));
+
+        assert!(puz.eprime.has_param("n"));
+
+        assert_eq!(puz.eprime.param_i64("n").unwrap(), 6);
+
+        assert!(puz.eprime.has_param("initial"));
+
+        assert!(puz.eprime.param_vec_i64("initial").is_err());
+
+        let initial: Vec<Vec<i64>> = puz.eprime.param_vec_vec_i64("initial").unwrap();
+
+        assert_eq!(initial[0], vec![2, 2, 2, 0, 0, 2]);
+        assert_eq!(initial[5], vec![2, 0, 2, 2, 1, 1]);
     }
 
     #[test]
@@ -550,6 +645,17 @@ mod tests {
         assert_eq!(puz.eprime.cons.len(), 1);
         assert_eq!(puz.eprime.auxvars.len(), 0);
         assert_eq!(puz.eprime.kind, Some("Tiny".to_string()));
+
+        assert!(puz.eprime.has_param("n"));
+
+        assert_eq!(puz.eprime.param_i64("n").unwrap(), 4);
+
+        assert!(puz.eprime.param_bool("n").is_err());
+
+        assert_eq!(puz.eprime.param_bool("b1").unwrap(), false);
+        assert_eq!(puz.eprime.param_bool("b2").unwrap(), true);
+
+        assert_eq!(puz.eprime.param_vec_i64("l").unwrap(), vec![2, 4, 6, 8]);
 
         // These next two may become '3' at some point, when we do better
         // at rejecting useless constraints

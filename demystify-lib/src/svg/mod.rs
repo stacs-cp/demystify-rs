@@ -1,5 +1,3 @@
-
-
 use crate::json::StateLit;
 
 use super::json::{Problem, Puzzle};
@@ -175,11 +173,7 @@ impl PuzzleDraw {
         let mut cagegrp = element::Group::new();
 
         if let Some(cages) = &cages {
-            let colours: Vec<_> = cages
-                .iter()
-                .flatten()
-                .filter_map(|cell| *cell)
-                .collect();
+            let colours: Vec<_> = cages.iter().flatten().filter_map(|cell| *cell).collect();
 
             for i in 0..width {
                 for j in 0..height {

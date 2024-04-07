@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use super::{parse::PuzzleParse, PuzVar};
 use anyhow::{bail, Context};
@@ -67,7 +67,7 @@ pub fn parse_savile_row_name(
 
 pub fn parse_constraint_name(
     template: &str,
-    params: &serde_json::value::Value,
+    params: &BTreeMap<String, serde_json::value::Value>,
     index: &Vec<i64>,
 ) -> anyhow::Result<String> {
     let mut context = tera::Context::new();
@@ -170,7 +170,7 @@ mod tests {
         cons.insert("con1".to_string(), "test1".to_string());
         cons.insert("con2".to_string(), "test2".to_string());
 
-        let params = serde_json::value::Value::Null;
+        let params = BTreeMap::new();
 
         let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, params, None);
 
