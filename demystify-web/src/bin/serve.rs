@@ -1,8 +1,12 @@
+use axum::body::Body;
+use axum::http::Request;
+use axum::response::Response;
 use axum::routing::post;
 use axum::{routing::get, Json, Router};
 use axum_session::{Session, SessionConfig, SessionLayer, SessionNullPool, SessionStore};
 use demystify_web::wrap;
 use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
@@ -26,7 +30,24 @@ async fn main() {
         .route("/greetX", get(greet_x))
         .route("/uploadPuzzle", post(wrap::upload_files))
         .route("/quickFullSolve", get(wrap::dump_full_solve))
-        .nest_service("/", ServeDir::new("html/website"))
+        .route(
+            "/htmx.js",
+            get(|_: Request<Body>| async {
+                let htmx: &'static str =
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/html/website/htmx.js"));
+                Ok::<_, Infallible>(Response::new(Body::from(htmx)))
+            }),
+        )
+        .route(
+            "/",
+            get(|_: Request<Body>| async {
+                let index: &'static str = include_str!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/html/website/index.html"
+                ));
+                Ok::<_, Infallible>(Response::new(Body::from(index)))
+            }),
+        )
         .layer(cors)
         .layer(SessionLayer::new(session_store));
 

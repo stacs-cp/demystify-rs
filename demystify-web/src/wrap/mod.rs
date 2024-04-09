@@ -37,9 +37,9 @@ pub async fn upload_files(
         .await
         .context("Failed to parse multipart upload")?
     {
-        if field.name().unwrap() != "files[]" {
+        if field.name().unwrap() != "filelist" {
             return Err(anyhow!(
-                "Form malformed -- should contain 'files[]', but it contains '{}'",
+                "Form malformed -- should contain 'filelist', but it contains '{}'",
                 field.name().unwrap()
             )
             .into());
