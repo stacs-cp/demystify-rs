@@ -49,11 +49,11 @@ impl Puzzle {
 
         if width.is_none() || height.is_none() {
             if start_grid.is_some() {
-                width = Some((&start_grid).as_ref().unwrap()[0].len() as i64);
-                height = Some((&start_grid).as_ref().unwrap().len() as i64);
+                width = Some(start_grid.as_ref().unwrap()[0].len() as i64);
+                height = Some(start_grid.as_ref().unwrap().len() as i64);
             } else if cages.is_some() {
-                width = Some((&cages).as_ref().unwrap()[0].len() as i64);
-                height = Some((&cages).as_ref().unwrap().len() as i64);
+                width = Some(cages.as_ref().unwrap()[0].len() as i64);
+                height = Some(cages.as_ref().unwrap().len() as i64);
             }
         }
 
@@ -93,7 +93,7 @@ pub struct Problem {
 }
 
 impl Problem {
-    pub fn new_from_puzzle(problem: &PuzzleParse) -> Problem {
+    pub fn new_from_puzzle(_problem: &PuzzleParse) -> Problem {
         panic!();
     }
 }

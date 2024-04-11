@@ -47,7 +47,7 @@ pub struct EPrimeAnnotations {
 
 impl EPrimeAnnotations {
     pub fn has_param(&self, s: &str) -> bool {
-        return self.params.contains_key(s);
+        self.params.contains_key(s)
     }
 
     pub fn param_bool(&self, s: &str) -> anyhow::Result<bool> {
@@ -681,8 +681,8 @@ mod tests {
 
         assert!(puz.eprime.param_bool("n").is_err());
 
-        assert_eq!(puz.eprime.param_bool("b1").unwrap(), false);
-        assert_eq!(puz.eprime.param_bool("b2").unwrap(), true);
+        assert!(!puz.eprime.param_bool("b1").unwrap());
+        assert!(puz.eprime.param_bool("b2").unwrap());
 
         assert_eq!(puz.eprime.param_vec_i64("l").unwrap(), vec![2, 4, 6, 8]);
 
