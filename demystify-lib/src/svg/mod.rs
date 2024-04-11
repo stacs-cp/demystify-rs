@@ -89,7 +89,7 @@ impl PuzzleDraw {
     fn fill_fixed_state(
         &self,
         cells: &mut Vec<Vec<element::Group>>,
-        contents: &Vec<Vec<Option<u32>>>,
+        contents: &Vec<Vec<Option<i64>>>,
     ) {
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {

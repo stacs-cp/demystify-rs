@@ -119,6 +119,35 @@ impl EPrimeAnnotations {
 
         Ok(ret)
     }
+
+    pub fn param_vec_vec_option_i64(&self, s: &str) -> anyhow::Result<Vec<Vec<Option<i64>>>> {
+        // Conjure produces arrays as maps, so we need to fix up
+        let map: HashMap<i64, HashMap<i64, Option<i64>>> = serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {}", s))?
+                .clone(),
+        )
+        .context(format!("Param {} is not a 2d array of ints and nulls", s))?;
+
+        let mut ret: Vec<Vec<Option<i64>>> = vec![vec![]; map.len()];
+
+        for i in 0..map.len() {
+            let row = map
+                .get(&((i + 1) as i64))
+                .context(format!("Malformed param? {}", s))?;
+            let mut rowvec: Vec<Option<i64>> = vec![None; row.len()];
+            for j in 0..row.len() {
+                rowvec[j] = *row
+                    .get(&((j + 1) as i64))
+                    .context(format!("Malformed param? {}", s))?;
+            }
+
+            ret[i] = rowvec;
+        }
+
+        Ok(ret)
+    }
 }
 
 /// Represents the result of parsing a DIMACS file.
@@ -623,11 +652,11 @@ mod tests {
 
         assert_eq!(puz.eprime.param_i64("n").unwrap(), 6);
 
-        assert!(puz.eprime.has_param("initial"));
+        assert!(puz.eprime.has_param("start_grid"));
 
-        assert!(puz.eprime.param_vec_i64("initial").is_err());
+        assert!(puz.eprime.param_vec_i64("start_grid").is_err());
 
-        let initial: Vec<Vec<i64>> = puz.eprime.param_vec_vec_i64("initial").unwrap();
+        let initial: Vec<Vec<i64>> = puz.eprime.param_vec_vec_i64("start_grid").unwrap();
 
         assert_eq!(initial[0], vec![2, 2, 2, 0, 0, 2]);
         assert_eq!(initial[5], vec![2, 0, 2, 2, 1, 1]);
