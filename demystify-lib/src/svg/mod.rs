@@ -1,3 +1,6 @@
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::needless_range_loop)]
+
 use crate::json::StateLit;
 
 use super::json::{Problem, Puzzle};

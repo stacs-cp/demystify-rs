@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 /// This module contains the implementation of parsing and processing functions for problem files.
 /// It includes functions for parsing DIMACS files, extracting annotations from Essence' files,
 /// and creating data structures to represent the parsed information.

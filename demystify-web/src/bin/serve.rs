@@ -12,7 +12,6 @@ use tokio::net::TcpListener;
 
 use tower_http::cors::{Any, CorsLayer};
 
-
 #[tokio::main]
 async fn main() {
     let session_config = SessionConfig::default().with_table_name("sessions_table");
