@@ -203,3 +203,67 @@ impl SatCore {
         Some(core.into_iter().filter(|x| lits.contains(x)).collect_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use rustsat::lit;
+
+    use super::*;
+
+    fn create_cnf() -> Arc<Cnf> {
+        let mut cnf = Cnf::new();
+        cnf.add_binary(lit![0], lit![1]);
+        cnf.add_binary(lit![0], !lit![1]);
+        Arc::new(cnf)
+    }
+
+    #[test]
+    fn test_assumption_solve_solution() -> anyhow::Result<()> {
+        let solver = SatCore::new(create_cnf())?;
+        let result = solver.assumption_solve_solution(&[lit![1], lit![2]]);
+        assert!(result.is_some());
+        let result = solver.assumption_solve_solution(&[lit![0]]);
+        assert!(result.is_some());
+        let result = solver.assumption_solve_solution(&[!lit![0]]);
+        assert!(result.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_assumption_solve_core() -> anyhow::Result<()> {
+        let solver = SatCore::new(create_cnf())?;
+        let result = solver.assumption_solve_solution(&[lit![1], lit![2]]);
+        assert!(result.is_some());
+        let result = solver.assumption_solve_solution(&[lit![0]]);
+        assert!(result.is_some());
+        let result = solver.assumption_solve_solution(&[!lit![0]]);
+        assert!(result.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_assumption_quick_mus() -> anyhow::Result<()> {
+        let solver = SatCore::new(create_cnf())?;
+        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None);
+        assert!(result.is_none());
+        let result = solver.quick_mus(&[], &[lit![0]], None);
+        assert!(result.is_none());
+        let result = solver.quick_mus(&[], &[!lit![0]], None);
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_assumption_quick_mus_known() -> anyhow::Result<()> {
+        let solver = SatCore::new(create_cnf())?;
+        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None);
+        assert!(result.is_none());
+        let result = solver.quick_mus(&[!lit![0]], &[lit![1], lit![2]], None);
+        assert_eq!(result, Some(vec![]));
+        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None);
+        assert!(result.is_none());
+
+        Ok(())
+    }
+}

@@ -310,3 +310,28 @@ impl PuzzleDraw {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+
+    use test_log::test;
+
+    use crate::{json::Problem, svg::PuzzleDraw};
+
+    #[test]
+    fn test_svg_sudoku() -> anyhow::Result<()> {
+        let svg_path = "./tst/sudoku.json";
+
+        let file = File::open(&svg_path)?;
+        let problem: Problem = serde_json::from_reader(file)?;
+
+        let puz_draw = PuzzleDraw::new();
+
+        let svg = puz_draw.draw_puzzle(&problem);
+
+        let _ = svg.to_string();
+
+        Ok(())
+    }
+}

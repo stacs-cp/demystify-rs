@@ -12,7 +12,7 @@ use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, Cnf, SatInstance};
 use rustsat::types::Lit;
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use std::fs;
 use std::io::prelude::*;
@@ -73,7 +73,7 @@ impl EPrimeAnnotations {
 
     pub fn param_vec_i64(&self, s: &str) -> anyhow::Result<Vec<i64>> {
         // Conjure produces arrays as maps, so we need to fix up
-        let map: HashMap<i64, i64> = serde_json::from_value(
+        let map: BTreeMap<i64, i64> = serde_json::from_value(
             self.params
                 .get(s)
                 .context(format!("Missing param: {}", s))?
@@ -94,7 +94,7 @@ impl EPrimeAnnotations {
 
     pub fn param_vec_vec_i64(&self, s: &str) -> anyhow::Result<Vec<Vec<i64>>> {
         // Conjure produces arrays as maps, so we need to fix up
-        let map: HashMap<i64, HashMap<i64, i64>> = serde_json::from_value(
+        let map: BTreeMap<i64, BTreeMap<i64, i64>> = serde_json::from_value(
             self.params
                 .get(s)
                 .context(format!("Missing param: {}", s))?
@@ -123,7 +123,7 @@ impl EPrimeAnnotations {
 
     pub fn param_vec_vec_option_i64(&self, s: &str) -> anyhow::Result<Vec<Vec<Option<i64>>>> {
         // Conjure produces arrays as maps, so we need to fix up
-        let map: HashMap<i64, HashMap<i64, Option<i64>>> = serde_json::from_value(
+        let map: BTreeMap<i64, BTreeMap<i64, Option<i64>>> = serde_json::from_value(
             self.params
                 .get(s)
                 .context(format!("Missing param: {}", s))?
@@ -162,13 +162,15 @@ pub struct PuzzleParse {
     // A Copy of the CNF of the SAT instance (as we frequently need this)
     pub cnf: Option<Arc<Cnf>>,
     /// A mapping from literals in the direct representation to their corresponding SAT integer.
-    pub litmap: HashMap<PuzLit, Lit>,
+    pub litmap: BTreeMap<PuzLit, Lit>,
     /// A mapping from SAT integers to the direct representation.
-    pub invlitmap: HashMap<Lit, BTreeSet<PuzLit>>,
+    pub invlitmap: BTreeMap<Lit, BTreeSet<PuzLit>>,
     /// A mapping from each variable to its domain
-    pub domainmap: HashMap<PuzVar, BTreeSet<i64>>,
+    pub domainmap: BTreeMap<PuzVar, BTreeSet<i64>>,
     /// List of all constraints in the problem, and their English-readable name
     pub conset: BTreeMap<Lit, String>,
+    /// Inverse of conset
+    pub invconset: BTreeMap<String, Lit>,
     /// Lits of all literals in each constraint
     pub varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
     /// List of all literals in a VAR
@@ -181,15 +183,22 @@ pub struct PuzzleParse {
     /// A mapping from variables in the order representation to their corresponding SAT integers.
     /// These are generally not useful, but are sometimes used when scanning
     /// the entire problem
-    pub ordervarmap: HashMap<PuzVar, HashSet<Lit>>,
+    pub ordervarmap: BTreeMap<PuzVar, HashSet<Lit>>,
     /// A mapping from lits to the order representation they represent.
     /// These are generally not useful, but are sometimes used when scanning
     /// the entire problem
-    pub invordervarmap: HashMap<Lit, PuzVar>,
+    pub invordervarmap: BTreeMap<Lit, PuzVar>,
     /// List of all literals in tbe order encoding of a VAR
     /// These are generally not useful, but are sometimes used when scanning
     /// the entire problem
     pub varset_order_lits: BTreeSet<Lit>,
+}
+
+fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> anyhow::Result<()> {
+    if dict.insert(key, value).is_some() {
+        bail!("Internal Error: Repeated Key")
+    }
+    Ok(())
 }
 
 impl PuzzleParse {
@@ -211,13 +220,14 @@ impl PuzzleParse {
             },
             satinstance: SatInstance::new(),
             cnf: None,
-            litmap: HashMap::new(),
-            invlitmap: HashMap::new(),
-            domainmap: HashMap::new(),
-            ordervarmap: HashMap::new(),
-            invordervarmap: HashMap::new(),
+            litmap: BTreeMap::new(),
+            invlitmap: BTreeMap::new(),
+            domainmap: BTreeMap::new(),
+            ordervarmap: BTreeMap::new(),
+            invordervarmap: BTreeMap::new(),
             varset_order_lits: BTreeSet::new(),
             conset: BTreeMap::new(),
+            invconset: BTreeMap::new(),
             varlits_in_con: BTreeMap::new(),
             varset_lits: BTreeSet::new(),
             conset_lits: BTreeSet::new(),
@@ -227,7 +237,7 @@ impl PuzzleParse {
 
     fn finalise(&mut self) -> anyhow::Result<()> {
         {
-            let mut newlitmap = HashMap::new();
+            let mut newlitmap = BTreeMap::new();
             // Make sure 'litmap' contains both positive and negative version of every problem literal
             for (key, &value) in &self.litmap {
                 if let Some(&val) = self.litmap.get(&key.neg()) {
@@ -238,10 +248,10 @@ impl PuzzleParse {
                         );
                     }
                 } else {
-                    newlitmap.insert(key.neg(), -value);
+                    safe_insert(&mut newlitmap, key.neg(), -value)?;
                 }
             }
-            self.litmap.extend(newlitmap.drain());
+            self.litmap.extend(newlitmap);
         }
 
         // Set up inverse of 'litmap', mapping from integers to PuzLit objects
@@ -305,9 +315,10 @@ impl PuzzleParse {
 
                 let puzlit = PuzLit::new_eq_val(varid, 1);
                 let lit = *self.litmap.get(&puzlit).unwrap();
-                self.conset.insert(lit, constraintname);
+                safe_insert(&mut self.conset, lit, constraintname.clone())?;
+                safe_insert(&mut self.invconset, constraintname, lit)?;
                 self.conset_lits.insert(lit);
-                self.varlits_in_con.insert(lit, fvc.get_connections(lit));
+                safe_insert(&mut self.varlits_in_con, lit, fvc.get_connections(lit))?;
 
                 // TODO: Find the literals in every constraint
             }
@@ -419,7 +430,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 if cons.contains_key(&con_name) {
                     bail!(format!("{} defined twice", con_name));
                 }
-                cons.insert(con_name, con_value);
+                safe_insert(&mut cons, con_name, con_value)?;
             } else if line.starts_with("$#AUX") {
                 let v = parts[1].to_string();
                 info!(target: "parser", "Found Aux VAR: '{}'", v);
@@ -473,7 +484,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
 
                     if let Some(varid) = varid {
                         let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
-                        dimacs.litmap.insert(puzlit, satlit);
+                        safe_insert(&mut dimacs.litmap, puzlit, satlit)?;
                     }
                 }
             } else {
@@ -504,8 +515,8 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                                 bail!("{} used for two variables: {} {}", satlit, val, varid);
                             }
                         }
-                        dimacs.invordervarmap.insert(satlit, varid.clone());
-                        dimacs.invordervarmap.insert(-satlit, varid.clone());
+                        safe_insert(&mut dimacs.invordervarmap, satlit, varid.clone())?;
+                        safe_insert(&mut dimacs.invordervarmap, -satlit, varid.clone())?;
                     }
                 }
             }
@@ -515,7 +526,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
 }
 
 pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
-    //let mut litmap = HashMap::new();
+    //let mut litmap = BTreeMap::new();
     //let mut varlist = Vec::new();
 
     let tdir = TempDir::new().unwrap();

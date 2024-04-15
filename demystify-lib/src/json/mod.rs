@@ -1,7 +1,9 @@
+use std::collections::BTreeSet;
+
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use crate::problem::parse::PuzzleParse;
+use crate::problem::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Puzzle {
@@ -77,6 +79,7 @@ pub struct StateLit {
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct State {
     pub knowledge_grid: Option<Vec<Vec<Option<Vec<StateLit>>>>>,
+    pub statements: Option<Vec<Statement>>,
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -89,12 +92,28 @@ pub struct Statement {
 pub struct Problem {
     pub puzzle: Puzzle,
     pub state: Option<State>,
-    pub statements: Option<Vec<Statement>>,
 }
 
 impl Problem {
-    pub fn new_from_puzzle(_problem: &PuzzleParse) -> Problem {
-        panic!();
+    pub fn new_from_puzzle(problem: &PuzzleParse) -> anyhow::Result<Problem> {
+        let puzzle = Puzzle::new_from_puzzle(problem)?;
+        Ok(Problem {
+            puzzle,
+            state: None,
+        })
+    }
+
+    pub fn new_from_puzzle_and_mus(
+        solver: &PuzzleSolver,
+        lits: &BTreeSet<PuzLit>,
+        constraints: &Vec<String>,
+    ) -> anyhow::Result<Problem> {
+        let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
+
+        Ok(Problem {
+            puzzle,
+            state: None,
+        })
     }
 }
 

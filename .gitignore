@@ -11,3 +11,4 @@ demystify.trace
 *.dimacs
 *.minion
 dist
+tarpaulin-report.html
