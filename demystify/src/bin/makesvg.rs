@@ -1,6 +1,6 @@
 use clap::Parser;
 use demystify_lib::json::Problem;
-use demystify_lib::svg::PuzzleDraw;
+use demystify_lib::web::puzsvg::PuzzleDraw;
 use std::fs::File;
 use std::io::Write;
 use tracing::Level;

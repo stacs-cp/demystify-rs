@@ -3,7 +3,7 @@
 
 use crate::json::StateLit;
 
-use super::json::{Problem, Puzzle};
+use crate::json::{Problem, Puzzle};
 use svg::Node;
 
 use svg::node::element;
@@ -317,7 +317,7 @@ mod tests {
 
     use test_log::test;
 
-    use crate::{json::Problem, svg::PuzzleDraw};
+    use crate::{json::Problem, web::puzsvg::PuzzleDraw};
 
     #[test]
     fn test_svg_sudoku() -> anyhow::Result<()> {
