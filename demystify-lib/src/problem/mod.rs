@@ -30,6 +30,11 @@ impl PuzVar {
     pub fn name(&self) -> &String {
         &self.name
     }
+
+    #[must_use]
+    pub fn indices(&self) -> &Vec<i64> {
+        &self.indices
+    }
 }
 
 impl fmt::Display for PuzVar {
@@ -104,6 +109,19 @@ impl PuzLit {
             equal: !self.equal,
         }
     }
+
+    /// Returns the 'equal' form of a literal
+    pub fn normalise(&self) -> PuzLit {
+        PuzLit {
+            var: self.var.clone(),
+            val: self.val,
+            equal: true,
+        }
+    }
+
+    pub fn equal_mod_sign(&self, p: &PuzLit) -> bool {
+        self.var == p.var && self.val == p.val
+    }
 }
 
 /// Represents a constraint identifier.
@@ -148,5 +166,11 @@ mod tests {
         assert_eq!(l, nl.neg());
         assert_eq!(l.neg(), nl);
         assert!(l != lw);
+        assert!(l.equal_mod_sign(&nl));
+        assert!(nl.equal_mod_sign(&l));
+        assert!(l.equal_mod_sign(&l));
+        assert!(!l.equal_mod_sign(&lw));
+        assert!(lw.equal_mod_sign(&lw));
+        assert!(lw.equal_mod_sign(&lw.neg()));
     }
 }

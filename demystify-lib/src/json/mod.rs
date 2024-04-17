@@ -1,6 +1,7 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use anyhow::Context;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::problem::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
@@ -72,7 +73,7 @@ impl Puzzle {
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct StateLit {
-    pub val: u32,
+    pub val: i64,
     pub classes: Option<Vec<String>>,
 }
 
@@ -110,9 +111,78 @@ impl Problem {
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
+        let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
+            vec![vec![None; puzzle.width as usize]; puzzle.height as usize];
+
+        let mut constraint_tags: HashMap<PuzLit, Vec<String>> = HashMap::new();
+
+        // Start by getting a map of all the constraints which need tagging
+        for (i, con) in constraints.iter().enumerate() {
+            let scope = solver.puzzleparse().constraint_scope(con);
+            for p in scope {
+                constraint_tags
+                    .entry(p.normalise())
+                    .or_insert(vec![])
+                    .push(format!("con{}", i));
+            }
+        }
+
+        let all_lits: HashSet<_> = solver
+            .puzzleparse()
+            .litmap
+            .keys()
+            .map(|l| l.normalise())
+            .collect();
+
+        for l in all_lits {
+            let l = l.normalise();
+            // TODO: Handle more than one variable matrix?
+            let index = l.var().indices().clone();
+            assert!(index.len() == 2);
+            let i = index[0] as usize;
+            let j = index[1] as usize;
+
+            let mut tags = vec![];
+
+            if let Some(val) = constraint_tags.get(&l) {
+                tags.extend(val.clone());
+            }
+
+            if lits.contains(&l) {
+                tags.push("lithighlightpos".to_string())
+            }
+
+            if lits.contains(&l.neg()) {
+                tags.push("lithighlightneg".to_string())
+            }
+
+            if knowledgegrid[i][j].is_none() {
+                knowledgegrid[i][j] = Some(vec![]);
+            }
+
+            knowledgegrid[i][j].as_mut().unwrap().push(StateLit {
+                val: l.val(),
+                classes: Some(tags),
+            })
+        }
+
+        let statements = constraints
+            .iter()
+            .enumerate()
+            .map(|(i, con)| Statement {
+                content: con.clone(),
+                classes: Some(vec![format!("con{}", i)]),
+            })
+            .collect_vec();
+
+        let state = State {
+            knowledge_grid: Some(knowledgegrid),
+            statements: Some(statements),
+        };
+
         Ok(Problem {
             puzzle,
-            state: None,
+            state: Some(state),
         })
     }
 }

@@ -359,7 +359,22 @@ impl PuzzleParse {
 
     #[must_use]
     pub fn lit_to_vars(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
-        self.invlitmap.get(lit).unwrap()
+        self.invlitmap.get(lit).expect("IE: Bad lit")
+    }
+
+    pub fn constraint_scope(&self, con: &String) -> BTreeSet<PuzLit> {
+        let lit = self.invconset.get(con).expect("IE: Bad constraint name");
+
+        let lits = self.varlits_in_con.get(lit).expect("IE: Bad constraint");
+
+        let puzlits = lits
+            .into_iter()
+            .map(|l| self.invlitmap.get(l).unwrap())
+            .flatten()
+            .cloned()
+            .collect_vec();
+
+        BTreeSet::from_iter(puzlits.into_iter())
     }
 
     /// Given a collection of Lits representing both direct and ordered
