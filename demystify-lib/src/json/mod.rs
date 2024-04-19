@@ -112,7 +112,7 @@ impl Problem {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
-            vec![vec![None; puzzle.width as usize]; puzzle.height as usize];
+            vec![vec![None; usize::try_from(puzzle.width).context("width is negative")?]; usize::try_from(puzzle.height).context("height is negative")?];
 
         let mut constraint_tags: HashMap<PuzLit, Vec<String>> = HashMap::new();
 
@@ -139,8 +139,8 @@ impl Problem {
             // TODO: Handle more than one variable matrix?
             let index = l.var().indices().clone();
             assert!(index.len() == 2);
-            let i = index[0] as usize;
-            let j = index[1] as usize;
+            let i = usize::try_from(index[0]).context("negative index 0?")?;
+            let j = usize::try_from(index[1]).context("negative index 1?")?;
 
             let mut tags = vec![];
 

@@ -162,8 +162,8 @@ impl PuzzleDraw {
 
         let mut grp = element::Group::new();
 
-        let width = puzzle.width as usize;
-        let height = puzzle.height as usize;
+        let width = usize::try_from(puzzle.width).expect("negative width?");
+        let height = usize::try_from(puzzle.height).expect("negative height?");
         let cages = &puzzle.cages;
 
         let sudoku_decorations = kind == "sudoku";
