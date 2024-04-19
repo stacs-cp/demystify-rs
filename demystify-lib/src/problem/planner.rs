@@ -3,6 +3,8 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustsat::types::Lit;
 
+use crate::{json::Problem, web::create_html};
+
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
 /// Represents a puzzle planner.
@@ -83,6 +85,32 @@ impl PuzzlePlanner {
         solvesteps
     }
 
+    /// Solves the puzzle quickly and returns a sequence of steps.
+    pub fn quick_solve_html(&mut self) -> String {
+        let mut html = String::new();
+        while !self.tosolve.is_empty() {
+            let muses = self.smallest_muses();
+
+            for (m, _) in &muses {
+                self.mark_lit_as_deduced(m);
+            }
+
+            // Map the 'muses' to a user PuzLits
+            let mus = muses
+                .into_iter()
+                .map(|mus| self.mus_to_user_mus(mus))
+                .next()
+                .unwrap();
+
+            let problem = Problem::new_from_puzzle_and_mus(&self.psolve, &mus.0, &mus.1)
+                .expect("Cannot make puzzle json");
+
+            html += &create_html(&problem);
+            html += "<br/>";
+        }
+        html
+    }
+
     /// Returns a reference to the puzzle being solved.
     fn puzzle(&self) -> &PuzzleParse {
         self.psolve.puzzleparse()
@@ -140,5 +168,21 @@ mod tests {
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
         }
+    }
+
+    // This test doesn't really do any deep tests,
+    // just do a full end-to-end run
+    #[test]
+    fn test_plan_binairo_essence_html() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/binairo.eprime",
+            "./tst/binairo-1.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let _ = plan.quick_solve_html();
     }
 }

@@ -85,7 +85,10 @@ impl PuzzleDraw {
 
         out.append(cellgrp);
 
-        let doc = svg::Document::new();
+        let doc = svg::Document::new()
+            .set("viewBox", (0, 0, 500, 500))
+            .set("width", 200)
+            .set("height", 200);
         doc.add(out)
     }
 

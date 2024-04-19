@@ -362,6 +362,14 @@ impl PuzzleParse {
         self.invlitmap.get(lit).expect("IE: Bad lit")
     }
 
+    pub fn all_var_lits(&self) -> BTreeSet<PuzLit> {
+        self.varset_lits
+            .iter()
+            .flat_map(|x| self.lit_to_vars(x))
+            .cloned()
+            .collect()
+    }
+
     pub fn constraint_scope(&self, con: &String) -> BTreeSet<PuzLit> {
         let lit = self.invconset.get(con).expect("IE: Bad constraint name");
 

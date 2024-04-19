@@ -17,6 +17,9 @@ struct Opt {
 
     #[arg(long)]
     trace: bool,
+
+    #[arg(long)]
+    html: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -44,8 +47,13 @@ fn main() -> anyhow::Result<()> {
     let mut planner = PuzzlePlanner::new(solver);
 
     if opt.quick {
-        for p in planner.quick_solve() {
-            println!("{p:?}");
+        if opt.html {
+            let html = planner.quick_solve_html();
+            println!("{html}");
+        } else {
+            for p in planner.quick_solve() {
+                println!("{p:?}");
+            }
         }
         exit(0);
     }
