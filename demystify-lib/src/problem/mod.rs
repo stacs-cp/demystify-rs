@@ -151,9 +151,6 @@ impl PuzLit {
         }
     }
 
-    pub fn equal_mod_sign(&self, p: &PuzLit) -> bool {
-        self.varval == p.varval
-    }
 }
 
 /// Represents a constraint identifier.
@@ -213,12 +210,6 @@ mod tests {
         assert_eq!(l, nl.neg());
         assert_eq!(l.neg(), nl);
         assert!(l != lw);
-        assert!(l.equal_mod_sign(&nl));
-        assert!(nl.equal_mod_sign(&l));
-        assert!(l.equal_mod_sign(&l));
-        assert!(!l.equal_mod_sign(&lw));
-        assert!(lw.equal_mod_sign(&lw));
-        assert!(lw.equal_mod_sign(&lw.neg()));
     }
 
     #[test]
