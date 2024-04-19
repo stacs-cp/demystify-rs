@@ -75,8 +75,8 @@ impl PuzzleSolver {
     ///
     /// A vector containing the unsatisfiable variable literals.
     #[must_use]
-    pub fn get_unsatisfiable_varlits(&self) -> Vec<Lit> {
-        let mut satisfied = vec![];
+    pub fn get_unsatisfiable_varlits(&self) -> BTreeSet<Lit> {
+        let mut unsatisfied = BTreeSet::new();
 
         let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
         litorig.extend_from_slice(&self.knownlits);
@@ -85,11 +85,11 @@ impl PuzzleSolver {
             let mut lits = litorig.clone();
             lits.push(lit);
             if !self.get_satcore().assumption_solve(&lits) {
-                satisfied.push(lit);
+                unsatisfied.insert(lit);
             }
         }
 
-        satisfied
+        unsatisfied
     }
 
     /// Adds a known literal to the `PuzzleSolver`.
@@ -140,7 +140,7 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals where no MUS was found are ommitted from the output.
-    pub fn get_many_vars_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn get_many_vars_mus_quick(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
         let muses: Vec<_> = lits
             .par_iter()
             .map(|&x| (x, self.get_var_mus_quick(x, None)))
@@ -160,7 +160,7 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals with large MUSes are skipped. The exact set of returned literals may vary.
-    pub fn get_many_vars_small_mus_quick(&self, lits: &[Lit]) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn get_many_vars_small_mus_quick(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
         let mut mus_size: i32 = 2;
         loop {
             let muses: Vec<_> = lits
@@ -265,9 +265,8 @@ mod tests {
         assert!(!muses.is_empty());
         assert!(!muses_quick.is_empty());
 
-        let neg_muses = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
-        let neg_muses_quick =
-            puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect_vec()));
+        let neg_muses = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect()));
+        let neg_muses_quick = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect()));
 
         assert!(neg_muses.is_empty());
         assert!(neg_muses_quick.is_empty());

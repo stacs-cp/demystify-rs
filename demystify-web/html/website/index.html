@@ -15,7 +15,7 @@
 
     
     
-    <div class="container-fluid">
+    <div class="container-fluid" id="mainSpace">
       <div class="row">
         <div class="col-md-8 bg-light shadow p-3">
           <!-- Left side content -->
@@ -29,7 +29,7 @@
     <button type="button" id="Refresh" class="btn btn-primary">Refresh</button>
 
 
-    <button type="button" id="BestNextStep" class="btn btn-primary">Best Next Step</button>
+    <button type="button" hx-get="/bestNextStep" hx-target="mainSpace" id="BestNextStep" class="btn btn-primary">Best Next Step</button>
 
     <div class="container">
       <h4>Upload eprime/essence + param</h4>

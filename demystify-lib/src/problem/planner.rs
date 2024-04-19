@@ -1,60 +1,80 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use rustsat::types::Lit;
 
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
 /// Represents a puzzle planner.
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
+
+    tosolve: BTreeSet<Lit>,
 }
 
 impl PuzzlePlanner {
     /// Creates a new `PuzzlePlanner` instance.
     #[must_use]
     pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
-        PuzzlePlanner { psolve }
+        let tosolve = psolve.get_unsatisfiable_varlits();
+        PuzzlePlanner { psolve, tosolve }
+    }
+
+    pub fn all_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+        self.psolve.get_many_vars_small_mus_quick(&self.tosolve)
+    }
+
+    pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+        let muses = self.all_muses();
+
+        let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
+        let muses: Vec<_> = muses
+            .into_iter()
+            .filter(|(_, x)| x.len() == minmus)
+            .collect();
+
+        muses
+    }
+
+    pub fn mus_to_user_mus(&self, mus: (Lit, Vec<Lit>)) -> (BTreeSet<PuzLit>, Vec<String>) {
+        let (l, x) = mus;
+        (
+            self.psolve.puzzleparse().lit_to_vars(&l).clone(),
+            x.into_iter()
+                .map(|c| self.psolve.puzzleparse().lit_to_con(&c))
+                .cloned()
+                .collect_vec(),
+        )
+    }
+
+    pub fn mark_lit_as_deduced(&mut self, lit: &Lit) {
+        assert!(self.tosolve.contains(&lit));
+        self.tosolve.remove(&lit);
+        self.psolve.add_known_lit(!*lit);
     }
 
     /// Solves the puzzle quickly and returns a sequence of steps.
     pub fn quick_solve(&mut self) -> Vec<(BTreeSet<PuzLit>, Vec<String>)> {
-        let mut tosolve = self.psolve.get_unsatisfiable_varlits();
         let mut solvesteps = vec![];
-        while !tosolve.is_empty() {
-            let muses = self.psolve.get_many_vars_small_mus_quick(&tosolve);
+        while !self.tosolve.is_empty() {
+            let muses = self.smallest_muses();
 
-            let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
-            let muses: Vec<_> = muses
-                .into_iter()
-                .filter(|(_, x)| x.len() == minmus)
-                .collect();
             for (m, _) in &muses {
-                self.psolve.add_known_lit(!*m);
+                self.mark_lit_as_deduced(m);
             }
-            let removeset: HashSet<_> = muses.iter().map(|(lit, _)| lit).collect();
-            // Remove these literals from those that need to be solved
-            tosolve.retain(|x| !removeset.contains(x));
 
             // Map the 'muses' to a user PuzLits
             let muses = muses
                 .into_iter()
-                .map(|(l, x)| {
-                    (
-                        self.psolve.puzzleparse().lit_to_vars(&l).clone(),
-                        x.into_iter()
-                            .map(|c| self.psolve.puzzleparse().lit_to_con(&c))
-                            .cloned()
-                            .collect_vec(),
-                    )
-                })
+                .map(|mus| self.mus_to_user_mus(mus))
                 .collect_vec();
 
             println!(
                 "{} steps, just found {} muses of size {}, {} left",
                 solvesteps.len(),
                 muses.len(),
-                minmus,
-                tosolve.len()
+                muses[0].1.len(),
+                self.tosolve.len()
             );
 
             // Add these muses to the solving steps

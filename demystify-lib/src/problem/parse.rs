@@ -400,7 +400,7 @@ impl PuzzleParse {
             }
         }
 
-        collected.into_iter().collect_vec()
+        collected.into_iter().collect()
     }
 }
 
@@ -623,7 +623,7 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
     eprimeparse.satinstance =
         instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)?;
 
-    eprimeparse.cnf = Some(Arc::new(eprimeparse.satinstance.clone().as_cnf().0));
+    eprimeparse.cnf = Some(Arc::new(eprimeparse.satinstance.clone().into_cnf().0));
 
     read_dimacs(&in_dimacs_path, &mut eprimeparse)?;
 

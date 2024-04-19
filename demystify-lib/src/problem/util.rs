@@ -85,7 +85,7 @@ pub struct FindVarConnections {
 impl FindVarConnections {
     #[must_use]
     pub fn new(sat: &SatInstance, all_var_lits: &BTreeSet<Lit>) -> FindVarConnections {
-        let (cnf, _) = sat.clone().as_cnf();
+        let (cnf, _) = sat.clone().into_cnf();
         let mut lit_to_clauses: HashMap<Lit, HashSet<Lit>> = HashMap::new();
         for clause in cnf.iter() {
             for &lit in clause {

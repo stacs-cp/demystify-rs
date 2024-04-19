@@ -123,7 +123,7 @@ impl Problem {
                 constraint_tags
                     .entry(p.normalise())
                     .or_insert(vec![])
-                    .push(format!("con{}", i));
+                    .push(format!("highlight_con{}", i));
             }
         }
 
@@ -149,11 +149,11 @@ impl Problem {
             }
 
             if lits.contains(&l) {
-                tags.push("lithighlightpos".to_string())
+                tags.push("litpos".to_string())
             }
 
             if lits.contains(&l.neg()) {
-                tags.push("lithighlightneg".to_string())
+                tags.push("litneg".to_string())
             }
 
             if knowledgegrid[i][j].is_none() {
