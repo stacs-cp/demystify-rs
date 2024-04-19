@@ -4,7 +4,7 @@ use anyhow::Context;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::problem::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
+use crate::problem::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit, VarValPair};
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Puzzle {
@@ -117,23 +117,22 @@ impl Problem {
                 usize::try_from(puzzle.height).context("height is negative")?
             ];
 
-        let mut constraint_tags: HashMap<PuzLit, Vec<String>> = HashMap::new();
+        let mut constraint_tags: HashMap<VarValPair, Vec<String>> = HashMap::new();
 
         // Start by getting a map of all the constraints which need tagging
         for (i, con) in constraints.iter().enumerate() {
             let scope = solver.puzzleparse().constraint_scope(con);
             for p in scope {
                 constraint_tags
-                    .entry(p.normalise())
+                    .entry(p.varval())
                     .or_default()
                     .push(format!("highlight_con{i}"));
             }
         }
 
-        let all_lits = solver.puzzleparse().all_var_lits();
+        let all_lits = solver.puzzleparse().all_var_varvals();
 
         for l in all_lits {
-            let l = l.normalise();
             // TODO: Handle more than one variable matrix?
             let index = l.var().indices().clone();
             assert_eq!(index.len(), 2);
@@ -152,11 +151,11 @@ impl Problem {
                 tags.extend(val.clone());
             }
 
-            if lits.contains(&l) {
+            if lits.contains(&PuzLit::new_eq(l.clone())) {
                 tags.push("litpos".to_string())
             }
 
-            if lits.contains(&l.neg()) {
+            if lits.contains(&PuzLit::new_neq(l.clone())) {
                 tags.push("litneg".to_string())
             }
 

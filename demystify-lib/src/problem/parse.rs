@@ -31,6 +31,7 @@ use crate::problem::util::parse_constraint_name;
 use crate::problem::{PuzLit, PuzVar};
 
 use super::util::FindVarConnections;
+use super::VarValPair;
 
 #[derive(Debug)]
 pub struct EPrimeAnnotations {
@@ -313,7 +314,7 @@ impl PuzzleParse {
                 // TODO: Skip constraints which are already parsed,
                 // or trivial (parse.py 270 -- 291)
 
-                let puzlit = PuzLit::new_eq_val(varid, 1);
+                let puzlit = PuzLit::new_eq(VarValPair::new(varid, 1));
                 let lit = *self.litmap.get(&puzlit).unwrap();
                 safe_insert(&mut self.conset, lit, constraintname.clone())?;
                 safe_insert(&mut self.invconset, constraintname, lit)?;
@@ -362,11 +363,11 @@ impl PuzzleParse {
         self.invlitmap.get(lit).expect("IE: Bad lit")
     }
 
-    pub fn all_var_lits(&self) -> BTreeSet<PuzLit> {
+    pub fn all_var_varvals(&self) -> BTreeSet<VarValPair> {
         self.varset_lits
             .iter()
             .flat_map(|x| self.lit_to_vars(x))
-            .cloned()
+            .map(|x| x.varval())
             .collect()
     }
 
@@ -402,7 +403,7 @@ impl PuzzleParse {
             }
             if let Some(found_var) = self.invordervarmap.get(&l) {
                 for &val in self.domainmap.get(found_var).unwrap() {
-                    collected.insert(PuzLit::new_eq_val(found_var, val));
+                    collected.insert(PuzLit::new_eq(VarValPair::new(found_var, val)));
                 }
             }
         }
@@ -505,7 +506,10 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                     let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
-                        let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
+                        let puzlit = PuzLit::new_eq(VarValPair::new(
+                            &varid,
+                            match_[2].parse::<i64>().unwrap(),
+                        ));
                         safe_insert(&mut dimacs.litmap, puzlit, satlit)?;
                     }
                 }
