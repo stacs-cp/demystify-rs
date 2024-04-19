@@ -368,13 +368,12 @@ impl PuzzleParse {
         let lits = self.varlits_in_con.get(lit).expect("IE: Bad constraint");
 
         let puzlits = lits
-            .into_iter()
-            .map(|l| self.invlitmap.get(l).unwrap())
-            .flatten()
+            .iter()
+            .flat_map(|l| self.invlitmap.get(l).unwrap())
             .cloned()
             .collect_vec();
 
-        BTreeSet::from_iter(puzlits.into_iter())
+        BTreeSet::from_iter(puzlits)
     }
 
     /// Given a collection of Lits representing both direct and ordered

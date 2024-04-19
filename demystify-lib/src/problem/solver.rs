@@ -190,7 +190,7 @@ impl PuzzleSolver {
 #[cfg(test)]
 mod tests {
     use crate::problem::solver::PuzzleSolver;
-    use itertools::Itertools;
+
     use test_log::test;
 
     #[test]

@@ -323,7 +323,7 @@ mod tests {
     fn test_svg_sudoku() -> anyhow::Result<()> {
         let svg_path = "./tst/sudoku.json";
 
-        let file = File::open(&svg_path)?;
+        let file = File::open(svg_path)?;
         let problem: Problem = serde_json::from_reader(file)?;
 
         let puz_draw = PuzzleDraw::new();

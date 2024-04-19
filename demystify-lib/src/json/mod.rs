@@ -122,7 +122,7 @@ impl Problem {
             for p in scope {
                 constraint_tags
                     .entry(p.normalise())
-                    .or_insert(vec![])
+                    .or_default()
                     .push(format!("highlight_con{}", i));
             }
         }

@@ -48,8 +48,8 @@ impl PuzzlePlanner {
     }
 
     pub fn mark_lit_as_deduced(&mut self, lit: &Lit) {
-        assert!(self.tosolve.contains(&lit));
-        self.tosolve.remove(&lit);
+        assert!(self.tosolve.contains(lit));
+        self.tosolve.remove(lit);
         self.psolve.add_known_lit(!*lit);
     }
 
