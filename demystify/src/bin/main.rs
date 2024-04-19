@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
 
     if opt.quick {
         for p in planner.quick_solve() {
-            println!("{:?}", p);
+            println!("{p:?}");
         }
         exit(0);
     }

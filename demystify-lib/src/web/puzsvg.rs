@@ -121,7 +121,7 @@ impl PuzzleDraw {
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {
                 if let Some(cell) = &contents[i][j] {
-                    println!("{} {}", i, j);
+                    println!("{i} {j}");
                     // Find the right size of grid to fit our values in
                     let sqrt_length = (cell.len() as f64).sqrt().ceil() as usize;
                     let little_step = 0.9 / sqrt_length as f64;

@@ -123,7 +123,7 @@ impl Problem {
                 constraint_tags
                     .entry(p.normalise())
                     .or_default()
-                    .push(format!("highlight_con{}", i));
+                    .push(format!("highlight_con{i}"));
             }
         }
 

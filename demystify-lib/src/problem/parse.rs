@@ -55,20 +55,20 @@ impl EPrimeAnnotations {
         serde_json::from_value(
             self.params
                 .get(s)
-                .context(format!("Missing param: {}", s))?
+                .context(format!("Missing param: {s}"))?
                 .clone(),
         )
-        .context(format!("Param {} is not bool", s))
+        .context(format!("Param {s} is not bool"))
     }
 
     pub fn param_i64(&self, s: &str) -> anyhow::Result<i64> {
         serde_json::from_value(
             self.params
                 .get(s)
-                .context(format!("Missing param: {}", s))?
+                .context(format!("Missing param: {s}"))?
                 .clone(),
         )
-        .context(format!("Param {} is not int", s))
+        .context(format!("Param {s} is not int"))
     }
 
     pub fn param_vec_i64(&self, s: &str) -> anyhow::Result<Vec<i64>> {
@@ -76,17 +76,17 @@ impl EPrimeAnnotations {
         let map: BTreeMap<i64, i64> = serde_json::from_value(
             self.params
                 .get(s)
-                .context(format!("Missing param: {}", s))?
+                .context(format!("Missing param: {s}"))?
                 .clone(),
         )
-        .context(format!("Param {} is not an array of ints", s))?;
+        .context(format!("Param {s} is not an array of ints"))?;
 
         let mut ret: Vec<i64> = vec![0; map.len()];
 
         for i in 0..map.len() {
             ret[i] = *map
                 .get(&((i + 1) as i64))
-                .context(format!("Malformed param? {}", s))?;
+                .context(format!("Malformed param? {s}"))?;
         }
 
         Ok(ret)
@@ -97,22 +97,22 @@ impl EPrimeAnnotations {
         let map: BTreeMap<i64, BTreeMap<i64, i64>> = serde_json::from_value(
             self.params
                 .get(s)
-                .context(format!("Missing param: {}", s))?
+                .context(format!("Missing param: {s}"))?
                 .clone(),
         )
-        .context(format!("Param {} is not a 2d array of ints", s))?;
+        .context(format!("Param {s} is not a 2d array of ints"))?;
 
         let mut ret: Vec<Vec<i64>> = vec![vec![]; map.len()];
 
         for i in 0..map.len() {
             let row = map
                 .get(&((i + 1) as i64))
-                .context(format!("Malformed param? {}", s))?;
+                .context(format!("Malformed param? {s}"))?;
             let mut rowvec: Vec<i64> = vec![0; row.len()];
             for j in 0..row.len() {
                 rowvec[j] = *row
                     .get(&((j + 1) as i64))
-                    .context(format!("Malformed param? {}", s))?;
+                    .context(format!("Malformed param? {s}"))?;
             }
 
             ret[i] = rowvec;
@@ -126,22 +126,22 @@ impl EPrimeAnnotations {
         let map: BTreeMap<i64, BTreeMap<i64, Option<i64>>> = serde_json::from_value(
             self.params
                 .get(s)
-                .context(format!("Missing param: {}", s))?
+                .context(format!("Missing param: {s}"))?
                 .clone(),
         )
-        .context(format!("Param {} is not a 2d array of ints and nulls", s))?;
+        .context(format!("Param {s} is not a 2d array of ints and nulls"))?;
 
         let mut ret: Vec<Vec<Option<i64>>> = vec![vec![]; map.len()];
 
         for i in 0..map.len() {
             let row = map
                 .get(&((i + 1) as i64))
-                .context(format!("Malformed param? {}", s))?;
+                .context(format!("Malformed param? {s}"))?;
             let mut rowvec: Vec<Option<i64>> = vec![None; row.len()];
             for j in 0..row.len() {
                 rowvec[j] = *row
                     .get(&((j + 1) as i64))
-                    .context(format!("Malformed param? {}", s))?;
+                    .context(format!("Malformed param? {s}"))?;
             }
 
             ret[i] = rowvec;
