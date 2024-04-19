@@ -106,7 +106,9 @@ impl Problem {
 
     pub fn new_from_puzzle_and_mus(
         solver: &PuzzleSolver,
-        lits: &BTreeSet<PuzLit>,
+        tosolve: &BTreeSet<VarValPair>,
+        known: &BTreeSet<PuzLit>,
+        deduced_lits: &BTreeSet<PuzLit>,
         constraints: &Vec<String>,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
@@ -133,6 +135,10 @@ impl Problem {
         let all_lits = solver.puzzleparse().all_var_varvals();
 
         for l in all_lits {
+            if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
+                continue;
+            }
+
             // TODO: Handle more than one variable matrix?
             let index = l.var().indices().clone();
             assert_eq!(index.len(), 2);
@@ -151,12 +157,16 @@ impl Problem {
                 tags.extend(val.clone());
             }
 
-            if lits.contains(&PuzLit::new_eq(l.clone())) {
+            if deduced_lits.contains(&PuzLit::new_eq(l.clone())) {
                 tags.push("litpos".to_string())
             }
 
-            if lits.contains(&PuzLit::new_neq(l.clone())) {
+            if deduced_lits.contains(&PuzLit::new_neq(l.clone())) {
                 tags.push("litneg".to_string())
+            }
+
+            if known.contains(&PuzLit::new_eq(l.clone())) {
+                tags.push("litknown".to_string())
             }
 
             if knowledgegrid[i][j].is_none() {

@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
     let file = File::open(&opt.puzzle)?;
     let problem: Problem = serde_json::from_reader(file)?;
 
-    let puz_draw = PuzzleDraw::new();
+    let puz_draw = PuzzleDraw::new(&problem.puzzle.kind);
 
     let svg = puz_draw.draw_puzzle(&problem);
 

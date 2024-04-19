@@ -150,7 +150,6 @@ impl PuzLit {
             equal: !self.equal,
         }
     }
-
 }
 
 /// Represents a constraint identifier.

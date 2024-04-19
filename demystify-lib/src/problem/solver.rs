@@ -52,7 +52,7 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// The corresponding `Lit` instance.
-    fn puzlit_to_lit(&self, puzlit: PuzLit) -> Lit {
+    pub fn puzlit_to_lit(&self, puzlit: &PuzLit) -> Lit {
         *self.puzzleparse.litmap.get(&puzlit).unwrap()
     }
 
@@ -65,7 +65,7 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// A reference to the set of `PuzLit` instances.
-    fn lit_to_puzlit(&self, lit: Lit) -> &BTreeSet<PuzLit> {
+    pub fn lit_to_puzlit(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
         self.puzzleparse.invlitmap.get(&lit).unwrap()
     }
 
@@ -206,7 +206,7 @@ mod tests {
 
         assert_eq!(varlits.len(), 16);
         for &lit in &varlits {
-            let puzlit = puz.lit_to_puzlit(lit);
+            let puzlit = puz.lit_to_puzlit(&lit);
             for p in puzlit {
                 let indices = p.var().indices;
                 assert_eq!(indices.len(), 1);
@@ -249,7 +249,7 @@ mod tests {
 
         assert_eq!(varlits.len(), 16);
         for &lit in &varlits {
-            let puzlit = puz.lit_to_puzlit(lit);
+            let puzlit = puz.lit_to_puzlit(&lit);
             for p in puzlit {
                 let indices = p.var().indices;
                 assert_eq!(indices.len(), 1);

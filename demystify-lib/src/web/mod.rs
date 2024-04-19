@@ -4,8 +4,12 @@ use crate::json::{Problem, Statement};
 
 use self::puzsvg::PuzzleDraw;
 
+pub fn base_css() -> &'static str {
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/include/base.css"))
+}
+
 pub fn create_html(puzjson: &Problem) -> String {
-    let pd = PuzzleDraw::new();
+    let pd = PuzzleDraw::new(&puzjson.puzzle.kind);
     let svg = pd.draw_puzzle(puzjson);
     let statements = if let Some(ref state) = puzjson.state {
         if let Some(ref statements) = state.statements {

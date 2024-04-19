@@ -12,6 +12,7 @@ pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
 
     tosolve: BTreeSet<Lit>,
+    deduced: BTreeSet<Lit>,
 }
 
 impl PuzzlePlanner {
@@ -19,7 +20,11 @@ impl PuzzlePlanner {
     #[must_use]
     pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
         let tosolve = psolve.get_unsatisfiable_varlits();
-        PuzzlePlanner { psolve, tosolve }
+        PuzzlePlanner {
+            psolve,
+            tosolve,
+            deduced: BTreeSet::new(),
+        }
     }
 
     pub fn all_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
@@ -52,7 +57,12 @@ impl PuzzlePlanner {
     pub fn mark_lit_as_deduced(&mut self, lit: &Lit) {
         assert!(self.tosolve.contains(lit));
         self.tosolve.remove(lit);
+        self.deduced.insert(*lit);
         self.psolve.add_known_lit(!*lit);
+    }
+
+    pub fn get_all_deduced_lits(&self) -> &BTreeSet<Lit> {
+        &self.deduced
     }
 
     /// Solves the puzzle quickly and returns a sequence of steps.
@@ -102,8 +112,28 @@ impl PuzzlePlanner {
                 .next()
                 .unwrap();
 
-            let problem = Problem::new_from_puzzle_and_mus(&self.psolve, &mus.0, &mus.1)
-                .expect("Cannot make puzzle json");
+            let tosolve_varvals: BTreeSet<_> = self
+                .tosolve
+                .iter()
+                .flat_map(|x| self.psolve.lit_to_puzlit(x))
+                .map(|x| x.varval())
+                .collect();
+
+            let known_puzlits: BTreeSet<PuzLit> = self
+                .deduced
+                .iter()
+                .flat_map(|x| self.psolve.lit_to_puzlit(x))
+                .cloned()
+                .collect();
+
+            let problem = Problem::new_from_puzzle_and_mus(
+                &self.psolve,
+                &tosolve_varvals,
+                &known_puzlits,
+                &mus.0,
+                &mus.1,
+            )
+            .expect("Cannot make puzzle json");
 
             html += &create_html(&problem);
             html += "<br/>";

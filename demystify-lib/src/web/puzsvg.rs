@@ -8,32 +8,54 @@ use svg::Node;
 
 use svg::node::element;
 
+struct Decorations {
+    sudoku_grid: bool,
+    blank_input_val: Option<i64>,
+}
+
+impl Decorations {
+    pub fn new(kind: &str) -> Decorations {
+        let kind = kind.to_lowercase();
+        if kind == "sudoku" {
+            Decorations {
+                sudoku_grid: true,
+                blank_input_val: Some(0),
+            }
+        } else if kind == "binairo" {
+            Decorations {
+                sudoku_grid: false,
+                blank_input_val: Some(2),
+            }
+        } else {
+            println!("Unknown puzzle type: {kind}");
+            Decorations {
+                sudoku_grid: false,
+                blank_input_val: None,
+            }
+        }
+    }
+}
+
 pub struct PuzzleDraw {
     base_width: f64,
     mid_width: f64,
     thick_width: f64,
+    decorations: Decorations,
 }
 
 impl Default for PuzzleDraw {
     fn default() -> Self {
-        Self::new()
+        Self::new("")
     }
 }
 
 impl PuzzleDraw {
-    pub fn new() -> Self {
+    pub fn new(kind: &str) -> Self {
         PuzzleDraw {
             base_width: 0.005,
             mid_width: 0.01,
             thick_width: 0.02,
-        }
-    }
-
-    fn new_with_options(base_width: f64, mid_width: f64, thick_width: f64) -> Self {
-        PuzzleDraw {
-            base_width,
-            mid_width,
-            thick_width,
+            decorations: Decorations::new(kind),
         }
     }
 }
@@ -42,7 +64,7 @@ impl PuzzleDraw {
     pub fn draw_puzzle(&self, puzjson: &Problem) -> svg::Document {
         let puzzle = &puzjson.puzzle;
 
-        let mut out = self.draw_grid(puzzle, &puzzle.kind);
+        let mut out = self.draw_grid(puzzle);
 
         let mut cells = self.make_cells(puzzle);
 
@@ -98,17 +120,15 @@ impl PuzzleDraw {
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {
                 if let Some(cell) = contents[i][j] {
-                    let s = cell.to_string();
+                    if Some(cell) != self.decorations.blank_input_val {
+                        let s = cell.to_string();
 
-                    let mut node = svg::node::element::Text::new(s);
-                    node.assign("font-size", 1);
-                    node.assign("transform", "translate(0.2, 0.9)");
+                        let mut node = svg::node::element::Text::new(s);
+                        node.assign("font-size", 1);
+                        node.assign("transform", "translate(0.2, 0.9)");
 
-                    cells[i][j].append(node);
-
-                    //.text(s)
-                    //.font_size(1)
-                    //.translate(0.2, 0.9);
+                        cells[i][j].append(node);
+                    }
                 }
             }
         }
@@ -156,7 +176,7 @@ impl PuzzleDraw {
         }
     }
 
-    fn draw_grid(&self, puzzle: &Puzzle, kind: &String) -> element::Group {
+    fn draw_grid(&self, puzzle: &Puzzle) -> element::Group {
         let mut topgrp = element::Group::new();
         topgrp.assign("transform", "translate(25,25) scale(450)");
 
@@ -165,8 +185,6 @@ impl PuzzleDraw {
         let width = usize::try_from(puzzle.width).expect("negative width?");
         let height = usize::try_from(puzzle.height).expect("negative height?");
         let cages = &puzzle.cages;
-
-        let sudoku_decorations = kind == "sudoku";
 
         let wstep = 1.0 / (width as f64);
         let hstep = 1.0 / (height as f64);
@@ -212,7 +230,7 @@ impl PuzzleDraw {
                 if i == 0 || i == width {
                     stroke = self.thick_width;
                 } else {
-                    if sudoku_decorations && i % 3 == 0 {
+                    if self.decorations.sudoku_grid && i % 3 == 0 {
                         stroke = self.mid_width;
                     }
                     if let Some(cages) = cages {
@@ -246,7 +264,7 @@ impl PuzzleDraw {
                 if j == 0 || j == height {
                     stroke = self.thick_width;
                 } else {
-                    if sudoku_decorations && j % 3 == 0 {
+                    if self.decorations.sudoku_grid && j % 3 == 0 {
                         stroke = self.mid_width;
                     }
                     if let Some(cages) = cages {
@@ -326,7 +344,7 @@ mod tests {
         let file = File::open(svg_path)?;
         let problem: Problem = serde_json::from_reader(file)?;
 
-        let puz_draw = PuzzleDraw::new();
+        let puz_draw = PuzzleDraw::new(&problem.puzzle.kind);
 
         let svg = puz_draw.draw_puzzle(&problem);
 
