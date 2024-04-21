@@ -1,9 +1,12 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_range_loop)]
 
+use std::collections::BTreeSet;
+
 use crate::json::StateLit;
 
 use crate::json::{Problem, Puzzle};
+use itertools::Itertools;
 use svg::Node;
 
 use svg::node::element;
@@ -150,9 +153,9 @@ impl PuzzleDraw {
                             if a * sqrt_length + b < cell.len() {
                                 let state = &cell[a * sqrt_length + b];
                                 let s = state.val.to_string();
-                                let mut node = svg::node::element::Text::new(s);
-                                node.assign("font-size", little_step);
-                                node.assign(
+
+                                let mut group = svg::node::element::Group::new();
+                                group.assign(
                                     "transform",
                                     format!(
                                         "translate({}, {})",
@@ -160,14 +163,30 @@ impl PuzzleDraw {
                                         (a as f64 + 1.2) * little_step
                                     ),
                                 );
-                                node.assign(
+
+                                let mut rect = svg::node::element::Rectangle::new();
+                                rect.assign("width", little_step);
+                                rect.assign("height", little_step);
+                                rect.assign("y", -little_step);
+                                rect.assign("fill", "none");
+                                rect.assign("stroke-width", "0.05");
+                                rect.assign("stroke", "blue");
+                                group.append(rect);
+
+                                let mut node = svg::node::element::Text::new(s);
+                                node.assign("font-size", little_step);
+
+                                group.append(node);
+
+                                group.assign(
                                     "id",
                                     format!("D_{}_{}_{}", j, i, cell[a * sqrt_length + b].val),
                                 );
                                 if let Some(classes) = &state.classes {
-                                    node.assign("classes", classes.join(" "));
+                                    group.assign("class", classes.iter().join(" "));
                                 }
-                                cells[i][j].append(node);
+
+                                cells[i][j].append(group);
                             }
                         }
                     }
@@ -189,12 +208,15 @@ impl PuzzleDraw {
         let wstep = 1.0 / (width as f64);
         let hstep = 1.0 / (height as f64);
 
-        let colours_list = ["#FFB3B3", "#B3B3FF", "#FFFFB3", "#B3FFB3", "#E6B3FF"];
+        let colours_list = [
+            "#85586f", "#d6efed", "#957dad", "#ac7d88", "#b7d3df", "#e0bbe4", "#deb6ab", "#c9bbcf",
+            "#fec8d8", "#f8ecd1", "#898aa6", "#ffdfd3", "#c4dfaa", "#f5f0bb", "#e6e1cd", "#d6b1dd",
+        ];
 
         let mut cagegrp = element::Group::new();
 
         if let Some(cages) = &cages {
-            let colours: Vec<_> = cages.iter().flatten().filter_map(|cell| *cell).collect();
+            let colours: BTreeSet<_> = cages.iter().flatten().filter_map(|cell| *cell).collect();
 
             for i in 0..width {
                 for j in 0..height {

@@ -1,5 +1,8 @@
 use clap::Parser;
-use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+use demystify_lib::{
+    problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver},
+    web::{base_css, base_javascript},
+};
 use std::{fs::File, path::PathBuf, process::exit};
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -49,7 +52,14 @@ fn main() -> anyhow::Result<()> {
     if opt.quick {
         if opt.html {
             let html = planner.quick_solve_html();
-            println!("{html}");
+            println!(
+                "<html> <head> <style> {} </style> <script> {} </script> </head>",
+                base_css(),
+                base_javascript()
+            );
+            println!("<body> {html}");
+            println!("<script> doJavascript(); </script>");
+            println!("</body> </html>")
         } else {
             for p in planner.quick_solve() {
                 println!("{p:?}");

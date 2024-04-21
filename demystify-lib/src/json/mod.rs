@@ -31,8 +31,9 @@ impl Puzzle {
             height = Some(problem.eprime.param_i64("height")?);
         }
 
-        if problem.eprime.has_param("height") {
-            height = Some(problem.eprime.param_i64("height")?);
+        if problem.eprime.has_param("grid_size") {
+            height = Some(problem.eprime.param_i64("grid_size")?);
+            width = Some(problem.eprime.param_i64("grid_size")?);
         }
 
         let mut start_grid = None;
@@ -47,7 +48,7 @@ impl Puzzle {
         }
 
         if problem.eprime.has_param("cages") {
-            cages = Some(problem.eprime.param_vec_vec_option_i64("fixed")?);
+            cages = Some(problem.eprime.param_vec_vec_option_i64("cages")?);
         }
 
         if width.is_none() || height.is_none() {
@@ -74,7 +75,7 @@ impl Puzzle {
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct StateLit {
     pub val: i64,
-    pub classes: Option<Vec<String>>,
+    pub classes: Option<BTreeSet<String>>,
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -119,16 +120,15 @@ impl Problem {
                 usize::try_from(puzzle.height).context("height is negative")?
             ];
 
-        let mut constraint_tags: HashMap<VarValPair, Vec<String>> = HashMap::new();
+        let mut constraint_tags: HashMap<VarValPair, BTreeSet<String>> = HashMap::new();
 
         // Start by getting a map of all the constraints which need tagging
         for (i, con) in constraints.iter().enumerate() {
             let scope = solver.puzzleparse().constraint_scope(con);
             for p in scope {
-                constraint_tags
-                    .entry(p.varval())
-                    .or_default()
-                    .push(format!("highlight_con{i}"));
+                let tags = constraint_tags.entry(p.varval()).or_default();
+                tags.insert(format!("highlight_con{i}"));
+                tags.insert("js_highlighter".to_string());
             }
         }
 
@@ -151,22 +151,23 @@ impl Problem {
             let i = i - 1;
             let j = j - 1;
 
-            let mut tags = vec![];
+            let mut tags = BTreeSet::new();
 
             if let Some(val) = constraint_tags.get(&l) {
                 tags.extend(val.clone());
+                tags.insert("litinmus".to_string());
             }
 
             if deduced_lits.contains(&PuzLit::new_eq(l.clone())) {
-                tags.push("litpos".to_string())
+                tags.insert("litpos".to_string());
             }
 
             if deduced_lits.contains(&PuzLit::new_neq(l.clone())) {
-                tags.push("litneg".to_string())
+                tags.insert("litneg".to_string());
             }
 
             if known.contains(&PuzLit::new_eq(l.clone())) {
-                tags.push("litknown".to_string())
+                tags.insert("litknown".to_string());
             }
 
             if knowledgegrid[i][j].is_none() {
@@ -184,7 +185,10 @@ impl Problem {
             .enumerate()
             .map(|(i, con)| Statement {
                 content: con.clone(),
-                classes: Some(vec![format!("con{}", i)]),
+                classes: Some(vec![
+                    format!("highlight_con{}", i),
+                    "js_highlighter".to_string(),
+                ]),
             })
             .collect_vec();
 

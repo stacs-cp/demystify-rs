@@ -1,0 +1,46 @@
+
+.litpos {
+    color: blue;
+    fill: blue;
+    font-weight: bold;
+}
+.litneg {
+    color: red;
+    fill: red;
+    text-decoration: line-through;
+}
+.litknown {
+    color: purple;
+    fill: purple;
+    font-weight: bold;
+    text-decoration: underline;
+}
+.litinmus {
+    background-color: yellow;
+}
+
+.constraintlist .highlight_con0 {
+    background-color: #d0ffff;
+    fill:  #d0ffff;
+}
+
+.highlight_con0 rect {
+    background-color: #d0ffff;
+    fill:  #d0ffff;
+}
+
+.highlight_con1 rect {
+    background-color: #ffd0ff;
+}
+
+.highlight_con2 rect {
+    background-color: #ffffd0;
+}
+
+.highlight_con3 rect {
+    background-color: #d0d0ff;
+}
+
+.highlight_con4 rect {
+    background-color: #d0ffd0;
+}
