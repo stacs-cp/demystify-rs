@@ -332,7 +332,7 @@ impl PuzzleDraw {
                 let j_f = j as f64;
 
                 let mut g = element::Group::new();
-                g.assign("id", format!("C_${j}_${i}"));
+                g.assign("id", format!("C_{j}_{i}"));
                 g.assign(
                     "transform",
                     format!(
