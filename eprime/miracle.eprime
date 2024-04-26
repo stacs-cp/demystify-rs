@@ -1,5 +1,7 @@
 language ESSENCE' 1.0
 
+$#KIND Sudoku
+
 letting D be domain int(1..9)
 letting Ds be {1,2,3,4,5,6,7,8,9}
 
@@ -10,32 +12,32 @@ given fixed : matrix indexed by [D,D] of int(0..9)
 $#VAR grid
 find grid : matrix indexed by [D,D] of D
 
-$#CON row_alldiff "cells ({a[0]},{a[1]}) and ({a[0]},{a[2]}) cannot both be {a[3]} as they are in the same row"
+$#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"
 find row_alldiff: matrix indexed by [D,D,D,D] of bool
 
-$#CON con_alldiff "cells ({a[0]},{a[1]}) and ({a[0]},{a[2]}) cannot both be {a[3]} as they are in the same column"
+$#CON con_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same column"
 find con_alldiff: matrix indexed by [D,D,D,D] of bool
 
-$#CON box_alldiff "cells ({1+3*int(a[0])+int(a[2])},{1+3*int(a[1])+int(a[3])}) and ({1+3*int(a[0])+int(a[4])},{1+3*int(a[1])+int(a[5])}) cannot both be {a[6]} as they are in the same box"
+$#CON box_alldiff "cells ({{1+3*index[0]+index[2]}},{{1+3*index[1]+index[3]}}) and ({{1+3*index[0]+index[4]}},{{1+3*index[1]+index[5]}}) cannot both be {{index[6]}} as they are in the same box"
 find box_alldiff: matrix indexed by [C,C,C,C,C,C,D] of bool
 
-$#CON row_contains "Row {a[0]} must contain a {a[1]}"
+$#CON row_contains "Row {{index[0]}} must contain a {{index[1]}}"
 find row_contains: matrix indexed by [D,D] of bool
 
-$#CON con_contains "Column {a[0]} must contain a {a[1]}"
+$#CON con_contains "Column {{index[0]}} must contain a {{index[1]}}"
 find con_contains: matrix indexed by [D,D] of bool
 
-$#CON box_contains "The box starting at ({1+3*int(a[0])},{1+3*int(a[1])}) must contain a {a[2]}"
+$#CON box_contains "The box starting at ({{1+3*index[0]}},{{1+3*index[1]}}) must contain a {{index[2]}}"
 find box_contains: matrix indexed by [C,C,D] of bool
 
 
-$#CON orthogonally "cells ({a[0]},{a[1]}) and ({int(a[0])+int(a[2])},{int(a[1])+int(a[3])}) cannot be {int(a[4])} and {int(a[4])+int(a[5])} because they cannot contain consecutive digits as they are orthogonally adjacent"
+$#CON orthogonally "cells ({{index[0]}},{{index[1]}}) and ({{index[0]+index[2]}},{{index[1]+index[3]}}) cannot be {{index[4]}} and {{index[4]+index[5]}} because they cannot contain consecutive digits as they are orthogonally adjacent"
 find orthogonally: matrix indexed by [D,D,int(0..1),int(0..1),D,int(-1,1)] of bool
 
-$#CON king "cells ({a[0]},{a[1]}) and ({int(a[0])+int(a[2])},{int(a[1])+int(a[3])}) cannot both be {a[4]} as they are a king's move apart"
+$#CON king "cells ({{index[0]}},{{index[1]}}) and ({{index[0]+index[2]}},{{index[1]+index[3]}}) cannot both be {{index[4]}} as they are a king's move apart"
 find king: matrix indexed by [D,D,int(-1,1),int(-1,1),D] of bool
 
-$#CON knight "cells ({a[0]},{a[1]}) and ({int(a[0])+int(a[2])},{int(a[1])+int(a[3])}) cannot both be {a[4]} as they are a knight's move apart"
+$#CON knight "cells ({{index[0]}},{{index[1]}}) and ({{index[0]+index[2]}},{{index[1]+index[3]}}) cannot both be {{index[4]}} as they are a knight's move apart"
 find knight: matrix indexed by [D,D,int(1,2),int(-2,-1,1,2),D] of bool
 
 such that

@@ -317,11 +317,14 @@ impl PuzzleParse {
                 let puzlit = PuzLit::new_eq(VarValPair::new(varid, 1));
                 let lit = *self.litmap.get(&puzlit).unwrap();
                 safe_insert(&mut self.conset, lit, constraintname.clone())?;
-                safe_insert(&mut self.invconset, constraintname, lit)?;
+                safe_insert(&mut self.invconset, constraintname.clone(), lit)?;
                 self.conset_lits.insert(lit);
                 safe_insert(&mut self.varlits_in_con, lit, fvc.get_connections(lit))?;
-
-                // TODO: Find the literals in every constraint
+                info!(
+                    "MAP {} {:?}",
+                    &constraintname,
+                    self.varlits_in_con.get(&lit).unwrap()
+                );
             }
         }
 

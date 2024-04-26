@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use super::{parse::PuzzleParse, PuzVar};
 use anyhow::{bail, Context};
@@ -79,12 +79,12 @@ pub fn parse_constraint_name(
 
 pub struct FindVarConnections {
     lit_to_clauses: HashMap<Lit, HashSet<Lit>>,
-    all_var_lits: BTreeSet<Lit>,
+    all_var_lits: HashSet<Lit>,
 }
 
 impl FindVarConnections {
     #[must_use]
-    pub fn new(sat: &SatInstance, all_var_lits: &BTreeSet<Lit>) -> FindVarConnections {
+    pub fn new(sat: &SatInstance, all_var_lits: &HashSet<Lit>) -> FindVarConnections {
         let (cnf, _) = sat.clone().into_cnf();
         let mut lit_to_clauses: HashMap<Lit, HashSet<Lit>> = HashMap::new();
         for clause in cnf.iter() {
@@ -112,19 +112,21 @@ impl FindVarConnections {
     }
 
     pub fn get_connections(&self, con_lit: Lit) -> Vec<Lit> {
-        let mut todo: BTreeSet<Lit> = BTreeSet::new();
-        let mut found: BTreeSet<Lit> = BTreeSet::new();
+        let mut todo: Vec<Lit> = vec![];
+        let mut found: HashSet<Lit> = HashSet::new();
 
         if !self.lit_to_clauses.contains_key(&-con_lit) {
             return vec![];
         }
 
+        info!("Looking for connections for: {con_lit}");
+
         found.insert(con_lit);
         found.insert(-con_lit);
-        todo.insert(-con_lit);
-        todo.insert(con_lit);
+        todo.push(-con_lit);
+        todo.push(con_lit);
 
-        while let Some(todo_lit) = todo.pop_first() {
+        while let Some(todo_lit) = todo.pop() {
             info!("Todo: {}", todo_lit);
             let litset = self.lit_to_clauses.get(&todo_lit);
             if let Some(litset) = litset {
@@ -135,8 +137,11 @@ impl FindVarConnections {
                         info!("Found {}\n", lit);
                         found.insert(lit);
                         if !self.all_var_lits.contains(&lit) {
+                            assert!(!self.all_var_lits.contains(&-lit));
                             info!("Add to todo: {}\n", lit);
-                            todo.insert(lit);
+                            todo.push(lit);
+                        } else {
+                            info!("In var_lits: {}\n", lit);
                         }
                     }
                 }

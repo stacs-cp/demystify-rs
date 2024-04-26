@@ -100,17 +100,14 @@ impl PuzzlePlanner {
         let mut html = String::new();
         while !self.tosolve.is_empty() {
             let muses = self.smallest_muses();
+            let first_mus = muses[0].clone();
 
-            for (m, _) in &muses {
-                self.mark_lit_as_deduced(m);
-            }
+            drop(muses);
+
+            self.mark_lit_as_deduced(&first_mus.0);
 
             // Map the 'muses' to a user PuzLits
-            let mus = muses
-                .into_iter()
-                .map(|mus| self.mus_to_user_mus(mus))
-                .next()
-                .unwrap();
+            let mus = self.mus_to_user_mus(first_mus);
 
             let tosolve_varvals: BTreeSet<_> = self
                 .tosolve
@@ -132,6 +129,7 @@ impl PuzzlePlanner {
                 &known_puzlits,
                 &mus.0,
                 &mus.1,
+                &format!("{:?} because of {} constraints", &mus.0, &mus.1.len()),
             )
             .expect("Cannot make puzzle json");
 

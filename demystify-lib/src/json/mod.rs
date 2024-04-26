@@ -82,6 +82,7 @@ pub struct StateLit {
 pub struct State {
     pub knowledge_grid: Option<Vec<Vec<Option<Vec<StateLit>>>>>,
     pub statements: Option<Vec<Statement>>,
+    pub description: Option<String>,
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -111,6 +112,7 @@ impl Problem {
         known: &BTreeSet<PuzLit>,
         deduced_lits: &BTreeSet<PuzLit>,
         constraints: &Vec<String>,
+        description: &String,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
@@ -135,7 +137,7 @@ impl Problem {
         let all_lits = solver.puzzleparse().all_var_varvals();
 
         for l in all_lits {
-            if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
+            if !(tosolve.contains(&l) || known.contains(&PuzLit::new_neq(l.clone()))) {
                 continue;
             }
 
@@ -195,6 +197,7 @@ impl Problem {
         let state = State {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
+            description: Some(description.clone()),
         };
 
         Ok(Problem {

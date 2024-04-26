@@ -15,12 +15,17 @@ pub fn base_javascript() -> &'static str {
 pub fn create_html(puzjson: &Problem) -> String {
     let pd = PuzzleDraw::new(&puzjson.puzzle.kind);
     let svg = pd.draw_puzzle(puzjson);
+
     let statements = if let Some(ref state) = puzjson.state {
-        if let Some(ref statements) = state.statements {
+        let constraints = if let Some(ref statements) = state.statements {
             map_statements(statements)
         } else {
             "".to_string()
-        }
+        };
+
+        let description = state.description.clone().unwrap_or("".to_string());
+
+        description + &"\n" + &constraints
     } else {
         "".to_string()
     };

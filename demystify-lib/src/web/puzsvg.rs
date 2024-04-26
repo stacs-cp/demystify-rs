@@ -77,7 +77,7 @@ impl PuzzleDraw {
 
         if let Some(state) = &puzjson.state {
             if let Some(knowledge_grid) = &state.knowledge_grid {
-                self.fill_knowledge(&mut cells, knowledge_grid);
+                self.fill_knowledge(&mut cells, &puzzle.start_grid, knowledge_grid);
             }
         }
 
@@ -115,6 +115,10 @@ impl PuzzleDraw {
         doc.add(out)
     }
 
+    fn fixed_cell_is_used(&self, cell: Option<i64>) -> bool {
+        cell.is_some_and(|c| Some(c) != self.decorations.blank_input_val)
+    }
+
     fn fill_fixed_state(
         &self,
         cells: &mut Vec<Vec<element::Group>>,
@@ -122,16 +126,15 @@ impl PuzzleDraw {
     ) {
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {
-                if let Some(cell) = contents[i][j] {
-                    if Some(cell) != self.decorations.blank_input_val {
-                        let s = cell.to_string();
+                if self.fixed_cell_is_used(contents[i][j]) {
+                    let cell = contents[i][j].unwrap();
+                    let s = cell.to_string();
 
-                        let mut node = svg::node::element::Text::new(s);
-                        node.assign("font-size", 1);
-                        node.assign("transform", "translate(0.2, 0.9)");
+                    let mut node = svg::node::element::Text::new(s);
+                    node.assign("font-size", 1);
+                    node.assign("transform", "translate(0.2, 0.9)");
 
-                        cells[i][j].append(node);
-                    }
+                    cells[i][j].append(node);
                 }
             }
         }
@@ -140,10 +143,20 @@ impl PuzzleDraw {
     fn fill_knowledge(
         &self,
         cells: &mut Vec<Vec<element::Group>>,
+        fixed_contents: &Option<Vec<Vec<Option<i64>>>>,
         contents: &Vec<Vec<Option<Vec<StateLit>>>>,
     ) {
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {
+                // The only reason we have 'fixed_contents' is because we do not want to
+                // put knowledge in these cells
+                if fixed_contents
+                    .as_ref()
+                    .is_some_and(|c| self.fixed_cell_is_used(c[i][j]))
+                {
+                    continue;
+                }
+
                 if let Some(cell) = &contents[i][j] {
                     // Find the right size of grid to fit our values in
                     let sqrt_length = (cell.len() as f64).sqrt().ceil() as usize;
