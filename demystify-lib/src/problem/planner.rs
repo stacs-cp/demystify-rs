@@ -13,6 +13,13 @@ pub struct PuzzlePlanner {
 
     tosolve: BTreeSet<Lit>,
     deduced: BTreeSet<Lit>,
+
+    config: PlannerConfig,
+}
+
+#[derive(Default)]
+pub struct PlannerConfig {
+    pub merge_small_threshold: Option<i64>,
 }
 
 impl PuzzlePlanner {
@@ -24,14 +31,27 @@ impl PuzzlePlanner {
             psolve,
             tosolve,
             deduced: BTreeSet::new(),
+            config: PlannerConfig::default(),
         }
     }
 
-    pub fn all_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+    /// Creates a new `PuzzlePlanner` instance.
+    #[must_use]
+    pub fn new_with_config(psolve: PuzzleSolver, config: PlannerConfig) -> PuzzlePlanner {
+        let tosolve = psolve.get_unsatisfiable_varlits();
+        PuzzlePlanner {
+            psolve,
+            tosolve,
+            deduced: BTreeSet::new(),
+            config,
+        }
+    }
+
+    pub fn all_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
         self.psolve.get_many_vars_small_mus_quick(&self.tosolve)
     }
 
-    pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn smallest_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
         let muses = self.all_muses();
 
         let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
@@ -43,7 +63,20 @@ impl PuzzlePlanner {
         muses
     }
 
-    pub fn mus_to_user_mus(&self, mus: (Lit, Vec<Lit>)) -> (BTreeSet<PuzLit>, Vec<String>) {
+    pub fn smallest_muses_with_config(&self) -> Vec<(Lit, Vec<Lit>)> {
+        let muses = self.smallest_muses();
+        if let Some(min) = self.config.merge_small_threshold {
+            if muses[0].1.len() as i64 <= min {
+                vec![muses[0].clone()]
+            } else {
+                muses
+            }
+        } else {
+            muses
+        }
+    }
+
+    pub fn mus_to_user_mus(&self, mus: &(Lit, Vec<Lit>)) -> (BTreeSet<PuzLit>, Vec<String>) {
         let (l, x) = mus;
         (
             self.psolve.puzzleparse().lit_to_vars(&l).clone(),
@@ -69,7 +102,7 @@ impl PuzzlePlanner {
     pub fn quick_solve(&mut self) -> Vec<(BTreeSet<PuzLit>, Vec<String>)> {
         let mut solvesteps = vec![];
         while !self.tosolve.is_empty() {
-            let muses = self.smallest_muses();
+            let muses = self.smallest_muses_with_config();
 
             for (m, _) in &muses {
                 self.mark_lit_as_deduced(m);
@@ -78,7 +111,7 @@ impl PuzzlePlanner {
             // Map the 'muses' to a user PuzLits
             let muses = muses
                 .into_iter()
-                .map(|mus| self.mus_to_user_mus(mus))
+                .map(|mus| self.mus_to_user_mus(&mus))
                 .collect_vec();
 
             println!(
@@ -99,15 +132,13 @@ impl PuzzlePlanner {
     pub fn quick_solve_html(&mut self) -> String {
         let mut html = String::new();
         while !self.tosolve.is_empty() {
-            let muses = self.smallest_muses();
-            let first_mus = muses[0].clone();
-
-            drop(muses);
-
-            self.mark_lit_as_deduced(&first_mus.0);
+            let base_muses = self.smallest_muses_with_config();
 
             // Map the 'muses' to a user PuzLits
-            let mus = self.mus_to_user_mus(first_mus);
+            let muses = base_muses
+                .iter()
+                .map(|mus| self.mus_to_user_mus(mus))
+                .collect_vec();
 
             let tosolve_varvals: BTreeSet<_> = self
                 .tosolve
@@ -123,15 +154,29 @@ impl PuzzlePlanner {
                 .cloned()
                 .collect();
 
+            let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
+
+            let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
+
+            let nice_deduced: String = deduced.iter().format(", ").to_string();
+
             let problem = Problem::new_from_puzzle_and_mus(
                 &self.psolve,
                 &tosolve_varvals,
                 &known_puzlits,
-                &mus.0,
-                &mus.1,
-                &format!("{:?} because of {} constraints", &mus.0, &mus.1.len()),
+                &deduced,
+                &constraints,
+                &format!(
+                    "{:?} because of {} constraints",
+                    nice_deduced,
+                    &constraints.len()
+                ),
             )
             .expect("Cannot make puzzle json");
+
+            for (m, _) in &base_muses {
+                self.mark_lit_as_deduced(m);
+            }
 
             html += &create_html(&problem);
             html += "<br/>";

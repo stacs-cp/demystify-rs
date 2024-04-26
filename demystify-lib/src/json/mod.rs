@@ -128,7 +128,7 @@ impl Problem {
         for (i, con) in constraints.iter().enumerate() {
             let scope = solver.puzzleparse().constraint_scope(con);
             for p in scope {
-                let tags = constraint_tags.entry(p.varval()).or_default();
+                let tags = constraint_tags.entry(p).or_default();
                 tags.insert(format!("highlight_con{i}"));
                 tags.insert("js_highlighter".to_string());
             }

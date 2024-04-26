@@ -110,8 +110,8 @@ impl PuzzleDraw {
 
         let doc = svg::Document::new()
             .set("viewBox", (0, 0, 500, 500))
-            .set("width", 200)
-            .set("height", 200);
+            .set("width", 500)
+            .set("height", 500);
         doc.add(out)
     }
 

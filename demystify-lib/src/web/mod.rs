@@ -30,7 +30,23 @@ pub fn create_html(puzjson: &Problem) -> String {
         "".to_string()
     };
 
-    svg.to_string() + "\n" + &statements
+    let two_div_template = r#"
+    <div style="display: flex; height: 550px;">
+    <div style="width: 550px; border: 1px solid black;">
+        {{ svg }}
+    </div>
+    <div style="flex: 1; border: 1px solid black; overflow-y: auto;">
+        {{ statements }}
+    </div>
+</div>
+"#;
+
+    let mut context = tera::Context::new();
+
+    context.insert("statements", &statements);
+    context.insert("svg", &svg.to_string());
+
+    tera::Tera::one_off(two_div_template, &context, false).expect("IE: Failed templating")
 }
 
 fn map_statements(statements: &Vec<Statement>) -> String {
@@ -40,8 +56,8 @@ fn map_statements(statements: &Vec<Statement>) -> String {
     <div class="{% for class in statement.classes %}{{ class }} {% endfor %}">
         {{ statement.content }}
     </div>
-    </div>
 {% endfor %}
+</div>
 "#;
 
     let mut context = tera::Context::new();

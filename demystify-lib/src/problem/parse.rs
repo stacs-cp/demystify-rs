@@ -168,13 +168,13 @@ pub struct PuzzleParse {
     pub invlitmap: BTreeMap<Lit, BTreeSet<PuzLit>>,
     /// A mapping from each variable to its domain
     pub domainmap: BTreeMap<PuzVar, BTreeSet<i64>>,
-    /// List of all constraints in the problem, and their English-readable name
+    /// List of all literals representing constraints in the problem, and their English-readable name
     pub conset: BTreeMap<Lit, String>,
     /// Inverse of conset
     pub invconset: BTreeMap<String, Lit>,
     /// Lits of all literals in each constraint
     pub varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
-    /// List of all literals in a VAR
+    /// List of all literals in a VAR in the direct encoding
     pub varset_lits: BTreeSet<Lit>,
     /// List of all literals which turn on CON
     pub conset_lits: BTreeSet<Lit>,
@@ -184,15 +184,15 @@ pub struct PuzzleParse {
     /// A mapping from variables in the order representation to their corresponding SAT integers.
     /// These are generally not useful, but are sometimes used when scanning
     /// the entire problem
-    pub ordervarmap: BTreeMap<PuzVar, HashSet<Lit>>,
+    pub order_encoding_map: BTreeMap<PuzVar, HashSet<Lit>>,
     /// A mapping from lits to the order representation they represent.
     /// These are generally not useful, but are sometimes used when scanning
     /// the entire problem
-    pub invordervarmap: BTreeMap<Lit, PuzVar>,
-    /// List of all literals in tbe order encoding of a VAR
+    pub inv_order_encoding_map: BTreeMap<Lit, PuzVar>,
+    /// List of all literals in tbe order encoding of a variable
     /// These are generally not useful, but are sometimes used when scanning
-    /// the entire problem
-    pub varset_order_lits: BTreeSet<Lit>,
+    /// the SAT instance
+    pub order_encoding_all_lits: BTreeSet<Lit>,
 }
 
 fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> anyhow::Result<()> {
@@ -224,9 +224,9 @@ impl PuzzleParse {
             litmap: BTreeMap::new(),
             invlitmap: BTreeMap::new(),
             domainmap: BTreeMap::new(),
-            ordervarmap: BTreeMap::new(),
-            invordervarmap: BTreeMap::new(),
-            varset_order_lits: BTreeSet::new(),
+            order_encoding_map: BTreeMap::new(),
+            inv_order_encoding_map: BTreeMap::new(),
+            order_encoding_all_lits: BTreeSet::new(),
             conset: BTreeMap::new(),
             invconset: BTreeMap::new(),
             varlits_in_con: BTreeMap::new(),
@@ -273,14 +273,7 @@ impl PuzzleParse {
 
         let mut usedconstraintnames: HashSet<String> = HashSet::new();
 
-        // Gather all lits, for use gathering connections between constraints and variables
-        let all_lits = self
-            .varset_lits
-            .union(&self.varset_order_lits)
-            .copied()
-            .collect();
-
-        let fvc = FindVarConnections::new(&self.satinstance, &all_lits);
+        let fvc = FindVarConnections::new(&self.satinstance, &self.all_var_related_lits());
 
         // Tidy up and check constraints
         for (varid, vals) in &self.domainmap {
@@ -366,6 +359,21 @@ impl PuzzleParse {
         self.invlitmap.get(lit).expect("IE: Bad lit")
     }
 
+    // All lits included in both the direct and ordered encoding
+    // of VARs
+    pub fn all_var_related_lits(&self) -> HashSet<Lit> {
+        let ordered_var: BTreeSet<Lit> = self
+            .order_encoding_map
+            .iter()
+            .filter(|(k, _)| self.eprime.vars.contains(k.name()))
+            .flat_map(|(_, v)| v)
+            .cloned()
+            .collect();
+
+        self.varset_lits.union(&ordered_var).copied().collect()
+    }
+
+    // All VarValPairs included in VARs
     pub fn all_var_varvals(&self) -> BTreeSet<VarValPair> {
         self.varset_lits
             .iter()
@@ -374,44 +382,42 @@ impl PuzzleParse {
             .collect()
     }
 
-    pub fn constraint_scope(&self, con: &String) -> BTreeSet<PuzLit> {
+    /// Given a collection of Lits representing both direct and ordered
+    /// representations, collect them into a collection of `VarValPair`s
+    pub fn direct_or_ordered_lit_to_varvalpair(&self, lit: &Lit) -> BTreeSet<VarValPair> {
+        let direct_lits = self.invlitmap.get(lit).cloned().unwrap_or_default();
+
+        let order_lits = if let Some(var) = self.inv_order_encoding_map.get(lit) {
+            self.domainmap
+                .get(var)
+                .unwrap()
+                .iter()
+                .map(|&d| VarValPair::new(var, d))
+                .collect_vec()
+        } else {
+            vec![]
+        };
+
+        direct_lits
+            .into_iter()
+            .map(|x| x.varval())
+            .chain(order_lits.into_iter())
+            .collect()
+    }
+    pub fn constraints(&self) -> BTreeSet<String> {
+        self.invconset.keys().cloned().collect()
+    }
+
+    pub fn constraint_scope(&self, con: &String) -> BTreeSet<VarValPair> {
         let lit = self.invconset.get(con).expect("IE: Bad constraint name");
 
         let lits = self.varlits_in_con.get(lit).expect("IE: Bad constraint");
-
         let puzlits = lits
             .iter()
-            .flat_map(|l| self.invlitmap.get(l).unwrap())
-            .cloned()
+            .flat_map(|l| self.direct_or_ordered_lit_to_varvalpair(l))
             .collect_vec();
 
         BTreeSet::from_iter(puzlits)
-    }
-
-    /// Given a collection of Lits representing both direct and ordered
-    /// representations, collect them into a collection of `PuzLits`
-    #[must_use]
-    pub fn collect_puzlits_both_direct_and_ordered(&self, lits: Vec<Lit>) -> Vec<PuzLit> {
-        let mut collected: BTreeSet<PuzLit> = BTreeSet::new();
-
-        for l in lits {
-            if let Some(found_lits) = self.invlitmap.get(&l) {
-                for f in found_lits {
-                    if f.sign() {
-                        collected.insert(f.clone());
-                    } else {
-                        collected.insert(f.neg());
-                    }
-                }
-            }
-            if let Some(found_var) = self.invordervarmap.get(&l) {
-                for &val in self.domainmap.get(found_var).unwrap() {
-                    collected.insert(PuzLit::new_eq(VarValPair::new(found_var, val)));
-                }
-            }
-        }
-
-        collected.into_iter().collect()
     }
 }
 
@@ -528,24 +534,24 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                         // Not currently using exact literal
                         // let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
                         dimacs
-                            .ordervarmap
+                            .order_encoding_map
                             .entry(varid.clone())
                             .or_default()
                             .insert(satlit);
                         dimacs
-                            .ordervarmap
+                            .order_encoding_map
                             .entry(varid.clone())
                             .or_default()
                             .insert(-satlit);
-                        dimacs.varset_order_lits.insert(satlit);
-                        dimacs.varset_order_lits.insert(-satlit);
-                        if let Some(val) = dimacs.invordervarmap.get(&satlit) {
+                        dimacs.order_encoding_all_lits.insert(satlit);
+                        dimacs.order_encoding_all_lits.insert(-satlit);
+                        if let Some(val) = dimacs.inv_order_encoding_map.get(&satlit) {
                             if *val != varid {
                                 bail!("{} used for two variables: {} {}", satlit, val, varid);
                             }
                         }
-                        safe_insert(&mut dimacs.invordervarmap, satlit, varid.clone())?;
-                        safe_insert(&mut dimacs.invordervarmap, -satlit, varid.clone())?;
+                        safe_insert(&mut dimacs.inv_order_encoding_map, satlit, varid.clone())?;
+                        safe_insert(&mut dimacs.inv_order_encoding_map, -satlit, varid.clone())?;
                     }
                 }
             }
@@ -677,6 +683,7 @@ fn read_essence_param(
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use test_log::test;
 
     #[test]
@@ -733,5 +740,11 @@ mod tests {
         assert_eq!(puz.conset_lits.len(), 4);
         assert_eq!(puz.varset_lits.len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
         assert_eq!(puz.auxset_lits.len(), 0);
+        println!("hi");
+        let cons = puz.constraints();
+
+        let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(&c))).collect();
+
+        insta::assert_debug_snapshot!(scopes);
     }
 }

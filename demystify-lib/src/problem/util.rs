@@ -121,8 +121,6 @@ impl FindVarConnections {
 
         info!("Looking for connections for: {con_lit}");
 
-        found.insert(con_lit);
-        found.insert(-con_lit);
         todo.push(-con_lit);
         todo.push(con_lit);
 
@@ -260,22 +258,19 @@ mod tests {
         let puz =
             crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
 
-        let all_lits = puz
-            .varset_lits
-            .union(&puz.varset_order_lits)
-            .copied()
-            .collect();
-
-        let fvc = FindVarConnections::new(&puz.satinstance, &all_lits);
+        let fvc = FindVarConnections::new(&puz.satinstance, &puz.all_var_related_lits());
 
         for c in &puz.conset_lits {
             let lits = fvc.get_connections(*c);
-            let puzlits = puz.collect_puzlits_both_direct_and_ordered(lits.clone());
+            let puzlits = lits
+                .iter()
+                .map(|l| puz.direct_or_ordered_lit_to_varvalpair(l))
+                .collect_vec();
             println!("{c} {puzlits:?}");
             for l in &lits {
                 println!("{l:?}");
                 println!("{:?}", puz.invlitmap.get(l));
-                println!("{:?}", puz.invordervarmap.get(l));
+                println!("{:?}", puz.inv_order_encoding_map.get(l));
             }
         }
     }
