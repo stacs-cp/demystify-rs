@@ -53,7 +53,7 @@ impl PuzzleSolver {
     ///
     /// The corresponding `Lit` instance.
     pub fn puzlit_to_lit(&self, puzlit: &PuzLit) -> Lit {
-        *self.puzzleparse.litmap.get(&puzlit).unwrap()
+        *self.puzzleparse.litmap.get(puzlit).unwrap()
     }
 
     /// Converts a `Lit` instance to a reference to the set of `PuzLit` instances it represents.
@@ -66,7 +66,7 @@ impl PuzzleSolver {
     ///
     /// A reference to the set of `PuzLit` instances.
     pub fn lit_to_puzlit(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
-        self.puzzleparse.invlitmap.get(&lit).unwrap()
+        self.puzzleparse.invlitmap.get(lit).unwrap()
     }
 
     /// Retrieves the unsatisfiable variable literals.

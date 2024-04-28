@@ -401,7 +401,7 @@ impl PuzzleParse {
         direct_lits
             .into_iter()
             .map(|x| x.varval())
-            .chain(order_lits.into_iter())
+            .chain(order_lits)
             .collect()
     }
     pub fn constraints(&self) -> BTreeSet<String> {
@@ -683,7 +683,7 @@ fn read_essence_param(
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
+
     use test_log::test;
 
     #[test]
@@ -743,7 +743,7 @@ mod tests {
         println!("hi");
         let cons = puz.constraints();
 
-        let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(&c))).collect();
+        let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
 
         insta::assert_debug_snapshot!(scopes);
     }

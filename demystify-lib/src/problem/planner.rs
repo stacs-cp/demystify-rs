@@ -79,9 +79,9 @@ impl PuzzlePlanner {
     pub fn mus_to_user_mus(&self, mus: &(Lit, Vec<Lit>)) -> (BTreeSet<PuzLit>, Vec<String>) {
         let (l, x) = mus;
         (
-            self.psolve.puzzleparse().lit_to_vars(&l).clone(),
-            x.into_iter()
-                .map(|c| self.psolve.puzzleparse().lit_to_con(&c))
+            self.psolve.puzzleparse().lit_to_vars(l).clone(),
+            x.iter()
+                .map(|c| self.psolve.puzzleparse().lit_to_con(c))
                 .cloned()
                 .collect_vec(),
         )
