@@ -1,0 +1,285 @@
+---
+source: demystify-lib/src/problem/parse.rs
+expression: scopes
+---
+[
+    (
+        "1 and 1 cannot both be 1",
+        {},
+    ),
+    (
+        "1 and 1 cannot both be 2",
+        {},
+    ),
+    (
+        "1 and 1 cannot both be 3",
+        {},
+    ),
+    (
+        "1 and 2 cannot both be 1",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 1,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 1,
+            },
+        },
+    ),
+    (
+        "1 and 2 cannot both be 2",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 2,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 2,
+            },
+        },
+    ),
+    (
+        "1 and 2 cannot both be 3",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 3,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 3,
+            },
+        },
+    ),
+    (
+        "1 and 3 cannot both be 1",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 1,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 1,
+            },
+        },
+    ),
+    (
+        "1 and 3 cannot both be 2",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 2,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 2,
+            },
+        },
+    ),
+    (
+        "1 and 3 cannot both be 3",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 3,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 3,
+            },
+        },
+    ),
+    (
+        "2 and 1 cannot both be 1",
+        {},
+    ),
+    (
+        "2 and 1 cannot both be 2",
+        {},
+    ),
+    (
+        "2 and 1 cannot both be 3",
+        {},
+    ),
+    (
+        "2 and 2 cannot both be 1",
+        {},
+    ),
+    (
+        "2 and 2 cannot both be 2",
+        {},
+    ),
+    (
+        "2 and 2 cannot both be 3",
+        {},
+    ),
+    (
+        "2 and 3 cannot both be 1",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 1,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 1,
+            },
+        },
+    ),
+    (
+        "2 and 3 cannot both be 2",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 2,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 2,
+            },
+        },
+    ),
+    (
+        "2 and 3 cannot both be 3",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 3,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 3,
+            },
+        },
+    ),
+    (
+        "3 and 1 cannot both be 1",
+        {},
+    ),
+    (
+        "3 and 1 cannot both be 2",
+        {},
+    ),
+    (
+        "3 and 1 cannot both be 3",
+        {},
+    ),
+    (
+        "3 and 2 cannot both be 1",
+        {},
+    ),
+    (
+        "3 and 2 cannot both be 2",
+        {},
+    ),
+    (
+        "3 and 2 cannot both be 3",
+        {},
+    ),
+    (
+        "3 and 3 cannot both be 1",
+        {},
+    ),
+    (
+        "3 and 3 cannot both be 2",
+        {},
+    ),
+    (
+        "3 and 3 cannot both be 3",
+        {},
+    ),
+]

@@ -18,6 +18,7 @@ use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+use std::mem::forget;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
@@ -271,6 +272,20 @@ impl PuzzleParse {
             }
         }
 
+        for (puzlit, &lit) in &self.litmap {
+            let var = puzlit.var();
+            let name = var.name();
+            if self.eprime.vars.contains(name) {
+                self.varset_lits.insert(lit);
+            } else if self.eprime.auxvars.contains(name) {
+                self.auxset_lits.insert(lit);
+            } else if self.eprime.cons.contains_key(name) {
+                // constraints are specially dealt with above
+            } else {
+                bail!("Cannot indentify {:?}", puzlit);
+            }
+        }
+
         let mut usedconstraintnames: HashSet<String> = HashSet::new();
 
         let fvc = FindVarConnections::new(&self.satinstance, &self.all_var_related_lits());
@@ -318,20 +333,6 @@ impl PuzzleParse {
                     &constraintname,
                     self.varlits_in_con.get(&lit).unwrap()
                 );
-            }
-        }
-
-        for (puzlit, &lit) in &self.litmap {
-            let var = puzlit.var();
-            let name = var.name();
-            if self.eprime.vars.contains(name) {
-                self.varset_lits.insert(lit);
-            } else if self.eprime.auxvars.contains(name) {
-                self.auxset_lits.insert(lit);
-            } else if self.eprime.cons.contains_key(name) {
-                // constraints are specially dealt with above
-            } else {
-                bail!("Cannot indentify {:?}", puzlit);
             }
         }
 
@@ -566,6 +567,8 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
 
     let tdir = TempDir::new().unwrap();
 
+    info!("Parsing Essence in TempDir: {tdir:?}");
+
     let finaleprime: PathBuf;
     let finaleprimeparam: PathBuf;
 
@@ -648,6 +651,9 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
     read_dimacs(&in_dimacs_path, &mut eprimeparse)?;
 
     eprimeparse.finalise()?;
+
+    forget(tdir);
+
     Ok(eprimeparse)
 }
 
@@ -740,7 +746,54 @@ mod tests {
         assert_eq!(puz.conset_lits.len(), 4);
         assert_eq!(puz.varset_lits.len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
         assert_eq!(puz.auxset_lits.len(), 0);
-        println!("hi");
+        let cons = puz.constraints();
+
+        let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
+
+        insta::assert_debug_snapshot!(scopes);
+    }
+
+    #[test]
+    fn test_parse_sudoku_little() {
+        let eprime_path = "./tst/little-sudoku.eprime";
+        let eprimeparam_path = "./tst/little-sudoku.param";
+
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        assert_eq!(puz.eprime.vars.len(), 1);
+        assert_eq!(puz.eprime.cons.len(), 1);
+        assert_eq!(puz.eprime.auxvars.len(), 0);
+        assert_eq!(puz.eprime.kind, Some("Sudoku".to_string()));
+
+        assert!(puz.eprime.has_param("n"));
+
+        assert_eq!(puz.eprime.param_i64("n").unwrap(), 3);
+
+        let cons = puz.constraints();
+
+        let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
+
+        insta::assert_debug_snapshot!(scopes);
+    }
+
+    #[test]
+    fn test_parse_sudoku_little_2() {
+        let eprime_path = "./tst/little-sudoku-2.eprime";
+        let eprimeparam_path = "./tst/little-sudoku-2.param";
+
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        assert_eq!(puz.eprime.vars.len(), 1);
+        assert_eq!(puz.eprime.cons.len(), 1);
+        assert_eq!(puz.eprime.auxvars.len(), 0);
+        assert_eq!(puz.eprime.kind, Some("Sudoku".to_string()));
+
+        assert!(puz.eprime.has_param("n"));
+
+        assert_eq!(puz.eprime.param_i64("n").unwrap(), 3);
+
         let cons = puz.constraints();
 
         let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();

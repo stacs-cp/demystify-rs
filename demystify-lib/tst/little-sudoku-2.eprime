@@ -1,0 +1,17 @@
+language ESSENCE' 1.0
+
+$#KIND Sudoku
+given n: int
+
+letting ndim be int(1..n)
+
+
+$#VAR grid
+find grid: matrix indexed by [ndim] of ndim
+
+$#CON onlyone "Only one variable can be {{index[0]}}"
+find onlyone: matrix indexed by [ndim] of bool
+
+such that
+
+forAll i : ndim. (onlyone[i] -> exists j : ndim. grid[j]=i)

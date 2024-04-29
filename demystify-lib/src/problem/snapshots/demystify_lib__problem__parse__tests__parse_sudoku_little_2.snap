@@ -1,0 +1,102 @@
+---
+source: demystify-lib/src/problem/parse.rs
+expression: scopes
+---
+[
+    (
+        "Only one variable can be 1",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 1,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 1,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 1,
+            },
+        },
+    ),
+    (
+        "Only one variable can be 2",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 2,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 2,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 2,
+            },
+        },
+    ),
+    (
+        "Only one variable can be 3",
+        {
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        1,
+                    ],
+                },
+                val: 3,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        2,
+                    ],
+                },
+                val: 3,
+            },
+            VarValPair {
+                var: PuzVar {
+                    name: "grid",
+                    indices: [
+                        3,
+                    ],
+                },
+                val: 3,
+            },
+        },
+    ),
+]
