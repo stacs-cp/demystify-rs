@@ -111,8 +111,8 @@ impl Problem {
         tosolve: &BTreeSet<VarValPair>,
         known: &BTreeSet<PuzLit>,
         deduced_lits: &BTreeSet<PuzLit>,
-        constraints: &Vec<String>,
-        description: &String,
+        constraints: &[String],
+        description: &str,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
@@ -197,7 +197,7 @@ impl Problem {
         let state = State {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
-            description: Some(description.clone()),
+            description: Some(description.to_owned()),
         };
 
         Ok(Problem {

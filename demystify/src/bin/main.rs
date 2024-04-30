@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
             );
             println!("<body> {html}");
             println!("<script> doJavascript(); </script>");
-            println!("</body> </html>")
+            println!("</body> </html>");
         } else {
             for p in planner.quick_solve() {
                 println!("{p:?}");

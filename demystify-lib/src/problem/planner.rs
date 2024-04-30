@@ -81,13 +81,13 @@ impl PuzzlePlanner {
 
     pub fn all_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
         self.psolve
-            .get_many_vars_small_mus_quick(&self.to_solve.get())
+            .get_many_vars_small_mus_quick(self.to_solve.get())
     }
 
     pub fn smallest_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
         let muses = self.all_muses();
 
-        let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
+        let minmus = muses.iter().map(|(_, x)| x.len()).min().expect("Did not find any MUSes??!?");
         let muses: Vec<_> = muses
             .into_iter()
             .filter(|(_, x)| x.len() == minmus)

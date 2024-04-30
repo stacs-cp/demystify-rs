@@ -20,14 +20,14 @@ pub fn create_html(puzjson: &Problem) -> String {
         let constraints = if let Some(ref statements) = state.statements {
             map_statements(statements)
         } else {
-            "".to_string()
+            String::new()
         };
 
-        let description = state.description.clone().unwrap_or("".to_string());
+        let description = state.description.clone().unwrap_or(String::new());
 
-        description + &"\n" + &constraints
+        description + "\n" + &constraints
     } else {
-        "".to_string()
+        String::new()
     };
 
     let two_div_template = r#"
