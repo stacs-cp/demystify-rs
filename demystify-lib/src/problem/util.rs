@@ -24,8 +24,15 @@ pub fn parse_savile_row_name(
         .keys()
         .filter(|&v| n.starts_with(v))
         .collect();
+    let revealmatch: Vec<&String> = dimacs
+        .eprime
+        .reveal
+        .values()
+        .filter(|&v| n.starts_with(v))
+        .collect();
 
     matches.extend(conmatch);
+    matches.extend(revealmatch);
 
     if matches.is_empty() {
         if !dimacs.eprime.auxvars.iter().any(|v| n.starts_with(v)) {
@@ -130,16 +137,16 @@ impl FindVarConnections {
             if let Some(litset) = litset {
                 for &lit in litset {
                     let lit = -lit;
-                    info!("Considering {}\n", lit);
+                    info!("Considering {}\n", lit.to_ipasir());
                     if !found.contains(&lit) {
-                        info!("Found {}\n", lit);
+                        info!("Found {}\n", lit.to_ipasir());
                         found.insert(lit);
                         if !self.all_var_lits.contains(&lit) {
                             assert!(!self.all_var_lits.contains(&-lit));
-                            info!("Add to todo: {}\n", lit);
+                            info!("Add to todo: {}\n", lit.to_ipasir());
                             todo.push(lit);
                         } else {
-                            info!("In var_lits: {}\n", lit);
+                            info!("In var_lits: {}\n", lit.to_ipasir());
                         }
                     }
                 }
@@ -175,7 +182,9 @@ mod tests {
 
         let params = BTreeMap::new();
 
-        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, params, None);
+        let reveal = BTreeMap::new();
+
+        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, reveal, params, None);
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_1_2_3";

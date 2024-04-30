@@ -42,6 +42,10 @@ pub struct EPrimeAnnotations {
     pub auxvars: BTreeSet<String>,
     /// The constraints in the Essence' file, represented as a mapping from constraint name to constraint expression.
     pub cons: BTreeMap<String, String>,
+    /// 'reveal', which allow extra information to be added during solving.
+    pub reveal: BTreeMap<String, String>,
+    /// values from the 'reveal' map (for ease of searching)
+    pub reveal_values: BTreeSet<String>,
     /// The parameters read from the param file
     params: BTreeMap<String, serde_json::value::Value>,
     /// The kind of puzzle
@@ -209,6 +213,7 @@ impl PuzzleParse {
         vars: BTreeSet<String>,
         auxvars: BTreeSet<String>,
         cons: BTreeMap<String, String>,
+        reveal: BTreeMap<String, String>,
         params: BTreeMap<String, serde_json::value::Value>,
         kind: Option<String>,
     ) -> PuzzleParse {
@@ -217,6 +222,8 @@ impl PuzzleParse {
                 vars,
                 auxvars,
                 cons,
+                reveal: reveal.clone(),
+                reveal_values: reveal.values().cloned().collect(),
                 params,
                 kind,
             },
@@ -281,8 +288,10 @@ impl PuzzleParse {
                 self.auxset_lits.insert(lit);
             } else if self.eprime.cons.contains_key(name) {
                 // constraints are specially dealt with above
+            } else if self.eprime.reveal_values.contains(name) {
+                // todo
             } else {
-                bail!("Cannot indentify {:?}", puzlit);
+                bail!("Cannot identify {:?}", puzlit);
             }
         }
 
@@ -405,6 +414,11 @@ impl PuzzleParse {
             .chain(order_lits)
             .collect()
     }
+
+    pub fn has_facts(&self) -> bool {
+        !self.eprime.reveal.is_empty()
+    }
+
     pub fn constraints(&self) -> BTreeSet<String> {
         self.invconset.keys().cloned().collect()
     }
@@ -430,6 +444,8 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
 
     let mut cons: BTreeMap<String, String> = BTreeMap::new();
 
+    let mut factvars: BTreeMap<String, String> = BTreeMap::new();
+
     let mut kind: Option<String> = None;
 
     let conmatch = Regex::new(r#"\$#CON (.*) \"(.*)\""#).unwrap();
@@ -437,8 +453,11 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
 
+    let mut all_names = HashSet::new();
+
     for line in reader.lines() {
         let line = line?;
+
         if line.contains("$#") {
             debug!(target: "parser", "line {:?}", line);
             let parts: Vec<&str> = line.split_whitespace().collect();
@@ -447,9 +466,11 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 let v = parts[1].to_string();
                 info!(target: "parser", "Found VAR: '{}'", v);
 
-                if vars.contains(&v) || auxvars.contains(&v) {
-                    bail!(format!("variable {} defined twice", v));
+                if all_names.contains(&v) {
+                    bail!(format!("{v} defined twice"));
                 }
+                all_names.insert(v.clone());
+
                 vars.insert(v);
             } else if line.starts_with("$#CON") {
                 info!(target: "parser", "{}", line);
@@ -460,6 +481,11 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
 
                 info!(target: "parser", "Found CON: '{}' '{}'", con_name, con_value);
 
+                if all_names.contains(&con_name) {
+                    bail!(format!("{con_name} defined twice"));
+                }
+                all_names.insert(con_name.clone());
+
                 if cons.contains_key(&con_name) {
                     bail!(format!("{} defined twice", con_name));
                 }
@@ -468,9 +494,11 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 let v = parts[1].to_string();
                 info!(target: "parser", "Found Aux VAR: '{}'", v);
 
-                if vars.contains(&v) || auxvars.contains(&v) {
-                    bail!(format!("{} defined twice", v));
+                if all_names.contains(&v) {
+                    bail!(format!("{v} defined twice"));
                 }
+                all_names.insert(v.clone());
+
                 auxvars.insert(v);
             } else if line.starts_with("$#KIND") {
                 let v = parts[1].to_string();
@@ -478,6 +506,40 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                     bail!("Cannot have two 'KIND' statements");
                 }
                 kind = Some(v)
+            } else if line.starts_with("$#REVEAL ") {
+                if parts.len() != 3 {
+                    bail!(format!(
+                        "Invalid format, should be $#REVEAL <orig> <reveal> : {line} > {parts:?}"
+                    ));
+                }
+
+                let key = parts[1].to_owned();
+                let value = parts[2].to_owned();
+
+                if !vars.contains(&key) {
+                    bail!(format!(
+                        "{key} from a REVEAL must be first be defined as a VAR"
+                    ));
+                }
+
+                if all_names.contains(&value) {
+                    bail!(format!("{value} defined twice"));
+                }
+                all_names.insert(value.clone());
+
+                safe_insert(&mut factvars, key, value)?;
+            } else {
+                bail!(format!("Do not understand line '{line}'"));
+            }
+        }
+
+        for name in all_names.iter() {
+            for other in all_names.iter() {
+                if name != other && (name.starts_with(other) || other.starts_with(name)) {
+                    bail!(format!(
+                        "Cannot have one name be a prefix of another: {name} and {other}"
+                    ));
+                }
             }
         }
     }
@@ -488,7 +550,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
     let params = read_essence_param(eprimeparam)?;
 
     Ok(PuzzleParse::new_from_eprime(
-        vars, auxvars, cons, params, kind,
+        vars, auxvars, cons, factvars, params, kind,
     ))
 }
 
@@ -644,13 +706,14 @@ pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<
     let mut eprimeparse = parse_eprime(&in_eprime_path, &finaleprimeparam)?;
 
     eprimeparse.satinstance =
-        instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)?;
+        instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)
+            .context("reading dimacs")?;
 
     eprimeparse.cnf = Some(Arc::new(eprimeparse.satinstance.clone().into_cnf().0));
 
-    read_dimacs(&in_dimacs_path, &mut eprimeparse)?;
+    read_dimacs(&in_dimacs_path, &mut eprimeparse).context("reading variable info from dimacs")?;
 
-    eprimeparse.finalise()?;
+    eprimeparse.finalise().context("finalisation of parsing")?;
 
     forget(tdir);
 

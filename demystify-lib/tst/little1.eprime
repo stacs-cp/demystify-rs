@@ -11,9 +11,11 @@ given l: matrix indexed by [int] of int
 letting ndim be int(1..n)
 letting ndim2 be int(1..n-2)
 
-
 $#VAR grid
 find grid: matrix indexed by [ndim] of ndim
+
+$#REVEAL grid outgrid
+find outgrid: matrix indexed by [ndim, ndim] of bool
 
 $#CON ordered "{{index[0]}}<{{index[0]+1}}"
 find ordered: matrix indexed by [ndim] of bool
