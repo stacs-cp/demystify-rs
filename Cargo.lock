@@ -2064,7 +2064,9 @@ dependencies = [
 
 [[package]]
 name = "rustsat"
-version = "0.4.3"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63846230f2af916ea7f3e08b41767ac7f7b14fd0c93dbb4a7108193f6ba302c5"
 dependencies = [
  "anyhow",
  "cpu-time",
@@ -2076,7 +2078,9 @@ dependencies = [
 
 [[package]]
 name = "rustsat-glucose"
-version = "0.2.4"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2a524f4fbf730f07506427ae24497e00590caa6fd5a653f699cfb2c4b9f07c0"
 dependencies = [
  "anyhow",
  "cc",
