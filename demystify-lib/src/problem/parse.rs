@@ -198,6 +198,10 @@ pub struct PuzzleParse {
     /// These are generally not useful, but are sometimes used when scanning
     /// the SAT instance
     pub order_encoding_all_lits: BTreeSet<Lit>,
+
+    /// Whenever a lit 'x' is proved, then reveal_map(x) should also be
+    /// added to the known lits.
+    pub reveal_map: BTreeMap<Lit, Lit>,
 }
 
 fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> anyhow::Result<()> {
@@ -241,6 +245,7 @@ impl PuzzleParse {
             varset_lits: BTreeSet::new(),
             conset_lits: BTreeSet::new(),
             auxset_lits: BTreeSet::new(),
+            reveal_map: BTreeMap::new(),
         }
     }
 
@@ -289,9 +294,33 @@ impl PuzzleParse {
             } else if self.eprime.cons.contains_key(name) {
                 // constraints are specially dealt with above
             } else if self.eprime.reveal_values.contains(name) {
-                // todo
+                // reveal_values are dealt with below,
+                // as we need all of 'varset' to be complete first
+                // So here we just allow the name
             } else {
                 bail!("Cannot identify {:?}", puzlit);
+            }
+        }
+
+        for (puzlit, &lit) in &self.litmap {
+            let var = puzlit.var();
+            let name = var.name();
+            if self.eprime.reveal.contains_key(name) && puzlit.sign() {
+                let mut index = puzlit.varval().var().indices().clone();
+                index.push(puzlit.varval().val);
+
+                let target_name = self.eprime.reveal.get(name).unwrap();
+
+                let target_puzvar = PuzVar::new(target_name, index);
+                let target_varvalpair = VarValPair::new(&target_puzvar, 1);
+                let target_puzlit = PuzLit::new_eq(target_varvalpair);
+
+                if let Some(&target_lit) = self.litmap.get(&target_puzlit) {
+                    safe_insert(&mut self.reveal_map, lit, target_lit)
+                        .context("Some variable used in two 'REVEAL'")?;
+                } else {
+                    info!("Can't find {target_puzlit} from {puzlit}");
+                }
             }
         }
 

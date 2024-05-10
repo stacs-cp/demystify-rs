@@ -12,6 +12,7 @@ use super::{parse::PuzzleParse, PuzLit};
 pub struct PuzzleSolver {
     satcore: ThreadLocal<SatCore>,
     puzzleparse: PuzzleParse,
+
     knownlits: Vec<Lit>,
 }
 
