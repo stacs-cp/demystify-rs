@@ -14,7 +14,7 @@ pub struct ToSolve {
 impl ToSolve {
     pub fn new(psolve: &PuzzleSolver) -> ToSolve {
         ToSolve {
-            tosolve: psolve.get_unsatisfiable_varlits(),
+            tosolve: psolve.get_provable_varlits(),
         }
     }
 
@@ -120,7 +120,7 @@ impl PuzzlePlanner {
         assert!(self.to_solve.contains(lit));
         self.to_solve.remove(lit);
         //self.deduced.insert(*lit);
-        self.psolve.add_known_lit(!*lit);
+        self.psolve.add_known_lit(*lit);
     }
 
     pub fn get_all_known_lits(&self) -> &Vec<Lit> {

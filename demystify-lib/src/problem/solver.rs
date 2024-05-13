@@ -70,14 +70,14 @@ impl PuzzleSolver {
         self.puzzleparse.invlitmap.get(lit).unwrap()
     }
 
-    /// Retrieves the unsatisfiable variable literals.
+    /// Retrieves variable literals which can be proved.
     ///
     /// # Returns
     ///
-    /// A vector containing the unsatisfiable variable literals.
+    /// A vector containing the provable variable literals.
     #[must_use]
-    pub fn get_unsatisfiable_varlits(&self) -> BTreeSet<Lit> {
-        let mut unsatisfied = BTreeSet::new();
+    pub fn get_provable_varlits(&self) -> BTreeSet<Lit> {
+        let mut provable = BTreeSet::new();
 
         let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
         litorig.extend_from_slice(&self.knownlits);
@@ -86,11 +86,11 @@ impl PuzzleSolver {
             let mut lits = litorig.clone();
             lits.push(lit);
             if !self.get_satcore().assumption_solve(&lits) {
-                unsatisfied.insert(lit);
+                provable.insert(!lit);
             }
         }
 
-        unsatisfied
+        provable
     }
 
     /// Adds a literal which is known to be true.
@@ -107,11 +107,12 @@ impl PuzzleSolver {
         &self.knownlits
     }
 
-    /// Retrieves the minimal unsatisfiable subset (MUS) of variables containing the given literal.
+    /// Retrieves the minimal unsatisfiable subset (MUS) of variables which proves
+    /// a given literal is required
     ///
     /// # Arguments
     ///
-    /// * `lit` - The literal to find the MUS for.
+    /// * `lit` - The literal to find a proof for (so we invert for the MUS).
     ///
     /// # Returns
     ///
@@ -122,7 +123,7 @@ impl PuzzleSolver {
 
         let mut lits: Vec<Lit> = vec![];
         lits.extend(self.puzzleparse.conset_lits.iter());
-        lits.push(lit);
+        lits.push(!lit);
         let mus = self
             .get_satcore()
             .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
@@ -133,11 +134,11 @@ impl PuzzleSolver {
         })
     }
 
-    /// Retrieves the MUS for each element of a list of literals
+    /// Retrieves the explanation for each element of a list of literals
     ///
     /// # Arguments
     ///
-    /// * `lits` - The literals to find the MUS for.
+    /// * `lits` - The literals to find the explanations for.
     ///
     /// # Returns
     ///
@@ -205,7 +206,7 @@ mod tests {
 
         let mut puz = PuzzleSolver::new(result).unwrap();
 
-        let varlits = puz.get_unsatisfiable_varlits();
+        let varlits = puz.get_provable_varlits();
 
         assert_eq!(puz.get_known_lits(), &vec![]);
 
@@ -236,7 +237,7 @@ mod tests {
 
         let puz = PuzzleSolver::new(result).unwrap();
 
-        let varlits = puz.get_unsatisfiable_varlits();
+        let varlits = puz.get_provable_varlits();
 
         assert_eq!(varlits.len(), 16);
         for &lit in &varlits {
@@ -245,8 +246,8 @@ mod tests {
                 let indices = p.var().indices;
                 assert_eq!(indices.len(), 1);
                 // In the solution, forAll i, x[i]=i
-                // and the lits are the 'unsatisfiable' lits
-                assert_eq!(indices[0] == p.val(), !p.sign());
+                // and the lits are the 'provable' lits
+                assert_eq!(indices[0] == p.val(), p.sign());
             }
         }
 
@@ -279,7 +280,7 @@ mod tests {
 
         let puz = PuzzleSolver::new(result).unwrap();
 
-        let varlits = puz.get_unsatisfiable_varlits();
+        let varlits = puz.get_provable_varlits();
 
         assert_eq!(varlits.len(), 16);
         for &lit in &varlits {
@@ -288,8 +289,8 @@ mod tests {
                 let indices = p.var().indices;
                 assert_eq!(indices.len(), 1);
                 // In the solution, forAll i, x[i]=i
-                // and the lits are the 'unsatisfiable' lits
-                assert_eq!(indices[0] == p.val(), !p.sign());
+                // and the lits are the 'provable' lits
+                assert_eq!(indices[0] == p.val(), p.sign());
             }
         }
 
