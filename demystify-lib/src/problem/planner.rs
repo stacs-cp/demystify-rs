@@ -77,7 +77,7 @@ impl PuzzlePlanner {
 
     pub fn all_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
         self.psolve
-            .get_many_vars_small_mus_quick(&self.to_solve.get())
+            .get_many_vars_small_mus_quick(self.to_solve.get())
     }
 
     pub fn smallest_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
@@ -124,7 +124,7 @@ impl PuzzlePlanner {
     }
 
     pub fn get_all_known_lits(&self) -> &Vec<Lit> {
-        &self.psolve.get_known_lits()
+        self.psolve.get_known_lits()
     }
 
     /// Solves the puzzle quickly and returns a sequence of steps.
