@@ -14,6 +14,7 @@ pub struct PuzzleSolver {
     puzzleparse: PuzzleParse,
 
     knownlits: Vec<Lit>,
+    tosolvelits: Option<BTreeSet<Lit>>,
 }
 
 impl PuzzleSolver {
@@ -30,6 +31,7 @@ impl PuzzleSolver {
         Ok(PuzzleSolver {
             satcore: ThreadLocal::new(),
             puzzleparse,
+            tosolvelits: None,
             knownlits: Vec::new(),
         })
     }
@@ -76,21 +78,25 @@ impl PuzzleSolver {
     ///
     /// A vector containing the provable variable literals.
     #[must_use]
-    pub fn get_provable_varlits(&self) -> BTreeSet<Lit> {
-        let mut provable = BTreeSet::new();
+    pub fn get_provable_varlits(&mut self) -> &BTreeSet<Lit> {
+        if self.tosolvelits.is_none() {
+            let mut provable = BTreeSet::new();
 
-        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
-        litorig.extend_from_slice(&self.knownlits);
+            let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
+            litorig.extend_from_slice(&self.knownlits);
 
-        for &lit in &self.puzzleparse.varset_lits {
-            let mut lits = litorig.clone();
-            lits.push(lit);
-            if !self.get_satcore().assumption_solve(&lits) {
-                provable.insert(!lit);
+            for &lit in &self.puzzleparse.varset_lits {
+                let mut lits = litorig.clone();
+                lits.push(lit);
+                if !self.get_satcore().assumption_solve(&lits) {
+                    provable.insert(!lit);
+                }
             }
+
+            self.tosolvelits = Some(provable)
         }
 
-        provable
+        self.tosolvelits.as_ref().unwrap()
     }
 
     /// Adds a literal which is known to be true.
@@ -99,6 +105,8 @@ impl PuzzleSolver {
     ///
     /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
+        assert!(self.tosolvelits.as_ref().unwrap().contains(&lit));
+        self.tosolvelits.as_mut().unwrap().remove(&lit);
         self.knownlits.push(lit);
     }
 
@@ -206,7 +214,7 @@ mod tests {
 
         let mut puz = PuzzleSolver::new(result).unwrap();
 
-        let varlits = puz.get_provable_varlits();
+        let varlits = puz.get_provable_varlits().clone();
 
         assert_eq!(puz.get_known_lits(), &vec![]);
 
@@ -235,9 +243,9 @@ mod tests {
             "./tst/little1.param",
         );
 
-        let puz = PuzzleSolver::new(result).unwrap();
+        let mut puz = PuzzleSolver::new(result).unwrap();
 
-        let varlits = puz.get_provable_varlits();
+        let varlits = puz.get_provable_varlits().clone();
 
         assert_eq!(varlits.len(), 16);
         for &lit in &varlits {
@@ -278,9 +286,9 @@ mod tests {
             "./tst/little1.param",
         );
 
-        let puz = PuzzleSolver::new(result).unwrap();
+        let mut puz = PuzzleSolver::new(result).unwrap();
 
-        let varlits = puz.get_provable_varlits();
+        let varlits = puz.get_provable_varlits().clone();
 
         assert_eq!(varlits.len(), 16);
         for &lit in &varlits {

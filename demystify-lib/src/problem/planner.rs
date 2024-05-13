@@ -7,43 +7,9 @@ use crate::{json::Problem, web::create_html};
 
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
-pub struct ToSolve {
-    tosolve: BTreeSet<Lit>,
-}
-
-impl ToSolve {
-    pub fn new(psolve: &PuzzleSolver) -> ToSolve {
-        ToSolve {
-            tosolve: psolve.get_provable_varlits(),
-        }
-    }
-
-    pub fn get(&self) -> &BTreeSet<Lit> {
-        &self.tosolve
-    }
-
-    pub fn contains(&self, lit: &Lit) -> bool {
-        self.tosolve.contains(lit)
-    }
-
-    pub fn remove(&mut self, lit: &Lit) {
-        if !self.contains(lit) {
-            panic!("Fatal: Tried removing a lit we didn't need to solve");
-        }
-        self.tosolve.remove(lit);
-    }
-
-    fn is_empty(&self) -> bool {
-        self.tosolve.is_empty()
-    }
-}
-
 /// Represents a puzzle planner.
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
-
-    to_solve: ToSolve,
-
     config: PlannerConfig,
 }
 
@@ -56,10 +22,8 @@ impl PuzzlePlanner {
     /// Creates a new `PuzzlePlanner` instance.
     #[must_use]
     pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
-        let to_solve = ToSolve::new(&psolve);
         PuzzlePlanner {
             psolve,
-            to_solve,
             config: PlannerConfig::default(),
         }
     }
@@ -67,20 +31,15 @@ impl PuzzlePlanner {
     /// Creates a new `PuzzlePlanner` instance.
     #[must_use]
     pub fn new_with_config(psolve: PuzzleSolver, config: PlannerConfig) -> PuzzlePlanner {
-        let to_solve = ToSolve::new(&psolve);
-        PuzzlePlanner {
-            psolve,
-            to_solve,
-            config,
-        }
+        PuzzlePlanner { psolve, config }
     }
 
-    pub fn all_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
-        self.psolve
-            .get_many_vars_small_mus_quick(self.to_solve.get())
+    pub fn all_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        self.psolve.get_many_vars_small_mus_quick(&varlits)
     }
 
-    pub fn smallest_muses(&self) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
         let muses = self.all_muses();
 
         let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
@@ -92,7 +51,7 @@ impl PuzzlePlanner {
         muses
     }
 
-    pub fn smallest_muses_with_config(&self) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn smallest_muses_with_config(&mut self) -> Vec<(Lit, Vec<Lit>)> {
         let muses = self.smallest_muses();
         if let Some(min) = self.config.merge_small_threshold {
             if muses[0].1.len() as i64 <= min {
@@ -117,9 +76,6 @@ impl PuzzlePlanner {
     }
 
     pub fn mark_lit_as_deduced(&mut self, lit: &Lit) {
-        assert!(self.to_solve.contains(lit));
-        self.to_solve.remove(lit);
-        //self.deduced.insert(*lit);
         self.psolve.add_known_lit(*lit);
     }
 
@@ -130,7 +86,7 @@ impl PuzzlePlanner {
     /// Solves the puzzle quickly and returns a sequence of steps.
     pub fn quick_solve(&mut self) -> Vec<(BTreeSet<PuzLit>, Vec<String>)> {
         let mut solvesteps = vec![];
-        while !self.to_solve.is_empty() {
+        while !self.psolve.get_provable_varlits().is_empty() {
             let muses = self.smallest_muses_with_config();
 
             for (m, _) in &muses {
@@ -148,7 +104,7 @@ impl PuzzlePlanner {
                 solvesteps.len(),
                 muses.len(),
                 muses[0].1.len(),
-                self.to_solve.get().len()
+                self.psolve.get_provable_varlits().len()
             );
 
             // Add these muses to the solving steps
@@ -160,7 +116,7 @@ impl PuzzlePlanner {
     /// Solves the puzzle quickly and returns a sequence of steps.
     pub fn quick_solve_html(&mut self) -> String {
         let mut html = String::new();
-        while !self.to_solve.is_empty() {
+        while !self.psolve.get_provable_varlits().is_empty() {
             let base_muses = self.smallest_muses_with_config();
 
             // Map the 'muses' to a user PuzLits
@@ -169,9 +125,9 @@ impl PuzzlePlanner {
                 .map(|mus| self.mus_to_user_mus(mus))
                 .collect_vec();
 
-            let tosolve_varvals: BTreeSet<_> = self
-                .to_solve
-                .get()
+            let varlits = self.psolve.get_provable_varlits().clone();
+
+            let tosolve_varvals: BTreeSet<_> = varlits
                 .iter()
                 .flat_map(|x| self.psolve.lit_to_puzlit(x))
                 .map(|x| x.varval())
