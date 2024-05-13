@@ -93,16 +93,18 @@ impl PuzzleSolver {
         unsatisfied
     }
 
-    /// Adds a known literal to the `PuzzleSolver`.
+    /// Adds a literal which is known to be true.
     ///
     /// # Arguments
     ///
     /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
         self.knownlits.push(lit);
-        // we could add the literal to the solver, but then it can't
-        // be backtracked.. but it might be faster! Investigate later.
-        //self.get_satcore().add_lit(lit);
+    }
+
+    /// Get all literals known to be true.
+    pub fn get_known_lits(&self) -> &Vec<Lit> {
+        &self.knownlits
     }
 
     /// Retrieves the minimal unsatisfiable subset (MUS) of variables containing the given literal.
@@ -196,6 +198,37 @@ mod tests {
 
     #[test]
     fn test_parse_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        );
+
+        let mut puz = PuzzleSolver::new(result).unwrap();
+
+        let varlits = puz.get_unsatisfiable_varlits();
+
+        assert_eq!(puz.get_known_lits(), &vec![]);
+
+        let l = *varlits.first().unwrap();
+
+        puz.add_known_lit(l);
+
+        assert_eq!(puz.get_known_lits(), &vec![l]);
+
+        assert_eq!(varlits.len(), 16);
+
+        // Do a basic check we get a MUS for every varlit
+        for &lit in &varlits {
+            let mus = puz.get_var_mus_quick(lit, None);
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
+            assert!(mus.is_some());
+            assert!(mus_limit.is_some());
+            println!("{lit:?} {mus:?}");
+        }
+    }
+
+    #[test]
+    fn test_known_lits() {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
