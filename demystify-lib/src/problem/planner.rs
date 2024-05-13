@@ -44,8 +44,6 @@ pub struct PuzzlePlanner {
 
     to_solve: ToSolve,
 
-    _deduced: BTreeSet<Lit>,
-
     config: PlannerConfig,
 }
 
@@ -62,7 +60,6 @@ impl PuzzlePlanner {
         PuzzlePlanner {
             psolve,
             to_solve,
-            _deduced: BTreeSet::new(),
             config: PlannerConfig::default(),
         }
     }
@@ -74,7 +71,6 @@ impl PuzzlePlanner {
         PuzzlePlanner {
             psolve,
             to_solve,
-            _deduced: BTreeSet::new(),
             config,
         }
     }
@@ -127,8 +123,8 @@ impl PuzzlePlanner {
         self.psolve.add_known_lit(!*lit);
     }
 
-    pub fn get_all_deduced_lits(&self) -> &BTreeSet<Lit> {
-        &self._deduced
+    pub fn get_all_known_lits(&self) -> &Vec<Lit> {
+        &self.psolve.get_known_lits()
     }
 
     /// Solves the puzzle quickly and returns a sequence of steps.
@@ -182,7 +178,7 @@ impl PuzzlePlanner {
                 .collect();
 
             let known_puzlits: BTreeSet<PuzLit> = self
-                .get_all_deduced_lits()
+                .get_all_known_lits()
                 .iter()
                 .flat_map(|x| self.psolve.lit_to_puzlit(x))
                 .cloned()
