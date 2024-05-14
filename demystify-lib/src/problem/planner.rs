@@ -232,6 +232,30 @@ mod tests {
     // This test doesn't really do any deep tests,
     // just do a full end-to-end run
     #[test]
+    fn test_plan_minesweeper_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperPrinted.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let sequence = plan.quick_solve();
+
+        assert_eq!(sequence.len(), 25);
+
+        for (litset, cons) in sequence {
+            assert!(!litset.is_empty());
+            // If this next line starts failing, it can be commented out.
+            assert!(cons.len() <= 2);
+        }
+    }
+
+    // This test doesn't really do any deep tests,
+    // just do a full end-to-end run
+    #[test]
     fn test_plan_binairo_essence_html() {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/binairo.eprime",

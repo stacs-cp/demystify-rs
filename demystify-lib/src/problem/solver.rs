@@ -4,7 +4,10 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustsat::types::Lit;
 use thread_local::ThreadLocal;
 
-use crate::satcore::SatCore;
+use crate::{
+    problem::{PuzVar, VarValPair},
+    satcore::SatCore,
+};
 
 use super::{parse::PuzzleParse, PuzLit};
 
@@ -86,10 +89,12 @@ impl PuzzleSolver {
             litorig.extend_from_slice(&self.knownlits);
 
             for &lit in &self.puzzleparse.varset_lits {
-                let mut lits = litorig.clone();
-                lits.push(lit);
-                if !self.get_satcore().assumption_solve(&lits) {
-                    provable.insert(!lit);
+                if !self.knownlits.contains(&!lit) {
+                    let mut lits = litorig.clone();
+                    lits.push(lit);
+                    if !self.get_satcore().assumption_solve(&lits) {
+                        provable.insert(!lit);
+                    }
                 }
             }
 
@@ -105,9 +110,33 @@ impl PuzzleSolver {
     ///
     /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
-        assert!(self.tosolvelits.as_ref().unwrap().contains(&lit));
+        assert!(self.get_provable_varlits().contains(&lit));
         self.tosolvelits.as_mut().unwrap().remove(&lit);
         self.knownlits.push(lit);
+
+        let lits = self.lit_to_puzlit(&lit).clone();
+
+        for l in lits {
+            let name = l.varval().var().name().clone();
+            if let Some(value) = self.puzzleparse.eprime.reveal.get(&name) {
+                // Build the 'reveal' variable
+                let value = value.clone();
+
+                let mut vec = l.varval().var().indices().clone();
+                vec.push(l.varval().val());
+
+                let vvpair = VarValPair::new(&PuzVar::new(&value, vec), 1);
+                let imply_lit = PuzLit::new_eq(vvpair);
+
+                let puzlit = self
+                    .puzzleparse()
+                    .litmap
+                    .get(&imply_lit)
+                    .expect("REVEAL variable missing: {imply_lit}");
+                self.knownlits.push(*puzlit);
+                self.tosolvelits = None;
+            }
+        }
     }
 
     /// Get all literals known to be true.
@@ -222,7 +251,8 @@ mod tests {
 
         puz.add_known_lit(l);
 
-        assert_eq!(puz.get_known_lits(), &vec![l]);
+        assert!(puz.get_known_lits().contains(&l));
+        assert_eq!(puz.get_known_lits().len(), 2);
 
         assert_eq!(varlits.len(), 16);
 
