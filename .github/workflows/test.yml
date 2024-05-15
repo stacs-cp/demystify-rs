@@ -1,0 +1,52 @@
+name: "conjure-oxide"
+
+on:
+  push:
+    branches:
+      - main # run for pushes to the main branch. other branches need to create a PR if they want testing.
+  pull_request:
+  workflow_dispatch:
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  SCCACHE_GHA_VERSION: 2
+
+jobs:
+  build-and-test:
+    name: "Build and Test"
+    strategy:
+      # run all combinations of the matrix even if one combination fails.
+      fail-fast: false
+      matrix:
+        rust_release:
+          - stable
+          - nightly
+        conjure_version:
+          - 2.5.1
+        os:
+          - ubuntu-latest
+          - macos-latest
+        include:
+          - os: ubuntu-latest
+            release_suffix: linux
+          - os: macos-latest
+            release_suffix: macos-intel
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
+      - run: rustup update ${{ matrix.rust_release }} && rustup default ${{ matrix.rust_release }}
+
+      - run: cargo build -vv --workspace
+
+      - uses: ./.github/actions/install-conjure
+        with:
+          os_arch: ${{ matrix.release_suffix }}
+          version: ${{ matrix.conjure_version }}
+
+      - run: cargo test --workspace

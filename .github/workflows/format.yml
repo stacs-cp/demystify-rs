@@ -1,0 +1,21 @@
+# see: https://github.com/marketplace/actions/rust-rustfmt-check
+
+name: "Formatting"
+
+on:
+  push:
+    branches:
+      - main # run for pushes to the main branch
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  rust:
+    name: "Check Rust Formatting"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --check
