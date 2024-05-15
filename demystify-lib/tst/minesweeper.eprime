@@ -1,0 +1,45 @@
+language ESSENCE' 1.0
+$ Range of values for the mine grids, with 1 representing a mine and 0, no mine (or unknown in the case of the knownMine grid).
+letting   MINERANGE be domain int(0..1)
+$ Range of values for the input grid, spanning from the unknown value to the max value found in Minesweeper, 8, to then the number used to identify a mine, 9
+letting   VALUES be domain int(-1..8)
+$ Hard-coded value for locations within the starting grid that begin as unknown
+letting   unknownValue be -1
+$ Range of values applied to a location's coords to get neighbour coords
+letting   neigbours be domain int(-1..1)
+
+$ Number of columns and rows, respectively
+given     width : int
+given     height : int
+$ Input grid that is to be solved
+given     known : matrix indexed by [int(1..height),int(1..width)] of bool
+given     mines : matrix indexed by [int(1..height),int(1..width)] of bool
+
+$ Output grid of mine locations that is to be produced
+$#VAR grid
+find      grid : matrix indexed by [int(1..height),int(1..width)] of bool
+
+$#CON sumcheck "Use the sum of ({{index[0]}},{{index[1]}})"
+find sumcheck: matrix indexed by [int(1..height),int(1..width)] of bool
+
+$#REVEAL grid facts
+find facts: matrix indexed by [int(1..height), int(1..width), int(0..1)] of bool
+
+such that
+$ For every grid location
+forAll i : int(1..height) .
+    forAll j : int(1..width) .
+        known[i,j] -> (grid[i,j] = mines[i,j]),
+
+forAll i : int(1..height) .
+    forAll j : int(1..width) .
+    (
+        (known[i,j] /\ !mines[i,j]) -> (sumcheck[i,j] -> ( sum([mines[i + a, j + b] | a,b : neigbours]) = sum([grid[i+a,j+b] | a,b : neigbours]) ) )
+    ),
+
+forAll i : int(1..height) .
+    forAll j : int(1..width) .
+        forAll d : int(0..1) .
+    sumcheck[i,j] -> (
+        (facts[i,j,d]) -> ( sum([mines[i + a, j + b] | a,b : neigbours]) = sum([grid[i+a,j+b] | a,b : neigbours]) )
+    )
