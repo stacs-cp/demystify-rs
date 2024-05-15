@@ -4,14 +4,17 @@ use crate::json::{Problem, Statement};
 
 use self::puzsvg::PuzzleDraw;
 
+#[must_use]
 pub fn base_css() -> &'static str {
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/include/base.css"))
 }
 
+#[must_use]
 pub fn base_javascript() -> &'static str {
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/include/base.js"))
 }
 
+#[must_use]
 pub fn create_html(puzjson: &Problem) -> String {
     let pd = PuzzleDraw::new(&puzjson.puzzle.kind);
     let svg = pd.draw_puzzle(puzjson);

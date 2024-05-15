@@ -53,6 +53,7 @@ impl Default for PuzzleDraw {
 }
 
 impl PuzzleDraw {
+    #[must_use]
     pub fn new(kind: &str) -> Self {
         PuzzleDraw {
             base_width: 0.005,
@@ -64,6 +65,7 @@ impl PuzzleDraw {
 }
 
 impl PuzzleDraw {
+    #[must_use]
     pub fn draw_puzzle(&self, puzjson: &Problem) -> svg::Document {
         let puzzle = &puzjson.puzzle;
 

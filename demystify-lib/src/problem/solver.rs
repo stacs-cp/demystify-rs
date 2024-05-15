@@ -98,7 +98,7 @@ impl PuzzleSolver {
                 }
             }
 
-            self.tosolvelits = Some(provable)
+            self.tosolvelits = Some(provable);
         }
 
         self.tosolvelits.as_ref().unwrap()

@@ -53,6 +53,7 @@ pub struct EPrimeAnnotations {
 }
 
 impl EPrimeAnnotations {
+    #[must_use]
     pub fn has_param(&self, s: &str) -> bool {
         self.params.contains_key(s)
     }
@@ -199,7 +200,7 @@ pub struct PuzzleParse {
     /// the SAT instance
     pub order_encoding_all_lits: BTreeSet<Lit>,
 
-    /// Whenever a lit 'x' is proved, then reveal_map(x) should also be
+    /// Whenever a lit 'x' is proved, then `reveal_map`(x) should also be
     /// added to the known lits.
     pub reveal_map: BTreeMap<Lit, Lit>,
 }
@@ -400,19 +401,21 @@ impl PuzzleParse {
 
     // All lits included in both the direct and ordered encoding
     // of VARs
+    #[must_use]
     pub fn all_var_related_lits(&self) -> HashSet<Lit> {
         let ordered_var: BTreeSet<Lit> = self
             .order_encoding_map
             .iter()
             .filter(|(k, _)| self.eprime.vars.contains(k.name()))
             .flat_map(|(_, v)| v)
-            .cloned()
+            .copied()
             .collect();
 
         self.varset_lits.union(&ordered_var).copied().collect()
     }
 
     // All VarValPairs included in VARs
+    #[must_use]
     pub fn all_var_varvals(&self) -> BTreeSet<VarValPair> {
         self.varset_lits
             .iter()
@@ -423,6 +426,7 @@ impl PuzzleParse {
 
     /// Given a collection of Lits representing both direct and ordered
     /// representations, collect them into a collection of `VarValPair`s
+    #[must_use]
     pub fn direct_or_ordered_lit_to_varvalpair(&self, lit: &Lit) -> BTreeSet<VarValPair> {
         let direct_lits = self.invlitmap.get(lit).cloned().unwrap_or_default();
 
@@ -444,14 +448,17 @@ impl PuzzleParse {
             .collect()
     }
 
+    #[must_use]
     pub fn has_facts(&self) -> bool {
         !self.eprime.reveal.is_empty()
     }
 
+    #[must_use]
     pub fn constraints(&self) -> BTreeSet<String> {
         self.invconset.keys().cloned().collect()
     }
 
+    #[must_use]
     pub fn constraint_scope(&self, con: &String) -> BTreeSet<VarValPair> {
         let lit = self.invconset.get(con).expect("IE: Bad constraint name");
 
@@ -534,7 +541,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 if kind.is_some() {
                     bail!("Cannot have two 'KIND' statements");
                 }
-                kind = Some(v)
+                kind = Some(v);
             } else if line.starts_with("$#REVEAL ") {
                 if parts.len() != 3 {
                     bail!(format!(
@@ -562,8 +569,8 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
             }
         }
 
-        for name in all_names.iter() {
-            for other in all_names.iter() {
+        for name in &all_names {
+            for other in &all_names {
                 if name != other && (name.starts_with(other) || other.starts_with(name)) {
                     bail!(format!(
                         "Cannot have one name be a prefix of another: {name} and {other}"

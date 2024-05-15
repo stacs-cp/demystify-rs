@@ -179,7 +179,7 @@ impl Problem {
             knowledgegrid[i][j].as_mut().unwrap().push(StateLit {
                 val: l.val(),
                 classes: Some(tags),
-            })
+            });
         }
 
         let statements = constraints

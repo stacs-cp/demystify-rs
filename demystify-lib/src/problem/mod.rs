@@ -65,14 +65,17 @@ impl VarValPair {
         }
     }
 
+    #[must_use]
     pub fn var(&self) -> &PuzVar {
         &self.var
     }
 
+    #[must_use]
     pub fn val(&self) -> i64 {
         self.val
     }
 
+    #[must_use]
     pub fn is_lit(&self, puzlit: &PuzLit) -> bool {
         *self == puzlit.varval()
     }
@@ -120,6 +123,7 @@ impl PuzLit {
         self.varval.clone()
     }
 
+    #[must_use]
     pub fn is_varval(&self, varval: &VarValPair) -> bool {
         self.varval == *varval
     }
