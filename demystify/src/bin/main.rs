@@ -1,9 +1,13 @@
 use clap::Parser;
 use demystify_lib::{
-    problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver},
+    problem::{
+        self,
+        planner::{PlannerConfig, PuzzlePlanner},
+        solver::PuzzleSolver,
+    },
     web::{base_css, base_javascript},
 };
-use std::{fs::File, path::PathBuf, process::exit};
+use std::{fs::File, path::PathBuf};
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -16,7 +20,7 @@ struct Opt {
     param: String,
 
     #[arg(long)]
-    quick: bool,
+    merge: Option<i64>,
 
     #[arg(long)]
     trace: bool,
@@ -47,25 +51,26 @@ fn main() -> anyhow::Result<()> {
 
     let solver = PuzzleSolver::new(puzzle)?;
 
-    let mut planner = PuzzlePlanner::new(solver);
+    let planner_config = PlannerConfig {
+        merge_small_threshold: opt.merge,
+    };
 
-    if opt.quick {
-        if opt.html {
-            let html = planner.quick_solve_html();
-            println!(
-                "<html> <head> <style> {} </style> <script> {} </script> </head>",
-                base_css(),
-                base_javascript()
-            );
-            println!("<body> {html}");
-            println!("<script> doJavascript(); </script>");
-            println!("</body> </html>");
-        } else {
-            for p in planner.quick_solve() {
-                println!("{p:?}");
-            }
+    let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);
+
+    if opt.html {
+        let html = planner.quick_solve_html();
+        println!(
+            "<html> <head> <style> {} </style> <script> {} </script> </head>",
+            base_css(),
+            base_javascript()
+        );
+        println!("<body> {html}");
+        println!("<script> doJavascript(); </script>");
+        println!("</body> </html>");
+    } else {
+        for p in planner.quick_solve() {
+            println!("{p:?}");
         }
-        exit(0);
     }
 
     Ok(())

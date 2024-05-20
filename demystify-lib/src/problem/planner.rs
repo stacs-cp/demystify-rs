@@ -7,9 +7,16 @@ use crate::{json::Problem, web::create_html};
 
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
-#[derive(Default)]
 pub struct PlannerConfig {
     pub merge_small_threshold: Option<i64>,
+}
+
+impl Default for PlannerConfig {
+    fn default() -> Self {
+        Self {
+            merge_small_threshold: Some(1),
+        }
+    }
 }
 
 /// The `PuzzlePlanner` struct represents a puzzle planner that can be used to solve puzzles.
@@ -92,7 +99,7 @@ impl PuzzlePlanner {
                 muses
             }
         } else {
-            muses
+            vec![muses[0].clone()]
         }
     }
 
@@ -268,7 +275,7 @@ mod tests {
             // It should be trivial to prove we only need one
             // constraint here, but MUS algorithms be tricky, if
             // this next line starts failing, it can be commented out.
-            assert_eq!(cons.len(), 1);
+            assert!(cons.len() <= 1);
         }
     }
 

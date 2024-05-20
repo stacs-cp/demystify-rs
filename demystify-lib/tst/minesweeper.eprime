@@ -39,7 +39,7 @@ forAll i : int(1..height) .
 
 forAll i : int(1..height) .
     forAll j : int(1..width) .
-        forAll d : int(0..1) .
+        forAll d : int(0..0) . $ Only reveal on empty squares
     sumcheck[i,j] -> (
         (facts[i,j,d]) -> ( sum([mines[i + a, j + b] | a,b : neigbours]) = sum([grid[i+a,j+b] | a,b : neigbours]) )
     )
