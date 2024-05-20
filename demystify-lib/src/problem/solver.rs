@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustsat::types::Lit;
 use thread_local::ThreadLocal;
+use tracing::info;
 
 use crate::{
     problem::{PuzVar, VarValPair},
@@ -117,6 +118,11 @@ impl PuzzleSolver {
         let lits = self.lit_to_puzlit(&lit).clone();
 
         for l in lits {
+            // Only reveal from positive varvalpairs
+            if !l.sign() {
+                continue;
+            }
+
             let name = l.varval().var().name().clone();
             if let Some(value) = self.puzzleparse.eprime.reveal.get(&name) {
                 // Build the 'reveal' variable
@@ -127,6 +133,7 @@ impl PuzzleSolver {
 
                 let vvpair = VarValPair::new(&PuzVar::new(&value, vec), 1);
                 let imply_lit = PuzLit::new_eq(vvpair);
+                info!(target: "solver", "{l} reveals {imply_lit}");
 
                 let puzlit = self
                     .puzzleparse()

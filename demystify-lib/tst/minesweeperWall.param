@@ -1,0 +1,18 @@
+language ESSENCE' 1.0
+letting     width be 5
+letting     height be 5
+letting     known be [
+[true, false, false, false, false],
+[false, false, false, false, false],
+[false, false, false, false, false],
+[false, false, false, false, false],
+[false, false, false, false, false],
+
+]
+letting     mines be [
+[false, false, true, false, false],
+[false, false, true, false, false],
+[false, false, true, false, false],
+[false, false, true, false, false],
+[false, false, true, false, false],
+]

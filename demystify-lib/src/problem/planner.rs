@@ -327,6 +327,29 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_plan_minesweeper_wall_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperWall.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let sequence = plan.quick_solve();
+
+        // Should only be able to solve 15 steps, due to the 'wall'
+        assert_eq!(sequence.len(), 15);
+
+        for (litset, cons) in sequence {
+            assert!(!litset.is_empty());
+            // If this next line starts failing, it can be commented out.
+            assert!(cons.len() <= 2);
+        }
+    }
+
     // This test doesn't really do any deep tests,
     // just do a full end-to-end run
     #[test]
