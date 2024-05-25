@@ -484,7 +484,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
 
     let mut kind: Option<String> = None;
 
-    let conmatch = Regex::new(r#"\$#CON (.*) \"(.*)\""#).unwrap();
+    let conmatch = Regex::new(r#"\$#CON (.*) "(.*)""#).unwrap();
 
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);

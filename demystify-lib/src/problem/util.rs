@@ -305,6 +305,7 @@ pub mod test_utils {
 
         // Copy eprimeparam file to temporary directory
         let temp_eprimeparam_path = temp_dir.path().join("binairo-1.param");
+
         fs::copy(dbg!(eprimeparam_path), &temp_eprimeparam_path)
             .expect("Failed to copy eprimeparam file");
 
