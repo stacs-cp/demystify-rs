@@ -94,9 +94,9 @@ impl PuzzlePlanner {
         let muses = self.smallest_muses();
         if let Some(min) = self.config.merge_small_threshold {
             if muses[0].1.len() as i64 <= min {
-                vec![muses[0].clone()]
-            } else {
                 muses
+            } else {
+                vec![muses[0].clone()]
             }
         } else {
             vec![muses[0].clone()]
