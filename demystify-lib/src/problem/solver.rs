@@ -187,7 +187,7 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
-    /// Literals where no MUS was found are ommitted from the output.
+    /// Literals where no MUS was found are omitted from the output.
     pub fn get_many_vars_mus_quick(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
         let muses: Vec<_> = lits
             .par_iter()

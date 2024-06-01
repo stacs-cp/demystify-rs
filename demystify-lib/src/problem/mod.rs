@@ -31,6 +31,7 @@ impl PuzVar {
         &self.name
     }
 
+    /// Returns the indices of the variable.
     #[must_use]
     pub fn indices(&self) -> &Vec<i64> {
         &self.indices
@@ -57,6 +58,7 @@ impl fmt::Display for VarValPair {
 }
 
 impl VarValPair {
+    /// Creates a new `VarValPair` instance.
     #[must_use]
     pub fn new(var: &PuzVar, val: i64) -> VarValPair {
         VarValPair {
@@ -65,23 +67,26 @@ impl VarValPair {
         }
     }
 
+    /// Returns the variable associated with the `VarValPair`.
     #[must_use]
     pub fn var(&self) -> &PuzVar {
         &self.var
     }
 
+    /// Returns the value associated with the `VarValPair`.
     #[must_use]
     pub fn val(&self) -> i64 {
         self.val
     }
 
+    /// Checks if the `VarValPair` is equal to a given `PuzLit`.
     #[must_use]
     pub fn is_lit(&self, puzlit: &PuzLit) -> bool {
         *self == puzlit.varval()
     }
 }
 
-/// Represents a puzzle literal.
+/// Represents a puzzle literal, which is the positive or negative form of a `VarValPair`.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct PuzLit {
     varval: VarValPair,
@@ -117,36 +122,37 @@ impl PuzLit {
         }
     }
 
-    /// Returns the variable associated with the literal.
+    /// Returns the `VarValPair` associated with the `PuzLit`.
     #[must_use]
     pub fn varval(&self) -> VarValPair {
         self.varval.clone()
     }
 
+    /// Checks if the `PuzLit` is equal to a given `VarValPair`.
     #[must_use]
     pub fn is_varval(&self, varval: &VarValPair) -> bool {
         self.varval == *varval
     }
 
-    /// Returns the variable associated with the literal.
+    /// Returns the variable associated with the `PuzLit`.
     #[must_use]
     pub fn var(&self) -> PuzVar {
         self.varval.var().clone()
     }
 
-    /// Returns the value associated with the literal.
+    /// Returns the value associated with the `PuzLit`.
     #[must_use]
     pub fn val(&self) -> i64 {
         self.varval.val()
     }
 
-    /// Returns the sign of the literal.
+    /// Returns the sign of the `PuzLit`.
     #[must_use]
     pub fn sign(&self) -> bool {
         self.equal
     }
 
-    /// Returns the negation of the literal.
+    /// Returns the negation of the `PuzLit`.
     #[must_use]
     pub fn neg(&self) -> PuzLit {
         PuzLit {

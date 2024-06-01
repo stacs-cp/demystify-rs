@@ -1,3 +1,4 @@
+/// This module contains the definitions and implementations related to JSON serialization and deserialization for the demystify library.
 use std::collections::{BTreeSet, HashMap};
 
 use anyhow::Context;
