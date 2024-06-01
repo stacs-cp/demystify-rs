@@ -659,16 +659,24 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
     Ok(())
 }
 
-pub fn parse_essence(eprime: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
+pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Result<PuzzleParse> {
     //let mut litmap = BTreeMap::new();
     //let mut varlist = Vec::new();
 
     let tdir = TempDir::new().unwrap();
 
+    let eprime = tdir.path().join(eprimein.file_name().unwrap());
+    let eprimeparam = tdir.path().join(eprimeparamin.file_name().unwrap());
+
+    fs::copy(&eprimein, &eprime)?;
+    fs::copy(&eprimeparamin, &eprimeparam)?;
+
+
     info!("Parsing Essence in TempDir: {tdir:?}");
 
     let finaleprime: PathBuf;
     let finaleprimeparam: PathBuf;
+
 
     // If input is essence, translate to essence' for savilerow
     if eprime.ends_with(".essence") {
