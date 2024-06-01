@@ -91,11 +91,11 @@ const VAL_COLUMN: &str = "cache_val";
 const TABLE: &str = "cache_table";
 
 pub struct Cache {
-    connection: Connection
+    connection: Connection,
 }
 
 impl Cache {
-        /// Creates a new in-memory cache.
+    /// Creates a new in-memory cache.
     ///
     /// # Examples
     ///
@@ -106,7 +106,7 @@ impl Cache {
     /// ```
     pub fn new_in_memory() -> rusqlite::Result<Cache> {
         let connection = Connection::open_in_memory()?;
-        let cache = Cache{connection};
+        let cache = Cache { connection };
         cache.create_table()?;
         Ok(cache)
     }
@@ -128,7 +128,7 @@ impl Cache {
     /// ```
     pub fn new_from_file(filename: &Path) -> rusqlite::Result<Cache> {
         let connection = Connection::open(filename)?;
-        let cache = Cache{connection};
+        let cache = Cache { connection };
         cache.create_table()?;
         Ok(cache)
     }
@@ -148,7 +148,6 @@ impl Cache {
         )?;
         Ok(())
     }
-
 
     /// Sets a key-value pair in the cache.
     /// Overwrites any existing value
@@ -178,7 +177,7 @@ impl Cache {
         Ok(())
     }
 
-     /// Retrieves the value for a given key from the cache.
+    /// Retrieves the value for a given key from the cache.
     ///
     /// # Arguments
     ///
@@ -198,12 +197,10 @@ impl Cache {
     /// ```
 
     pub fn get(&self, key: &str) -> rusqlite::Result<Option<String>> {
-        let mut stmt = self.connection.prepare(
-            &format!(
-                "SELECT {} FROM {} WHERE {} = ?",
-                VAL_COLUMN, TABLE, KEY_COLUMN
-            )
-        )?;
+        let mut stmt = self.connection.prepare(&format!(
+            "SELECT {} FROM {} WHERE {} = ?",
+            VAL_COLUMN, TABLE, KEY_COLUMN
+        ))?;
         let mut rows = stmt.query(&[key])?;
         if let Some(row) = rows.next()? {
             let value: String = row.get(0)?;
@@ -236,17 +233,12 @@ impl Cache {
     /// ```
     pub fn delete(&self, key: &str) -> rusqlite::Result<()> {
         self.connection.execute(
-            &format!(
-                "DELETE FROM {} WHERE {} = ?",
-                TABLE, KEY_COLUMN
-            ),
+            &format!("DELETE FROM {} WHERE {} = ?", TABLE, KEY_COLUMN),
             &[key],
         )?;
         Ok(())
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -258,7 +250,6 @@ mod tests {
     fn test_new_in_memory() {
         let _ = Cache::new_in_memory().unwrap();
     }
-
 
     #[test]
     fn test_new_from_file() {
@@ -409,7 +400,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_insert_multiple_times() {
         let cache = Cache::new_in_memory().unwrap();
@@ -430,5 +420,4 @@ mod tests {
         let result3 = cache.get(key).unwrap();
         assert_eq!(result3, Some(value3.to_string()));
     }
-
 }

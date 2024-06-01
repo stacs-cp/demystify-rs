@@ -671,12 +671,10 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     fs::copy(&eprimein, &eprime)?;
     fs::copy(&eprimeparamin, &eprimeparam)?;
 
-
     info!("Parsing Essence in TempDir: {tdir:?}");
 
     let finaleprime: PathBuf;
     let finaleprimeparam: PathBuf;
-
 
     // If input is essence, translate to essence' for savilerow
     if eprime.ends_with(".essence") {
