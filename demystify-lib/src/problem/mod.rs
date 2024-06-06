@@ -1,3 +1,4 @@
+pub mod musdict;
 /// Module containing problem-related functionality.
 pub mod parse;
 pub mod planner;

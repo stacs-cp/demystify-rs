@@ -7,6 +7,24 @@ use crate::{json::Problem, web::create_html};
 
 use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
+pub struct MusConfig {
+    pub base_size_MUS: i64,
+    pub mus_add_step: i64,
+    pub mus_mult_step: i64,
+    pub repeats: i64,
+}
+
+impl Default for MusConfig {
+    fn default() -> Self {
+        Self {
+            base_size_MUS: 3,
+            mus_add_step: 1,
+            mus_mult_step: 1,
+            repeats: 2,
+        }
+    }
+}
+
 pub struct PlannerConfig {
     pub merge_small_threshold: Option<i64>,
 }
