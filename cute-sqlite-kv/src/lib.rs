@@ -1,29 +1,39 @@
-/// This crate provides a simple multi-process key-value store,
-///  using SQLite as the underlying storage.
+/// This crate provides a very small and simple multi-process
+/// persistant key-value store, using SQLite for storage.
 ///
-/// This code is intended to be as simple as a wrapper around
-/// sqlite (via rusqlite) as possible, while ensuring the same
-/// KVStore can be used from multiple processes correctly.
+/// The code is intended to be as simple a wrapper around SQLite
+/// (via rusqlite) as possible.
+///
+/// The key-value store created can be used from multiple processes,
+/// and also opened multiple times from the same process.
+///
+/// While SQLite can be very quick, this key-value store is not
+/// intended for high-performance situations, but when you need
+/// something as simple as possible, but still correct. Please feel
+/// free to take, extend, and modify this code for your own requirements!
 ///
 /// # Examples
 ///
 /// ```
 /// use cute_sqlite_kv::KVStore;
+/// use std::path::Path;
 ///
-/// // Create a new in-memory store
-/// let kvstore = KVStore::new_in_memory().unwrap();
+/// // Create a new key-value store
 ///
-/// // Set a key-value pair
-/// kvstore.set("key", "value").unwrap();
+/// let filename = Path::new("/tmp/kvstore.db");
+/// let kvstore = KVStore::new_from_file(filename).unwrap();
+///
+/// // Insert a key-value pair
+/// kvstore.insert("key", "value").unwrap();
 ///
 /// // Get the value for a key
 /// let result = kvstore.get("key").unwrap();
 /// assert_eq!(result, Some("value".to_string()));
 ///
-/// // Delete a key
-/// kvstore.delete("key").unwrap();
+/// // Remove a key
+/// kvstore.remove("key").unwrap();
 ///
-/// // Check if the key is deleted
+/// // Check if the key is removed
 /// let result = kvstore.get("key").unwrap();
 /// assert_eq!(result, None);
 /// ```
@@ -59,9 +69,9 @@
 ///
 /// The `KVStore` struct provides the following methods:
 ///
-/// - `set`: Sets a key-value pair in the `KVStore`.
+/// - `insert`: Inserts a key-value pair in the `KVStore`.
 /// - `get`: Retrieves the value for a given key from the `KVStore`.
-/// - `delete`: Deletes a key-value pair from the `KVStore`.
+/// - `remove`: removes a key-value pair from the `KVStore`.
 ///
 /// Please refer to the method documentation for more details on how to use each method.
 ///
@@ -72,12 +82,12 @@
 ///
 /// let kvstore = KVStore::new_in_memory().unwrap();
 ///
-/// kvstore.set("key", "value").unwrap();
+/// kvstore.insert("key", "value").unwrap();
 ///
 /// let result = kvstore.get("key").unwrap();
 /// assert_eq!(result, Some("value".to_string()));
 ///
-/// kvstore.delete("key").unwrap();
+/// kvstore.remove("key").unwrap();
 ///
 /// let result = kvstore.get("key").unwrap();
 /// assert_eq!(result, None);
@@ -154,7 +164,7 @@ impl KVStore {
         Ok(())
     }
 
-    /// Sets a key-value pair in the KVStore.
+    /// Inserts a key-value pair in the KVStore.
     /// Overwrites any existing value
     ///
     /// # Arguments
@@ -169,9 +179,9 @@ impl KVStore {
     ///
     /// let kvstore = KVStore::new_in_memory().unwrap();
     ///
-    /// kvstore.set("key", "value").unwrap();
+    /// kvstore.insert("key", "value").unwrap();
     /// ```
-    pub fn set(&self, key: &str, value: &str) -> rusqlite::Result<()> {
+    pub fn insert(&self, key: &str, value: &str) -> rusqlite::Result<()> {
         self.connection.execute(
             &format!(
                 "REPLACE INTO {} ({}, {}) VALUES (?, ?)",
@@ -195,7 +205,7 @@ impl KVStore {
     ///
     /// let kvstore = KVStore::new_in_memory().unwrap();
     ///
-    /// kvstore.set("key", "value").unwrap();
+    /// kvstore.insert("key", "value").unwrap();
     ///
     /// let result = kvstore.get("key").unwrap();
     /// assert_eq!(result, Some("value".to_string()));
@@ -215,12 +225,12 @@ impl KVStore {
         }
     }
 
-    /// Deletes a key-value pair from the KVStore,
+    /// Removes a key-value pair from the KVStore,
     /// if present
     ///
     /// # Arguments
     ///
-    /// * `key` - The key to delete.
+    /// * `key` - The key to remove.
     ///
     /// # Examples
     ///
@@ -229,18 +239,46 @@ impl KVStore {
     ///
     /// let kvstore = KVStore::new_in_memory().unwrap();
     ///
-    /// kvstore.set("key", "value").unwrap();
+    /// kvstore.insert("key", "value").unwrap();
     ///
-    /// kvstore.delete("key").unwrap();
+    /// kvstore.remove("key").unwrap();
     ///
     /// let result = kvstore.get("key").unwrap();
     /// assert_eq!(result, None);
     /// ```
-    pub fn delete(&self, key: &str) -> rusqlite::Result<()> {
+    pub fn remove(&self, key: &str) -> rusqlite::Result<()> {
         self.connection.execute(
             &format!("DELETE FROM {} WHERE {} = ?", TABLE, KEY_COLUMN),
             &[key],
         )?;
+        Ok(())
+    }
+
+    /// Clears the entire table in the KVStore.
+    ///
+    /// This method removes all key-value pairs from the table, effectively clearing the entire store.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use cute_sqlite_kv::KVStore;
+    ///
+    /// let kvstore = KVStore::new_in_memory().unwrap();
+    ///
+    /// kvstore.insert("key1", "value1").unwrap();
+    /// kvstore.insert("key2", "value2").unwrap();
+    ///
+    /// kvstore.clear().unwrap();
+    ///
+    /// let result1 = kvstore.get("key1").unwrap();
+    /// let result2 = kvstore.get("key2").unwrap();
+    ///
+    /// assert_eq!(result1, None);
+    /// assert_eq!(result2, None);
+    /// ```
+    pub fn clear(&self) -> rusqlite::Result<()> {
+        self.connection
+            .execute(&format!("DELETE FROM {}", TABLE), ())?;
         Ok(())
     }
 }
@@ -270,7 +308,7 @@ mod tests {
         let kvstore = KVStore::new_from_file(&filename).unwrap();
         let key = "test_key";
         let value = "test_value";
-        kvstore.set(key, value).unwrap();
+        kvstore.insert(key, value).unwrap();
         let result = kvstore.get(key).unwrap();
         assert_eq!(result, Some(value.to_string()));
     }
@@ -283,7 +321,7 @@ mod tests {
             let kvstore = KVStore::new_from_file(&filename).unwrap();
             let key = "test_key";
             let value = "test_value";
-            kvstore.set(key, value).unwrap();
+            kvstore.insert(key, value).unwrap();
         }
         {
             let kvstore = KVStore::new_from_file(&filename).unwrap();
@@ -294,11 +332,11 @@ mod tests {
     }
 
     #[test]
-    fn test_set_and_get() {
+    fn test_insert_and_get() {
         let kvstore = KVStore::new_in_memory().unwrap();
         let key = "test_key";
         let value = "test_value";
-        kvstore.set(key, value).unwrap();
+        kvstore.insert(key, value).unwrap();
         let result = kvstore.get(key).unwrap();
         assert_eq!(result, Some(value.to_string()));
     }
@@ -312,21 +350,32 @@ mod tests {
     }
 
     #[test]
-    fn test_delete() {
+    fn test_remove() {
         let kvstore = KVStore::new_in_memory().unwrap();
         let key = "test_key";
         let value = "test_value";
-        kvstore.set(key, value).unwrap();
-        kvstore.delete(key).unwrap();
+        kvstore.insert(key, value).unwrap();
+        kvstore.remove(key).unwrap();
         let result = kvstore.get(key).unwrap();
         assert_eq!(result, None);
     }
 
     #[test]
-    fn test_delete_nonexistent_key() {
+    fn test_remove_nonexistent_key() {
         let kvstore = KVStore::new_in_memory().unwrap();
         let key = "nonexistent_key";
-        kvstore.delete(key).unwrap();
+        kvstore.remove(key).unwrap();
+        let result = kvstore.get(key).unwrap();
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_clear() {
+        let kvstore = KVStore::new_in_memory().unwrap();
+        let key = "test_key";
+        let value = "test_value";
+        kvstore.insert(key, value).unwrap();
+        kvstore.clear().unwrap();
         let result = kvstore.get(key).unwrap();
         assert_eq!(result, None);
     }
@@ -341,7 +390,7 @@ mod tests {
             let kvstore = KVStore::new_from_file(&filename).unwrap();
             let key = "test_key";
             let value = "test_value";
-            kvstore.set(key, value).unwrap();
+            kvstore.insert(key, value).unwrap();
         }
 
         // Check if the key is there
@@ -352,11 +401,11 @@ mod tests {
             assert_eq!(result, Some("test_value".to_string()));
         }
 
-        // Delete the key
+        // remove the key
         {
             let kvstore = KVStore::new_from_file(&filename).unwrap();
             let key = "test_key";
-            kvstore.delete(key).unwrap();
+            kvstore.remove(key).unwrap();
         }
 
         // Check if the key is gone
@@ -379,7 +428,7 @@ mod tests {
         {
             let key = "test_key";
             let value = "test_value";
-            kvstore.set(key, value).unwrap();
+            kvstore.insert(key, value).unwrap();
         }
 
         let kvstore2 = KVStore::new_from_file(&filename).unwrap();
@@ -391,10 +440,10 @@ mod tests {
             assert_eq!(result, Some("test_value".to_string()));
         }
 
-        // Delete the key
+        // remove the key
         {
             let key = "test_key";
-            kvstore2.delete(key).unwrap();
+            kvstore2.remove(key).unwrap();
         }
 
         // Check if the key is gone
@@ -413,15 +462,15 @@ mod tests {
         let value2 = "test_value2";
         let value3 = "test_value3";
 
-        kvstore.set(key, value1).unwrap();
+        kvstore.insert(key, value1).unwrap();
         let result1 = kvstore.get(key).unwrap();
         assert_eq!(result1, Some(value1.to_string()));
 
-        kvstore.set(key, value2).unwrap();
+        kvstore.insert(key, value2).unwrap();
         let result2 = kvstore.get(key).unwrap();
         assert_eq!(result2, Some(value2.to_string()));
 
-        kvstore.set(key, value3).unwrap();
+        kvstore.insert(key, value3).unwrap();
         let result3 = kvstore.get(key).unwrap();
         assert_eq!(result3, Some(value3.to_string()));
     }
