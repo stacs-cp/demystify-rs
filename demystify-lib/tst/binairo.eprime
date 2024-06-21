@@ -1,9 +1,9 @@
 language ESSENCE' 1.0
 $#KIND Binairo
 given n: int
-letting half = n/2
-letting ndim be int(1..n)
-letting ndim2 be int(1..n-2)
+letting half be n/2
+letting ndim be domain int(1..n)
+letting ndim2 be domain int(1..n-2)
 given start_grid: matrix indexed by [ndim, ndim] of int(0,1,2)
 $ 0: black, 1: white, 2=empty
 
@@ -39,7 +39,7 @@ such that
 
 forAll i,j: ndim.(
 (start_grid[i,j] = 1 -> grid[i,j]) /\
-(start_grid[i,j] = 0 -> !grid[i,j]) 
+(start_grid[i,j] = 0 -> !grid[i,j])
 ),
 
 forAll i: ndim.
@@ -74,7 +74,7 @@ forAll i,j: ndim. (i!=j) ->
 (alldiffcol[i,j] -> exists k : ndim. grid[k,i] != grid[k,j])
 
 
-,false->and(flatten([and(flatten(rowwhite)), and(flatten(rowblack)), and(flatten(colwhite)), and(flatten(colblack)), 
+,false->and(flatten([and(flatten(rowwhite)), and(flatten(rowblack)), and(flatten(colwhite)), and(flatten(colblack)),
 and(flatten(rowmatchwhite)), and(flatten(rowmatchblack)), and(flatten(colmatchwhite)), and(flatten(colmatchblack)),
 and(flatten(alldiffrow)),and(flatten(alldiffcol))
 ]))

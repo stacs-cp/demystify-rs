@@ -804,6 +804,10 @@ mod tests {
 
     use test_log::test;
 
+    use super::pretty_print_essence;
+
+    use std::{collections::BTreeSet, path::PathBuf};
+
     #[test]
     fn test_parse_essence_binairo() {
         let eprime_path = "./tst/binairo.eprime";
@@ -911,5 +915,14 @@ mod tests {
         let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
 
         insta::assert_debug_snapshot!(scopes);
+    }
+
+    #[test]
+    fn pretty_print() {
+        let eprime_path = "./tst/binairo.eprime";
+        let parse = pretty_print_essence(&PathBuf::from(eprime_path), "astjson");
+        // Do not want to output the whole tree
+        let k: BTreeSet<_> = parse.unwrap().keys().cloned().collect();
+        insta::assert_debug_snapshot!(k);
     }
 }
