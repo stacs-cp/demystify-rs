@@ -10,7 +10,7 @@ use crate::{
     satcore::SatCore,
 };
 
-use super::{parse::PuzzleParse, PuzLit};
+use super::{musdict::MusDict, parse::PuzzleParse, PuzLit};
 
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
@@ -188,14 +188,18 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals where no MUS was found are omitted from the output.
-    pub fn get_many_vars_mus_quick(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn get_many_vars_mus_quick(&self, lits: &BTreeSet<Lit>) -> MusDict {
         let muses: Vec<_> = lits
             .par_iter()
             .map(|&x| (x, self.get_var_mus_quick(x, None)))
             .filter(|(_, mus)| mus.is_some())
             .map(|(lit, mus)| (lit, mus.unwrap()))
             .collect();
-        muses
+        let mut md = MusDict::new();
+        for (k, v) in muses {
+            md.add_mus(k, v);
+        }
+        md
     }
 
     /// Retrieves small MUSes for each element of a list of literals
@@ -208,7 +212,7 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals with large MUSes are skipped. The exact set of returned literals may vary.
-    pub fn get_many_vars_small_mus_quick(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn get_many_vars_small_mus_quick(&self, lits: &BTreeSet<Lit>) -> MusDict {
         let mut mus_size: i32 = 2;
         loop {
             let muses: Vec<_> = lits
@@ -218,7 +222,11 @@ impl PuzzleSolver {
                 .map(|(lit, mus)| (lit, mus.unwrap()))
                 .collect();
             if mus_size > (lits.len() as i32) + 1 || !muses.is_empty() {
-                return muses;
+                let mut md = MusDict::new();
+                for (k, v) in muses {
+                    md.add_mus(k, v);
+                }
+                return md;
             }
             mus_size *= 2;
         }

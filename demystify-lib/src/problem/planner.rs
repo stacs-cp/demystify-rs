@@ -5,7 +5,7 @@ use rustsat::types::Lit;
 
 use crate::{json::Problem, web::create_html};
 
-use super::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
+use super::{musdict::MusDict, parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
 pub struct MusConfig {
     pub base_size_MUS: i64,
@@ -76,12 +76,8 @@ impl PuzzlePlanner {
         PuzzlePlanner { psolve, config }
     }
 
-    /// Returns a vector of all minimal unsatisfiable subsets (MUSes) of the puzzle.
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
-    pub fn all_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+    /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle.
+    pub fn all_muses(&mut self) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
         self.psolve.get_many_vars_small_mus_quick(&varlits)
     }
@@ -94,13 +90,25 @@ impl PuzzlePlanner {
     pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
         let muses = self.all_muses();
 
-        let minmus = muses.iter().map(|(_, x)| x.len()).min().unwrap();
-        let muses: Vec<_> = muses
-            .into_iter()
-            .filter(|(_, x)| x.len() == minmus)
-            .collect();
+        let min = muses.min();
 
-        muses
+        if min.is_none() {
+            return vec![];
+        }
+
+        let min = min.unwrap();
+
+        let mut vec = vec![];
+
+        for (&lit, v) in muses.muses() {
+            if let Some(m) = v.iter().next() {
+                if m.len() == min {
+                    vec.push((lit, m.clone()));
+                }
+            }
+        }
+
+        vec
     }
 
     /// Returns a vector of the smallest MUSes of the puzzle based on the planner's configuration.
@@ -110,6 +118,10 @@ impl PuzzlePlanner {
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
     pub fn smallest_muses_with_config(&mut self) -> Vec<(Lit, Vec<Lit>)> {
         let muses = self.smallest_muses();
+        if muses.is_empty() {
+            return muses;
+        }
+
         if let Some(min) = self.config.merge_small_threshold {
             if muses[0].1.len() as i64 <= min {
                 muses
