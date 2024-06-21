@@ -771,25 +771,32 @@ fn read_essence_param(
         let reader = BufReader::new(file);
         serde_json::from_reader(reader).context("Failed reading json param file")
     } else {
-        info!(target: "parser", "Reading params {:?} as conjure param", eprimeparam);
-        let output = Command::new("conjure")
-            .arg("pretty")
-            .arg("--output-format")
-            .arg("json")
-            .arg(eprimeparam)
-            .output()
-            .expect("Failed to execute command");
-
-        if !output.status.success() {
-            bail!(format!(
-                "Conjure pretty-printing of params failed\n{}\n{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        serde_json::from_slice(&output.stdout).context("Failed to parse JSON produced by conjure")
+        pretty_print_essence(eprimeparam, "json")
     }
+}
+
+fn pretty_print_essence(
+    file: &PathBuf,
+    format: &str,
+) -> anyhow::Result<BTreeMap<String, serde_json::value::Value>> {
+    info!(target: "parser", "Pretty printing {:?} as {}", file, format);
+    let output = Command::new("conjure")
+        .arg("pretty")
+        .arg("--output-format")
+        .arg(format)
+        .arg(file)
+        .output()
+        .expect("Failed to execute command");
+
+    if !output.status.success() {
+        bail!(format!(
+            "Conjure pretty-printing failed\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    serde_json::from_slice(&output.stdout).context("Failed to parse JSON produced by conjure")
 }
 
 #[cfg(test)]
