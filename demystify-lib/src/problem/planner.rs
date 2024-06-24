@@ -194,15 +194,15 @@ impl PuzzlePlanner {
                 .into_iter()
                 .map(|mus| self.mus_to_user_mus(&mus))
                 .collect_vec();
-
-            println!(
-                "{} steps, just found {} muses of size {}, {} left",
-                solvesteps.len(),
-                muses.len(),
-                muses[0].1.len(),
-                self.psolve.get_provable_varlits().len()
-            );
-
+            /*
+                        println!(
+                            "{} steps, just found {} muses of size {}, {} left",
+                            solvesteps.len(),
+                            muses.len(),
+                            muses[0].1.len(),
+                            self.psolve.get_provable_varlits().len()
+                        );
+            */
             // Add these muses to the solving steps
             solvesteps.extend(muses);
         }
@@ -295,7 +295,7 @@ impl PuzzlePlanner {
     /// # Returns
     ///
     /// A reference to the `PuzzleParse` instance representing the puzzle being solved.
-    fn puzzle(&self) -> &PuzzleParse {
+    pub fn puzzle(&self) -> &PuzzleParse {
         self.psolve.puzzleparse()
     }
 
