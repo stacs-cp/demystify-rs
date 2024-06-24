@@ -112,7 +112,19 @@ impl PuzzleSolver {
     /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
         assert!(self.get_provable_varlits().contains(&lit));
-        self.tosolvelits.as_mut().unwrap().remove(&lit);
+        self.add_known_lit_unchecked(lit);
+    }
+
+    /// Forces a literal to be true, without checking if
+    /// this can be logically deduced.
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The literal to add.
+    pub fn add_known_lit_unchecked(&mut self, lit: Lit) {
+        if let Some(tosolvelits) = self.tosolvelits.as_mut() {
+            tosolvelits.remove(&lit);
+        }
         self.knownlits.push(lit);
 
         let lits = self.lit_to_puzlit(&lit).clone();
