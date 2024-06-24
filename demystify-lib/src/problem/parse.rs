@@ -34,7 +34,7 @@ use crate::problem::{PuzLit, PuzVar};
 use super::util::FindVarConnections;
 use super::VarValPair;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EPrimeAnnotations {
     /// The set of variables in the Essence' file.
     pub vars: BTreeSet<String>,
@@ -160,7 +160,7 @@ impl EPrimeAnnotations {
 
 /// Represents the result of parsing a DIMACS file.
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PuzzleParse {
     /// The annotations from the Essence' file
     pub eprime: EPrimeAnnotations,
