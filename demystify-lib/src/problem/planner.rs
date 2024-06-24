@@ -209,6 +209,26 @@ impl PuzzlePlanner {
         solvesteps
     }
 
+    pub fn get_provable_varlits(&mut self) -> BTreeSet<Lit> {
+        self.psolve.get_provable_varlits().clone()
+    }
+
+    pub fn get_provable_varlits_including_reveals(&mut self) -> BTreeSet<Lit> {
+        let mut all_lits = BTreeSet::new();
+
+        while !self.psolve.get_provable_varlits().is_empty() {
+            let varlits = self.psolve.get_provable_varlits().clone();
+
+            for v in &varlits {
+                self.mark_lit_as_deduced(v);
+            }
+
+            all_lits.extend(varlits.into_iter());
+        }
+
+        all_lits
+    }
+
     /// Solves the puzzle quickly and returns a sequence of steps in HTML format.
     ///
     /// # Returns
@@ -282,6 +302,8 @@ impl PuzzlePlanner {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use crate::problem::{planner::PuzzlePlanner, solver::PuzzleSolver};
     use test_log::test;
 
@@ -355,6 +377,35 @@ mod tests {
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
         }
+    }
+
+    #[test]
+    fn test_varlits_minesweeper_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperPrinted.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let first_step = plan.get_provable_varlits();
+
+        let all_steps = plan.get_provable_varlits_including_reveals();
+
+        let first_step: BTreeSet<_> = first_step
+            .into_iter()
+            .map(|x| plan.psolve.lit_to_puzlit(&x).clone())
+            .collect();
+
+        let all_steps: BTreeSet<_> = all_steps
+            .into_iter()
+            .map(|x| plan.psolve.lit_to_puzlit(&x).clone())
+            .collect();
+
+        insta::assert_debug_snapshot!(first_step);
+        insta::assert_debug_snapshot!(all_steps);
     }
 
     #[test]
