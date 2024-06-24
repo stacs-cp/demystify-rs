@@ -298,6 +298,12 @@ impl PuzzlePlanner {
     fn puzzle(&self) -> &PuzzleParse {
         self.psolve.puzzleparse()
     }
+
+    /// Returns a mutable reference to the solver. Warning, incorrect use of underlying
+    /// solver can result in incorrect answers.
+    pub fn solver(&mut self) -> &mut PuzzleSolver {
+        &mut self.psolve
+    }
 }
 
 #[cfg(test)]
