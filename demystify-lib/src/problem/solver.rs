@@ -14,6 +14,7 @@ use crate::{
 
 use super::{musdict::MusDict, parse::PuzzleParse, PuzLit};
 
+#[derive(Copy, Clone)]
 pub struct MusConfig {
     pub base_size_mus: i64,
     pub mus_add_step: i64,
@@ -28,6 +29,17 @@ impl Default for MusConfig {
             mus_add_step: 1,
             mus_mult_step: 2,
             repeats: 5,
+        }
+    }
+}
+
+impl MusConfig {
+    pub fn repeats(repeats: i64) -> Self {
+        Self {
+            base_size_mus: 2,
+            mus_add_step: 1,
+            mus_mult_step: 2,
+            repeats,
         }
     }
 }

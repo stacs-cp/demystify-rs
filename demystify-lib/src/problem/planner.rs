@@ -13,6 +13,7 @@ use super::{
     PuzLit,
 };
 
+#[derive(Copy, Clone)]
 pub struct PlannerConfig {
     pub mus_config: MusConfig,
     pub merge_small_threshold: Option<i64>,
