@@ -172,6 +172,19 @@ impl PuzzlePlanner {
     ///
     /// A vector of tuples, where each tuple contains a set of user-friendly literals and a vector of user-friendly constraints.
     pub fn quick_solve(&mut self) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
+        self.quick_solve_impl(false)
+    }
+
+    /// Solves the puzzle quickly and returns a sequence of steps, printing info on progress as solving runs
+    ///
+    /// # Returns
+    ///
+    /// A vector of tuples, where each tuple contains a set of user-friendly literals and a vector of user-friendly constraints.
+    pub fn quick_solve_with_progress(&mut self) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
+        self.quick_solve_impl(true)
+    }
+
+    fn quick_solve_impl(&mut self, progress: bool) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
         let mut solvesteps = vec![];
         while !self.psolve.get_provable_varlits().is_empty() {
             let muses = self.smallest_muses_with_config();
@@ -186,8 +199,14 @@ impl PuzzlePlanner {
                 .map(|mus| self.mus_to_user_mus(&mus))
                 .collect_vec();
 
-            if muses.is_empty() {
-                info!(target: "planner", "no progress..?");
+            if progress {
+                println!(
+                    "{} steps, just found {} muses of size {}, {} left",
+                    solvesteps.len(),
+                    muses.len(),
+                    muses[0].1.len(),
+                    self.psolve.get_provable_varlits().len()
+                );
             } else {
                 info!(target: "planner",
                     "{} steps, just found {} muses of size {}, {} left",
@@ -197,7 +216,6 @@ impl PuzzlePlanner {
                     self.psolve.get_provable_varlits().len()
                 );
             }
-
             // Add these muses to the solving steps
             solvesteps.push(muses);
         }

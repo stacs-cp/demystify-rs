@@ -69,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         println!("<script> doJavascript(); </script>");
         println!("</body> </html>");
     } else {
-        for p in planner.quick_solve() {
+        for p in planner.quick_solve_with_progress() {
             println!("{p:?}");
         }
     }
