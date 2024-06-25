@@ -8,7 +8,7 @@ use crate::{json::Problem, web::create_html};
 use super::{musdict::MusDict, parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
 
 pub struct MusConfig {
-    pub base_size_MUS: i64,
+    pub base_size_mus: i64,
     pub mus_add_step: i64,
     pub mus_mult_step: i64,
     pub repeats: i64,
@@ -17,7 +17,7 @@ pub struct MusConfig {
 impl Default for MusConfig {
     fn default() -> Self {
         Self {
-            base_size_MUS: 3,
+            base_size_mus: 3,
             mus_add_step: 1,
             mus_mult_step: 1,
             repeats: 2,
@@ -180,7 +180,7 @@ impl PuzzlePlanner {
     /// # Returns
     ///
     /// A vector of tuples, where each tuple contains a set of user-friendly literals and a vector of user-friendly constraints.
-    pub fn quick_solve(&mut self) -> Vec<(BTreeSet<PuzLit>, Vec<String>)> {
+    pub fn quick_solve(&mut self) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
         let mut solvesteps = vec![];
         while !self.psolve.get_provable_varlits().is_empty() {
             let muses = self.smallest_muses_with_config();
@@ -204,7 +204,7 @@ impl PuzzlePlanner {
                         );
             */
             // Add these muses to the solving steps
-            solvesteps.extend(muses);
+            solvesteps.push(muses);
         }
         solvesteps
     }
@@ -311,6 +311,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use crate::problem::{planner::PuzzlePlanner, solver::PuzzleSolver};
+    use itertools::Itertools;
     use test_log::test;
 
     #[test]
@@ -326,9 +327,9 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.len(), 16);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 16);
 
-        for (litset, cons) in sequence {
+        for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
             // It should be trivial to prove we only need one
             // constraint here, but MUS algorithms be tricky, if
@@ -352,9 +353,9 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.len(), 36);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 36);
 
-        for (litset, cons) in sequence {
+        for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
@@ -376,9 +377,9 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.len(), 25);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 25);
 
-        for (litset, cons) in sequence {
+        for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
@@ -428,9 +429,9 @@ mod tests {
         let sequence = plan.quick_solve();
 
         // Should only be able to solve 15 steps, due to the 'wall'
-        assert_eq!(sequence.len(), 15);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 15);
 
-        for (litset, cons) in sequence {
+        for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
