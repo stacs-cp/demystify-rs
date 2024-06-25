@@ -19,6 +19,7 @@ impl MusDict {
     /// # Returns
     ///
     /// A new `MusDict` instance.
+    #[must_use]
     pub fn new() -> Self {
         MusDict {
             muses: HashMap::new(),
@@ -59,21 +60,24 @@ impl MusDict {
     }
 
     /// Returns a reference to the muses in the dictionary.
+    #[must_use]
     pub fn muses(&self) -> &HashMap<Lit, BTreeSet<Vec<Lit>>> {
         &self.muses
     }
 
-    /// Checks if the MusDict is empty.
+    /// Checks if the `MusDict` is empty.
     ///
-    /// Returns true if the MusDict is empty, false otherwise.
+    /// Returns true if the `MusDict` is empty, false otherwise.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.muses.is_empty()
     }
 
+    #[must_use]
     pub fn min(&self) -> Option<usize> {
         self.muses
             .values()
-            .flat_map(|sets| sets.iter().map(|vec| vec.len()))
+            .flat_map(|sets| sets.iter().map(std::vec::Vec::len))
             .min()
     }
 }

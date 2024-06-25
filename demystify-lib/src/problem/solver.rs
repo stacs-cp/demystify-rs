@@ -216,7 +216,7 @@ impl PuzzleSolver {
 
         let mut lits: Vec<Lit> = vec![];
 
-        let mut conset = self.puzzleparse.conset_lits.iter().cloned().collect_vec();
+        let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
 
         conset.shuffle(&mut rand::thread_rng());
 

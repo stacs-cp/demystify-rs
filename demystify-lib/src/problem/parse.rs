@@ -420,7 +420,7 @@ impl PuzzleParse {
         self.varset_lits
             .iter()
             .flat_map(|x| self.lit_to_vars(x))
-            .map(|x| x.varval())
+            .map(super::PuzLit::varval)
             .collect()
     }
 

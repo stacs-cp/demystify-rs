@@ -264,7 +264,7 @@ impl PuzzlePlanner {
             let tosolve_varvals: BTreeSet<_> = varlits
                 .iter()
                 .flat_map(|x| self.psolve.lit_to_puzlit(x))
-                .map(|x| x.varval())
+                .map(super::PuzLit::varval)
                 .collect();
 
             let known_puzlits: BTreeSet<PuzLit> = self

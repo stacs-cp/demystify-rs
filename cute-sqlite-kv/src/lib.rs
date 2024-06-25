@@ -1,13 +1,13 @@
 /// This crate provides a very small and simple multi-process
-/// persistant key-value store, using SQLite for storage.
+/// persistant key-value store, using `SQLite` for storage.
 ///
-/// The code is intended to be as simple a wrapper around SQLite
+/// The code is intended to be as simple a wrapper around `SQLite`
 /// (via rusqlite) as possible.
 ///
 /// The key-value store created can be used from multiple processes,
 /// and also opened multiple times from the same process.
 ///
-/// While SQLite can be very quick, this key-value store is not
+/// While `SQLite` can be very quick, this key-value store is not
 /// intended for high-performance situations, but when you need
 /// something as simple as possible, but still correct. Please feel
 /// free to take, extend, and modify this code for your own requirements!
@@ -40,12 +40,12 @@
 ///
 /// # Usage
 ///
-/// To use the `KVStore` struct, you need to import the `cute_sqlite_kv` crate and create a new KVStore instance.
-/// You can create a KVStore either in-memory or from a file.
+/// To use the `KVStore` struct, you need to import the `cute_sqlite_kv` crate and create a new `KVStore` instance.
+/// You can create a `KVStore` either in-memory or from a file.
 ///
-/// ## In-Memory KVStore
+/// ## In-Memory `KVStore`
 ///
-/// To create a new in-memory KVStore, use the `new_in_memory` method:
+/// To create a new in-memory `KVStore`, use the `new_in_memory` method:
 ///
 /// ```rust
 /// use cute_sqlite_kv::KVStore;
@@ -53,9 +53,9 @@
 /// let kvstore = KVStore::new_in_memory().unwrap();
 /// ```
 ///
-/// ## File-based KVStore
+/// ## File-based `KVStore`
 ///
-/// To create a new KVStore using a file as the storage, use the `new_from_file` method and provide the path to the file:
+/// To create a new `KVStore` using a file as the storage, use the `new_from_file` method and provide the path to the file:
 ///
 /// ```rust
 /// use cute_sqlite_kv::KVStore;
@@ -109,7 +109,7 @@ impl KVStore {
     /// Creates a new in-memory key-value store.
     ///
     /// An in-memory key-value store is in practice worse than
-    /// a standard HashMap in every way, so the only use of this function
+    /// a standard `HashMap` in every way, so the only use of this function
     /// is for creating a key value store for testing.
     ///
     /// # Examples
@@ -126,11 +126,11 @@ impl KVStore {
         Ok(kvstore)
     }
 
-    /// Creates a new KVStore using a file as the storage.
+    /// Creates a new `KVStore` using a file as the storage.
     ///
     /// # Arguments
     ///
-    /// * `filename` - The path to the file used as the storage for the KVStore.
+    /// * `filename` - The path to the file used as the storage for the `KVStore`.
     ///
     /// # Examples
     ///
@@ -148,23 +148,22 @@ impl KVStore {
         Ok(kvstore)
     }
 
-    /// Internal function which ensures KVStore
+    /// Internal function which ensures `KVStore`
     /// table is created
     fn create_table(&self) -> rusqlite::Result<()> {
         self.connection.execute(
             &format!(
-                "CREATE TABLE IF NOT EXISTS {} (
-                {} varchar PRIMARY KEY UNIQUE NOT NULL,
-                {}
-            )",
-                TABLE, KEY_COLUMN, VAL_COLUMN
+                "CREATE TABLE IF NOT EXISTS {TABLE} (
+                {KEY_COLUMN} varchar PRIMARY KEY UNIQUE NOT NULL,
+                {VAL_COLUMN}
+            )"
             ),
             (),
         )?;
         Ok(())
     }
 
-    /// Inserts a key-value pair in the KVStore.
+    /// Inserts a key-value pair in the `KVStore`.
     /// Overwrites any existing value
     ///
     /// # Arguments
@@ -183,16 +182,13 @@ impl KVStore {
     /// ```
     pub fn insert(&self, key: &str, value: &str) -> rusqlite::Result<()> {
         self.connection.execute(
-            &format!(
-                "REPLACE INTO {} ({}, {}) VALUES (?, ?)",
-                TABLE, KEY_COLUMN, VAL_COLUMN
-            ),
+            &format!("REPLACE INTO {TABLE} ({KEY_COLUMN}, {VAL_COLUMN}) VALUES (?, ?)"),
             [key, value],
         )?;
         Ok(())
     }
 
-    /// Retrieves the value for a given key from the KVStore.
+    /// Retrieves the value for a given key from the `KVStore`.
     ///
     /// # Arguments
     ///
@@ -213,8 +209,7 @@ impl KVStore {
 
     pub fn get(&self, key: &str) -> rusqlite::Result<Option<String>> {
         let mut stmt = self.connection.prepare(&format!(
-            "SELECT {} FROM {} WHERE {} = ?",
-            VAL_COLUMN, TABLE, KEY_COLUMN
+            "SELECT {VAL_COLUMN} FROM {TABLE} WHERE {KEY_COLUMN} = ?"
         ))?;
         let mut rows = stmt.query([key])?;
         if let Some(row) = rows.next()? {
@@ -225,7 +220,7 @@ impl KVStore {
         }
     }
 
-    /// Removes a key-value pair from the KVStore,
+    /// Removes a key-value pair from the `KVStore`,
     /// if present
     ///
     /// # Arguments
@@ -248,13 +243,13 @@ impl KVStore {
     /// ```
     pub fn remove(&self, key: &str) -> rusqlite::Result<()> {
         self.connection.execute(
-            &format!("DELETE FROM {} WHERE {} = ?", TABLE, KEY_COLUMN),
+            &format!("DELETE FROM {TABLE} WHERE {KEY_COLUMN} = ?"),
             [key],
         )?;
         Ok(())
     }
 
-    /// Clears the entire table in the KVStore.
+    /// Clears the entire table in the `KVStore`.
     ///
     /// This method removes all key-value pairs from the table, effectively clearing the entire store.
     ///
@@ -278,7 +273,7 @@ impl KVStore {
     /// ```
     pub fn clear(&self) -> rusqlite::Result<()> {
         self.connection
-            .execute(&format!("DELETE FROM {}", TABLE), ())?;
+            .execute(&format!("DELETE FROM {TABLE}"), ())?;
         Ok(())
     }
 }
