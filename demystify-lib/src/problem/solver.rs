@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use itertools::Itertools;
+use rand::seq::SliceRandom;
+use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
 use thread_local::ThreadLocal;
 use tracing::info;
@@ -11,6 +13,24 @@ use crate::{
 };
 
 use super::{musdict::MusDict, parse::PuzzleParse, PuzLit};
+
+pub struct MusConfig {
+    pub base_size_mus: i64,
+    pub mus_add_step: i64,
+    pub mus_mult_step: i64,
+    pub repeats: i64,
+}
+
+impl Default for MusConfig {
+    fn default() -> Self {
+        Self {
+            base_size_mus: 2,
+            mus_add_step: 1,
+            mus_mult_step: 2,
+            repeats: 5,
+        }
+    }
+}
 
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
@@ -174,7 +194,7 @@ impl PuzzleSolver {
     ///
     /// An optional vector containing the MUS of variables, or `None` if no MUS is found.
     #[must_use]
-    pub fn get_var_mus_quick(&self, lit: Lit, max_size: Option<i32>) -> Option<Vec<Lit>> {
+    pub fn get_var_mus_quick(&self, lit: Lit, max_size: Option<i64>) -> Option<Vec<Lit>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
 
         let mut lits: Vec<Lit> = vec![];
@@ -190,7 +210,52 @@ impl PuzzleSolver {
         })
     }
 
-    /// Retrieves the explanation for each element of a list of literals
+    #[must_use]
+    pub fn get_var_mus_slice(&self, lit: Lit, max_size: Option<i64>) -> Option<Vec<Lit>> {
+        assert!(self.puzzleparse.varset_lits.contains(&lit));
+
+        let mut lits: Vec<Lit> = vec![];
+
+        let mut conset = self.puzzleparse.conset_lits.iter().cloned().collect_vec();
+
+        conset.shuffle(&mut rand::thread_rng());
+
+        // This code tries to deduce how many elements we can drop from 'conset', such that
+        // we will still have an 80% chance of leaving a MUS of size 'max_size'.
+        // The code is a bit more horrible than the simplest version, to make sure we do
+        // not break when very large, or small, MUSes are required.
+
+        let mut percentage_reduce = 0.4;
+
+        if let Some(size) = max_size {
+            if size > 0 {
+                percentage_reduce = 1.0 - (size as f64) / (conset.len() as f64);
+            }
+        }
+
+        percentage_reduce = percentage_reduce.clamp(0.4, 0.9999);
+
+        let trims = ((0.8 as f64).ln() / (percentage_reduce.ln())) as i64;
+
+        let trims = trims.clamp(0, (conset.len() as i64) / 2);
+
+        info!(target: "solver", "trimming {} from {} because max_size = {:?}", trims, conset.len(), max_size);
+
+        lits.extend(conset.into_iter().skip(trims as usize));
+
+        lits.push(!lit);
+        let mus = self
+            .get_satcore()
+            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
+        mus.map(|m| {
+            m.into_iter()
+                .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                .collect()
+        })
+    }
+
+    /// Retrieves an explanation for each element of a list of literals. This will often be
+    /// much bigger than the minimum possible MUS size.
     ///
     /// # Arguments
     ///
@@ -200,7 +265,7 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals where no MUS was found are omitted from the output.
-    pub fn get_many_vars_mus_quick(&self, lits: &BTreeSet<Lit>) -> MusDict {
+    pub fn get_many_vars_mus_first(&self, lits: &BTreeSet<Lit>) -> MusDict {
         let muses: Vec<_> = lits
             .par_iter()
             .map(|&x| (x, self.get_var_mus_quick(x, None)))
@@ -224,23 +289,36 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals with large MUSes are skipped. The exact set of returned literals may vary.
-    pub fn get_many_vars_small_mus_quick(&self, lits: &BTreeSet<Lit>) -> MusDict {
-        let mut mus_size: i32 = 2;
+    pub fn get_many_vars_small_mus_quick(
+        &self,
+        lits: &BTreeSet<Lit>,
+        config: &MusConfig,
+    ) -> MusDict {
+        let mut md = MusDict::new();
+        let mut mus_size = config.base_size_mus;
+        info!(target: "solver", "scanning for {} muses", lits.len());
         loop {
+            info!(target: "solver", "scanning for muses size {}", mus_size);
             let muses: Vec<_> = lits
-                .par_iter()
-                .map(|&x| (x, self.get_var_mus_quick(x, Some(mus_size))))
+                .iter()
+                .flat_map(|x| std::iter::repeat(x).take(config.repeats as usize))
+                .par_bridge()
+                .map(|&x| (x, self.get_var_mus_slice(x, Some(mus_size))))
                 .filter(|(_, mus)| mus.is_some())
                 .map(|(lit, mus)| (lit, mus.unwrap()))
                 .collect();
-            if mus_size > (lits.len() as i32) + 1 || !muses.is_empty() {
-                let mut md = MusDict::new();
-                for (k, v) in muses {
-                    md.add_mus(k, v);
-                }
-                return md;
+
+            for (k, v) in muses {
+                md.add_mus(k, v);
             }
-            mus_size *= 2;
+
+            if let Some(mus_min) = md.min() {
+                if mus_min as i64 <= mus_size {
+                    info!(target: "solver", "muses found!");
+                    return md;
+                }
+            }
+            mus_size = mus_size * config.mus_mult_step + config.mus_add_step;
         }
     }
 
@@ -257,7 +335,7 @@ impl PuzzleSolver {
 
 #[cfg(test)]
 mod tests {
-    use crate::problem::solver::PuzzleSolver;
+    use crate::problem::solver::{MusConfig, PuzzleSolver};
 
     use test_log::test;
 
@@ -359,14 +437,14 @@ mod tests {
             }
         }
 
-        let muses = puz.get_many_vars_mus_quick(&varlits);
-        let muses_quick = puz.get_many_vars_small_mus_quick(&varlits);
+        let muses = puz.get_many_vars_mus_first(&varlits);
+        let muses_quick = puz.get_many_vars_small_mus_quick(&varlits, &MusConfig::default());
 
         assert!(!muses.is_empty());
         assert!(!muses_quick.is_empty());
 
-        let neg_muses = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect()));
-        let neg_muses_quick = puz.get_many_vars_mus_quick(&(varlits.iter().map(|&x| !x).collect()));
+        let neg_muses = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()));
+        let neg_muses_quick = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()));
 
         assert!(neg_muses.is_empty());
         assert!(neg_muses_quick.is_empty());

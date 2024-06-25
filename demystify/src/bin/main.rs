@@ -3,7 +3,7 @@ use demystify_lib::{
     problem::{
         self,
         planner::{PlannerConfig, PuzzlePlanner},
-        solver::PuzzleSolver,
+        solver::{MusConfig, PuzzleSolver},
     },
     web::{base_css, base_javascript},
 };
@@ -52,6 +52,7 @@ fn main() -> anyhow::Result<()> {
     let solver = PuzzleSolver::new(puzzle)?;
 
     let planner_config = PlannerConfig {
+        mus_config: MusConfig::default(),
         merge_small_threshold: opt.merge,
     };
 

@@ -176,7 +176,7 @@ impl SatCore {
         &self,
         known: &[Lit],
         lits: &[Lit],
-        max_size: Option<i32>,
+        max_size: Option<i64>,
     ) -> Option<Vec<Lit>> {
         self.fix_values(known);
         let mut known_size = 0;

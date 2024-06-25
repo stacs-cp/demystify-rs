@@ -2,36 +2,26 @@ use std::collections::BTreeSet;
 
 use itertools::Itertools;
 use rustsat::types::Lit;
+use tracing::info;
 
 use crate::{json::Problem, web::create_html};
 
-use super::{musdict::MusDict, parse::PuzzleParse, solver::PuzzleSolver, PuzLit};
-
-pub struct MusConfig {
-    pub base_size_mus: i64,
-    pub mus_add_step: i64,
-    pub mus_mult_step: i64,
-    pub repeats: i64,
-}
-
-impl Default for MusConfig {
-    fn default() -> Self {
-        Self {
-            base_size_mus: 3,
-            mus_add_step: 1,
-            mus_mult_step: 1,
-            repeats: 2,
-        }
-    }
-}
+use super::{
+    musdict::MusDict,
+    parse::PuzzleParse,
+    solver::{MusConfig, PuzzleSolver},
+    PuzLit,
+};
 
 pub struct PlannerConfig {
+    pub mus_config: MusConfig,
     pub merge_small_threshold: Option<i64>,
 }
 
 impl Default for PlannerConfig {
     fn default() -> Self {
         Self {
+            mus_config: MusConfig::default(),
             merge_small_threshold: Some(1),
         }
     }
@@ -79,7 +69,8 @@ impl PuzzlePlanner {
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle.
     pub fn all_muses(&mut self) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
-        self.psolve.get_many_vars_small_mus_quick(&varlits)
+        self.psolve
+            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config)
     }
 
     /// Returns a vector of the smallest MUSes of the puzzle.
@@ -194,18 +185,23 @@ impl PuzzlePlanner {
                 .into_iter()
                 .map(|mus| self.mus_to_user_mus(&mus))
                 .collect_vec();
-            /*
-                        println!(
-                            "{} steps, just found {} muses of size {}, {} left",
-                            solvesteps.len(),
-                            muses.len(),
-                            muses[0].1.len(),
-                            self.psolve.get_provable_varlits().len()
-                        );
-            */
+
+            if muses.is_empty() {
+                info!(target: "planner", "no progress..?");
+            } else {
+                info!(target: "planner",
+                    "{} steps, just found {} muses of size {}, {} left",
+                    solvesteps.len(),
+                    muses.len(),
+                    muses[0].1.len(),
+                    self.psolve.get_provable_varlits().len()
+                );
+            }
+
             // Add these muses to the solving steps
             solvesteps.push(muses);
         }
+        info!(target: "planner", "solved!");
         solvesteps
     }
 
