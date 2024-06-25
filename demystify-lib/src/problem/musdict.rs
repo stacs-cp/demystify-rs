@@ -7,6 +7,12 @@ pub struct MusDict {
     muses: HashMap<Lit, BTreeSet<Vec<Lit>>>,
 }
 
+impl Default for MusDict {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MusDict {
     /// Creates a new instance of `MusDict`.
     ///

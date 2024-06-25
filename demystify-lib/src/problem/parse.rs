@@ -668,8 +668,8 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     let eprime = tdir.path().join(eprimein.file_name().unwrap());
     let eprimeparam = tdir.path().join(eprimeparamin.file_name().unwrap());
 
-    fs::copy(&eprimein, &eprime)?;
-    fs::copy(&eprimeparamin, &eprimeparam)?;
+    fs::copy(eprimein, &eprime)?;
+    fs::copy(eprimeparamin, &eprimeparam)?;
 
     info!("Parsing Essence in TempDir: {tdir:?}");
 

@@ -187,7 +187,7 @@ impl KVStore {
                 "REPLACE INTO {} ({}, {}) VALUES (?, ?)",
                 TABLE, KEY_COLUMN, VAL_COLUMN
             ),
-            &[key, value],
+            [key, value],
         )?;
         Ok(())
     }
@@ -216,7 +216,7 @@ impl KVStore {
             "SELECT {} FROM {} WHERE {} = ?",
             VAL_COLUMN, TABLE, KEY_COLUMN
         ))?;
-        let mut rows = stmt.query(&[key])?;
+        let mut rows = stmt.query([key])?;
         if let Some(row) = rows.next()? {
             let value: String = row.get(0)?;
             Ok(Some(value))
@@ -249,7 +249,7 @@ impl KVStore {
     pub fn remove(&self, key: &str) -> rusqlite::Result<()> {
         self.connection.execute(
             &format!("DELETE FROM {} WHERE {} = ?", TABLE, KEY_COLUMN),
-            &[key],
+            [key],
         )?;
         Ok(())
     }

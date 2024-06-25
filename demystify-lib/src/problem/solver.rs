@@ -235,7 +235,7 @@ impl PuzzleSolver {
 
         percentage_reduce = percentage_reduce.clamp(0.4, 0.9999);
 
-        let trims = ((0.8 as f64).ln() / (percentage_reduce.ln())) as i64;
+        let trims = (0.8_f64.ln() / (percentage_reduce.ln())) as i64;
 
         let trims = trims.clamp(0, (conset.len() as i64) / 2);
 
