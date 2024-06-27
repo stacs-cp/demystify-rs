@@ -169,6 +169,7 @@ pub struct QuickTimer {
 }
 
 impl QuickTimer {
+    #[must_use]
     pub fn new(description: String) -> Self {
         QuickTimer {
             start: Instant::now(),

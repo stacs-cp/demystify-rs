@@ -34,6 +34,7 @@ impl Default for MusConfig {
 }
 
 impl MusConfig {
+    #[must_use]
     pub fn repeats(repeats: i64) -> Self {
         Self {
             base_size_mus: 2,
@@ -44,12 +45,10 @@ impl MusConfig {
     }
 }
 
-#[derive(Copy, Clone)]
-#[derive(Default)]
+#[derive(Copy, Clone, Default)]
 pub struct SolverConfig {
     pub only_assignments: bool,
 }
-
 
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
