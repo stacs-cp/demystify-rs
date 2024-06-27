@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    time::Instant,
+};
 
 use super::{parse::PuzzleParse, PuzVar};
 use anyhow::{bail, Context};
@@ -160,10 +163,34 @@ impl FindVarConnections {
     }
 }
 
+pub struct QuickTimer {
+    start: Instant,
+    description: String,
+}
+
+impl QuickTimer {
+    pub fn new(description: String) -> Self {
+        QuickTimer {
+            start: Instant::now(),
+            description,
+        }
+    }
+}
+
+impl Drop for QuickTimer {
+    fn drop(&mut self) {
+        let duration = self.start.elapsed();
+        println!("{:?} !QT! {} ", duration, self.description);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
+
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_parse_savile_row_name() {
@@ -282,6 +309,24 @@ mod tests {
                 println!("{:?}", puz.inv_order_encoding_map.get(l));
             }
         }
+    }
+
+    #[test]
+    fn cpu_timer_instantiates() {
+        let timer = QuickTimer::new("Test Timer".to_string());
+        assert_eq!(timer.description, "Test Timer");
+    }
+
+    #[test]
+    fn cpu_timer_drops_correctly() {
+        // This test checks if QuickTimer can be dropped without errors.
+        // Note: This does not check the printed output, as capturing stdout in tests is non-trivial.
+        {
+            let _timer = QuickTimer::new("Drop Test".to_string());
+            // Simulate work
+            thread::sleep(Duration::from_millis(10));
+        }
+        // If the test reaches this point without panicking or errors, it's assumed to be successful.
     }
 }
 
