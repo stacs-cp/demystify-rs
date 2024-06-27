@@ -44,6 +44,19 @@ impl MusConfig {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct SolverConfig {
+    pub only_assignments: bool,
+}
+
+impl Default for SolverConfig {
+    fn default() -> Self {
+        Self {
+            only_assignments: false,
+        }
+    }
+}
+
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
     satcore: ThreadLocal<SatCore>,
@@ -51,6 +64,8 @@ pub struct PuzzleSolver {
 
     knownlits: Vec<Lit>,
     tosolvelits: Option<BTreeSet<Lit>>,
+
+    solver_config: SolverConfig,
 }
 
 impl PuzzleSolver {
@@ -69,6 +84,30 @@ impl PuzzleSolver {
             puzzleparse,
             tosolvelits: None,
             knownlits: Vec::new(),
+            solver_config: SolverConfig::default(),
+        })
+    }
+
+    /// Creates a new `PuzzleSolver` instance from a config
+    ///
+    /// # Arguments
+    ///
+    /// * `puzzleparse` - The `PuzzleParse` instance containing puzzle information.
+    /// * `solverconfig` - A `SolverConfig` object
+    ///
+    /// # Returns
+    ///
+    /// A `PuzzleSolver` instance.
+    pub fn new_with_config(
+        puzzleparse: PuzzleParse,
+        solver_config: SolverConfig,
+    ) -> anyhow::Result<PuzzleSolver> {
+        Ok(PuzzleSolver {
+            satcore: ThreadLocal::new(),
+            puzzleparse,
+            tosolvelits: None,
+            knownlits: Vec::new(),
+            solver_config,
         })
     }
 
@@ -121,7 +160,13 @@ impl PuzzleSolver {
             let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
             litorig.extend_from_slice(&self.knownlits);
 
-            for &lit in &self.puzzleparse.varset_lits {
+            let lits = if self.solver_config.only_assignments {
+                &self.puzzleparse.varset_lits_neg
+            } else {
+                &self.puzzleparse.varset_lits
+            };
+
+            for &lit in lits {
                 if !self.knownlits.contains(&!lit) {
                     let mut lits = litorig.clone();
                     lits.push(lit);
@@ -224,6 +269,7 @@ impl PuzzleSolver {
 
     #[must_use]
     pub fn get_var_mus_slice(&self, lit: Lit, max_size: Option<i64>) -> Option<Vec<Lit>> {
+        // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
         assert!(self.puzzleparse.varset_lits.contains(&lit));
 
         let mut lits: Vec<Lit> = vec![];
@@ -347,7 +393,7 @@ impl PuzzleSolver {
 
 #[cfg(test)]
 mod tests {
-    use crate::problem::solver::{MusConfig, PuzzleSolver};
+    use crate::problem::solver::{MusConfig, PuzzleSolver, SolverConfig};
 
     use test_log::test;
 
@@ -372,6 +418,44 @@ mod tests {
         assert_eq!(puz.get_known_lits().len(), 2);
 
         assert_eq!(varlits.len(), 16);
+
+        // Do a basic check we get a MUS for every varlit
+        for &lit in &varlits {
+            let mus = puz.get_var_mus_quick(lit, None);
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
+            assert!(mus.is_some());
+            assert!(mus_limit.is_some());
+            println!("{lit:?} {mus:?}");
+        }
+    }
+
+    #[test]
+    fn test_parse_essence_config() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        );
+
+        let mut puz = PuzzleSolver::new_with_config(
+            result,
+            SolverConfig {
+                only_assignments: true,
+            },
+        )
+        .unwrap();
+
+        let varlits = puz.get_provable_varlits().clone();
+
+        assert_eq!(puz.get_known_lits(), &vec![]);
+
+        let l = *varlits.first().unwrap();
+
+        puz.add_known_lit(l);
+
+        assert!(puz.get_known_lits().contains(&l));
+        assert_eq!(puz.get_known_lits().len(), 2);
+
+        assert_eq!(varlits.len(), 4);
 
         // Do a basic check we get a MUS for every varlit
         for &lit in &varlits {

@@ -151,6 +151,8 @@ impl SatCore {
     #[must_use]
     fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
         let mut solver = self.solver.lock().unwrap();
+        // let _t = QuickTimer::new("solver".to_owned());
+        //solver.set_limit(Limit::Conflicts(1000));
         let solve = solver.solve_assumps(lits).unwrap();
         match solve {
             rustsat::solvers::SolverResult::Sat => None,

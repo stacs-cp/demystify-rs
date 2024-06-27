@@ -116,13 +116,11 @@ impl PuzzlePlanner {
 
         if let Some(min) = self.config.merge_small_threshold {
             if muses[0].1.len() as i64 <= min {
-                muses
-            } else {
-                vec![muses[0].clone()]
+                return muses;
             }
-        } else {
-            vec![muses[0].clone()]
         }
+
+        vec![muses[0].clone()]
     }
 
     /// Converts a MUS to a user-friendly MUS representation.

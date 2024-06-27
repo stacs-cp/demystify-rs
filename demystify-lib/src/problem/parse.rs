@@ -182,6 +182,8 @@ pub struct PuzzleParse {
     pub varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
     /// List of all literals in a VAR in the direct encoding
     pub varset_lits: BTreeSet<Lit>,
+    /// Lits of all literals in a VAR in the direct encoding, representing a variable becoming unassigned
+    pub varset_lits_neg: BTreeSet<Lit>,
     /// List of all literals which turn on CON
     pub conset_lits: BTreeSet<Lit>,
     /// List of all literals in an AUX
@@ -244,6 +246,7 @@ impl PuzzleParse {
             invconset: BTreeMap::new(),
             varlits_in_con: BTreeMap::new(),
             varset_lits: BTreeSet::new(),
+            varset_lits_neg: BTreeSet::new(),
             conset_lits: BTreeSet::new(),
             auxset_lits: BTreeSet::new(),
             reveal_map: BTreeMap::new(),
@@ -287,9 +290,13 @@ impl PuzzleParse {
 
         for (puzlit, &lit) in &self.litmap {
             let var = puzlit.var();
+
             let name = var.name();
             if self.eprime.vars.contains(name) {
                 self.varset_lits.insert(lit);
+                if !puzlit.sign() {
+                    self.varset_lits_neg.insert(lit);
+                }
             } else if self.eprime.auxvars.contains(name) {
                 self.auxset_lits.insert(lit);
             } else if self.eprime.cons.contains_key(name) {
