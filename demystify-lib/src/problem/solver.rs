@@ -45,17 +45,11 @@ impl MusConfig {
 }
 
 #[derive(Copy, Clone)]
+#[derive(Default)]
 pub struct SolverConfig {
     pub only_assignments: bool,
 }
 
-impl Default for SolverConfig {
-    fn default() -> Self {
-        Self {
-            only_assignments: false,
-        }
-    }
-}
 
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
