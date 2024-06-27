@@ -9,7 +9,7 @@ use tracing::info;
 
 use crate::{
     problem::{PuzVar, VarValPair},
-    satcore::SatCore,
+    satcore::{SatCore, SearchResult},
 };
 
 use super::{musdict::MusDict, parse::PuzzleParse, PuzLit};
@@ -163,7 +163,11 @@ impl PuzzleSolver {
                 if !self.knownlits.contains(&!lit) {
                     let mut lits = litorig.clone();
                     lits.push(lit);
-                    if !self.get_satcore().assumption_solve(&lits) {
+                    if !self
+                        .get_satcore()
+                        .assumption_solve(&lits)
+                        .expect("Solving the basic problem took too long, solver timed out")
+                    {
                         provable.insert(!lit);
                     }
                 }
@@ -181,7 +185,7 @@ impl PuzzleSolver {
     ///
     /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
-        assert!(self.get_provable_varlits().contains(&lit));
+        debug_assert!(self.get_provable_varlits().contains(&lit));
         self.add_known_lit_unchecked(lit);
     }
 
@@ -244,7 +248,11 @@ impl PuzzleSolver {
     ///
     /// An optional vector containing the MUS of variables, or `None` if no MUS is found.
     #[must_use]
-    pub fn get_var_mus_quick(&self, lit: Lit, max_size: Option<i64>) -> Option<Vec<Lit>> {
+    pub fn get_var_mus_quick(
+        &self,
+        lit: Lit,
+        max_size: Option<i64>,
+    ) -> SearchResult<Option<Vec<Lit>>> {
         assert!(self.puzzleparse.varset_lits.contains(&lit));
 
         let mut lits: Vec<Lit> = vec![];
@@ -252,16 +260,20 @@ impl PuzzleSolver {
         lits.push(!lit);
         let mus = self
             .get_satcore()
-            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
-        mus.map(|m| {
+            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1))?;
+        Ok(mus.map(|m| {
             m.into_iter()
                 .filter(|x| self.puzzleparse.conset_lits.contains(x))
                 .collect()
-        })
+        }))
     }
 
     #[must_use]
-    pub fn get_var_mus_slice(&self, lit: Lit, max_size: Option<i64>) -> Option<Vec<Lit>> {
+    pub fn get_var_mus_slice(
+        &self,
+        lit: Lit,
+        max_size: Option<i64>,
+    ) -> SearchResult<Option<Vec<Lit>>> {
         // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
         assert!(self.puzzleparse.varset_lits.contains(&lit));
 
@@ -297,12 +309,12 @@ impl PuzzleSolver {
         lits.push(!lit);
         let mus = self
             .get_satcore()
-            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1));
-        mus.map(|m| {
+            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1))?;
+        Ok(mus.map(|m| {
             m.into_iter()
                 .filter(|x| self.puzzleparse.conset_lits.contains(x))
                 .collect()
-        })
+        }))
     }
 
     /// Retrieves an explanation for each element of a list of literals. This will often be
@@ -320,6 +332,8 @@ impl PuzzleSolver {
         let muses: Vec<_> = lits
             .par_iter()
             .map(|&x| (x, self.get_var_mus_quick(x, None)))
+            .filter(|(_, y)| y.is_ok())
+            .map(|(x, y)| (x, y.unwrap()))
             .filter(|(_, mus)| mus.is_some())
             .map(|(lit, mus)| (lit, mus.unwrap()))
             .collect();
@@ -355,6 +369,8 @@ impl PuzzleSolver {
                 .flat_map(|x| std::iter::repeat(x).take(config.repeats as usize))
                 .par_bridge()
                 .map(|&x| (x, self.get_var_mus_slice(x, Some(mus_size))))
+                .filter(|(_, y)| y.is_ok())
+                .map(|(x, y)| (x, y.unwrap()))
                 .filter(|(_, mus)| mus.is_some())
                 .map(|(lit, mus)| (lit, mus.unwrap()))
                 .collect();
@@ -391,7 +407,7 @@ mod tests {
     use test_log::test;
 
     #[test]
-    fn test_parse_essence() {
+    fn test_parse_essence() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
@@ -414,16 +430,17 @@ mod tests {
 
         // Do a basic check we get a MUS for every varlit
         for &lit in &varlits {
-            let mus = puz.get_var_mus_quick(lit, None);
-            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
+            let mus = puz.get_var_mus_quick(lit, None)?;
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
             assert!(mus.is_some());
             assert!(mus_limit.is_some());
             println!("{lit:?} {mus:?}");
         }
+        Ok(())
     }
 
     #[test]
-    fn test_parse_essence_config() {
+    fn test_parse_essence_config() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
@@ -452,16 +469,17 @@ mod tests {
 
         // Do a basic check we get a MUS for every varlit
         for &lit in &varlits {
-            let mus = puz.get_var_mus_quick(lit, None);
-            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
+            let mus = puz.get_var_mus_quick(lit, None)?;
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
             assert!(mus.is_some());
             assert!(mus_limit.is_some());
             println!("{lit:?} {mus:?}");
         }
+        Ok(())
     }
 
     #[test]
-    fn test_known_lits() {
+    fn test_known_lits() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
@@ -485,8 +503,8 @@ mod tests {
 
         // Do a basic check we get a MUS for every varlit
         for &lit in &varlits {
-            let mus = puz.get_var_mus_quick(lit, None);
-            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
+            let mus = puz.get_var_mus_quick(lit, None)?;
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
             assert!(mus.is_some());
             assert!(mus_limit.is_some());
             println!("{lit:?} {mus:?}");
@@ -496,15 +514,16 @@ mod tests {
         // only for puzzles with only one solution)
         for &lit in &varlits {
             let lit = !lit;
-            let mus = puz.get_var_mus_quick(lit, None);
-            let mus_limit = puz.get_var_mus_quick(lit, Some(100));
+            let mus = puz.get_var_mus_quick(lit, None)?;
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
             assert!(mus.is_none());
             assert!(mus_limit.is_none());
         }
+        Ok(())
     }
 
     #[test]
-    fn test_many_lits() {
+    fn test_many_lits() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
@@ -537,5 +556,7 @@ mod tests {
 
         assert!(neg_muses.is_empty());
         assert!(neg_muses_quick.is_empty());
+
+        Ok(())
     }
 }

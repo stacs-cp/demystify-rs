@@ -1,10 +1,10 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use itertools::Itertools;
 use rustsat::instances::Cnf;
-use rustsat::solvers::{Solve, SolveIncremental};
+use rustsat::solvers::{Solve, SolveIncremental, SolverResult};
 use rustsat::types::{Assignment, Lit};
 use tracing::info;
 
@@ -20,6 +20,18 @@ pub struct SatCore {
     pub cnf: Arc<Cnf>,
     pub fixed: RefCell<HashSet<Lit>>,
 }
+
+const CONFLICT_LIMIT: i64 = 50000;
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum SearchError {
+    #[error("The SAT solver reached it's search limit")]
+    Limit,
+}
+
+pub type SearchResult<T> = std::result::Result<T, SearchError>;
 
 impl SatCore {
     /// Creates a new `SatCore` instance.
@@ -81,6 +93,17 @@ impl SatCore {
         }
     }
 
+    fn do_solve_assumps(
+        solver: &mut MutexGuard<rustsat_glucose::core::Glucose>,
+        lits: &[Lit],
+    ) -> SolverResult {
+        solver.set_limit(rustsat_glucose::Limit::Conflicts(CONFLICT_LIMIT));
+        let solve = solver.solve_assumps(lits).unwrap();
+        solver.set_limit(rustsat_glucose::Limit::Conflicts(-1));
+
+        solve
+    }
+
     /// Solves the CNF formula with the given assumptions.
     ///
     /// # Arguments
@@ -90,13 +113,13 @@ impl SatCore {
     /// # Returns
     ///
     /// `true` if the formula is satisfiable, `false` if it is unsatisfiable.
-    pub fn assumption_solve(&self, lits: &[Lit]) -> bool {
+    pub fn assumption_solve(&self, lits: &[Lit]) -> SearchResult<bool> {
         let mut solver = self.solver.lock().unwrap();
-        let solve = solver.solve_assumps(lits).unwrap();
+        let solve = SatCore::do_solve_assumps(&mut solver, lits);
         let result = match solve {
-            rustsat::solvers::SolverResult::Sat => true,
-            rustsat::solvers::SolverResult::Unsat => false,
-            rustsat::solvers::SolverResult::Interrupted => panic!(),
+            rustsat::solvers::SolverResult::Sat => Ok(true),
+            rustsat::solvers::SolverResult::Unsat => Ok(false),
+            rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
         info!(target: "solver", "Solution to {:?} is {:?}", lits, result);
         result
@@ -111,13 +134,13 @@ impl SatCore {
     /// # Returns
     ///
     /// The full solution if the formula is satisfiable, `None` if it is unsatisfiable.
-    pub fn assumption_solve_solution(&self, lits: &[Lit]) -> Option<Assignment> {
+    pub fn assumption_solve_solution(&self, lits: &[Lit]) -> SearchResult<Option<Assignment>> {
         let mut solver = self.solver.lock().unwrap();
-        let solve = solver.solve_assumps(lits).unwrap();
+        let solve = SatCore::do_solve_assumps(&mut solver, lits);
         let result = match solve {
-            rustsat::solvers::SolverResult::Sat => Some(solver.full_solution().unwrap()),
-            rustsat::solvers::SolverResult::Unsat => None,
-            rustsat::solvers::SolverResult::Interrupted => panic!(),
+            rustsat::solvers::SolverResult::Sat => Ok(Some(solver.full_solution().unwrap())),
+            rustsat::solvers::SolverResult::Unsat => Ok(None),
+            rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
         info!(target: "solver", "Solution to {:?} is {:?}", lits, result);
         result
@@ -133,7 +156,7 @@ impl SatCore {
     ///
     /// The unsatisfiable core if the formula is unsatisfiable, `None` if it is satisfiable.
     #[must_use]
-    pub fn assumption_solve_with_core(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
+    pub fn assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(&[]);
         self.raw_assumption_solve_with_core(lits)
     }
@@ -149,17 +172,15 @@ impl SatCore {
     ///
     /// The unsatisfiable core if the formula is unsatisfiable, `None` if it is satisfiable.
     #[must_use]
-    fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> Option<Vec<Lit>> {
+    fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
-        // let _t = QuickTimer::new("solver".to_owned());
-        //solver.set_limit(Limit::Conflicts(1000));
-        let solve = solver.solve_assumps(lits).unwrap();
+        let solve = SatCore::do_solve_assumps(&mut solver, lits);
         match solve {
-            rustsat::solvers::SolverResult::Sat => None,
-            rustsat::solvers::SolverResult::Unsat => {
-                Some(solver.core().unwrap().into_iter().map(|l| !l).collect())
-            }
-            rustsat::solvers::SolverResult::Interrupted => panic!(),
+            rustsat::solvers::SolverResult::Sat => Ok(None),
+            rustsat::solvers::SolverResult::Unsat => Ok(Some(
+                solver.core().unwrap().into_iter().map(|l| !l).collect(),
+            )),
+            rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         }
     }
 
@@ -179,30 +200,37 @@ impl SatCore {
         known: &[Lit],
         lits: &[Lit],
         max_size: Option<i64>,
-    ) -> Option<Vec<Lit>> {
+    ) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(known);
         let mut known_size = 0;
-        let mut core = self.raw_assumption_solve_with_core(lits)?;
+        let core = self.raw_assumption_solve_with_core(lits)?;
+        if core.is_none() {
+            return Ok(core);
+        }
+        let mut core = core.unwrap();
+
         // Need to make a copy for actually searching over
         for &lit in lits {
             let location = core.iter().position(|&x| x == lit);
             if let Some(location) = location {
                 let mut check_core = core.clone();
                 check_core.remove(location);
-                let candidate = self.raw_assumption_solve_with_core(&check_core);
+                let candidate = self.raw_assumption_solve_with_core(&check_core)?;
                 if let Some(found) = candidate {
                     core = found;
                 } else {
                     known_size += 1;
                     if let Some(max_size) = max_size {
                         if known_size > max_size {
-                            return None;
+                            return Ok(None);
                         }
                     }
                 }
             }
         }
-        Some(core.into_iter().filter(|x| lits.contains(x)).collect_vec())
+        Ok(Some(
+            core.into_iter().filter(|x| lits.contains(x)).collect_vec(),
+        ))
     }
 }
 
@@ -222,11 +250,11 @@ mod tests {
     #[test]
     fn test_assumption_solve_solution() -> anyhow::Result<()> {
         let solver = SatCore::new(create_cnf())?;
-        let result = solver.assumption_solve_solution(&[lit![1], lit![2]]);
+        let result = solver.assumption_solve_solution(&[lit![1], lit![2]])?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[lit![0]]);
+        let result = solver.assumption_solve_solution(&[lit![0]])?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[!lit![0]]);
+        let result = solver.assumption_solve_solution(&[!lit![0]])?;
         assert!(result.is_none());
         Ok(())
     }
@@ -234,11 +262,11 @@ mod tests {
     #[test]
     fn test_assumption_solve_core() -> anyhow::Result<()> {
         let solver = SatCore::new(create_cnf())?;
-        let result = solver.assumption_solve_solution(&[lit![1], lit![2]]);
+        let result = solver.assumption_solve_solution(&[lit![1], lit![2]])?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[lit![0]]);
+        let result = solver.assumption_solve_solution(&[lit![0]])?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[!lit![0]]);
+        let result = solver.assumption_solve_solution(&[!lit![0]])?;
         assert!(result.is_none());
         Ok(())
     }
@@ -246,11 +274,11 @@ mod tests {
     #[test]
     fn test_assumption_quick_mus() -> anyhow::Result<()> {
         let solver = SatCore::new(create_cnf())?;
-        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None);
+        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None)?;
         assert!(result.is_none());
-        let result = solver.quick_mus(&[], &[lit![0]], None);
+        let result = solver.quick_mus(&[], &[lit![0]], None)?;
         assert!(result.is_none());
-        let result = solver.quick_mus(&[], &[!lit![0]], None);
+        let result = solver.quick_mus(&[], &[!lit![0]], None)?;
         assert!(result.is_some());
 
         Ok(())
@@ -259,11 +287,11 @@ mod tests {
     #[test]
     fn test_assumption_quick_mus_known() -> anyhow::Result<()> {
         let solver = SatCore::new(create_cnf())?;
-        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None);
+        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None)?;
         assert!(result.is_none());
-        let result = solver.quick_mus(&[!lit![0]], &[lit![1], lit![2]], None);
+        let result = solver.quick_mus(&[!lit![0]], &[lit![1], lit![2]], None)?;
         assert_eq!(result, Some(vec![]));
-        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None);
+        let result = solver.quick_mus(&[], &[lit![1], lit![2]], None)?;
         assert!(result.is_none());
 
         Ok(())

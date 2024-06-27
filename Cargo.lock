@@ -595,6 +595,7 @@ dependencies = [
  "tempfile",
  "tera",
  "test-log",
+ "thiserror",
  "thread_local",
  "tracing",
  "tracing-appender",
@@ -1755,9 +1756,9 @@ dependencies = [
 
 [[package]]
 name = "rustsat"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63846230f2af916ea7f3e08b41767ac7f7b14fd0c93dbb4a7108193f6ba302c5"
+checksum = "6faaa583540c4c2f93a575a62a596a1d3fa010b5b78c6140d7867fcc2421bf93"
 dependencies = [
  "anyhow",
  "cpu-time",
@@ -1769,9 +1770,9 @@ dependencies = [
 
 [[package]]
 name = "rustsat-glucose"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2a524f4fbf730f07506427ae24497e00590caa6fd5a653f699cfb2c4b9f07c0"
+checksum = "9af9ec64396dc57f5f4f48e25d6fe608b6d5400fa5b24ca97dbacc2f7c1134e8"
 dependencies = [
  "anyhow",
  "cc",
