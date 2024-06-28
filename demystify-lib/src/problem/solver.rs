@@ -160,7 +160,7 @@ impl PuzzleSolver {
             };
 
             for &lit in lits {
-                if !self.knownlits.contains(&!lit) {
+                if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
                     let mut lits = litorig.clone();
                     lits.push(lit);
                     if !self
@@ -185,6 +185,9 @@ impl PuzzleSolver {
     ///
     /// * `lit` - The literal to add.
     pub fn add_known_lit(&mut self, lit: Lit) {
+        if self.knownlits.contains(&lit) {
+            return;
+        }
         debug_assert!(self.get_provable_varlits().contains(&lit));
         self.add_known_lit_unchecked(lit);
     }
@@ -196,6 +199,41 @@ impl PuzzleSolver {
     ///
     /// * `lit` - The literal to add.
     pub fn add_known_lit_unchecked(&mut self, lit: Lit) {
+        if self.knownlits.contains(&lit) {
+            return;
+        }
+        self.add_known_lit_internal(lit);
+        // When we add 'x=i' literal, automatically add 'x != j'
+        // for all 'j != i'. This isn't required, but it speeds
+        // up solving, and cleans up the output.
+        let puzlit_set = self.lit_to_puzlit(&lit).clone();
+        for puzlit in puzlit_set {
+            if puzlit.sign() {
+                let var = puzlit.var();
+                let val = puzlit.val();
+                let domain = self
+                    .puzzleparse()
+                    .domainmap
+                    .get(&var)
+                    .expect("Fatal error getting var")
+                    .clone();
+                for d in domain {
+                    if d != val {
+                        let new_puzlit = PuzLit::new_neq(VarValPair {
+                            var: var.clone(),
+                            val: d,
+                        });
+                        let new_lit = self.puzlit_to_lit(&new_puzlit);
+                        if !self.knownlits.contains(&new_lit) {
+                            self.add_known_lit_internal(new_lit);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn add_known_lit_internal(&mut self, lit: Lit) {
         if let Some(tosolvelits) = self.tosolvelits.as_mut() {
             tosolvelits.remove(&lit);
         }
@@ -424,7 +462,7 @@ mod tests {
         puz.add_known_lit(l);
 
         assert!(puz.get_known_lits().contains(&l));
-        assert_eq!(puz.get_known_lits().len(), 2);
+        assert_eq!(puz.get_known_lits().len(), 5);
 
         assert_eq!(varlits.len(), 16);
 
@@ -463,7 +501,7 @@ mod tests {
         puz.add_known_lit(l);
 
         assert!(puz.get_known_lits().contains(&l));
-        assert_eq!(puz.get_known_lits().len(), 2);
+        assert_eq!(puz.get_known_lits().len(), 5);
 
         assert_eq!(varlits.len(), 4);
 
