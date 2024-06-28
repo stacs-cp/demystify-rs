@@ -8,6 +8,8 @@ use rustsat::solvers::{Solve, SolveIncremental, SolverResult};
 use rustsat::types::{Assignment, Lit};
 use tracing::info;
 
+use std::sync::atomic::Ordering::Relaxed;
+
 pub type Solver = rustsat_glucose::core::Glucose;
 
 /// Represents a SAT solver core.
@@ -21,7 +23,11 @@ pub struct SatCore {
     pub fixed: RefCell<HashSet<Lit>>,
 }
 
-const CONFLICT_LIMIT: i64 = 50000;
+// Solvers can sometimes time out, so we add a conflict limit.
+// We also set a 'counter', which checks if the solver is frequently hitting it's limit, if so
+// we increase the limit
+const CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
+const CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
 use thiserror::Error;
 
@@ -97,9 +103,34 @@ impl SatCore {
         solver: &mut MutexGuard<rustsat_glucose::core::Glucose>,
         lits: &[Lit],
     ) -> SolverResult {
-        solver.set_limit(rustsat_glucose::Limit::Conflicts(CONFLICT_LIMIT));
+        solver.set_limit(rustsat_glucose::Limit::Conflicts(
+            CONFLICT_LIMIT.load(Relaxed),
+        ));
         let solve = solver.solve_assumps(lits).unwrap();
         solver.set_limit(rustsat_glucose::Limit::Conflicts(-1));
+
+        if matches!(solve, SolverResult::Interrupted) {
+            eprintln!("SAT solver limit tripped");
+            // This code may well have some race conditions, but
+            // if we are in this situation, I don't mind if we
+            // end up increasing the limit even more than intended,
+            // as long as it is increased, and the counter reset.
+            let count = CONFLICT_COUNT.fetch_add(1, Relaxed);
+            if count > 1000 {
+                let limit = CONFLICT_LIMIT.load(Relaxed);
+                eprintln!("Warning: The puzzle is hard to solve, increasing limits in SAT solver from {} to {}", limit, limit * 10);
+                CONFLICT_LIMIT.store(CONFLICT_LIMIT.load(Relaxed) * 10, Relaxed);
+                CONFLICT_COUNT.store(0, Relaxed);
+            } else {
+                let _ = CONFLICT_COUNT.fetch_update(Relaxed, Relaxed, |count| {
+                    if count > 0 {
+                        Some(count - 1)
+                    } else {
+                        Some(0)
+                    }
+                });
+            }
+        }
 
         solve
     }
