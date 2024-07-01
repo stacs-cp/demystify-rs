@@ -1,4 +1,6 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::atomic::AtomicI64};
+
+use std::sync::atomic::Ordering::Relaxed;
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -399,14 +401,25 @@ impl PuzzleSolver {
     ) -> MusDict {
         let mut md = MusDict::new();
         let mut mus_size = config.base_size_mus;
+        let best_mus_size = AtomicI64::new(config.base_size_mus);
         info!(target: "solver", "scanning for {} muses", lits.len());
         loop {
             info!(target: "solver", "scanning for muses size {}", mus_size);
+            best_mus_size.store(mus_size, Relaxed);
             let muses: Vec<_> = lits
                 .iter()
                 .flat_map(|x| std::iter::repeat(x).take(config.repeats as usize))
                 .par_bridge()
-                .map(|&x| (x, self.get_var_mus_slice(x, Some(mus_size))))
+                .map(|&x| {
+                    let mus_test_size = best_mus_size.load(Relaxed);
+                    let ret = self.get_var_mus_slice(x, Some(mus_test_size));
+                    if let Ok(x) = &ret {
+                        if let Some(y) = x {
+                            best_mus_size.fetch_min(y.len() as i64, Relaxed);
+                        }
+                    }
+                    (x, ret)
+                })
                 .filter(|(_, y)| y.is_ok())
                 .map(|(x, y)| (x, y.unwrap()))
                 .filter(|(_, mus)| mus.is_some())

@@ -103,6 +103,7 @@ impl SatCore {
         solver: &mut MutexGuard<rustsat_glucose::core::Glucose>,
         lits: &[Lit],
     ) -> SolverResult {
+        //let _timer = QuickTimer::new("sat".to_owned());
         solver.set_limit(rustsat_glucose::Limit::Conflicts(
             CONFLICT_LIMIT.load(Relaxed),
         ));
@@ -110,7 +111,7 @@ impl SatCore {
         solver.set_limit(rustsat_glucose::Limit::Conflicts(-1));
 
         if matches!(solve, SolverResult::Interrupted) {
-            eprintln!("SAT solver limit tripped");
+            //eprintln!("SAT solver limit tripped");
             // This code may well have some race conditions, but
             // if we are in this situation, I don't mind if we
             // end up increasing the limit even more than intended,

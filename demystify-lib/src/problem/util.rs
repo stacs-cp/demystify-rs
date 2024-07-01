@@ -170,11 +170,15 @@ pub struct QuickTimer {
 
 impl QuickTimer {
     #[must_use]
-    pub fn new(description: String) -> Self {
+    pub fn new(description: &str) -> Self {
         QuickTimer {
             start: Instant::now(),
-            description,
+            description: description.to_owned(),
         }
+    }
+
+    pub fn add_info(&mut self, info: &str) {
+        self.description += info;
     }
 }
 
@@ -314,7 +318,7 @@ mod tests {
 
     #[test]
     fn cpu_timer_instantiates() {
-        let timer = QuickTimer::new("Test Timer".to_string());
+        let timer = QuickTimer::new("Test Timer");
         assert_eq!(timer.description, "Test Timer");
     }
 
@@ -323,7 +327,7 @@ mod tests {
         // This test checks if QuickTimer can be dropped without errors.
         // Note: This does not check the printed output, as capturing stdout in tests is non-trivial.
         {
-            let _timer = QuickTimer::new("Drop Test".to_string());
+            let _timer = QuickTimer::new("Drop Test");
             // Simulate work
             thread::sleep(Duration::from_millis(10));
         }

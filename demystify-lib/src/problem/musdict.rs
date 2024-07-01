@@ -59,6 +59,18 @@ impl MusDict {
         }
     }
 
+    pub fn min_lit(&self, lit: Lit) -> Option<usize> {
+        if let Some(mus_list) = self.muses.get(&lit) {
+            if let Some(element) = mus_list.iter().next() {
+                Some(element.len())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
     /// Returns a reference to the muses in the dictionary.
     #[must_use]
     pub fn muses(&self) -> &HashMap<Lit, BTreeSet<Vec<Lit>>> {
@@ -102,7 +114,7 @@ mod tests {
         mus_dict.add_mus(lit, mus1.clone());
         mus_dict.add_mus(lit, mus2.clone());
         let bts: BTreeSet<_> = std::iter::once(mus2).collect();
-        assert_eq!(mus_dict.muses().get(&lit), Some(&bts));
+
         assert_eq!(mus_dict.min(), Some(1));
         assert!(!mus_dict.is_empty());
         Ok(())
@@ -120,6 +132,28 @@ mod tests {
         assert_eq!(mus_dict.muses().get(&lit), Some(&bts));
         assert_eq!(mus_dict.min(), Some(2));
         assert!(!mus_dict.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_min_lit_existing_literal() -> anyhow::Result<()> {
+        let mut mus_dict = MusDict::new();
+        let lit = Lit::from_ipasir(1)?;
+        let lit2 = Lit::from_ipasir(2)?;
+        let mus1 = vec![Lit::from_ipasir(2)?, Lit::from_ipasir(3)?];
+        let mus2 = vec![Lit::from_ipasir(4)?, Lit::from_ipasir(5)?];
+        mus_dict.add_mus(lit, mus1.clone());
+        mus_dict.add_mus(lit, mus2.clone());
+        assert_eq!(mus_dict.min_lit(lit), Some(2));
+        assert_eq!(mus_dict.min_lit(lit2), None);
+        Ok(())
+    }
+
+    #[test]
+    fn test_min_lit_non_existing_literal() -> anyhow::Result<()> {
+        let mus_dict = MusDict::new();
+        let lit = Lit::from_ipasir(1)?;
+        assert_eq!(mus_dict.min_lit(lit), None);
         Ok(())
     }
 

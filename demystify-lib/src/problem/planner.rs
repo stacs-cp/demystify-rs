@@ -80,6 +80,7 @@ impl PuzzlePlanner {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
     pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+        //let mut t = QuickTimer::new("smallest_muses");
         let muses = self.all_muses();
 
         let min = muses.min();
@@ -99,6 +100,8 @@ impl PuzzlePlanner {
                 }
             }
         }
+
+        //t.add_info(&format!("minmus: {:?}", muses.min()));
 
         vec
     }
