@@ -3,9 +3,17 @@
   <head>
     <meta charset="utf-8"/>
     <title>Demystify</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <script src="htmx.js"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.11/dist/ext/response-targets.js"></script>
+    <link href="ext/bootstrap.min.css" rel="stylesheet">
+    <script src="ext/bootstrap.bundle.min.js"></script>
+    <script src="ext/htmx.js"></script>
+    <script src="ext/response-targets.js"></script>
+    <link href="base/base.css" rel="stylesheet">
+    <script src="base/base.js"></script>
+    <script>
+      window.addEventListener('load', function() {
+        htmx.onLoad(x => {doJavascript()});
+      });
+    </script>
   </head>
   <body hx-ext="response-targets">
     <h1>Hello, World!</h1>
@@ -13,8 +21,8 @@
     <script>
     </script>
 
-    
-    
+
+
     <div class="container-fluid" id="mainSpace">
       <div class="row">
         <div class="col-md-8 bg-light shadow p-3">
@@ -29,7 +37,7 @@
     <button type="button" id="Refresh" class="btn btn-primary">Refresh</button>
 
 
-    <button type="button" hx-get="/bestNextStep" hx-target="mainSpace" id="BestNextStep" class="btn btn-primary">Best Next Step</button>
+    <button type="button" hx-get="/bestNextStep" hx-target="#mainSpace" id="BestNextStep" class="btn btn-primary">Best Next Step</button>
 
     <div class="container">
       <h4>Upload eprime/essence + param</h4>
