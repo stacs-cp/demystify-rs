@@ -113,7 +113,8 @@ impl PuzzleDraw {
         let doc = svg::Document::new()
             .set("viewBox", (0, 0, 500, 500))
             .set("width", 500)
-            .set("height", 500);
+            .set("height", 500)
+            .set("class", "puzzle");
         doc.add(out)
     }
 
@@ -174,8 +175,8 @@ impl PuzzleDraw {
                                     "transform",
                                     format!(
                                         "translate({}, {})",
-                                        0.1 + b as f64 * little_step,
-                                        (a as f64 + 1.2) * little_step
+                                        0.05 + (b as f64 * little_step),
+                                        0.05 + (a as f64 + 1.0) * little_step
                                     ),
                                 );
 
@@ -183,13 +184,15 @@ impl PuzzleDraw {
                                 rect.assign("width", little_step);
                                 rect.assign("height", little_step);
                                 rect.assign("y", -little_step);
-                                rect.assign("fill", "none");
-                                rect.assign("stroke-width", "0.05");
-                                rect.assign("stroke", "blue");
+                                rect.assign("class", "litbox");
                                 group.append(rect);
 
                                 let mut node = svg::node::element::Text::new(s);
                                 node.assign("font-size", little_step);
+                                node.assign("x", little_step / 2.0);
+                                node.assign("y", -little_step / 3.0);
+                                node.assign("dominant-baseline", "middle");
+                                node.assign("text-anchor", "middle");
 
                                 group.append(node);
 
@@ -336,13 +339,12 @@ impl PuzzleDraw {
     }
 
     fn make_cells(&self, puzzle: &Puzzle) -> Vec<Vec<element::Group>> {
-        let wstep = 1.0 / (puzzle.width as f64);
-        let hstep = 1.0 / (puzzle.height as f64);
+        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
 
         let mut out = Vec::new();
-        for i in 0..puzzle.width {
+        for i in 0..puzzle.height {
             out.push(vec![]);
-            for j in 0..puzzle.height {
+            for j in 0..puzzle.width {
                 let i_f = i as f64;
                 let j_f = j as f64;
 
@@ -352,9 +354,9 @@ impl PuzzleDraw {
                     "transform",
                     format!(
                         "translate({} {}) scale({})",
-                        wstep * (i_f + 0.05),
-                        hstep * (j_f + 0.05),
-                        wstep * 0.9
+                        step * (j_f + 0.05),
+                        step * (i_f + 0.05),
+                        step * 0.9
                     ),
                 );
 
