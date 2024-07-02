@@ -23,6 +23,16 @@ pub async fn dump_full_solve(
     Ok(Json(serde_json::value::to_value(solve).unwrap()))
 }
 
+pub async fn best_next_step(session: Session<SessionNullPool>) -> Result<String, util::AppError> {
+    let solver = get_solver_global(&session)?;
+
+    let mut solver = solver.lock().unwrap();
+
+    let solve = solver.quick_solve_html_step();
+
+    Ok(solve)
+}
+
 pub async fn upload_files(
     session: Session<SessionNullPool>,
     mut multipart: Multipart,

@@ -23,28 +23,52 @@ async fn main() {
 
     let cors = CorsLayer::new().allow_origin(Any);
 
+    macro_rules! serve_static_file {
+        ($path:expr) => {
+            get(move |_: Request<Body>| async {
+                let file_content: &'static str =
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), $path));
+                Ok::<_, Infallible>(Response::new(Body::from(file_content)))
+            })
+        };
+    }
+
     // build our application with some routes
     let app = Router::new()
         .route("/greet", get(greet))
         .route("/greetX", get(greet_x))
         .route("/uploadPuzzle", post(wrap::upload_files))
         .route("/quickFullSolve", get(wrap::dump_full_solve))
+        .route("/bestNextStep", get(wrap::best_next_step))
         .route(
-            "/htmx.js",
-            get(|_: Request<Body>| async {
-                let htmx: &'static str =
-                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/html/website/htmx.js"));
-                Ok::<_, Infallible>(Response::new(Body::from(htmx)))
+            "/ext/htmx.js",
+            serve_static_file!("/html/website/ext/htmx.js"),
+        )
+        .route(
+            "/ext/bootstrap.min.css",
+            serve_static_file!("/html/website/ext/bootstrap.min.css"),
+        )
+        .route(
+            "/ext/bootstrap.bundle.min.js",
+            serve_static_file!("/html/website/ext/bootstrap.bundle.min.js"),
+        )
+        .route(
+            "/ext/response-targets.js",
+            serve_static_file!("/html/website/ext/response-targets.js"),
+        )
+        .route("/", serve_static_file!("/html/website/index.html"))
+        .route(
+            "/base/base.css",
+            get(move |_: Request<Body>| async {
+                Ok::<_, Infallible>(Response::new(Body::from(demystify_lib::web::base_css())))
             }),
         )
         .route(
-            "/",
-            get(|_: Request<Body>| async {
-                let index: &'static str = include_str!(concat!(
-                    env!("CARGO_MANIFEST_DIR"),
-                    "/html/website/index.html"
-                ));
-                Ok::<_, Infallible>(Response::new(Body::from(index)))
+            "/base/base.js",
+            get(move |_: Request<Body>| async {
+                Ok::<_, Infallible>(Response::new(Body::from(
+                    demystify_lib::web::base_javascript(),
+                )))
             }),
         )
         .layer(cors)
