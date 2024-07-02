@@ -436,6 +436,11 @@ impl PuzzleSolver {
                     return md;
                 }
             }
+            // Make sure we stop, if something stupid has happened
+            if mus_size > (i32::MAX as i64) {
+                info!(target: "solver", "no muses found!");
+                return md;
+            }
             mus_size = mus_size * config.mus_mult_step + config.mus_add_step;
         }
     }
