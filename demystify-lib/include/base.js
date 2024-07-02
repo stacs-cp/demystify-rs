@@ -5,8 +5,8 @@ function applyHighlight(element) {
         if (className.startsWith('highlight_')) {
             const highlightedElements = document.getElementsByClassName(className);
             for (let j = 0; j < highlightedElements.length; j++) {
-                highlightedElements[j].style["background-color"] = 'yellow';
-                highlightedElements[j].style.fill = 'yellow';
+                highlightedElements[j].style["background-color"] = '#F88889';
+                highlightedElements[j].style.fill = '#D20103';
             }
         }
     }

@@ -2,26 +2,34 @@
 .litpos {
     color: blue;
     fill: blue;
-    font-weight: bold;
 }
 .litneg {
     color: red;
     fill: red;
-    text-decoration: line-through;
 }
+
+.litinmus .litbox {
+    stroke: yellow;
+}
+
 .litknown {
     color: purple;
     fill: purple;
     font-weight: bold;
-    text-decoration: underline;
 }
 .litinmus {
-    background-color: yellow;
+    background-color: rgb(255, 115, 0);
+    font-weight: bold;
 }
 
-.constraintlist .highlight_con0 {
-    background-color: #d0ffff;
-    fill:  #d0ffff;
+.puzzle {
+    font-family: Garamond, serif;
+}
+
+.litbox {
+    stroke-width: 0.02;
+    stroke: blue;
+    fill: none;
 }
 
 .highlight_con0 rect {
@@ -31,16 +39,21 @@
 
 .highlight_con1 rect {
     background-color: #ffd0ff;
+    fill:  #ffd0ff;
+
 }
 
 .highlight_con2 rect {
     background-color: #ffffd0;
+    fill: #ffffd0;
 }
 
 .highlight_con3 rect {
     background-color: #d0d0ff;
+    fill: #d0d0ff;
 }
 
 .highlight_con4 rect {
     background-color: #d0ffd0;
+    fill: #d0ffd0;
 }
