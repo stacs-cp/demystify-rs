@@ -138,7 +138,7 @@ impl Problem {
         let all_lits = solver.puzzleparse().all_var_varvals();
 
         for l in all_lits {
-            if !(tosolve.contains(&l) || known.contains(&PuzLit::new_neq(l.clone()))) {
+            if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
                 continue;
             }
 
