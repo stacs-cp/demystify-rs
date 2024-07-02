@@ -253,57 +253,61 @@ impl PuzzlePlanner {
     pub fn quick_solve_html(&mut self) -> String {
         let mut html = String::new();
         while !self.psolve.get_provable_varlits().is_empty() {
-            let base_muses = self.smallest_muses_with_config();
-
-            // Map the 'muses' to a user-friendly representation
-            let muses = base_muses
-                .iter()
-                .map(|mus| self.mus_to_user_mus(mus))
-                .collect_vec();
-
-            let varlits = self.psolve.get_provable_varlits().clone();
-
-            let tosolve_varvals: BTreeSet<_> = varlits
-                .iter()
-                .flat_map(|x| self.psolve.lit_to_puzlit(x))
-                .map(super::PuzLit::varval)
-                .collect();
-
-            let known_puzlits: BTreeSet<PuzLit> = self
-                .get_all_known_lits()
-                .iter()
-                .flat_map(|x| self.psolve.lit_to_puzlit(x))
-                .cloned()
-                .collect();
-
-            let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
-
-            let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
-
-            let nice_deduced: String = deduced.iter().format(", ").to_string();
-
-            let problem = Problem::new_from_puzzle_and_mus(
-                &self.psolve,
-                &tosolve_varvals,
-                &known_puzlits,
-                &deduced,
-                &constraints,
-                &format!(
-                    "{:?} because of {} constraints",
-                    nice_deduced,
-                    &constraints.len()
-                ),
-            )
-            .expect("Cannot make puzzle json");
-
-            for (m, _) in &base_muses {
-                self.mark_lit_as_deduced(m);
-            }
-
-            html += &create_html(&problem);
+            html += &self.quick_solve_html_step();
             html += "<br/>";
         }
         html
+    }
+
+    pub fn quick_solve_html_step(&mut self) -> String {
+        let base_muses = self.smallest_muses_with_config();
+
+        // Map the 'muses' to a user-friendly representation
+        let muses = base_muses
+            .iter()
+            .map(|mus| self.mus_to_user_mus(mus))
+            .collect_vec();
+
+        let varlits = self.psolve.get_provable_varlits().clone();
+
+        let tosolve_varvals: BTreeSet<_> = varlits
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .map(super::PuzLit::varval)
+            .collect();
+
+        let known_puzlits: BTreeSet<PuzLit> = self
+            .get_all_known_lits()
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .cloned()
+            .collect();
+
+        let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
+
+        let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
+
+        let nice_deduced: String = deduced.iter().format(", ").to_string();
+
+        let problem = Problem::new_from_puzzle_and_mus(
+            &self.psolve,
+            &tosolve_varvals,
+            &known_puzlits,
+            &deduced,
+            &constraints,
+            &format!(
+                "{:?} because of {} constraints",
+                nice_deduced,
+                &constraints.len()
+            ),
+        )
+        .expect("Cannot make puzzle json");
+
+        for (m, _) in &base_muses {
+            self.mark_lit_as_deduced(m);
+        }
+
+        create_html(&problem)
     }
 
     /// Returns a reference to the puzzle being solved.
