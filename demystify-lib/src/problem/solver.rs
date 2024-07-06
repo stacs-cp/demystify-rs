@@ -142,6 +142,27 @@ impl PuzzleSolver {
         self.puzzleparse.invlitmap.get(lit).unwrap()
     }
 
+    /// Determines if the current puzzle state is solvable under the current assumptions. This only checks if the puzzle has at least one solution, not that the solution is unique.
+    ///
+    /// Note that for multi-step puzzles (like minesweeper), this only
+    /// checks if the current state of the puzzle has at least one solution.
+    ///
+    /// This method combines the literals from the puzzle's constraint set (`conset_lits`)
+    /// and the known literals (`knownlits`) to form a set of assumptions. It then attempts
+    /// to solve the puzzle using these assumptions. If the solver finds a solution, it
+    /// indicates that the puzzle is currently solvable under these assumptions.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the puzzle is solvable under the current assumptions, otherwise `false`.
+    pub fn is_currently_solvable(&mut self) -> bool {
+        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
+        litorig.extend_from_slice(&self.knownlits);
+        self.get_satcore()
+            .assumption_solve(&litorig)
+            .expect("Solving the basic problem took too long, solver timed out (type 2)")
+    }
+
     /// Retrieves variable literals which can be proved.
     ///
     /// # Returns
@@ -155,13 +176,9 @@ impl PuzzleSolver {
             let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
             litorig.extend_from_slice(&self.knownlits);
 
-            let lits = if self.solver_config.only_assignments {
-                &self.puzzleparse.varset_lits_neg
-            } else {
-                &self.puzzleparse.varset_lits
-            };
+            let lits = self.get_literals_to_try_solving();
 
-            for &lit in lits {
+            for lit in lits {
                 if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
                     let mut lits = litorig.clone();
                     lits.push(lit);
@@ -181,6 +198,19 @@ impl PuzzleSolver {
         self.tosolvelits.as_ref().unwrap()
     }
 
+    /// Returns the set of literals which we should still try solving (may be true, or false)
+    fn get_literals_to_try_solving(&mut self) -> BTreeSet<Lit> {
+        let lits = if self.solver_config.only_assignments {
+            &self.puzzleparse.varset_lits_neg
+        } else {
+            &self.puzzleparse.varset_lits
+        };
+        lits.iter()
+            .cloned()
+            .filter(|&lit| !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)))
+            .collect()
+    }
+
     /// Adds a literal which is known to be true.
     ///
     /// # Arguments
@@ -190,7 +220,10 @@ impl PuzzleSolver {
         if self.knownlits.contains(&lit) {
             return;
         }
-        debug_assert!(self.get_provable_varlits().contains(&lit));
+        // The puzzle may have become unsolvable (in which case there are no
+        // solvable lits), but we didn't realise yet (as we don't check that
+        // at every addition of a known lit).
+        debug_assert!(self.get_provable_varlits().contains(&lit) || !self.is_currently_solvable());
         self.add_known_lit_unchecked(lit);
     }
 

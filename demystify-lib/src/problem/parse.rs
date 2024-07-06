@@ -477,12 +477,32 @@ impl PuzzleParse {
 
         BTreeSet::from_iter(puzlits)
     }
+
+    pub fn filter_out_constraint(&mut self, con: &str) {
+        assert!(self.eprime.cons.contains_key(con));
+        let mut new_conset_lits = BTreeSet::new();
+        for l in self.conset_lits.iter() {
+            let puzvars = self.invlitmap.get(&l).unwrap();
+            if !puzvars.iter().all(|p| p.var().name() == con) {
+                new_conset_lits.insert(*l);
+            }
+        }
+        println!(
+            "Removing {}: {} -> {}",
+            con,
+            self.conset_lits.len(),
+            new_conset_lits.len()
+        );
+        self.conset_lits = new_conset_lits;
+    }
 }
 
 fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
     info!(target: "parser", "reading DIMACS {:?}", in_path);
 
     let mut vars: BTreeSet<String> = BTreeSet::new();
+    let mut puzzle: BTreeSet<String> = BTreeSet::new();
+
     let mut auxvars: BTreeSet<String> = BTreeSet::new();
 
     let mut cons: BTreeMap<String, String> = BTreeMap::new();
@@ -515,6 +535,16 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 all_names.insert(v.clone());
 
                 vars.insert(v);
+            } else if line.starts_with("$#PUZZLE") {
+                let v = parts[1].to_string();
+                info!(target: "parser", "Found PUZZLE: '{}'", v);
+
+                if all_names.contains(&v) {
+                    bail!(format!("{v} defined twice"));
+                }
+                all_names.insert(v.clone());
+
+                puzzle.insert(v);
             } else if line.starts_with("$#CON") {
                 info!(target: "parser", "{}", line);
                 let captures = conmatch.captures(&line).unwrap();

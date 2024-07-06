@@ -225,6 +225,22 @@ impl PuzzlePlanner {
         solvesteps
     }
 
+    pub fn check_solvability(&mut self) -> Option<usize> {
+        while !self.psolve.get_provable_varlits().is_empty() {
+            let lits = self.psolve.get_provable_varlits().clone();
+
+            for l in lits {
+                self.mark_lit_as_deduced(&l);
+            }
+        }
+
+        if self.psolve.is_currently_solvable() {
+            Some(self.psolve.get_known_lits().len())
+        } else {
+            None
+        }
+    }
+
     pub fn get_provable_varlits(&mut self) -> BTreeSet<Lit> {
         self.psolve.get_provable_varlits().clone()
     }
