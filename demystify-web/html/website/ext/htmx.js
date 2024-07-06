@@ -271,7 +271,13 @@ var htmx = (function() {
        * @type boolean
        * @default true
        */
-      allowNestedOobSwaps: true
+      allowNestedOobSwaps: true,
+      /**
+       * If to use caching of nodes (faster, but can get messed up by hx-trigger) (added by Chris Jefferson, hacky)
+       * @type boolean
+       * @default false
+       */
+       allowCaching: false
     },
     /** @type {typeof parseInterval} */
     parseInterval: null,
@@ -1504,8 +1510,14 @@ var htmx = (function() {
   function makeAjaxLoadTask(child) {
     return function() {
       removeClassFromElement(child, htmx.config.addedClass)
-      processNode(asElement(child))
-      processFocus(asParentNode(child))
+      if(htmx.config.allowCaching) {
+          processNode(asElement(child))
+          processFocus(asParentNode(child))
+        }
+      else {
+        processNode(document.body)
+        processFocus(asParentNode(document.body))
+    }
       triggerEvent(child, 'htmx:load')
     }
   }
@@ -2789,7 +2801,7 @@ var htmx = (function() {
       return
     }
     const nodeData = getInternalData(elt)
-    if (nodeData.initHash !== attributeHash(elt)) {
+    if (!htmx.config.allowCaching || (nodeData.initHash !== attributeHash(elt))) {
       // clean up any previously processed info
       deInitNode(elt)
 

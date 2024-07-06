@@ -1,15 +1,19 @@
 use anyhow::Context;
-use axum::{extract::Multipart, Json};
+use axum::{
+    extract::{Multipart, Query, Request},
+    Json,
+};
 use axum_session::{Session, SessionNullPool};
 use serde_json::Value;
 
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{collections::HashMap, fs::File, io::Write, path::PathBuf};
 
 use anyhow::anyhow;
 
 use crate::util::{self, get_solver_global, set_solver_global};
 
 use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+use std::str;
 
 pub async fn dump_full_solve(
     session: Session<SessionNullPool>,
@@ -31,6 +35,21 @@ pub async fn best_next_step(session: Session<SessionNullPool>) -> Result<String,
     let solve = solver.quick_solve_html_step();
 
     Ok(solve)
+}
+
+pub async fn click_literal(
+    headers: axum::http::header::HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+    session: Session<SessionNullPool>,
+) -> Result<String, util::AppError> {
+    let solver = get_solver_global(&session)?;
+
+    let mut solver = solver.lock().unwrap();
+
+    println!("Received headers:\n{:?}", headers);
+    println!("Body: {:?}", params);
+
+    Err(anyhow!("bug").into())
 }
 
 pub async fn upload_files(
