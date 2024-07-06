@@ -374,6 +374,20 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_solvability_little_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        assert_eq!(plan.check_solvability(), Some(0));
+    }
+
     // This test doesn't really do any deep tests,
     // just do a full end-to-end run
     #[test]
@@ -472,6 +486,20 @@ mod tests {
             // If this next line starts failing, it can be commented out.
             assert!(cons.len() <= 2);
         }
+    }
+
+    #[test]
+    fn test_solvability_minesweeper_wall_essence() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperWall.param",
+        );
+
+        let puz = PuzzleSolver::new(result).unwrap();
+
+        let mut plan = PuzzlePlanner::new(puz);
+
+        assert_eq!(plan.check_solvability(), Some(20));
     }
 
     // This test doesn't really do any deep tests,
