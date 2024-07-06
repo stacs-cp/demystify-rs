@@ -196,13 +196,18 @@ impl PuzzleDraw {
 
                                 group.append(node);
 
-                                group.assign(
-                                    "id",
-                                    format!("D_{}_{}_{}", j, i, cell[a * sqrt_length + b].val),
-                                );
-                                if let Some(classes) = &state.classes {
-                                    group.assign("class", classes.iter().join(" "));
+                                let id = format!("D_{}_{}_{}", j, i, cell[a * sqrt_length + b].val);
+                                group.assign("id", id.clone());
+                                group.assign("name", id);
+                                group.assign("hx-post", "/clickLiteral");
+                                group.assign("hx-target", "#mainSpace");
+                                group.assign("class", "literal");
+                                let mut classes = vec!["literal".to_owned()];
+
+                                if let Some(extra_classes) = &state.classes {
+                                    classes.extend(extra_classes.iter().cloned());
                                 }
+                                group.assign("class", classes.iter().join(" "));
 
                                 cells[i][j].append(group);
                             }
