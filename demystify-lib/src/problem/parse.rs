@@ -34,7 +34,7 @@ use crate::problem::{PuzLit, PuzVar};
 use super::util::FindVarConnections;
 use super::VarValPair;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EPrimeAnnotations {
     /// The set of variables in the Essence' file.
     pub vars: BTreeSet<String>,
@@ -160,7 +160,8 @@ impl EPrimeAnnotations {
 
 /// Represents the result of parsing a DIMACS file.
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+
 pub struct PuzzleParse {
     /// The annotations from the Essence' file
     pub eprime: EPrimeAnnotations,
@@ -853,6 +854,8 @@ mod tests {
         let puz =
             crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
 
+        assert!(!puz.has_facts());
+
         assert!(!puz.eprime.has_param("q"));
 
         assert!(puz.eprime.has_param("n"));
@@ -867,6 +870,52 @@ mod tests {
 
         assert_eq!(initial[0], vec![2, 2, 2, 0, 0, 2]);
         assert_eq!(initial[5], vec![2, 0, 2, 2, 1, 1]);
+    }
+
+    #[test]
+    fn test_parse_essence_minesweeper() {
+        let eprime_path = "./tst/minesweeper.eprime";
+        let eprimeparam_path = "./tst/minesweeperPrinted.param";
+
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        assert!(puz.has_facts());
+
+        assert!(!puz.eprime.has_param("q"));
+
+        assert!(puz.eprime.has_param("width"));
+
+        assert_eq!(puz.eprime.param_i64("width").unwrap(), 5);
+    }
+
+    #[test]
+    fn test_filter_constraint_binairo() {
+        let eprime_path = "./tst/binairo.eprime";
+        let eprimeparam_path = "./tst/binairo-1.param";
+
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        let mut filter1_puz = puz.clone();
+
+        filter1_puz.filter_out_constraint("rowwhite");
+
+        assert_eq!(puz.conset_lits.len() - filter1_puz.conset_lits.len(), 6);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_filter_constraint_fail_binairo() {
+        let eprime_path = "./tst/binairo.eprime";
+        let eprimeparam_path = "./tst/binairo-1.param";
+
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
+
+        let mut filter_fail_puz = puz.clone();
+
+        filter_fail_puz.filter_out_constraint("row");
     }
 
     #[test]
@@ -900,6 +949,11 @@ mod tests {
         assert_eq!(puz.varset_lits.len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
         assert_eq!(puz.auxset_lits.len(), 0);
         let cons = puz.constraints();
+
+        assert!(puz.conset_lits.iter().all(|l| puz.lit_is_con(l)));
+        assert!(puz.varset_lits.iter().all(|l| !puz.lit_is_con(l)));
+        assert!(puz.conset_lits.iter().all(|l| !puz.lit_is_var(l)));
+        assert!(puz.varset_lits.iter().all(|l| puz.lit_is_var(l)));
 
         let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
 

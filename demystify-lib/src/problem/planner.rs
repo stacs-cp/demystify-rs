@@ -235,7 +235,7 @@ impl PuzzlePlanner {
         }
 
         if self.psolve.is_currently_solvable() {
-            Some(self.psolve.get_known_lits().len())
+            Some(self.psolve.get_literals_to_try_solving().len())
         } else {
             None
         }

@@ -199,7 +199,7 @@ impl PuzzleSolver {
     }
 
     /// Returns the set of literals which we should still try solving (may be true, or false)
-    fn get_literals_to_try_solving(&mut self) -> BTreeSet<Lit> {
+    pub fn get_literals_to_try_solving(&mut self) -> BTreeSet<Lit> {
         let lits = if self.solver_config.only_assignments {
             &self.puzzleparse.varset_lits_neg
         } else {
@@ -506,11 +506,17 @@ mod tests {
 
         let varlits = puz.get_provable_varlits().clone();
 
+        insta::assert_debug_snapshot!(varlits);
+        insta::assert_debug_snapshot!(puz.get_literals_to_try_solving());
+
         assert_eq!(puz.get_known_lits(), &vec![]);
 
         let l = *varlits.first().unwrap();
 
         puz.add_known_lit(l);
+
+        insta::assert_debug_snapshot!(puz.get_provable_varlits().clone());
+        insta::assert_debug_snapshot!(puz.get_literals_to_try_solving());
 
         assert!(puz.get_known_lits().contains(&l));
         assert_eq!(puz.get_known_lits().len(), 5);
