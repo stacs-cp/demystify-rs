@@ -483,7 +483,7 @@ impl PuzzleParse {
         assert!(self.eprime.cons.contains_key(con));
         let mut new_conset_lits = BTreeSet::new();
         for l in self.conset_lits.iter() {
-            let puzvars = self.invlitmap.get(&l).unwrap();
+            let puzvars = self.invlitmap.get(l).unwrap();
             if !puzvars.iter().all(|p| p.var().name() == con) {
                 new_conset_lits.insert(*l);
             }

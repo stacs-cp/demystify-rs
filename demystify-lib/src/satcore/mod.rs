@@ -187,7 +187,6 @@ impl SatCore {
     /// # Returns
     ///
     /// The unsatisfiable core if the formula is unsatisfiable, `None` if it is satisfiable.
-    #[must_use]
     pub fn assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(&[]);
         self.raw_assumption_solve_with_core(lits)
@@ -203,7 +202,6 @@ impl SatCore {
     /// # Returns
     ///
     /// The unsatisfiable core if the formula is unsatisfiable, `None` if it is satisfiable.
-    #[must_use]
     fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
@@ -226,7 +224,6 @@ impl SatCore {
     /// # Returns
     ///
     /// The minimal unsatisfiable subset (MUS) of literals, if one exists.
-    #[must_use]
     pub fn quick_mus(
         &self,
         known: &[Lit],

@@ -320,7 +320,6 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// An optional vector containing the MUS of variables, or `None` if no MUS is found.
-    #[must_use]
     pub fn get_var_mus_quick(
         &self,
         lit: Lit,
@@ -341,7 +340,6 @@ impl PuzzleSolver {
         }))
     }
 
-    #[must_use]
     pub fn get_var_mus_slice(
         &self,
         lit: Lit,

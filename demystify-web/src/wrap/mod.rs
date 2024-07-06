@@ -1,6 +1,6 @@
 use anyhow::Context;
 use axum::{
-    extract::{Multipart, Query, Request},
+    extract::{Multipart, Query},
     Json,
 };
 use axum_session::{Session, SessionNullPool};
@@ -13,7 +13,6 @@ use anyhow::anyhow;
 use crate::util::{self, get_solver_global, set_solver_global};
 
 use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
-use std::str;
 
 pub async fn dump_full_solve(
     session: Session<SessionNullPool>,
@@ -44,7 +43,7 @@ pub async fn click_literal(
 ) -> Result<String, util::AppError> {
     let solver = get_solver_global(&session)?;
 
-    let mut solver = solver.lock().unwrap();
+    let _solver = solver.lock().unwrap();
 
     println!("Received headers:\n{:?}", headers);
     println!("Body: {:?}", params);

@@ -61,11 +61,7 @@ impl MusDict {
 
     pub fn min_lit(&self, lit: Lit) -> Option<usize> {
         if let Some(mus_list) = self.muses.get(&lit) {
-            if let Some(element) = mus_list.iter().next() {
-                Some(element.len())
-            } else {
-                None
-            }
+            mus_list.iter().next().map(|element| element.len())
         } else {
             None
         }
@@ -113,7 +109,6 @@ mod tests {
         let mus2 = vec![Lit::from_ipasir(4)?];
         mus_dict.add_mus(lit, mus1.clone());
         mus_dict.add_mus(lit, mus2.clone());
-        let bts: BTreeSet<_> = std::iter::once(mus2).collect();
 
         assert_eq!(mus_dict.min(), Some(1));
         assert!(!mus_dict.is_empty());
