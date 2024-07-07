@@ -234,7 +234,7 @@ impl PuzzlePlanner {
         solvesteps
     }
 
-    pub fn check_solvability(&mut self) -> Option<usize> {
+    pub fn check_solvability(&mut self) -> Option<i64> {
         while !self.psolve.get_provable_varlits().is_empty() {
             let lits = self.psolve.get_provable_varlits().clone();
 
@@ -244,7 +244,13 @@ impl PuzzlePlanner {
         }
 
         if self.psolve.is_currently_solvable() {
-            Some(self.psolve.get_literals_to_try_solving().len())
+            Some(
+                self.psolve
+                    .get_literals_to_try_solving()
+                    .len()
+                    .try_into()
+                    .unwrap(),
+            )
         } else {
             None
         }
