@@ -1,12 +1,9 @@
 use anyhow::Context;
-use axum::{
-    extract::{Multipart, Query},
-    Json,
-};
+use axum::{extract::Multipart, Json};
 use axum_session::{Session, SessionNullPool};
 use serde_json::Value;
 
-use std::{collections::HashMap, fs::File, io::Write, path::PathBuf};
+use std::{fs::File, io::Write, path::PathBuf};
 
 use anyhow::anyhow;
 
@@ -38,17 +35,22 @@ pub async fn best_next_step(session: Session<SessionNullPool>) -> Result<String,
 
 pub async fn click_literal(
     headers: axum::http::header::HeaderMap,
-    Query(params): Query<HashMap<String, String>>,
     session: Session<SessionNullPool>,
 ) -> Result<String, util::AppError> {
     let solver = get_solver_global(&session)?;
 
-    let _solver = solver.lock().unwrap();
+    let mut solver = solver.lock().unwrap();
 
-    println!("Received headers:\n{:?}", headers);
-    println!("Body: {:?}", params);
+    let cell = headers
+        .get("hx-trigger")
+        .context("Missing header: 'hx-trigger'")?;
+    let cell = cell.to_str()?;
+    let cell: Result<Vec<_>, _> = cell.split("_").skip(1).map(|x| x.parse::<i64>()).collect();
+    let cell = cell?;
 
-    Err(anyhow!("bug").into())
+    let solve = solver.quick_solve_html_step_for_literal(dbg!(cell));
+
+    Ok(solve)
 }
 
 pub async fn upload_files(

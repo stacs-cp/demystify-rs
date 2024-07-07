@@ -74,6 +74,17 @@ impl PuzzlePlanner {
             .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config)
     }
 
+    /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle which satisfy a filter.
+    pub fn filtered_muses(
+        &mut self,
+        filter: Box<dyn Fn(&Lit, &mut PuzzlePlanner) -> bool>,
+    ) -> MusDict {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let varlits: BTreeSet<_> = varlits.into_iter().filter(|l| filter(l, self)).collect();
+        self.psolve
+            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config)
+    }
+
     /// Returns a vector of the smallest MUSes of the puzzle.
     ///
     /// # Returns
@@ -100,8 +111,6 @@ impl PuzzlePlanner {
                 }
             }
         }
-
-        //t.add_info(&format!("minmus: {:?}", muses.min()));
 
         vec
     }
@@ -277,7 +286,47 @@ impl PuzzlePlanner {
 
     pub fn quick_solve_html_step(&mut self) -> String {
         let base_muses = self.smallest_muses_with_config();
+        self.quick_display_html_step(base_muses)
+    }
 
+    pub fn quick_solve_html_step_for_literal(&mut self, lit_def: Vec<i64>) -> String {
+        let muses = self.filtered_muses(Box::new(move |lit, planner| {
+            let puzlit_list = planner.solver().lit_to_puzlit(lit);
+            for puzlit in puzlit_list {
+                let mut indices = puzlit.var().indices().clone();
+                indices.push(puzlit.val());
+                if dbg!(indices) == lit_def {
+                    return true;
+                }
+            }
+            false
+        }));
+
+        // TEMP CODE
+        let min = muses.min();
+
+        if min.is_none() {
+            return "No MUS".to_owned();
+        }
+
+        let min = min.unwrap();
+
+        let mut vec = vec![];
+
+        for (&lit, v) in muses.muses() {
+            if let Some(m) = v.iter().next() {
+                if m.len() == min {
+                    vec.push((lit, m.clone()));
+                }
+            }
+        }
+
+        //
+
+        self.quick_display_html_step(vec)
+    }
+
+    pub fn quick_display_html_step(&mut self, base_muses: Vec<(Lit, Vec<Lit>)>) -> String {
         // Map the 'muses' to a user-friendly representation
         let muses = base_muses
             .iter()

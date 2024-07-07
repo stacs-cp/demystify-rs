@@ -196,7 +196,12 @@ impl PuzzleDraw {
 
                                 group.append(node);
 
-                                let id = format!("D_{}_{}_{}", j, i, cell[a * sqrt_length + b].val);
+                                let id = format!(
+                                    "D_{}_{}_{}",
+                                    i + 1,
+                                    j + 1,
+                                    cell[a * sqrt_length + b].val
+                                );
                                 group.assign("id", id.clone());
                                 group.assign("name", id);
                                 group.assign("hx-post", "/clickLiteral");
@@ -354,7 +359,7 @@ impl PuzzleDraw {
                 let j_f = j as f64;
 
                 let mut g = element::Group::new();
-                g.assign("id", format!("C_{j}_{i}"));
+                g.assign("id", format!("C_{}_{}", i + 1, j + 1));
                 g.assign(
                     "transform",
                     format!(
