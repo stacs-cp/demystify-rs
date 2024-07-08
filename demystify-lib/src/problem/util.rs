@@ -189,6 +189,19 @@ impl Drop for QuickTimer {
     }
 }
 
+use serde_json::Value;
+
+fn merge_serde_json_dicts(a: &mut Value, b: &Value) {
+    match (a, b) {
+        (Value::Object(a), Value::Object(b)) => {
+            for (k, v) in b {
+                a.insert(k.clone(), v.clone());
+            }
+        }
+        (_, _) => panic!("merging non-dictionaries"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +209,33 @@ mod tests {
 
     use std::thread;
     use std::time::Duration;
+
+    #[test]
+    fn test_merge_json_dicts() {
+        // Test case 1: Merging two empty dictionaries
+        let mut a: Value = serde_json::from_str("{}").unwrap();
+        let b: Value = serde_json::from_str("{}").unwrap();
+        let expected: Value = serde_json::from_str("{}").unwrap();
+        merge_serde_json_dicts(&mut a, &b);
+        assert_eq!(a, expected);
+
+        // Test case 2: Merging two dictionaries with overlapping keys
+        let mut a: Value = serde_json::from_str(r#"{"a": 1, "b": 2}"#).unwrap();
+        let b: Value = serde_json::from_str(r#"{"b": 3, "c": 4}"#).unwrap();
+        let expected: Value = serde_json::from_str(r#"{"a": 1, "b": 3, "c": 4}"#).unwrap();
+        merge_serde_json_dicts(&mut a, &b);
+        assert_eq!(a, expected);
+
+        // Test case 3: Merging a dictionary with a non-dictionary value
+        let a: Value = serde_json::from_str(r#"{"a": 1}"#).unwrap();
+        let b: Value = serde_json::from_str(r#"2"#).unwrap();
+        assert!(std::panic::catch_unwind(|| {
+            let mut a = a.clone();
+            let b = b.clone();
+            merge_serde_json_dicts(&mut a, &b)
+        })
+        .is_err());
+    }
 
     #[test]
     fn test_parse_savile_row_name() {
