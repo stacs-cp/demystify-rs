@@ -28,7 +28,7 @@ use tracing::{debug, info};
 use std::fs::File;
 use std::io;
 
-use crate::problem::util::parse_constraint_name;
+use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
 
 use super::util::FindVarConnections;
@@ -357,8 +357,11 @@ impl PuzzleParse {
                     ));
                 }
 
-                let constraintname =
-                    parse_constraint_name(template_string, &self.eprime.params, &varid.indices)?;
+                let constraintname = parsing::parse_constraint_name(
+                    template_string,
+                    &self.eprime.params,
+                    &varid.indices,
+                )?;
 
                 // Check is we have used this name before
                 if usedconstraintnames.contains(&constraintname) {
@@ -649,7 +652,8 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
 
                 if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
-                    let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
+                    let varid =
+                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
                         let puzlit = PuzLit::new_eq(VarValPair::new(
@@ -665,7 +669,8 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                 info!(target: "parser", "matches: {:?}", match_);
                 if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
-                    let varid = crate::problem::util::parse_savile_row_name(dimacs, &match_[1])?;
+                    let varid =
+                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])?;
 
                     if let Some(varid) = varid {
                         // Not currently using exact literal
