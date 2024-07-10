@@ -551,7 +551,9 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
                 puzzle.insert(v);
             } else if line.starts_with("$#CON") {
                 info!(target: "parser", "{}", line);
-                let captures = conmatch.captures(&line).unwrap();
+                let captures = conmatch
+                    .captures(&line)
+                    .unwrap_or_else(|| panic!("Broken line: {line}"));
 
                 let con_name = captures.get(1).unwrap().as_str().to_string();
                 let con_value = captures.get(2).unwrap().as_str().to_string();

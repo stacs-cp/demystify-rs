@@ -234,6 +234,14 @@ impl PuzzlePlanner {
         solvesteps
     }
 
+    /// Checks the solvability of the current problem state. This can be used
+    /// to both check if a problem is inconsistent, or how much of the problem
+    /// does not have a unique solution
+    ///
+    /// # Returns
+    /// - `Some(i64)`: If the problem is not inconsistent, return the number of literals
+    ///   which are not fixed to a single value.
+    /// - `None`: If the problem is has no solution.
     pub fn check_solvability(&mut self) -> Option<i64> {
         while !self.psolve.get_provable_varlits().is_empty() {
             let lits = self.psolve.get_provable_varlits().clone();
