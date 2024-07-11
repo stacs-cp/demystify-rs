@@ -26,8 +26,8 @@ pub struct SatCore {
 // Solvers can sometimes time out, so we add a conflict limit.
 // We also set a 'counter', which checks if the solver is frequently hitting it's limit, if so
 // we increase the limit
-const CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
-const CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
+static CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
 use thiserror::Error;
 
