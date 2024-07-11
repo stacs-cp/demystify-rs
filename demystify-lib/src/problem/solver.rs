@@ -506,10 +506,8 @@ impl PuzzleSolver {
                 .map(|&x| {
                     let mus_test_size = best_mus_size.load(Relaxed);
                     let ret = self.get_var_mus_slice(x, Some(mus_test_size));
-                    if let Ok(x) = &ret {
-                        if let Some(y) = x {
-                            best_mus_size.fetch_min(y.len() as i64, Relaxed);
-                        }
+                    if let Ok(Some(y)) = &ret {
+                        best_mus_size.fetch_min(y.len() as i64, Relaxed);
                     }
                     (x, ret)
                 })
@@ -718,10 +716,46 @@ mod tests {
     }
 
     #[test]
-    fn test_random_solution() -> anyhow::Result<()> {
+    fn test_random_solution_little() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
             "./tst/little1.eprime",
             "./tst/little1.param",
+        );
+
+        let mut gens = BTreeSet::new();
+
+        for i in 0..10 {
+            let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(i);
+
+            let mut puz = PuzzleSolver::new(result.clone())?;
+
+            let sol = puz.random_solution(&mut rng);
+            gens.insert(sol);
+        }
+
+        assert_eq!(gens.len(), 1);
+
+        let sol = gens.into_iter().next().unwrap();
+
+        insta::assert_debug_snapshot!(sol);
+
+        let puz = PuzzleSolver::new(result)?;
+
+        let puzsol: BTreeSet<_> = sol
+            .into_iter()
+            .flat_map(|lit| puz.lit_to_puzlit(&lit))
+            .collect();
+
+        insta::assert_debug_snapshot!(puzsol);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_random_solution_wall() -> anyhow::Result<()> {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperWall.param",
         );
 
         let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
