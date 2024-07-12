@@ -252,13 +252,13 @@ impl PuzzlePlanner {
         }
 
         if self.psolve.is_currently_solvable() {
-            Some(
-                self.psolve
-                    .get_literals_to_try_solving()
-                    .len()
-                    .try_into()
-                    .unwrap(),
-            )
+            let lits = self.psolve.get_literals_to_try_solving();
+
+            for l in &lits {
+                self.solver().lit_to_puzlit(l);
+            }
+
+            Some(lits.len().try_into().unwrap())
         } else {
             None
         }

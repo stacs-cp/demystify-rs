@@ -30,9 +30,16 @@ pub fn parse_savile_row_name(
         .values()
         .filter(|&v| n.starts_with(v))
         .collect();
+    let auxmatch: Vec<&String> = dimacs
+        .eprime
+        .auxvars
+        .iter()
+        .filter(|&v| n.starts_with(v))
+        .collect();
 
     matches.extend(conmatch);
     matches.extend(revealmatch);
+    matches.extend(auxmatch);
 
     if matches.is_empty() {
         if !dimacs.eprime.auxvars.iter().any(|v| n.starts_with(v)) {
@@ -136,7 +143,10 @@ mod tests {
 
         // Test case 2: n starts with a variable in aux_variables
         let n2 = "aux2_4_5_6";
-        assert_eq!(parse_savile_row_name(&dp, n2).unwrap(), None);
+        assert_eq!(
+            parse_savile_row_name(&dp, n2).unwrap(),
+            Some(PuzVar::new("aux2", vec![4, 5, 6]))
+        );
 
         // Test case 3: n does not start with any variable
         let n3 = "not_found_7_8_9";

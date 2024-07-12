@@ -31,7 +31,7 @@ use std::io;
 use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
 
-use super::util::FindVarConnections;
+use super::util::{safe_insert, FindVarConnections};
 use super::VarValPair;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -206,13 +206,6 @@ pub struct PuzzleParse {
     /// Whenever a lit 'x' is proved, then `reveal_map`(x) should also be
     /// added to the known lits.
     pub reveal_map: BTreeMap<Lit, Lit>,
-}
-
-fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> anyhow::Result<()> {
-    if dict.insert(key, value).is_some() {
-        bail!("Internal Error: Repeated Key")
-    }
-    Ok(())
 }
 
 impl PuzzleParse {
@@ -656,7 +649,6 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
                     let varid =
                         crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])?;
-
                     if let Some(varid) = varid {
                         let puzlit = PuzLit::new_eq(VarValPair::new(
                             &varid,

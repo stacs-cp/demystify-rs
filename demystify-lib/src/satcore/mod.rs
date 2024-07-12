@@ -29,6 +29,12 @@ pub struct SatCore {
 static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
 static CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
+/// Set the global conflict limit used for the SAT
+/// solver (0 = no limit)
+pub fn set_global_conflict_limit(val: i64) {
+    CONFLICT_LIMIT.store(val, Relaxed);
+}
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

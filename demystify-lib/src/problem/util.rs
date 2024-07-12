@@ -1,10 +1,18 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
+use anyhow::bail;
 use itertools::Itertools;
 use rustsat::{instances::SatInstance, types::Lit};
 use tracing::info;
 
 pub mod parsing;
+
+pub fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> anyhow::Result<()> {
+    if dict.insert(key, value).is_some() {
+        bail!("Internal Error: Repeated Key")
+    }
+    Ok(())
+}
 
 pub struct FindVarConnections {
     lit_to_clauses: HashMap<Lit, HashSet<Lit>>,
