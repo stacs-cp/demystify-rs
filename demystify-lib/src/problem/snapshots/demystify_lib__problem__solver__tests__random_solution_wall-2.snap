@@ -1,0 +1,643 @@
+---
+source: demystify-lib/src/problem/solver.rs
+expression: puzsol
+---
+{
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    1,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    2,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    2,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    3,
+                ],
+            },
+            val: 0,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    3,
+                ],
+            },
+            val: 1,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    4,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    4,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    5,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    1,
+                    5,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    1,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    1,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    2,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    2,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    3,
+                ],
+            },
+            val: 0,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    3,
+                ],
+            },
+            val: 1,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    4,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    4,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    5,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    2,
+                    5,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    1,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    1,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    2,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    2,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    3,
+                ],
+            },
+            val: 0,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    3,
+                ],
+            },
+            val: 1,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    4,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    4,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    5,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    3,
+                    5,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    1,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    1,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    2,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    2,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    3,
+                ],
+            },
+            val: 0,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    3,
+                ],
+            },
+            val: 1,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    4,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    4,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    5,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    4,
+                    5,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    1,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    1,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    2,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    2,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    3,
+                ],
+            },
+            val: 0,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    3,
+                ],
+            },
+            val: 1,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    4,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    4,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    5,
+                ],
+            },
+            val: 0,
+        },
+        equal: true,
+    },
+    PuzLit {
+        varval: VarValPair {
+            var: PuzVar {
+                name: "grid",
+                indices: [
+                    5,
+                    5,
+                ],
+            },
+            val: 1,
+        },
+        equal: false,
+    },
+}
