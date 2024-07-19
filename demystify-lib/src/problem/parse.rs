@@ -476,7 +476,9 @@ impl PuzzleParse {
     }
 
     pub fn filter_out_constraint(&mut self, con: &str) {
-        assert!(self.eprime.cons.contains_key(con));
+        if !self.eprime.cons.contains_key(con) {
+            panic!("Filtered constraint is not present: {con}")
+        }
         let mut new_conset_lits = BTreeSet::new();
         for l in self.conset_lits.iter() {
             let puzvars = self.invlitmap.get(l).unwrap();
