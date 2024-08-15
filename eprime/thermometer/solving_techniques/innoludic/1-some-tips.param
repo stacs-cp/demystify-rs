@@ -1,7 +1,7 @@
 $ https://www.innoludic.com/2015-04-30-13-56-29/thermometers/56-rules-of-thermometers.html
 
-letting x be 6
-letting y be 6
+letting width be 6
+letting height be 6
 letting step be 10
 letting thermcount be 9
 

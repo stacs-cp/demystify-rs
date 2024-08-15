@@ -1,7 +1,7 @@
 $ http://www.tectonicpuzzel.eu/thermometer-sudoku-puzzle-solving-strategy.html
 
-letting x be 10
-letting y be 10
+letting width be 10
+letting height be 10
 letting step be 10
 letting thermcount be 25
 

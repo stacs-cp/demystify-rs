@@ -1,10 +1,10 @@
 language ESSENCE' 1.0
 
-given x,y: int
+given width, height: int
 given step: int
 given thermcount: int
-letting X be int(1..x)
-letting Y be int(1..y)
+letting X be int(1..width)
+letting Y be int(1..height)
 
 given therms: matrix indexed by [X,Y] of int(0..step*thermcount)
 given rowsums: matrix indexed by [X] of int
