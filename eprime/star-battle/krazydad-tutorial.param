@@ -1,12 +1,12 @@
 $ https://krazydad.com/starbattle/tutorial/tutorial_10x10.php
 $ basically one grid, with many "tutorial" steps
 
-letting dim be 10
+letting grid_size be 10
 letting starcount be 2
 letting numblocks be 10
 
 
-letting cages be 
+letting cages be
 [
     [1,1,1,1,1,7,7,8,8,8],
     [1,1,1,1,1,7,7,7,8,8],

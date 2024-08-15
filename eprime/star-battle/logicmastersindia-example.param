@@ -1,12 +1,12 @@
 $ https://logicmastersindia.com/forum/forums/thread-view.asp?tid=140
 $ basically one grid, with "tutorial" steps
 
-letting dim be 9
+letting grid_size be 9
 letting starcount be 2
 letting numblocks be 9
 
 
-letting cages be 
+letting cages be
 [
     [1,1,1,1,2,2,2,2,2],
     [1,1,2,2,2,2,3,2,2],

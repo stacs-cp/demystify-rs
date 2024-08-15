@@ -1,9 +1,9 @@
-letting dim be 8
+letting grid_size be 8
 letting starcount be 1
 letting numblocks be 8
 
 
-letting cages be 
+letting cages be
 [
     [1,2,3,3,3,3,3,3],
     [1,2,3,3,3,3,3,3],

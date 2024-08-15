@@ -1,12 +1,12 @@
-$ http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html 
+$ http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html
 $ GROUPING OF ROWS OR COLUMNSa: http://www.tectonicpuzzel.eu/star-battle-puzzel-strategy.jpg
 
-letting dim be 10
+letting grid_size be 10
 letting starcount be 1
 letting numblocks be 10
 
 
-letting cages be 
+letting cages be
 [
     [1,1,1,5,5,5,5,5,9,9],
     [1,1,5,5,5,5,5,5,9,9],

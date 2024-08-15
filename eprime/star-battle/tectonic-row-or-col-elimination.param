@@ -1,11 +1,11 @@
 $ http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html
 $ ROW OR COLUMN ELIMINATION: http://www.tectonicpuzzel.eu/star-battle-puzzle-solver.jpg
 
-letting dim be 10
+letting grid_size be 10
 letting starcount be 2
 letting numblocks be 10
 
-letting cages be 
+letting cages be
 [
     [1,1,1,1,8,8,8,8,8,8],
     [1,1,7,7,8,9,9,9,9,9],
