@@ -1,0 +1,25 @@
+language ESSENCE' 1.0
+
+given grid_size : int
+given row_sums : matrix indexed by [int(1..grid_size)] of int(1..sum( [i | i : int(1..grid_size)] ))
+given col_sums : matrix indexed by [int(1..grid_size)] of int(1..sum( [i | i : int(1..grid_size)] ))
+
+
+$#VAR res
+find res : matrix indexed by [int(1..grid_size), int(1..grid_size)] of int(0,1)
+
+$#CON rowcon "The sum of row {{index[0]}} is {{params['row_sums'][index[0]]}}"
+find rowcon : matrix indexed by [int(1..grid_size)] of bool
+
+$#CON colcon "The sum of column {{index[0]}} is {{params['col_sums'][index[0]]}}"
+find colcon : matrix indexed by [int(1..grid_size)] of bool
+
+
+such that
+    forAll r : int(1..grid_size) .
+        rowcon[r] -> (sum( [ res[r,i]*i | i : int(1..grid_size)] ) = row_sums[r]),
+
+    forAll c : int(1..grid_size) .
+        colcon[c] -> (sum( [ res[i,c]*i | i : int(1..grid_size)] ) = col_sums[c]),
+
+true
