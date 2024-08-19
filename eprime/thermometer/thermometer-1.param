@@ -12,5 +12,5 @@ letting therms be [
     [ 41, 33, 32, 31, 22]
 ]
 
-letting rowsums be [3,4,2,2,3]
-letting colsums be [3,2,3,3,3]
+letting row_sums be [3,4,2,2,3]
+letting col_sums be [3,2,3,3,3]

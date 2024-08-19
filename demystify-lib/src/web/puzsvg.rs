@@ -30,7 +30,7 @@ impl Decorations {
                 blank_input_val: Some(2),
             }
         } else {
-            println!("Unknown puzzle type: {kind}");
+            //println!("Unknown puzzle type: {kind}");
             Decorations {
                 sudoku_grid: false,
                 blank_input_val: None,
@@ -110,12 +110,106 @@ impl PuzzleDraw {
 
         out.append(cellgrp);
 
+        let out = self.fill_outside_labels(
+            out,
+            puzzle.width,
+            puzzle.height,
+            &puzzle.top_labels,
+            &puzzle.bottom_labels,
+            &puzzle.left_labels,
+            &puzzle.right_labels,
+        );
+
+        let mut final_grp = element::Group::new();
+        final_grp.assign("transform", "translate(50,50) scale(400)");
+        final_grp.append(out);
+
         let doc = svg::Document::new()
             .set("viewBox", (0, 0, 500, 500))
             .set("width", 500)
             .set("height", 500)
             .set("class", "puzzle");
-        doc.add(out)
+        doc.add(final_grp)
+    }
+
+    fn fill_outside_labels(
+        &self,
+        mut grid: element::Group,
+        width: i64,
+        height: i64,
+        top_labels: &Option<Vec<String>>,
+        bottom_labels: &Option<Vec<String>>,
+        left_labels: &Option<Vec<String>>,
+        right_labels: &Option<Vec<String>>,
+    ) -> element::Group {
+        let mut label_group = element::Group::new();
+        label_group.assign("class", "labels");
+
+        let mut puz_bounds = (0.0, 1.0, 0.0, 1.0);
+
+        let step = 1.0 / std::cmp::min(width, height) as f64;
+
+        // Add top labels
+        let label_groups = vec![top_labels, bottom_labels, left_labels, right_labels];
+
+        let label_positions: Vec<(
+            Box<dyn Fn(usize) -> i64>,
+            Box<dyn Fn(usize) -> i64>,
+            Box<dyn Fn(&mut (f64, f64, f64, f64)) -> ()>,
+        )> = vec![
+            (
+                Box::new(|i| i as i64),
+                Box::new(|_| -1),
+                Box::new(|bounds| bounds.0 -= step),
+            ),
+            (
+                Box::new(|i| i as i64),
+                Box::new(|_| height),
+                Box::new(|bounds| bounds.1 += step),
+            ),
+            (
+                Box::new(|_| -1),
+                Box::new(|i| i as i64),
+                Box::new(|bounds| bounds.2 -= step),
+            ),
+            (
+                Box::new(|_| width),
+                Box::new(|i| i as i64),
+                Box::new(|bounds| bounds.3 += step),
+            ),
+        ];
+
+        for (labels, position) in label_groups.iter().zip(label_positions.iter()) {
+            if let Some(labels) = labels {
+                // Update grid bounds
+                position.2(&mut puz_bounds);
+                for (i, label) in labels.iter().enumerate() {
+                    let mut node = svg::node::element::Text::new(label);
+                    node.assign("font-size", 1);
+                    node.assign("transform", "translate(0.2, 0.9)");
+                    let mut g = make_cell(position.0(i), position.1(i), step);
+                    g.append(node);
+                    label_group.append(g);
+                }
+            }
+        }
+
+        grid.append(label_group);
+
+        let mut resized_grid = element::Group::new();
+        resized_grid.assign(
+            "transform",
+            format!(
+                "translate({},{}) scale({},{})",
+                -puz_bounds.0,
+                -puz_bounds.2,
+                1.0 / (-puz_bounds.0 + puz_bounds.1),
+                1.0 / (-puz_bounds.2 + puz_bounds.3)
+            ),
+        );
+        resized_grid.append(grid);
+
+        resized_grid
     }
 
     fn fixed_cell_is_used(&self, cell: Option<i64>) -> bool {
@@ -225,7 +319,6 @@ impl PuzzleDraw {
 
     fn draw_grid(&self, puzzle: &Puzzle) -> element::Group {
         let mut topgrp = element::Group::new();
-        topgrp.assign("transform", "translate(25,25) scale(450)");
 
         let mut grp = element::Group::new();
 
@@ -355,20 +448,7 @@ impl PuzzleDraw {
         for i in 0..puzzle.height {
             out.push(vec![]);
             for j in 0..puzzle.width {
-                let i_f = i as f64;
-                let j_f = j as f64;
-
-                let mut g = element::Group::new();
-                g.assign("id", format!("C_{}_{}", i + 1, j + 1));
-                g.assign(
-                    "transform",
-                    format!(
-                        "translate({} {}) scale({})",
-                        step * (j_f + 0.05),
-                        step * (i_f + 0.05),
-                        step * 0.9
-                    ),
-                );
+                let g = make_cell(i, j, step);
 
                 out.last_mut().unwrap().push(g);
             }
@@ -376,6 +456,24 @@ impl PuzzleDraw {
 
         out
     }
+}
+
+fn make_cell(i: i64, j: i64, step: f64) -> element::Group {
+    let i_f = i as f64;
+    let j_f = j as f64;
+
+    let mut g = element::Group::new();
+    g.assign("id", format!("C_{}_{}", i + 1, j + 1));
+    g.assign(
+        "transform",
+        format!(
+            "translate({} {}) scale({})",
+            step * (j_f + 0.05),
+            step * (i_f + 0.05),
+            step * 0.9
+        ),
+    );
+    g
 }
 
 #[cfg(test)]

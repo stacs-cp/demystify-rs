@@ -15,8 +15,10 @@ pub struct Puzzle {
     pub start_grid: Option<Vec<Vec<Option<i64>>>>,
     pub solution_grid: Option<Vec<Vec<Option<i64>>>>,
     pub cages: Option<Vec<Vec<Option<i64>>>>,
-    pub row_labels: Option<Vec<String>>,
-    pub col_labels: Option<Vec<String>>,
+    pub top_labels: Option<Vec<String>>,
+    pub bottom_labels: Option<Vec<String>>,
+    pub left_labels: Option<Vec<String>>,
+    pub right_labels: Option<Vec<String>>,
 }
 
 impl Puzzle {
@@ -46,23 +48,33 @@ impl Puzzle {
         let mut start_grid = None;
         let mut cages = None;
 
-        let mut row_labels = None;
-        let mut col_labels = None;
+        let mut top_labels = None;
+        let mut bottom_labels = None;
+        let mut left_labels = None;
+        let mut right_labels = None;
 
-        if problem.eprime.has_param("row_labels") {
-            row_labels = Some(problem.eprime.param_vec_string("row_labels")?);
+        for label in ["row_labels", "top_labels", "row_sums"] {
+            if problem.eprime.has_param(label) {
+                top_labels = Some(problem.eprime.param_vec_string(label)?);
+            }
         }
 
-        if problem.eprime.has_param("row_sums") {
-            row_labels = Some(problem.eprime.param_vec_string("row_sums")?);
+        for label in ["col_labels", "left_labels", "col_sums"] {
+            if problem.eprime.has_param(label) {
+                left_labels = Some(problem.eprime.param_vec_string(label)?);
+            }
         }
 
-        if problem.eprime.has_param("col_labels") {
-            col_labels = Some(problem.eprime.param_vec_string("col_labels")?);
+        for label in ["bottom_labels"] {
+            if problem.eprime.has_param(label) {
+                bottom_labels = Some(problem.eprime.param_vec_string(label)?);
+            }
         }
 
-        if problem.eprime.has_param("col_sums") {
-            col_labels = Some(problem.eprime.param_vec_string("col_sums")?);
+        for label in ["right_labels"] {
+            if problem.eprime.has_param(label) {
+                right_labels = Some(problem.eprime.param_vec_string(label)?);
+            }
         }
 
         if problem.eprime.has_param("start_grid") {
@@ -94,8 +106,10 @@ impl Puzzle {
             start_grid,
             solution_grid: None,
             cages,
-            row_labels,
-            col_labels,
+            top_labels,
+            bottom_labels,
+            left_labels,
+            right_labels,
         })
     }
 }

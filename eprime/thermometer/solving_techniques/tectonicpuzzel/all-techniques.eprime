@@ -19,5 +19,5 @@ letting therms be [
     [211,174,221,236,235,234,233,232,231,241]
 ]
 
-letting rowsums be [7,8,9,5,8,6,1,4,3,4]
-letting colsums be [8,10,4,5,4,5,1,7,7,4]
+letting row_sums be [7,8,9,5,8,6,1,4,3,4]
+letting col_sums be [8,10,4,5,4,5,1,7,7,4]
