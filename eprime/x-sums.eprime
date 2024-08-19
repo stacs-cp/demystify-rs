@@ -12,24 +12,24 @@ $ https://cracking-the-cryptic.web.app/sudoku/PtjJbFhttP
 $ https://www.youtube.com/watch?v=fnCzYnsC4Ow
 
 
-$$ Input would be SIZE, which is dimension of square grid, but set to 9
+$$ Input would be size, which is dimension of square grid, but set to 9
 
-letting   SIZE be 9  $$ I.e. not generalised yet
+letting   size be 9  $$ I.e. not generalised yet
 
 $ the numeric values specified in the puzzle
 
-letting   VALUES be domain int( 0..SIZE )
-letting   RANGE  be domain int( 1..SIZE )
+letting   VALUES be domain int( 0..size )
+letting   RANGE  be domain int( 1..size )
 
-letting   MAXCLUES be (SIZE * (SIZE+1))/2
+letting   MAXCLUES be (size * (size+1))/2
 
-$$ And CLUES, 4xSIZE array of clues
-$ CLUES[1,..] is clues along left of grid pointing right, 0 indicating no clue
-$ CLUES[2,..] is clues along top of grid pointing down
-$ CLUES[3,..] is clues along right of grid pointing left
-$ CLUES[4,..] is clues along bottom of grid pointing up.
+$$ And side_labels, 4xSIZE array of clues
+$ side_labels[1,..] is clues along left of grid pointing right, 0 indicating no clue
+$ side_labels[2,..] is clues along top of grid pointing down
+$ side_labels[3,..] is clues along right of grid pointing left
+$ side_labels[4,..] is clues along bottom of grid pointing up.
 
-given     CLUES : matrix indexed by [int(1..4),RANGE] of int(0..MAXCLUES)
+given     side_labels : matrix indexed by [int(1..4),RANGE] of int(0..MAXCLUES)
 
 $$ And GRID, any initial values provided for cells (or 0 for no value)
 
@@ -77,7 +77,7 @@ $ find alldiff_col : matrix indexed by [int(1..9)] of bool
 $#CON alldiff_box "box {{index[0]}} must have all different elements"
 find alldiff_box : matrix indexed by [int(1..9)] of bool
 
-$#CON clues_left_on "the sum of first X numbers on {['row','column','row','column'][index[0]-1]} {{index[1]}} {['from left','from top','from right','from bottom'][index[0]-1]} is {params['CLUES'][index[0]][index[1]]}"
+$#CON clues_left_on "the sum of first X numbers on {['row','column','row','column'][index[0]-1]} {{index[1]}} {['from left','from top','from right','from bottom'][index[0]-1]} is {params['side_labels'][index[0]][index[1]]}"
 
 find clues_left_on : matrix indexed by [int(1..4),RANGE] of bool
 
@@ -92,8 +92,8 @@ $ variant fields setup
 forAll row, col: RANGE .
     variant_fields[1,row,col] = field[row,col] /\
     variant_fields[2,row,col] = field[col,row] /\
-    variant_fields[3,row,col] = field[row,SIZE+1-col] /\
-    variant_fields[4,row,col] = field[SIZE+1-col,row],
+    variant_fields[3,row,col] = field[row,size+1-col] /\
+    variant_fields[4,row,col] = field[size+1-col,row],
 
 $ port over hints grid to solution
     forAll row : RANGE .
@@ -107,8 +107,8 @@ forAll i : int(1..4) .
     forAll row : RANGE .
         clues_left_on[i,row] ->
             (
-             CLUES[i,row] > 0 ->
-                 CLUES[i,row]  =
+             side_labels[i,row] > 0 ->
+                 side_labels[i,row]  =
                      sum col : RANGE .
                          toInt( col <= variant_fields[i,row,1] ) * variant_fields[i,row,col]
             ),

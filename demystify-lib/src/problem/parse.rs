@@ -149,6 +149,36 @@ impl EPrimeAnnotations {
         Ok(ret)
     }
 
+    pub fn param_vec_vec_string(&self, s: &str) -> anyhow::Result<Vec<Vec<String>>> {
+        // Conjure produces arrays as maps, so we need to fix up
+        let map: BTreeMap<i64, BTreeMap<i64, serde_json::Value>> = serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {s}"))?
+                .clone(),
+        )
+        .context(format!("Param {s} is not a 2d array of strings"))?;
+
+        let mut ret: Vec<Vec<String>> = vec![vec![]; map.len()];
+
+        for i in 0..map.len() {
+            let row = map
+                .get(&((i + 1) as i64))
+                .context(format!("Malformed param? {s}"))?;
+            let mut rowvec: Vec<String> = vec![String::new(); row.len()];
+            for j in 0..row.len() {
+                rowvec[j] = row
+                    .get(&((j + 1) as i64))
+                    .context(format!("Malformed param? {s}"))?
+                    .to_string();
+            }
+
+            ret[i] = rowvec;
+        }
+
+        Ok(ret)
+    }
+
     pub fn param_vec_vec_option_i64(&self, s: &str) -> anyhow::Result<Vec<Vec<Option<i64>>>> {
         // Conjure produces arrays as maps, so we need to fix up
         let map: BTreeMap<i64, BTreeMap<i64, Option<i64>>> = serde_json::from_value(
@@ -531,7 +561,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
 
     let mut kind: Option<String> = None;
 
-    let conmatch = Regex::new(r#"\$#CON (.*) "(.*)""#).unwrap();
+    let conmatch = Regex::new(r#"\$#CON (.*) "(.*)" *$"#).unwrap();
 
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
@@ -970,8 +1000,18 @@ mod tests {
         );
 
         assert_eq!(
+            puz.eprime.param_vec_vec_string("l2").unwrap(),
+            vec![vec!["1", "2"], vec!["3", "4"]]
+        );
+
+        assert_eq!(
             puz.eprime.param_vec_string("lb").unwrap(),
             vec!["false", "false", "true", "false"]
+        );
+
+        assert_eq!(
+            puz.eprime.param_vec_vec_string("lb2").unwrap(),
+            vec![vec!["false", "true"], vec!["true", "false"]]
         );
 
         // These next two may become '3' at some point, when we do better

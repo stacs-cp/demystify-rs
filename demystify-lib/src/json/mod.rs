@@ -45,6 +45,11 @@ impl Puzzle {
             width = Some(problem.eprime.param_i64("grid_size")?);
         }
 
+        if problem.eprime.has_param("size") {
+            height = Some(problem.eprime.param_i64("size")?);
+            width = Some(problem.eprime.param_i64("size")?);
+        }
+
         let mut start_grid = None;
         let mut cages = None;
 
@@ -75,6 +80,14 @@ impl Puzzle {
             if problem.eprime.has_param(label) {
                 right_labels = Some(problem.eprime.param_vec_string(label)?);
             }
+        }
+
+        if problem.eprime.has_param("side_labels") {
+            let side_labels = problem.eprime.param_vec_vec_string("side_labels")?;
+            left_labels = Some(side_labels[0].clone());
+            top_labels = Some(side_labels[1].clone());
+            right_labels = Some(side_labels[2].clone());
+            bottom_labels = Some(side_labels[3].clone());
         }
 
         if problem.eprime.has_param("start_grid") {

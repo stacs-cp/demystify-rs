@@ -4,4 +4,9 @@ letting b1 be false
 letting b2 be true
 
 letting l be [2,4,6,8]
+
+letting l2 be [[1,2],[3,4]]
+
 letting lb be [false, false, true, false]
+
+letting lb2 be [[false,true],[true,false]]
