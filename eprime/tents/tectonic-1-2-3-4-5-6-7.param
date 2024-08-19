@@ -1,0 +1,16 @@
+letting x be 5
+letting y be 5
+
+letting treecount be 5
+
+letting col_sums be [1,0,1,1,2]
+letting row_sums be [1,1,1,1,1]
+
+letting trees be
+[
+    [0,0,0,0,0],
+    [0,0,0,0,4],
+    [1,0,2,3,0],
+    [0,0,0,0,0],
+    [0,0,5,0,0]
+]
