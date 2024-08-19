@@ -8,6 +8,8 @@ given b2: bool
 
 given l: matrix indexed by [int] of int
 
+given lb: matrix indexed by [int] of bool
+
 letting ndim be int(1..n)
 letting ndim2 be int(1..n-2)
 

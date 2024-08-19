@@ -128,6 +128,27 @@ impl EPrimeAnnotations {
         Ok(ret)
     }
 
+    pub fn param_vec_string(&self, s: &str) -> anyhow::Result<Vec<String>> {
+        let map: BTreeMap<i64, serde_json::Value> = serde_json::from_value(
+            self.params
+                .get(s)
+                .context(format!("Missing param: {s}"))?
+                .clone(),
+        )
+        .context(format!("Param {s} is not an array of strings"))?;
+
+        let mut ret: Vec<String> = vec![String::new(); map.len()];
+
+        for i in 0..map.len() {
+            ret[i] = map
+                .get(&((i + 1) as i64))
+                .context(format!("Malformed param? {s}"))?
+                .to_string();
+        }
+
+        Ok(ret)
+    }
+
     pub fn param_vec_vec_option_i64(&self, s: &str) -> anyhow::Result<Vec<Vec<Option<i64>>>> {
         // Conjure produces arrays as maps, so we need to fix up
         let map: BTreeMap<i64, BTreeMap<i64, Option<i64>>> = serde_json::from_value(
@@ -942,6 +963,16 @@ mod tests {
         assert!(puz.eprime.param_bool("b2").unwrap());
 
         assert_eq!(puz.eprime.param_vec_i64("l").unwrap(), vec![2, 4, 6, 8]);
+
+        assert_eq!(
+            puz.eprime.param_vec_string("l").unwrap(),
+            vec!["2", "4", "6", "8"]
+        );
+
+        assert_eq!(
+            puz.eprime.param_vec_string("lb").unwrap(),
+            vec!["false", "false", "true", "false"]
+        );
 
         // These next two may become '3' at some point, when we do better
         // at rejecting useless constraints

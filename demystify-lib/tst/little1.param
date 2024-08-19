@@ -4,3 +4,4 @@ letting b1 be false
 letting b2 be true
 
 letting l be [2,4,6,8]
+letting lb be [false, false, true, false]
