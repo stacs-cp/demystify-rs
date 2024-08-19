@@ -26,10 +26,14 @@ impl Puzzle {
 
         if problem.eprime.has_param("width") {
             width = Some(problem.eprime.param_i64("width")?);
+        } else if problem.eprime.has_param("x") {
+            width = Some(problem.eprime.param_i64("x")?);
         }
 
         if problem.eprime.has_param("height") {
             height = Some(problem.eprime.param_i64("height")?);
+        } else if problem.eprime.has_param("y") {
+            height = Some(problem.eprime.param_i64("y")?);
         }
 
         if problem.eprime.has_param("grid_size") {
