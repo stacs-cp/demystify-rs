@@ -1,0 +1,26 @@
+letting width be 4
+letting height be 3
+
+letting blanks be
+[
+    [0,0,0],
+    [0,0,1],
+    [0,1,1],
+    [0,1,1]
+]
+
+letting vertsums be
+[
+    [ 0, 0, 6],
+    [ 0, 4, 0],
+    [ 0, 0, 0],
+    [ 0, 0, 0]
+]
+
+letting horzsums be
+[
+    [ 0, 0, 0],
+    [ 0, 0, 0],
+    [ 4, 0, 0],
+    [ 3, 0, 0]
+]
