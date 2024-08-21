@@ -409,7 +409,7 @@ impl PuzzleParse {
 
                 // Check is we have used this name before
                 if usedconstraintnames.contains(&constraintname) {
-                    bail!(format!("CON name {:?} used twice", constraintname))
+                    bail!(format!("CON name {:?} used twice. This should already have substitutions done, so if you see '{{' or '}}' check your formatting string.", constraintname))
                 }
                 usedconstraintnames.insert(constraintname.clone());
 

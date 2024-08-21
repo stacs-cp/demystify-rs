@@ -28,16 +28,16 @@ impl Puzzle {
         let mut width = None;
         let mut height = None;
 
-        if problem.eprime.has_param("width") {
-            width = Some(problem.eprime.param_i64("width")?);
-        } else if problem.eprime.has_param("x") {
-            width = Some(problem.eprime.param_i64("x")?);
+        for label in ["width", "x", "x_dim"] {
+            if problem.eprime.has_param(label) {
+                width = Some(problem.eprime.param_i64(label)?);
+            }
         }
 
-        if problem.eprime.has_param("height") {
-            height = Some(problem.eprime.param_i64("height")?);
-        } else if problem.eprime.has_param("y") {
-            height = Some(problem.eprime.param_i64("y")?);
+        for label in ["height", "y", "y_dim"] {
+            if problem.eprime.has_param(label) {
+                height = Some(problem.eprime.param_i64(label)?);
+            }
         }
 
         if problem.eprime.has_param("grid_size") {
