@@ -50,6 +50,21 @@ impl Puzzle {
             width = Some(problem.eprime.param_i64("size")?);
         }
 
+        // If there is only one 'VAR', then it might tell us what to draw
+        if height.is_none() && width.is_none() {
+            if problem.eprime.vars.len() == 1 {
+                let var = problem.eprime.vars.iter().next().unwrap();
+
+                let indices = problem.get_matrix_indices(var);
+                if let Some(v) = indices {
+                    if v.len() == 2 {
+                        width = Some(v[1]);
+                        height = Some(v[0]);
+                    }
+                }
+            }
+        }
+
         let mut start_grid = None;
         let mut cages = None;
 

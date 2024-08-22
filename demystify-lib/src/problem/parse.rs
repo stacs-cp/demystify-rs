@@ -12,6 +12,7 @@ use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, Cnf, SatInstance};
 use rustsat::types::Lit;
 
+use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use std::fs;
@@ -544,6 +545,24 @@ impl PuzzleParse {
             new_conset_lits.len()
         );
         self.conset_lits = new_conset_lits;
+    }
+
+    pub fn get_matrix_indices(&self, var: &str) -> Option<Vec<i64>> {
+        let mut domain: Option<Vec<i64>> = None;
+        for (key, _) in &self.domainmap {
+            if key.name() == var {
+                let indices = key.indices();
+                if let Some(mut current_domain) = domain {
+                    for i in 0..current_domain.len() {
+                        current_domain[i] = max(current_domain[i], indices[i]);
+                    }
+                    domain = Some(current_domain);
+                } else {
+                    domain = Some(indices.clone());
+                }
+            }
+        }
+        domain
     }
 }
 
