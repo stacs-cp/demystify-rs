@@ -368,17 +368,23 @@ impl PuzzlePlanner {
 
         let nice_deduced: String = deduced.iter().format(", ").to_string();
 
+        let description = if constraints.is_empty() {
+            format!("{:?} because of the design of the problem", nice_deduced)
+        } else {
+            format!(
+                "{:?} because of {} constraints",
+                nice_deduced,
+                &constraints.len()
+            )
+        };
+
         let problem = Problem::new_from_puzzle_and_mus(
             &self.psolve,
             &tosolve_varvals,
             &known_puzlits,
             &deduced,
             &constraints,
-            &format!(
-                "{:?} because of {} constraints",
-                nice_deduced,
-                &constraints.len()
-            ),
+            &description,
         )
         .expect("Cannot make puzzle json");
 
