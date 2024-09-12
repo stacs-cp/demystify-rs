@@ -150,12 +150,12 @@ impl PuzzleDraw {
         let step = 1.0 / std::cmp::min(width, height) as f64;
 
         // Add top labels
-        let label_groups = vec![top_labels, bottom_labels, left_labels, right_labels];
+        let label_groups = [top_labels, bottom_labels, left_labels, right_labels];
 
         let label_positions: Vec<(
             Box<dyn Fn(usize) -> i64>,
             Box<dyn Fn(usize) -> i64>,
-            Box<dyn Fn(&mut (f64, f64, f64, f64)) -> ()>,
+            Box<dyn Fn(&mut (f64, f64, f64, f64))>,
         )> = vec![
             (
                 Box::new(|i| i as i64),
