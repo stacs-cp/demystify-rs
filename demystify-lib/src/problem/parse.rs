@@ -551,7 +551,7 @@ impl PuzzleParse {
     #[must_use]
     pub fn get_matrix_indices(&self, var: &str) -> Option<Vec<i64>> {
         let mut domain: Option<Vec<i64>> = None;
-        for (key, _) in &self.domainmap {
+        for key in self.domainmap.keys() {
             if key.name() == var {
                 let indices = key.indices();
                 if let Some(mut current_domain) = domain {
