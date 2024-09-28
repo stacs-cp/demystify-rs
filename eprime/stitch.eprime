@@ -34,6 +34,9 @@ find colgrid: matrix indexed by [griddim_y, griddim_x, blockdim] of bool
 $#CON blocksizecon "The size of box {{index[0]}} is the product of the width and height"
 find blocksizecon: matrix indexed by [blockdim] of bool
 
+$#CON blockingridcon "Box {{index[0]}} is in grid"
+find blockingridcon: matrix indexed by [blockdim] of bool
+
 such that
 
 $ The square at starty[i], startx[i] is in block i
@@ -46,6 +49,9 @@ colgrid[i,j,k] ->
 ( (i >= blocky[k]) /\ (i <= blocky[k] + blockheight[k] - 1) /\
   (j >= blockx[k]) /\ (j <= blockx[k] + blockwidth[k] - 1)
 ) ),
+
+forAll i: blockdim.
+blockingridcon[i] -> (blockx[i] + blockwidth[i] - 1 <= width) /\ (blocky[i] + blockheight[i] - 1 <= height),
 
 $ Add basic maths conditions unconditionally
 forAll i : blockdim.
