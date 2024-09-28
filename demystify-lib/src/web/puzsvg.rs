@@ -145,9 +145,9 @@ impl PuzzleDraw {
         let mut label_group = element::Group::new();
         label_group.assign("class", "labels");
 
-        let mut puz_bounds = (0.0, 1.0, 0.0, 1.0);
-
         let step = 1.0 / std::cmp::min(width, height) as f64;
+
+        let mut puz_bounds = (0.0, step * (width as f64), 0.0, step * (height as f64));
 
         // Add top labels
         let label_groups = [top_labels, bottom_labels, left_labels, right_labels];
@@ -196,15 +196,17 @@ impl PuzzleDraw {
 
         grid.append(label_group);
 
+        let max_scale = f64::min(
+            1.0 / (-puz_bounds.0 + puz_bounds.1),
+            1.0 / (-puz_bounds.2 + puz_bounds.3),
+        );
+
         let mut resized_grid = element::Group::new();
         resized_grid.assign(
             "transform",
             format!(
                 "translate({},{}) scale({},{})",
-                -puz_bounds.0,
-                -puz_bounds.2,
-                1.0 / (-puz_bounds.0 + puz_bounds.1),
-                1.0 / (-puz_bounds.2 + puz_bounds.3)
+                -puz_bounds.0, -puz_bounds.2, max_scale, max_scale
             ),
         );
         resized_grid.append(grid);
@@ -326,8 +328,7 @@ impl PuzzleDraw {
         let height = usize::try_from(puzzle.height).expect("negative height?");
         let cages = &puzzle.cages;
 
-        let wstep = 1.0 / (width as f64);
-        let hstep = 1.0 / (height as f64);
+        let step = 1.0 / std::cmp::min(width, height) as f64;
 
         let colours_list = [
             "#85586f", "#d6efed", "#957dad", "#ac7d88", "#b7d3df", "#e0bbe4", "#deb6ab", "#c9bbcf",
@@ -347,11 +348,11 @@ impl PuzzleDraw {
                         let j_f = j as f64;
                         let path = format!(
                             "M {} {} H {} V {} H {} Z",
-                            wstep * i_f,
-                            hstep * j_f,
-                            wstep * (i_f + 1.0),
-                            wstep * (j_f + 1.0),
-                            wstep * i_f
+                            step * i_f,
+                            step * j_f,
+                            step * (i_f + 1.0),
+                            step * (j_f + 1.0),
+                            step * i_f
                         );
 
                         let mut p = element::Path::new();
@@ -387,10 +388,10 @@ impl PuzzleDraw {
 
                 let path = format!(
                     "M {} {} L {} {}",
-                    wstep * i_f,
-                    hstep * j_f,
-                    wstep * i_f,
-                    hstep * (j_f + 1.0)
+                    step * i_f,
+                    step * j_f,
+                    step * i_f,
+                    step * (j_f + 1.0)
                 );
                 let mut p = element::Path::new();
                 p.assign("d", path);
@@ -421,10 +422,10 @@ impl PuzzleDraw {
 
                 let path = format!(
                     "M {} {} L {} {}",
-                    wstep * i_f,
-                    hstep * j_f,
-                    wstep * (i_f + 1.0),
-                    hstep * j_f
+                    step * i_f,
+                    step * j_f,
+                    step * (i_f + 1.0),
+                    step * j_f
                 );
                 let mut p = element::Path::new();
                 p.assign("d", path);
