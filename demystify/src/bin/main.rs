@@ -3,7 +3,7 @@ use demystify_lib::{
     problem::{
         self,
         planner::{PlannerConfig, PuzzlePlanner},
-        solver::{MusConfig, PuzzleSolver},
+        solver::{MusConfig, PuzzleSolver, SolverConfig},
     },
     web::{base_css, base_javascript},
 };
@@ -27,6 +27,9 @@ struct Opt {
 
     #[arg(long)]
     html: bool,
+
+    #[arg(long)]
+    only_assign: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -49,7 +52,12 @@ fn main() -> anyhow::Result<()> {
     let puzzle =
         problem::parse::parse_essence(&PathBuf::from(opt.model), &PathBuf::from(opt.param))?;
 
-    let solver = PuzzleSolver::new(puzzle)?;
+    let solver = PuzzleSolver::new_with_config(
+        puzzle,
+        SolverConfig {
+            only_assignments: opt.only_assign,
+        },
+    )?;
 
     let planner_config = PlannerConfig {
         mus_config: MusConfig::default(),
