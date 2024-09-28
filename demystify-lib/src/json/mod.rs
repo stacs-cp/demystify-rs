@@ -1,5 +1,5 @@
 /// This module contains the definitions and implementations related to JSON serialization and deserialization for the demystify library.
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use anyhow::Context;
 use itertools::Itertools;
@@ -184,6 +184,26 @@ impl Problem {
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
+        let varnames = tosolve
+            .iter()
+            .map(|x| x.var().name().clone())
+            .chain(known.iter().map(|x| x.var().name().clone()))
+            .collect::<HashSet<String>>();
+
+        let allowed_names: HashSet<String> = if varnames.len() != 1 {
+            if !varnames.contains("grid") {
+                return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
+            } else {
+                {
+                    let mut set = HashSet::new();
+                    set.insert("grid".to_string());
+                    set
+                }
+            }
+        } else {
+            varnames
+        };
+
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
             vec![
                 vec![None; usize::try_from(puzzle.width).context("width is negative")?];
@@ -206,6 +226,10 @@ impl Problem {
 
         for l in all_lits {
             if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
+                continue;
+            }
+
+            if !allowed_names.contains(l.var().name()) {
                 continue;
             }
 
