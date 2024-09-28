@@ -1,0 +1,59 @@
+language ESSENCE' 1.0
+
+$#KIND blocks
+
+given width: int
+given height: int
+letting griddim_x be domain int(1..width)
+letting griddim_y be domain int(1..height)
+given numblocks: int
+letting blockdim be domain int(1..numblocks)
+given startx: matrix indexed by [blockdim] of griddim_x
+given starty: matrix indexed by [blockdim] of griddim_y
+given blocksize: matrix indexed by [blockdim] of int
+
+$#VAR grid
+find grid: matrix indexed by [griddim_y, griddim_x] of blockdim
+
+$#VAR blockx
+find blockx: matrix indexed by [blockdim] of griddim_x
+
+$#VAR blocky
+find blocky: matrix indexed by [blockdim] of griddim_y
+
+$#VAR blockwidth
+find blockwidth: matrix indexed by [blockdim] of griddim_x
+
+$#VAR blockheight
+find blockheight: matrix indexed by [blockdim] of griddim_y
+
+
+$#CON colgrid "({{index[0]}}, {{index[1]}}) is in block {{index[2]}} if and only if it is within bounds"
+find colgrid: matrix indexed by [griddim_y, griddim_x, blockdim] of bool
+
+$#CON blocksizecon "The size of box {{index[0]}} is the product of the width and height"
+find blocksizecon: matrix indexed by [blockdim] of bool
+
+such that
+
+$ The square at starty[i], startx[i] is in block i
+forAll i: blockdim. grid[starty[i], startx[i]] = i,
+
+
+forAll i: griddim_y. forAll j: griddim_x. forAll k: blockdim.
+colgrid[i,j,k] ->
+( (grid[i,j] = k) <->
+( (i >= blocky[k]) /\ (i <= blocky[k] + blockheight[k] - 1) /\
+  (j >= blockx[k]) /\ (j <= blockx[k] + blockwidth[k] - 1)
+) ),
+
+$ Add basic maths conditions unconditionally
+forAll i : blockdim.
+forAll j: int(1..width*height).
+( blocksize[i] % j != 0) -> ((blockwidth[i] != j) /\ (blockheight[i] != j))
+
+,forAll i: blockdim.
+blocksizecon[i] -> (blockwidth[i] * blockheight[i] = blocksize[i])
+
+
+$,true -> and(flatten([flatten(colgrid), flatten(blocksizecon))]))
