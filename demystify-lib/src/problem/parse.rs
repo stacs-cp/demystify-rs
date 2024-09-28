@@ -528,11 +528,12 @@ impl PuzzleParse {
     }
 
     pub fn filter_out_constraint(&mut self, con: &str) {
-        if !self.eprime.cons.contains_key(con) {
-            panic!("Filtered constraint is not present: {con}")
-        }
+        assert!(
+            self.eprime.cons.contains_key(con),
+            "Filtered constraint is not present: {con}"
+        );
         let mut new_conset_lits = BTreeSet::new();
-        for l in self.conset_lits.iter() {
+        for l in &self.conset_lits {
             let puzvars = self.invlitmap.get(l).unwrap();
             if !puzvars.iter().all(|p| p.var().name() == con) {
                 new_conset_lits.insert(*l);
@@ -547,6 +548,7 @@ impl PuzzleParse {
         self.conset_lits = new_conset_lits;
     }
 
+    #[must_use]
     pub fn get_matrix_indices(&self, var: &str) -> Option<Vec<i64>> {
         let mut domain: Option<Vec<i64>> = None;
         for (key, _) in &self.domainmap {

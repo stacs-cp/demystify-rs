@@ -45,7 +45,7 @@ pub async fn click_literal(
         .get("hx-trigger")
         .context("Missing header: 'hx-trigger'")?;
     let cell = cell.to_str()?;
-    let cell: Result<Vec<_>, _> = cell.split('_').skip(1).map(|x| x.parse::<i64>()).collect();
+    let cell: Result<Vec<_>, _> = cell.split('_').skip(1).map(str::parse).collect();
     let cell = cell?;
 
     let solve = solver.quick_solve_html_step_for_literal(dbg!(cell));

@@ -13,9 +13,10 @@ fn merge_into_serde_json_dict_impl(a: &mut Value, b: &Value) -> bool {
 }
 
 pub fn merge_into_serde_json_dict(a: &mut Value, b: &Value) {
-    if !merge_into_serde_json_dict_impl(a, b) {
-        panic!("merging non-dictionaries: {} {}", a, b);
-    }
+    assert!(
+        merge_into_serde_json_dict_impl(a, b),
+        "merging non-dictionaries: {a} {b}"
+    );
 }
 
 #[cfg(test)]
@@ -49,11 +50,11 @@ mod tests {
     fn test_merge_json_dicts_3() {
         // Test case 3: Merging a dictionary with a non-dictionary value
         let a: Value = serde_json::from_str(r#"{"a": 1}"#).unwrap();
-        let b: Value = serde_json::from_str(r#"2"#).unwrap();
+        let b: Value = serde_json::from_str(r"2").unwrap();
         assert!(std::panic::catch_unwind(|| {
             let mut a = a.clone();
             let b = b.clone();
-            merge_into_serde_json_dict(&mut a, &b)
+            merge_into_serde_json_dict(&mut a, &b);
         })
         .is_err());
     }

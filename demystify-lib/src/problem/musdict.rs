@@ -59,9 +59,10 @@ impl MusDict {
         }
     }
 
+    #[must_use]
     pub fn min_lit(&self, lit: Lit) -> Option<usize> {
         if let Some(mus_list) = self.muses.get(&lit) {
-            mus_list.iter().next().map(|element| element.len())
+            mus_list.iter().next().map(std::vec::Vec::len)
         } else {
             None
         }

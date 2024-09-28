@@ -369,7 +369,7 @@ impl PuzzlePlanner {
         let nice_deduced: String = deduced.iter().format(", ").to_string();
 
         let description = if constraints.is_empty() {
-            format!("{:?} because of the design of the problem", nice_deduced)
+            format!("{nice_deduced:?} because of the design of the problem")
         } else {
             format!(
                 "{:?} because of {} constraints",

@@ -227,10 +227,10 @@ impl PuzzleSolver {
         let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
         litorig.extend_from_slice(&self.knownlits);
 
-        let reveal_lits: Vec<_> = self.puzzleparse.reveal_map.values().cloned().collect();
+        let reveal_lits: Vec<_> = self.puzzleparse.reveal_map.values().copied().collect();
         litorig.extend_from_slice(&reveal_lits);
 
-        let mut lits_to_check = self.puzzleparse.varset_lits.iter().cloned().collect_vec();
+        let mut lits_to_check = self.puzzleparse.varset_lits.iter().copied().collect_vec();
 
         lits_to_check.shuffle(rng);
 
@@ -296,7 +296,7 @@ impl PuzzleSolver {
             &self.puzzleparse.varset_lits
         };
         lits.iter()
-            .cloned()
+            .copied()
             .filter(|&lit| !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)))
             .collect()
     }
@@ -556,7 +556,7 @@ impl PuzzleSolver {
                 }
             }
             // Make sure we stop, if something stupid has happened
-            if mus_size > (i32::MAX as i64) {
+            if mus_size > i64::from(i32::MAX) {
                 info!(target: "solver", "no muses found!");
                 return md;
             }
