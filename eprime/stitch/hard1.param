@@ -1,0 +1,13 @@
+letting width be 8
+letting height be 14
+
+letting numblocks be 22
+
+letting startx be    [ 4,5,7,5,8, 7,3,2,2,6, 8, 1, 4, 2, 3, 5, 6, 7, 5, 2, 5, 7 ]
+letting starty be    [ 1,1,1,2,2, 4,5,6,8,8, 9,10,10,11,11,11,12,12,13,14,14,14 ]
+letting blocksize be [12,2,2,8,2,12,6,3,2,8,10, 8,10, 4, 8, 3, 2, 2, 1, 2, 3, 2 ]
+
+$ I have slightly tweaked the original puzzle, to make it have a unique solution
+$letting startx be    [ 4,5,7,5,8, 7,3,2,2,6, 8, 1, 4, 2, 3, 5, 6, 7, 5, 2, 5, 7 ]
+$letting starty be    [ 1,1,1,2,2, 4,5,6,8,8, 9,10,10,11,11,11,12,12,13,14,14,14 ]
+$letting blocksize be [12,2,2,8,2,12,6,3,2,8,10, 8,10, 4, 8, 2, 2, 2, 2, 2, 3, 2 ]

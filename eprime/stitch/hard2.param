@@ -1,0 +1,9 @@
+letting width be 8
+letting height be 14
+
+letting numblocks be 22
+
+letting starty be    [ 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 6, 6, 7, 7, 8, 9, 9, 9,10,12,13,14]
+letting startx be    [ 1, 3, 6, 3, 6, 8, 1, 2, 2, 5, 2, 4, 3, 7, 7, 4, 5, 7, 2, 8, 3, 1]
+letting blocksize be [ 2, 2, 4, 2, 8, 2,12, 2, 2, 8, 2, 4, 6, 4, 2, 6, 6,10, 7,10, 3, 8]
+
