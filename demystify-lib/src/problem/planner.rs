@@ -413,7 +413,7 @@ impl PuzzlePlanner {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::{collections::BTreeSet, sync::Arc};
 
     use crate::problem::{planner::PuzzlePlanner, solver::PuzzleSolver};
     use itertools::Itertools;
@@ -425,6 +425,8 @@ mod tests {
             "./tst/little1.eprime",
             "./tst/little1.param",
         );
+
+        let result = Arc::new(result);
 
         let puz = PuzzleSolver::new(result).unwrap();
 
@@ -450,6 +452,8 @@ mod tests {
             "./tst/little1.param",
         );
 
+        let result = Arc::new(result);
+
         let puz = PuzzleSolver::new(result).unwrap();
 
         let mut plan = PuzzlePlanner::new(puz);
@@ -465,6 +469,8 @@ mod tests {
             "./tst/binairo.eprime",
             "./tst/binairo-1.param",
         );
+
+        let result = Arc::new(result);
 
         let puz = PuzzleSolver::new(result).unwrap();
 
@@ -490,6 +496,8 @@ mod tests {
             "./tst/minesweeperPrinted.param",
         );
 
+        let result = Arc::new(result);
+
         let puz = PuzzleSolver::new(result).unwrap();
 
         let mut plan = PuzzlePlanner::new(puz);
@@ -511,6 +519,8 @@ mod tests {
             "./tst/minesweeper.eprime",
             "./tst/minesweeperPrinted.param",
         );
+
+        let result = Arc::new(result);
 
         let puz = PuzzleSolver::new(result).unwrap();
 
@@ -541,6 +551,8 @@ mod tests {
             "./tst/minesweeperWall.param",
         );
 
+        let result = Arc::new(result);
+
         let puz = PuzzleSolver::new(result).unwrap();
 
         let mut plan = PuzzlePlanner::new(puz);
@@ -564,6 +576,8 @@ mod tests {
             "./tst/minesweeperWall.param",
         );
 
+        let result = Arc::new(result);
+
         let puz = PuzzleSolver::new(result).unwrap();
 
         let mut plan = PuzzlePlanner::new(puz);
@@ -579,6 +593,8 @@ mod tests {
             "./tst/binairo.eprime",
             "./tst/binairo-1.param",
         );
+
+        let result = Arc::new(result);
 
         let puz = PuzzleSolver::new(result).unwrap();
 

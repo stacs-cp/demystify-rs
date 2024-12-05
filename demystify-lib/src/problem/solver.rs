@@ -1,4 +1,5 @@
 use std::ops::Neg;
+use std::sync::Arc;
 use std::{collections::BTreeSet, sync::atomic::AtomicI64};
 
 use std::sync::atomic::Ordering::Relaxed;
@@ -58,7 +59,7 @@ pub struct SolverConfig {
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
     satcore: ThreadLocal<SatCore>,
-    puzzleparse: PuzzleParse,
+    puzzleparse: Arc<PuzzleParse>,
 
     knownlits: Vec<Lit>,
     tosolvelits: Option<BTreeSet<Lit>>,
@@ -76,7 +77,7 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// A `PuzzleSolver` instance.
-    pub fn new(puzzleparse: PuzzleParse) -> anyhow::Result<PuzzleSolver> {
+    pub fn new(puzzleparse: Arc<PuzzleParse>) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
             satcore: ThreadLocal::new(),
             puzzleparse,
@@ -97,7 +98,7 @@ impl PuzzleSolver {
     ///
     /// A `PuzzleSolver` instance.
     pub fn new_with_config(
-        puzzleparse: PuzzleParse,
+        puzzleparse: Arc<PuzzleParse>,
         solver_config: SolverConfig,
     ) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
@@ -577,7 +578,7 @@ impl PuzzleSolver {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::{collections::BTreeSet, sync::Arc};
 
     use crate::problem::solver::{MusConfig, PuzzleSolver, SolverConfig};
 
@@ -590,6 +591,8 @@ mod tests {
             "./tst/little1.eprime",
             "./tst/little1.param",
         );
+
+        let result = Arc::new(result);
 
         let mut puz = PuzzleSolver::new(result)?;
 
@@ -630,6 +633,8 @@ mod tests {
             "./tst/little1.param",
         );
 
+        let result = Arc::new(result);
+
         let mut puz = PuzzleSolver::new_with_config(
             result,
             SolverConfig {
@@ -667,6 +672,8 @@ mod tests {
             "./tst/little1.eprime",
             "./tst/little1.param",
         );
+
+        let result = Arc::new(result);
 
         let mut puz = PuzzleSolver::new(result)?;
 
@@ -712,6 +719,8 @@ mod tests {
             "./tst/little1.param",
         );
 
+        let result = Arc::new(result);
+
         let mut puz = PuzzleSolver::new(result)?;
 
         let varlits = puz.get_provable_varlits().clone();
@@ -749,6 +758,8 @@ mod tests {
             "./tst/little1.eprime",
             "./tst/little1.param",
         );
+
+        let result = Arc::new(result);
 
         let mut gens = BTreeSet::new();
 
@@ -790,6 +801,8 @@ mod tests {
             "./tst/minesweeper.eprime",
             "./tst/minesweeperWall.param",
         );
+
+        let result = Arc::new(result);
 
         let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
 

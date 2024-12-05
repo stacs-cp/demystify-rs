@@ -7,7 +7,7 @@ use demystify_lib::{
     },
     web::{base_css, base_javascript},
 };
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -51,6 +51,8 @@ fn main() -> anyhow::Result<()> {
 
     let puzzle =
         problem::parse::parse_essence(&PathBuf::from(opt.model), &PathBuf::from(opt.param))?;
+
+    let puzzle = Arc::new(puzzle);
 
     let solver = PuzzleSolver::new_with_config(
         puzzle,

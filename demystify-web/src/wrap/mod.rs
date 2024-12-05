@@ -3,7 +3,7 @@ use axum::{extract::Multipart, Json};
 use axum_session::{Session, SessionNullPool};
 use serde_json::Value;
 
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 
@@ -138,6 +138,8 @@ pub async fn upload_files(
         &temp_dir.path().join(model.unwrap()),
         &temp_dir.path().join(param.unwrap()),
     )?;
+
+    let puzzle = Arc::new(puzzle);
 
     let puz = PuzzleSolver::new(puzzle)?;
 
