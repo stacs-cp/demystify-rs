@@ -401,6 +401,74 @@ impl PuzzleSolver {
         &self.knownlits
     }
 
+    fn get_var_mus_size_1_loop(
+        &self,
+        lit: Lit,
+        count: Option<usize>,
+        lits: &[Lit],
+        muses: &mut Vec<Vec<Lit>>,
+    ) -> SearchResult<()> {
+        if lits.len() == 0 || count.is_some_and(|x| muses.len() >= x) {
+            return Ok(());
+        }
+
+        let mut lit_cpy = lits.to_vec();
+        lit_cpy.push(!lit);
+
+        let solvable = self
+            .get_satcore()
+            .assumption_solve_with_known(&self.knownlits, &lit_cpy)?;
+
+        if !solvable {
+            if lits.len() == 1 {
+                muses.push(lits.to_vec());
+            } else {
+                let mid = lits.len() / 2;
+                let (left, right) = lits.split_at(mid);
+                self.get_var_mus_size_1_loop(lit, count, left, muses)?;
+                self.get_var_mus_size_1_loop(lit, count, right, muses)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Retrieves MUSes of size 0 or 1 for a given literal
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The literal to find a proof for (so we invert for the MUS).
+    /// * `count` - the largest number of MUSes to return (or None for all MUSes)
+    ///
+    /// # Returns
+    ///
+    /// An optional vector of vectors, containing the MUS of variables, or `None` if no MUS is found.
+    pub fn get_var_mus_size_1(
+        &self,
+        lit: Lit,
+        count: Option<usize>,
+    ) -> SearchResult<Vec<Vec<Lit>>> {
+        // First of all, check if there is a MUS of size 0,
+        // mainly because it makes the rest of this algorithm
+        // degenerate.
+        let just_lit = vec![!lit];
+
+        let solvable = self
+            .get_satcore()
+            .assumption_solve_with_known(&self.knownlits, &just_lit)?;
+
+        if !solvable {
+            return Ok(vec![]);
+        }
+
+        let conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+
+        let mut muses: Vec<Vec<Lit>> = vec![];
+
+        self.get_var_mus_size_1_loop(lit, count, &conset, &mut muses)?;
+        Ok(muses)
+    }
+
     /// Retrieves the minimal unsatisfiable subset (MUS) of variables which proves
     /// a given literal is required
     ///
@@ -693,10 +761,17 @@ mod tests {
 
         // Do a basic check we get a MUS for every varlit
         for &lit in &varlits {
-            let mus = puz.get_var_mus_quick(lit, None)?;
-            let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
-            assert!(mus.is_some());
-            assert!(mus_limit.is_some());
+            let mus = puz.get_var_mus_quick(lit, None)?.unwrap();
+            let mus_limit = puz.get_var_mus_quick(lit, Some(100))?.unwrap();
+            let tiny_muses = puz.get_var_mus_size_1(lit, None)?;
+            let tiny_muses_1 = puz.get_var_mus_size_1(lit, Some(1))?;
+            assert_eq!(mus.len() == 1, tiny_muses.len() > 0);
+            assert_eq!(tiny_muses_1.len() > 0, tiny_muses.len() > 0);
+            if mus.len() == 1 {
+                assert!(tiny_muses.iter().any(|x| x == &mus));
+                assert!(tiny_muses.iter().any(|x| x == &mus_limit));
+                assert!(tiny_muses.iter().any(|x| x == &tiny_muses_1[0]));
+            }
             println!("{lit:?} {mus:?}");
         }
 
@@ -706,8 +781,12 @@ mod tests {
             let lit = !lit;
             let mus = puz.get_var_mus_quick(lit, None)?;
             let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
+            let tiny_muses = puz.get_var_mus_size_1(lit, None)?;
+            let tiny_muses_1 = puz.get_var_mus_size_1(lit, Some(1))?;
             assert!(mus.is_none());
             assert!(mus_limit.is_none());
+            assert!(tiny_muses.is_empty());
+            assert!(tiny_muses_1.is_empty());
         }
         Ok(())
     }

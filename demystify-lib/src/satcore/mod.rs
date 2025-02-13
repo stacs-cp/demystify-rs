@@ -163,6 +163,30 @@ impl SatCore {
         result
     }
 
+    /// Solves the CNF formula with the given assumption and known
+    /// values.
+    ///
+    /// # Arguments
+    ///
+    /// * `known` - Literal known to be true
+    /// * `lits` - The assumptions to use during solving.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the formula is satisfiable, `false` if it is unsatisfiable.
+    pub fn assumption_solve_with_known(&self, known: &[Lit], lits: &[Lit]) -> SearchResult<bool> {
+        self.fix_values(known);
+        let mut solver = self.solver.lock().unwrap();
+        let solve = SatCore::do_solve_assumps(&mut solver, lits);
+        let result = match solve {
+            rustsat::solvers::SolverResult::Sat => Ok(true),
+            rustsat::solvers::SolverResult::Unsat => Ok(false),
+            rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
+        };
+        info!(target: "solver", "Solution to {:?} is {:?}", lits, result);
+        result
+    }
+
     /// Solves the CNF formula with the given assumptions and returns the full solution.
     ///
     /// # Arguments
