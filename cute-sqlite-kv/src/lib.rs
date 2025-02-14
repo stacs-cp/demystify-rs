@@ -206,7 +206,6 @@ impl KVStore {
     /// let result = kvstore.get("key").unwrap();
     /// assert_eq!(result, Some("value".to_string()));
     /// ```
-
     pub fn get(&self, key: &str) -> rusqlite::Result<Option<String>> {
         let mut stmt = self.connection.prepare(&format!(
             "SELECT {VAL_COLUMN} FROM {TABLE} WHERE {KEY_COLUMN} = ?"

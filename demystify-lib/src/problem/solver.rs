@@ -408,7 +408,7 @@ impl PuzzleSolver {
         lits: &[Lit],
         muses: &mut Vec<Vec<Lit>>,
     ) -> SearchResult<()> {
-        if lits.len() == 0 || count.is_some_and(|x| muses.len() >= x) {
+        if lits.is_empty() || count.is_some_and(|x| muses.len() >= x) {
             return Ok(());
         }
 
@@ -607,11 +607,11 @@ impl PuzzleSolver {
             })
             .filter(|(_, y)| y.is_ok())
             .map(|(x, y)| (x, y.unwrap()))
-            .filter(|(_, mus)| mus.len() > 0)
+            .filter(|(_, mus)| !mus.is_empty())
             .map(|(lit, mus)| (lit, mus[0].clone()))
             .collect();
 
-        if muses.len() > 0 {
+        if !muses.is_empty() {
             info!(target: "solve", "found tiny muses");
             for (k, v) in muses {
                 md.add_mus(k, v);
@@ -792,8 +792,8 @@ mod tests {
             let mus_limit = puz.get_var_mus_quick(lit, Some(100))?.unwrap();
             let tiny_muses = puz.get_var_mus_size_1(lit, None)?;
             let tiny_muses_1 = puz.get_var_mus_size_1(lit, Some(1))?;
-            assert_eq!(mus.len() == 1, tiny_muses.len() > 0);
-            assert_eq!(tiny_muses_1.len() > 0, tiny_muses.len() > 0);
+            assert_eq!(mus.len() == 1, !tiny_muses.is_empty());
+            assert_eq!(!tiny_muses_1.is_empty(), !tiny_muses.is_empty());
             if mus.len() == 1 {
                 assert!(tiny_muses.iter().any(|x| x == &mus));
                 assert!(tiny_muses.iter().any(|x| x == &mus_limit));
