@@ -4,7 +4,7 @@ use itertools::Itertools;
 use rustsat::types::Lit;
 use tracing::info;
 
-use crate::{json::Problem, web::create_html};
+use crate::{json::Problem, satcore::get_solver_calls, web::create_html};
 
 use super::{
     musdict::MusDict,
@@ -212,19 +212,21 @@ impl PuzzlePlanner {
 
             if progress {
                 println!(
-                    "{} steps, just found {} muses of size {}, {} left",
+                    "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
                     solvesteps.len(),
                     muses.len(),
                     muses[0].1.len(),
-                    self.psolve.get_provable_varlits().len()
+                    self.psolve.get_provable_varlits().len(),
+                    get_solver_calls(),
                 );
             } else {
                 info!(target: "planner",
-                    "{} steps, just found {} muses of size {}, {} left",
+                    "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
                     solvesteps.len(),
                     muses.len(),
                     muses[0].1.len(),
-                    self.psolve.get_provable_varlits().len()
+                    self.psolve.get_provable_varlits().len(),
+                    get_solver_calls(),
                 );
             }
             // Add these muses to the solving steps

@@ -169,7 +169,7 @@ impl PuzzleSolver {
         let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
         litorig.extend_from_slice(&self.knownlits);
         self.get_satcore()
-            .assumption_solve(&litorig)
+            .assumption_solve(self.get_known_lits(), &litorig)
             .expect("Solving the basic problem took too long, solver timed out (type 2)")
     }
 
@@ -194,7 +194,7 @@ impl PuzzleSolver {
                         lits.push(lit);
                         if !self
                             .get_satcore()
-                            .assumption_solve(&lits)
+                            .assumption_solve(self.get_known_lits(), &lits)
                             .expect("Solving the basic problem took too long, solver timed out")
                         {
                             return Some(!lit);
@@ -243,7 +243,7 @@ impl PuzzleSolver {
 
             if self
                 .get_satcore()
-                .assumption_solve(&lits)
+                .assumption_solve(self.get_known_lits(), &lits)
                 .expect("??? solver took too long")
             {
                 solution.push(test_lit);
@@ -255,7 +255,7 @@ impl PuzzleSolver {
                 lits.push(test_lit);
                 if self
                     .get_satcore()
-                    .assumption_solve(&lits)
+                    .assumption_solve(self.get_known_lits(), &lits)
                     .expect("??? solver took too long")
                 {
                     solution.push(test_lit);
@@ -268,7 +268,7 @@ impl PuzzleSolver {
             if steps == Some(0) {
                 let sol = self
                     .get_satcore()
-                    .assumption_solve_solution(&litorig)
+                    .assumption_solve_solution(self.get_known_lits(), &litorig)
                     .expect("Solver too slow...?!?!")
                     .expect("Must be a solution, from previous call??!?");
 
@@ -406,7 +406,7 @@ impl PuzzleSolver {
         lit: Lit,
         count: Option<usize>,
         lits: &[Lit],
-        muses: &mut Vec<Vec<Lit>>,
+        muses: &mut BTreeSet<Vec<Lit>>,
     ) -> SearchResult<()> {
         if lits.is_empty() || count.is_some_and(|x| muses.len() >= x) {
             return Ok(());
@@ -417,12 +417,24 @@ impl PuzzleSolver {
 
         let solvable = self
             .get_satcore()
-            .assumption_solve_with_known(&self.knownlits, &lit_cpy)?;
+            .assumption_solve_with_core(self.get_known_lits(), &lit_cpy)?;
 
-        if !solvable {
+        if let Some(core) = solvable {
             if lits.len() == 1 {
-                muses.push(lits.to_vec());
+                muses.insert(lits.to_vec());
             } else {
+                // This core can be found early. We might find it again later,
+                // but we add it here as it might make us find enough cores (in particular
+                // if we only want one))
+                if core.len() == 2 {
+                    let mus = core
+                        .iter()
+                        .copied()
+                        .filter(|x| lits.contains(x))
+                        .collect_vec();
+                    assert!(mus.len() == 1);
+                    muses.insert(mus);
+                }
                 let mid = lits.len() / 2;
                 let (left, right) = lits.split_at(mid);
                 self.get_var_mus_size_1_loop(lit, count, left, muses)?;
@@ -455,7 +467,7 @@ impl PuzzleSolver {
 
         let solvable = self
             .get_satcore()
-            .assumption_solve_with_known(&self.knownlits, &just_lit)?;
+            .assumption_solve(self.get_known_lits(), &just_lit)?;
 
         if !solvable {
             return Ok(vec![]);
@@ -466,10 +478,13 @@ impl PuzzleSolver {
         let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
         conset.shuffle(&mut rng);
 
-        let mut muses: Vec<Vec<Lit>> = vec![];
+        let mut muses: BTreeSet<Vec<Lit>> = BTreeSet::new();
 
-        self.get_var_mus_size_1_loop(lit, count, &conset, &mut muses)?;
-        Ok(muses)
+        let mid = conset.len() / 2;
+        let (left, right) = conset.split_at(mid);
+        self.get_var_mus_size_1_loop(lit, count, left, &mut muses)?;
+        self.get_var_mus_size_1_loop(lit, count, right, &mut muses)?;
+        Ok(muses.into_iter().collect_vec())
     }
 
     /// Retrieves the minimal unsatisfiable subset (MUS) of variables which proves
