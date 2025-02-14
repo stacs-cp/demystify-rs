@@ -565,6 +565,50 @@ impl PuzzleSolver {
         }))
     }
 
+    pub fn get_var_mus_cake(&self, lit: Lit, max_size: i64) -> SearchResult<Option<Vec<Lit>>> {
+        // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
+        assert!(self.puzzleparse.varset_lits.contains(&lit));
+
+        let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+
+        conset.shuffle(&mut rand::thread_rng());
+
+        let conset_chunks: Vec<Vec<Lit>> = (0..=max_size)
+            .map(|i| {
+                conset
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(j, &lit)| {
+                        if j % (max_size as usize + 1) != i as usize {
+                            Some(lit)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        for chunk in conset_chunks {
+            let mut lits: Vec<Lit> = vec![];
+            lits.extend(chunk);
+            lits.push(!lit);
+            let mus = self
+                .get_satcore()
+                .quick_mus(&self.knownlits, &lits, Some(max_size + 1))?;
+            if let Some(m) = mus {
+                return Ok(Some(
+                    m.into_iter()
+                        .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                        .collect(),
+                ));
+            }
+            lits.clear();
+        }
+
+        Ok(None)
+    }
+
     /// Retrieves an explanation for each element of a list of literals. This will often be
     /// much bigger than the minimum possible MUS size.
     ///
@@ -807,12 +851,14 @@ mod tests {
             let mus_limit = puz.get_var_mus_quick(lit, Some(100))?.unwrap();
             let tiny_muses = puz.get_var_mus_size_1(lit, None)?;
             let tiny_muses_1 = puz.get_var_mus_size_1(lit, Some(1))?;
+            let cake_mus = puz.get_var_mus_cake(lit, 3)?.unwrap();
             assert_eq!(mus.len() == 1, !tiny_muses.is_empty());
             assert_eq!(!tiny_muses_1.is_empty(), !tiny_muses.is_empty());
             if mus.len() == 1 {
                 assert!(tiny_muses.iter().any(|x| x == &mus));
                 assert!(tiny_muses.iter().any(|x| x == &mus_limit));
                 assert!(tiny_muses.iter().any(|x| x == &tiny_muses_1[0]));
+                assert_eq!(cake_mus.len(), 1);
             }
             println!("{lit:?} {mus:?}");
         }
@@ -825,10 +871,12 @@ mod tests {
             let mus_limit = puz.get_var_mus_quick(lit, Some(100))?;
             let tiny_muses = puz.get_var_mus_size_1(lit, None)?;
             let tiny_muses_1 = puz.get_var_mus_size_1(lit, Some(1))?;
+            let cake_mus = puz.get_var_mus_cake(lit, 2)?;
             assert!(mus.is_none());
             assert!(mus_limit.is_none());
             assert!(tiny_muses.is_empty());
             assert!(tiny_muses_1.is_empty());
+            assert!(cake_mus.is_none());
         }
         Ok(())
     }
