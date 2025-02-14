@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
@@ -461,7 +461,10 @@ impl PuzzleSolver {
             return Ok(vec![]);
         }
 
-        let conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+        let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+
+        let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
+        conset.shuffle(&mut rng);
 
         let mut muses: Vec<Vec<Lit>> = vec![];
 
@@ -592,6 +595,30 @@ impl PuzzleSolver {
         let mut md = MusDict::new();
         let mut mus_size = config.base_size_mus;
         let best_mus_size = AtomicI64::new(config.base_size_mus);
+
+        info!(target: "solve", "scanning for tiny muses");
+
+        let muses: Vec<_> = lits
+            .iter()
+            .par_bridge()
+            .map(|&x| {
+                let ret = self.get_var_mus_size_1(x, Some(1));
+                (x, ret)
+            })
+            .filter(|(_, y)| y.is_ok())
+            .map(|(x, y)| (x, y.unwrap()))
+            .filter(|(_, mus)| mus.len() > 0)
+            .map(|(lit, mus)| (lit, mus[0].clone()))
+            .collect();
+
+        if muses.len() > 0 {
+            info!(target: "solve", "found tiny muses");
+            for (k, v) in muses {
+                md.add_mus(k, v);
+            }
+            return md;
+        }
+
         info!(target: "solver", "scanning for {} muses", lits.len());
         loop {
             info!(target: "solver", "scanning for muses size {}", mus_size);
