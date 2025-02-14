@@ -71,7 +71,7 @@ impl PuzzlePlanner {
     pub fn all_muses(&mut self) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
         self.psolve
-            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config)
+            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config, None)
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle which satisfy a filter.
@@ -82,7 +82,7 @@ impl PuzzlePlanner {
         let varlits = self.psolve.get_provable_varlits().clone();
         let varlits: BTreeSet<_> = varlits.into_iter().filter(|l| filter(l, self)).collect();
         self.psolve
-            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config)
+            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config, None)
     }
 
     /// Returns a vector of the smallest MUSes of the puzzle.
