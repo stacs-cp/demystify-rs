@@ -237,7 +237,7 @@ impl PuzzleSolver {
 
         for &l in &lits_to_check {
             let mut lits = litorig.clone();
-            let test_lit = if rng.gen_bool(0.5) { l } else { l.neg() };
+            let test_lit = if rng.random_bool(0.5) { l } else { l.neg() };
 
             lits.push(test_lit);
 
@@ -529,7 +529,7 @@ impl PuzzleSolver {
 
         let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
 
-        conset.shuffle(&mut rand::thread_rng());
+        conset.shuffle(&mut rand::rng());
 
         // This code tries to deduce how many elements we can drop from 'conset', such that
         // we will still have an 80% chance of leaving a MUS of size 'max_size'.
@@ -571,7 +571,7 @@ impl PuzzleSolver {
 
         let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
 
-        conset.shuffle(&mut rand::thread_rng());
+        conset.shuffle(&mut rand::rng());
 
         let conset_chunks: Vec<Vec<Lit>> = (0..=max_size)
             .map(|i| {
