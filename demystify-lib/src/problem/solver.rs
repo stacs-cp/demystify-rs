@@ -620,8 +620,11 @@ impl PuzzleSolver {
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals where no MUS was found are omitted from the output.
-    pub fn get_many_vars_mus_first(&self, lits: &BTreeSet<Lit>,
-        musdict : Option<MusDict>) -> MusDict {
+    pub fn get_many_vars_mus_first(
+        &self,
+        lits: &BTreeSet<Lit>,
+        musdict: Option<MusDict>,
+    ) -> MusDict {
         let muses: Vec<_> = lits
             .par_iter()
             .map(|&x| (x, self.get_var_mus_quick(x, None)))
@@ -651,7 +654,7 @@ impl PuzzleSolver {
         &self,
         lits: &BTreeSet<Lit>,
         config: &MusConfig,
-        musdict : Option<MusDict>
+        musdict: Option<MusDict>,
     ) -> MusDict {
         let mut md = musdict.unwrap_or_else(MusDict::new);
 
@@ -915,8 +918,14 @@ mod tests {
         assert!(!muses.is_empty());
         assert!(!muses_quick.is_empty());
 
-        let muses_2 = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), Some(muses.clone()));
-        let muses_quick_2 = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), Some(muses_quick.clone()));
+        let muses_2 = puz.get_many_vars_mus_first(
+            &(varlits.iter().map(|&x| !x).collect()),
+            Some(muses.clone()),
+        );
+        let muses_quick_2 = puz.get_many_vars_mus_first(
+            &(varlits.iter().map(|&x| !x).collect()),
+            Some(muses_quick.clone()),
+        );
 
         assert!(!muses_2.is_empty());
         assert!(!muses_quick_2.is_empty());
@@ -925,13 +934,20 @@ mod tests {
         assert_eq!(muses_quick.min(), muses_quick_2.min());
 
         let neg_muses = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), None);
-        let neg_muses_quick = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), None);
+        let neg_muses_quick =
+            puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), None);
 
         assert!(neg_muses.is_empty());
         assert!(neg_muses_quick.is_empty());
 
-        let neg_muses_2 = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), Some(neg_muses.clone()));
-        let neg_muses_quick_2 = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), Some(neg_muses_quick.clone()));
+        let neg_muses_2 = puz.get_many_vars_mus_first(
+            &(varlits.iter().map(|&x| !x).collect()),
+            Some(neg_muses.clone()),
+        );
+        let neg_muses_quick_2 = puz.get_many_vars_mus_first(
+            &(varlits.iter().map(|&x| !x).collect()),
+            Some(neg_muses_quick.clone()),
+        );
 
         assert!(neg_muses_2.is_empty());
         assert!(neg_muses_quick_2.is_empty());

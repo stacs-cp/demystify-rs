@@ -166,6 +166,19 @@ impl PuzzlePlanner {
         self.psolve.add_known_lit(*lit);
     }
 
+    /// Marks multiple literals as deduced.
+    ///
+    /// This method should only be called if there are no solutions with the negation of the literals.
+    ///
+    /// # Arguments
+    ///
+    /// * `lits` - A slice of literals to mark as deduced.
+    pub fn mark_lits_as_deduced(&mut self, lits: &[Lit]) {
+        for lit in lits {
+            self.psolve.add_known_lit(*lit);
+        }
+    }
+
     /// Returns a reference to the vector of all known literals.
     ///
     /// This includes literals that have been marked as deduced and literals from 'REVEAL' statements.
@@ -294,18 +307,20 @@ impl PuzzlePlanner {
     pub fn quick_solve_html(&mut self) -> String {
         let mut html = String::new();
         while !self.psolve.get_provable_varlits().is_empty() {
-            html += &self.quick_solve_html_step();
+            let (new_html, lits) = self.quick_solve_html_step();
+            html += &new_html;
+            self.mark_lits_as_deduced(&lits);
             html += "<br/>";
         }
         html
     }
 
-    pub fn quick_solve_html_step(&mut self) -> String {
+    pub fn quick_solve_html_step(&mut self) -> (String, Vec<Lit>) {
         let base_muses = self.smallest_muses_with_config();
         self.quick_display_html_step(base_muses)
     }
 
-    pub fn quick_solve_html_step_for_literal(&mut self, lit_def: Vec<i64>) -> String {
+    pub fn quick_solve_html_step_for_literal(&mut self, lit_def: Vec<i64>) -> (String, Vec<Lit>) {
         let muses = self.filtered_muses(Box::new(move |lit, planner| {
             let puzlit_list = planner.solver().lit_to_puzlit(lit);
             for puzlit in puzlit_list {
@@ -322,7 +337,7 @@ impl PuzzlePlanner {
         let min = muses.min();
 
         if min.is_none() {
-            return "No MUS".to_owned();
+            return ("No MUS".to_owned(), vec![]);
         }
 
         let min = min.unwrap();
@@ -342,7 +357,10 @@ impl PuzzlePlanner {
         self.quick_display_html_step(vec)
     }
 
-    pub fn quick_display_html_step(&mut self, base_muses: Vec<(Lit, Vec<Lit>)>) -> String {
+    pub fn quick_display_html_step(
+        &mut self,
+        base_muses: Vec<(Lit, Vec<Lit>)>,
+    ) -> (String, Vec<Lit>) {
         // Map the 'muses' to a user-friendly representation
         let muses = base_muses
             .iter()
@@ -390,11 +408,12 @@ impl PuzzlePlanner {
         )
         .expect("Cannot make puzzle json");
 
+        let v = base_muses.iter().map(|(c, _)| c).copied().collect_vec();
         for (m, _) in &base_muses {
             self.mark_lit_as_deduced(m);
         }
 
-        create_html(&problem)
+        (create_html(&problem), v)
     }
 
     /// Returns a reference to the puzzle being solved.

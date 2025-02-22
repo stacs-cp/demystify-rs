@@ -28,7 +28,9 @@ pub async fn best_next_step(session: Session<SessionNullPool>) -> Result<String,
 
     let mut solver = solver.lock().unwrap();
 
-    let solve = solver.quick_solve_html_step();
+    let (solve, lits) = solver.quick_solve_html_step();
+
+    solver.mark_lits_as_deduced(&lits);
 
     Ok(solve)
 }
@@ -48,9 +50,14 @@ pub async fn click_literal(
     let cell: Result<Vec<_>, _> = cell.split('_').skip(1).map(str::parse).collect();
     let cell = cell?;
 
-    let solve = solver.quick_solve_html_step_for_literal(dbg!(cell));
+    session.set("click_cell", &cell);
 
-    Ok(solve)
+    let (html, lits) = solver.quick_solve_html_step_for_literal(dbg!(cell));
+
+    let lidx_lits: Vec<_> = lits.iter().map(|x| x.lidx()).collect();
+    session.set("lidx_lits", &lidx_lits);
+
+    Ok(html)
 }
 
 pub async fn upload_files(
