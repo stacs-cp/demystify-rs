@@ -30,6 +30,9 @@ struct Opt {
 
     #[arg(long)]
     only_assign: bool,
+
+    #[arg(long)]
+    searches: Option<i64>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -61,8 +64,14 @@ fn main() -> anyhow::Result<()> {
         },
     )?;
 
+    let mus_config: MusConfig = if let Some(searches) = opt.searches {
+        MusConfig::new_with_repeats(searches)
+    } else {
+        MusConfig::default()
+    };
+
     let planner_config = PlannerConfig {
-        mus_config: MusConfig::default(),
+        mus_config: mus_config,
         merge_small_threshold: opt.merge,
     };
 

@@ -41,7 +41,7 @@ impl Default for MusConfig {
 
 impl MusConfig {
     #[must_use]
-    pub fn repeats(repeats: i64) -> Self {
+    pub fn new_with_repeats(repeats: i64) -> Self {
         Self {
             base_size_mus: 2,
             mus_add_step: 1,
