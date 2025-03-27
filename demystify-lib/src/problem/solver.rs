@@ -633,7 +633,7 @@ impl PuzzleSolver {
             .filter(|(_, mus)| mus.is_some())
             .map(|(lit, mus)| (lit, mus.unwrap()))
             .collect();
-        let mut md = musdict.unwrap_or_else(MusDict::new);
+        let mut md = musdict.unwrap_or_default();
         for (k, v) in muses {
             md.add_mus(k, v);
         }
@@ -656,7 +656,7 @@ impl PuzzleSolver {
         config: &MusConfig,
         musdict: Option<MusDict>,
     ) -> MusDict {
-        let mut md = musdict.unwrap_or_else(MusDict::new);
+        let mut md = musdict.unwrap_or_default();
 
         let mut mus_size = config.base_size_mus;
         let best_mus_size = AtomicI64::new(config.base_size_mus);

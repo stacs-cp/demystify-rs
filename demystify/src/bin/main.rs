@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let planner_config = PlannerConfig {
-        mus_config: mus_config,
+        mus_config,
         merge_small_threshold: opt.merge,
     };
 
