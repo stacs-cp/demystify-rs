@@ -85,7 +85,7 @@ pub async fn upload_files(
         // Grab the name
         let form_file_name = field.file_name().context("No filename")?;
 
-        println!("Got file '{form_file_name}'!");
+        eprintln!("Got file '{form_file_name}'!");
 
         let file_name = if form_file_name.ends_with(".param") || form_file_name.ends_with(".json") {
             if param.is_some() {

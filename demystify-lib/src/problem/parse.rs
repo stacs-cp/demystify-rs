@@ -539,7 +539,7 @@ impl PuzzleParse {
                 new_conset_lits.insert(*l);
             }
         }
-        println!(
+        eprintln!(
             "Removing {}: {} -> {}",
             con,
             self.conset_lits.len(),

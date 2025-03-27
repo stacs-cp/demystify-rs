@@ -78,7 +78,7 @@ async fn main() {
     // run it
     let addr = SocketAddr::from(([0, 0, 0, 0], 8008));
 
-    println!("listening on {addr}");
+    eprintln!("listening on {addr}");
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }

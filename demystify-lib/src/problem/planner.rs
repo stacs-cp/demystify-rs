@@ -224,7 +224,7 @@ impl PuzzlePlanner {
                 .collect_vec();
 
             if progress {
-                println!(
+                eprintln!(
                     "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
                     solvesteps.len(),
                     muses.len(),

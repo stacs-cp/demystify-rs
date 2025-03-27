@@ -98,7 +98,7 @@ impl SatCore {
         // As we added all 'lits' to 'fixed', if there are more things in 'fixed'
         // something we don't want is in fixed.
         if fixed.len() > lits.len() {
-            println!("Rebooting solver");
+            eprintln!("Rebooting solver");
             let mut solver = Solver::default();
             solver
                 .add_cnf(self.cnf.as_ref().clone())
