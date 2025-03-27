@@ -841,7 +841,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         .arg("-reduce-domains")
         .arg("-aggregate")
         .output()
-        .expect("Failed to execute command");
+        .expect("Failed to find 'savilerow' -- have you installed savilerow and conjure?");
 
     if !makedimacs.status.success() {
         bail!(
