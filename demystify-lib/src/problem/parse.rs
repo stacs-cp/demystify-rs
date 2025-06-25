@@ -787,14 +787,19 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     let finaleprime: PathBuf;
     let finaleprimeparam: PathBuf;
 
+    info!(target: "parser", "Handling {:?}", eprime);
+
+    // Check if file extension is .essence
+    let is_essence = eprime.extension().map_or(false, |ext| ext == "essence");
+
     // If input is essence, translate to essence' for savilerow
-    if eprime.ends_with(".essence") {
+    if is_essence {
         info!(target: "parser", "Running {:?} {:?} through conjure", eprime, eprimeparam);
         let output = Command::new("conjure")
             .arg("solve")
             .arg("-o")
             .arg(tdir.path().to_str().unwrap())
-            .arg(eprime)
+            .arg(&eprime)
             .arg(eprimeparam)
             .output()
             .expect("Failed to execute command");
@@ -851,12 +856,12 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         );
     }
 
-    let in_eprime_path = PathBuf::from(&finaleprime);
+    let original_input_path = PathBuf::from(&eprime);
 
     // Need to put '.dimacs' on the end in this slightly horrible way.
     let in_dimacs_path = PathBuf::from(finaleprimeparam.to_str().unwrap().to_owned() + ".dimacs");
 
-    let mut eprimeparse = parse_eprime(&in_eprime_path, &finaleprimeparam)?;
+    let mut eprimeparse = parse_eprime(&original_input_path, &finaleprimeparam)?;
 
     eprimeparse.satinstance =
         instances::SatInstance::<BasicVarManager>::from_dimacs_path(&in_dimacs_path)
