@@ -110,15 +110,7 @@ impl PuzzleDraw {
 
         out.append(cellgrp);
 
-        let out = self.fill_outside_labels(
-            out,
-            puzzle.width,
-            puzzle.height,
-            &puzzle.top_labels,
-            &puzzle.bottom_labels,
-            &puzzle.left_labels,
-            &puzzle.right_labels,
-        );
+        let out = self.fill_outside_labels(out, &puzzle);
 
         let mut final_grp = element::Group::new();
         final_grp.assign("transform", "translate(50,50) scale(400)");
@@ -132,25 +124,21 @@ impl PuzzleDraw {
         doc.add(final_grp)
     }
 
-    fn fill_outside_labels(
-        &self,
-        mut grid: element::Group,
-        width: i64,
-        height: i64,
-        top_labels: &Option<Vec<String>>,
-        bottom_labels: &Option<Vec<String>>,
-        left_labels: &Option<Vec<String>>,
-        right_labels: &Option<Vec<String>>,
-    ) -> element::Group {
+    fn fill_outside_labels(&self, mut grid: element::Group, p: &Puzzle) -> element::Group {
         let mut label_group = element::Group::new();
         label_group.assign("class", "labels");
 
-        let step = 1.0 / std::cmp::min(width, height) as f64;
+        let step = 1.0 / std::cmp::min(p.width, p.height) as f64;
 
-        let mut puz_bounds = (0.0, step * (width as f64), 0.0, step * (height as f64));
+        let mut puz_bounds = (0.0, step * (p.width as f64), 0.0, step * (p.height as f64));
 
         // Add top labels
-        let label_groups = [top_labels, bottom_labels, left_labels, right_labels];
+        let label_groups = [
+            &p.top_labels,
+            &p.bottom_labels,
+            &p.left_labels,
+            &p.right_labels,
+        ];
 
         let label_positions: Vec<(
             Box<dyn Fn(usize) -> i64>,
@@ -164,7 +152,7 @@ impl PuzzleDraw {
             ),
             (
                 Box::new(|i| i as i64),
-                Box::new(|_| height),
+                Box::new(|_| p.height),
                 Box::new(|bounds| bounds.1 += step),
             ),
             (
@@ -173,7 +161,7 @@ impl PuzzleDraw {
                 Box::new(|bounds| bounds.2 -= step),
             ),
             (
-                Box::new(|_| width),
+                Box::new(|_| p.width),
                 Box::new(|i| i as i64),
                 Box::new(|bounds| bounds.3 += step),
             ),

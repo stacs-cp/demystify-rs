@@ -690,7 +690,7 @@ impl PuzzleSolver {
             best_mus_size.store(mus_size, Relaxed);
             let muses: Vec<_> = lits
                 .iter()
-                .flat_map(|x| std::iter::repeat(x).take(config.repeats as usize))
+                .flat_map(|x| std::iter::repeat_n(x, config.repeats as usize))
                 .par_bridge()
                 .map(|&x| {
                     let mus_test_size = best_mus_size.load(Relaxed);

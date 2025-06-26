@@ -790,7 +790,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     info!(target: "parser", "Handling {:?}", eprime);
 
     // Check if file extension is .essence
-    let is_essence = eprime.extension().map_or(false, |ext| ext == "essence");
+    let is_essence = eprime.extension().is_some_and(|ext| ext == "essence");
 
     // If input is essence, translate to essence' for savilerow
     if is_essence {

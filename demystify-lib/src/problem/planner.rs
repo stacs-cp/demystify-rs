@@ -34,6 +34,8 @@ pub struct PuzzlePlanner {
     config: PlannerConfig,
 }
 
+type FilterType = Box<dyn Fn(&Lit, &mut PuzzlePlanner) -> bool>;
+
 impl PuzzlePlanner {
     /// Creates a new `PuzzlePlanner` instance.
     ///
@@ -75,10 +77,7 @@ impl PuzzlePlanner {
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle which satisfy a filter.
-    pub fn filtered_muses(
-        &mut self,
-        filter: Box<dyn Fn(&Lit, &mut PuzzlePlanner) -> bool>,
-    ) -> MusDict {
+    pub fn filtered_muses(&mut self, filter: FilterType) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
         let varlits: BTreeSet<_> = varlits.into_iter().filter(|l| filter(l, self)).collect();
         self.psolve
