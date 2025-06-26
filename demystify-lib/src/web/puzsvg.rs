@@ -110,7 +110,7 @@ impl PuzzleDraw {
 
         out.append(cellgrp);
 
-        let out = self.fill_outside_labels(out, &puzzle);
+        let out = self.fill_outside_labels(out, puzzle);
 
         let mut final_grp = element::Group::new();
         final_grp.assign("transform", "translate(50,50) scale(400)");
@@ -140,6 +140,7 @@ impl PuzzleDraw {
             &p.right_labels,
         ];
 
+        #[allow(clippy::type_complexity)]
         let label_positions: Vec<(
             Box<dyn Fn(usize) -> i64>,
             Box<dyn Fn(usize) -> i64>,
