@@ -50,3 +50,5 @@ jobs:
           version: ${{ matrix.conjure_version }}
 
       - run: cargo test --workspace
+
+      - run: scripts/check-some.sh
