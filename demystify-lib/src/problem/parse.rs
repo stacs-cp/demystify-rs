@@ -239,8 +239,6 @@ pub struct PuzzleParse {
     pub varset_lits_neg: BTreeSet<Lit>,
     /// List of all literals which turn on CON
     pub conset_lits: BTreeSet<Lit>,
-    /// List of all literals in an AUX
-    pub auxset_lits: BTreeSet<Lit>,
 
     /// A mapping from variables in the order representation to their corresponding SAT integers.
     /// These are generally not useful, but are sometimes used when scanning
@@ -294,7 +292,6 @@ impl PuzzleParse {
             varset_lits: BTreeSet::new(),
             varset_lits_neg: BTreeSet::new(),
             conset_lits: BTreeSet::new(),
-            auxset_lits: BTreeSet::new(),
             reveal_map: BTreeMap::new(),
         }
     }
@@ -344,7 +341,7 @@ impl PuzzleParse {
                     self.varset_lits_neg.insert(lit);
                 }
             } else if self.eprime.auxvars.contains(name) {
-                self.auxset_lits.insert(lit);
+                // don't care about aux vars
             } else if self.eprime.cons.contains_key(name) {
                 // constraints are specially dealt with above
             } else if self.eprime.reveal_values.contains(name) {
@@ -1054,7 +1051,6 @@ mod tests {
         assert_eq!(puz.conset.len(), 4);
         assert_eq!(puz.conset_lits.len(), 4);
         assert_eq!(puz.varset_lits.len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
-        assert_eq!(puz.auxset_lits.len(), 0);
         let cons = puz.constraints();
 
         assert!(puz.conset_lits.iter().all(|l| puz.lit_is_con(l)));
