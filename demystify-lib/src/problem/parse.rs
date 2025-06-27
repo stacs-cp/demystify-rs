@@ -720,9 +720,15 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                 let litval = match_[3].parse::<i64>().unwrap();
 
                 if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
-                    let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
+                    let satlit = Lit::from_ipasir(
+                        i32::try_from(litval)
+                            .with_context(|| format!("Number too large: {}", litval))?,
+                    )?;
                     let varid =
-                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])?;
+                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])
+                            .with_context(|| {
+                                format!("Failed parsing savile row name {}", &match_[1])
+                            })?;
                     if let Some(varid) = varid {
                         let puzlit = PuzLit::new_eq(VarValPair::new(
                             &varid,
@@ -738,7 +744,10 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                 if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
                     let varid =
-                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])?;
+                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])
+                            .with_context(|| {
+                                format!("Failed parsing savile row name {}", &match_[1])
+                            })?;
 
                     if let Some(varid) = varid {
                         // Not currently using exact literal

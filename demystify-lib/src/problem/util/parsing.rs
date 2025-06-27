@@ -6,12 +6,7 @@ use super::super::PuzVar;
 
 use crate::problem::parse::PuzzleParse;
 
-pub fn parse_savile_row_name(
-    dimacs: &PuzzleParse,
-    //    vars: &BTreeSet<String>,
-    //    auxvars: &BTreeSet<String>,
-    n: &str,
-) -> anyhow::Result<Option<PuzVar>> {
+pub fn parse_savile_row_name(dimacs: &PuzzleParse, n: &str) -> anyhow::Result<Option<PuzVar>> {
     let mut matches: Vec<&String> = dimacs
         .eprime
         .vars
@@ -42,7 +37,8 @@ pub fn parse_savile_row_name(
     matches.extend(auxmatch);
 
     if matches.is_empty() {
-        if !dimacs.eprime.auxvars.iter().any(|v| n.starts_with(v)) {
+        if !dimacs.eprime.auxvars.iter().any(|v| n.starts_with(v)) && !n.starts_with("conjure_aux")
+        {
             bail!("{} is not defined -- should it be AUX?", n);
         }
         return Ok(None);
@@ -68,12 +64,15 @@ pub fn parse_savile_row_name(
     let mut args = Vec::new();
     for arg in splits {
         if !arg.is_empty() {
-            let c = if let Some(strip) = arg.strip_prefix('n') {
-                -(strip.parse::<i64>()?)
+            let parse_result = if let Some(strip) = arg.strip_prefix('n') {
+                strip.parse::<i64>().map(|v| -v)
             } else {
-                arg.parse::<i64>()?
+                arg.parse::<i64>()
             };
-            args.push(c);
+
+            if let Ok(c) = parse_result {
+                args.push(c);
+            }
         }
     }
     Ok(Some(PuzVar::new(&name, args)))
