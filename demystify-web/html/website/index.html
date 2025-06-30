@@ -13,6 +13,24 @@
       window.addEventListener('load', function() {
         htmx.onLoad(x => {doJavascript()});
       });
+
+      document.addEventListener('htmx:beforeRequest', function() {
+  document.querySelectorAll('button').forEach(btn => {
+    if (!btn.disabled) {
+      btn.disabled = true;
+      btn.dataset.htmxDisabled = "true"; // Mark this button
+    }
+  });
+});
+
+document.addEventListener('htmx:afterRequest', function() {
+  document.querySelectorAll('[data-htmx-disabled="true"]').forEach(btn => {
+    btn.disabled = false;
+    delete btn.dataset.htmxDisabled; // Clean up
+  });
+});
+
+
     </script>
   </head>
   <body hx-ext="response-targets">
@@ -34,10 +52,14 @@
       </div>
     </div>
 
-    <button type="button" id="Refresh" class="btn btn-primary">Refresh</button>
+    <span id="indicator" class="htmx-indicator ms-2">
+    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+    </span>
+
+    <button type="button" id="Refresh" class="btn btn-primary" hx-indicator="#indicator">Refresh</button>
 
 
-    <button type="button" hx-post="/bestNextStep" hx-target="#mainSpace" id="BestNextStep" class="btn btn-primary">Best Next Step</button>
+    <button type="button" hx-post="/bestNextStep" hx-target="#mainSpace" id="BestNextStep" class="btn btn-primary" hx-indicator="#indicator">Best Next Step</button>
 
     <div class="container">
       <h4>Upload eprime/essence + param</h4>
@@ -50,6 +72,7 @@
         <div id="uploadMessage">uploadMessage</div>
       </form>
     </div>
+
 
 
     <div id="infoBox"><p>Info</p></div>
