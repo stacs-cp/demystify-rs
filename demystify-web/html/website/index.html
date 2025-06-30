@@ -61,6 +61,8 @@ document.addEventListener('htmx:afterRequest', function() {
 
     <button type="button" hx-post="/bestNextStep" hx-target="#mainSpace" id="BestNextStep" class="btn btn-primary" hx-indicator="#indicator">Best Next Step</button>
 
+        <button type="button" hx-post="/getDifficulties" hx-target="#mainSpace" id="GetDifficulties" class="btn btn-primary" hx-indicator="#indicator">Get Difficulties</button>
+
     <div class="container">
       <h4>Upload eprime/essence + param</h4>
       <form id="fileUploadForm" hx-encoding="multipart/form-data" hx-post="/uploadPuzzle" hx-target="#uploadMessage" hx-target-error="#uploadMessage">

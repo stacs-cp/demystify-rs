@@ -26,6 +26,7 @@ pub struct MusConfig {
     pub mus_add_step: i64,
     pub mus_mult_step: i64,
     pub repeats: i64,
+    pub find_bigger: bool,
 }
 
 impl Default for MusConfig {
@@ -35,6 +36,7 @@ impl Default for MusConfig {
             mus_add_step: 1,
             mus_mult_step: 2,
             repeats: 5,
+            find_bigger: false,
         }
     }
 }
@@ -47,6 +49,7 @@ impl MusConfig {
             mus_add_step: 1,
             mus_mult_step: 2,
             repeats,
+            find_bigger: false,
         }
     }
 }
@@ -676,7 +679,7 @@ impl PuzzleSolver {
             .map(|(lit, mus)| (lit, mus[0].clone()))
             .collect();
 
-        if !muses.is_empty() {
+        if !muses.is_empty() && !config.find_bigger {
             info!(target: "solve", "found tiny muses");
             for (k, v) in muses {
                 md.add_mus(k, v);
@@ -694,6 +697,11 @@ impl PuzzleSolver {
                 .par_bridge()
                 .map(|&x| {
                     let mus_test_size = best_mus_size.load(Relaxed);
+                    let mus_test_size = if config.find_bigger {
+                        mus_test_size + 3 * 3
+                    } else {
+                        mus_test_size
+                    };
                     let ret = self.get_var_mus_slice(x, Some(mus_test_size));
                     if let Ok(Some(y)) = &ret {
                         best_mus_size.fetch_min(y.len() as i64, Relaxed);
@@ -711,7 +719,12 @@ impl PuzzleSolver {
             }
 
             if let Some(mus_min) = md.min() {
-                if mus_min as i64 <= mus_size {
+                let met_target = if config.find_bigger {
+                    (mus_min as i64) * 3 + 3 <= mus_size
+                } else {
+                    mus_min as i64 <= mus_size
+                };
+                if met_target {
                     info!(target: "solver", "muses found!");
                     return md;
                 }

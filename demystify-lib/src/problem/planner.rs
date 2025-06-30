@@ -1,10 +1,10 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::Itertools;
 use rustsat::types::Lit;
 use tracing::info;
 
-use crate::{json::Problem, satcore::get_solver_calls, web::create_html};
+use crate::{json::Problem, problem::VarValPair, satcore::get_solver_calls, web::create_html};
 
 use super::{
     musdict::MusDict,
@@ -69,11 +69,20 @@ impl PuzzlePlanner {
         PuzzlePlanner { psolve, config }
     }
 
-    /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle.
-    pub fn all_muses(&mut self) -> MusDict {
+    /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle,
+    pub fn all_smallish_muses(&mut self) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
         self.psolve
             .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config, None)
+    }
+
+    /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle.
+    pub fn all_muses_with_larger(&mut self) -> MusDict {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let mut conf_clone = self.config.mus_config;
+        conf_clone.find_bigger = true;
+        self.psolve
+            .get_many_vars_small_mus_quick(&varlits, &conf_clone, None)
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle which satisfy a filter.
@@ -91,7 +100,7 @@ impl PuzzlePlanner {
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
     pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
         //let mut t = QuickTimer::new("smallest_muses");
-        let muses = self.all_muses();
+        let muses = self.all_smallish_muses();
 
         let min = muses.min();
 
@@ -319,6 +328,19 @@ impl PuzzlePlanner {
         self.quick_display_html_step(base_muses)
     }
 
+    pub fn quick_generate_html_difficulties(&mut self) -> String {
+        let base_muses = self.all_muses_with_larger();
+
+        let base_difficulties: BTreeMap<Lit, usize> = base_muses
+            .muses()
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, v)| (k.clone(), v.iter().next().unwrap().len()))
+            .collect();
+
+        self.quick_display_difficulty_step(base_difficulties)
+    }
+
     pub fn quick_solve_html_step_for_literal(&mut self, lit_def: Vec<i64>) -> (String, Vec<Lit>) {
         let muses = self.filtered_muses(Box::new(move |lit, planner| {
             let puzlit_list = planner.solver().lit_to_puzlit(lit);
@@ -413,6 +435,48 @@ impl PuzzlePlanner {
         }
 
         (create_html(&problem), v)
+    }
+
+    pub fn quick_display_difficulty_step(
+        &mut self,
+        base_difficulties: BTreeMap<Lit, usize>,
+    ) -> String {
+        // Make a nicer map
+
+        let mut vvpmap: BTreeMap<VarValPair, usize> = BTreeMap::new();
+
+        for (lit, &val) in base_difficulties.iter() {
+            for puzlit in self.psolve.puzzleparse().lit_to_vars(lit) {
+                let vvp = puzlit.varval();
+                vvpmap.insert(vvp, val);
+            }
+        }
+
+        let varlits = self.psolve.get_provable_varlits().clone();
+
+        let tosolve_varvals: BTreeSet<_> = varlits
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .map(super::PuzLit::varval)
+            .collect();
+
+        let known_puzlits: BTreeSet<PuzLit> = self
+            .get_all_known_lits()
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .cloned()
+            .collect();
+
+        let problem = Problem::new_from_puzzle_and_difficulty(
+            &self.psolve,
+            &tosolve_varvals,
+            &known_puzlits,
+            &vvpmap,
+            "The difficulty of the problem",
+        )
+        .expect("Cannot make puzzle json");
+
+        create_html(&problem)
     }
 
     /// Returns a reference to the puzzle being solved.

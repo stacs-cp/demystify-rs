@@ -1,5 +1,5 @@
 /// This module contains the definitions and implementations related to JSON serialization and deserialization for the demystify library.
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use anyhow::Context;
 use itertools::Itertools;
@@ -279,6 +279,112 @@ impl Problem {
             .enumerate()
             .map(|(i, con)| Statement {
                 content: con.clone(),
+                classes: Some(vec![
+                    format!("highlight_con{}", i),
+                    "js_highlighter".to_string(),
+                ]),
+            })
+            .collect_vec();
+
+        let state = State {
+            knowledge_grid: Some(knowledgegrid),
+            statements: Some(statements),
+            description: Some(description.to_owned()),
+        };
+
+        Ok(Problem {
+            puzzle,
+            state: Some(state),
+        })
+    }
+
+    pub fn new_from_puzzle_and_difficulty(
+        solver: &PuzzleSolver,
+        tosolve: &BTreeSet<VarValPair>,
+        known: &BTreeSet<PuzLit>,
+        complexity: &BTreeMap<VarValPair, usize>,
+        description: &str,
+    ) -> anyhow::Result<Problem> {
+        let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
+
+        let varnames = tosolve
+            .iter()
+            .map(|x| x.var().name().clone())
+            .chain(known.iter().map(|x| x.var().name().clone()))
+            .collect::<HashSet<String>>();
+
+        let allowed_names: HashSet<String> = if varnames.len() != 1 {
+            if !varnames.contains("grid") {
+                return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
+            } else {
+                {
+                    let mut set = HashSet::new();
+                    set.insert("grid".to_string());
+                    set
+                }
+            }
+        } else {
+            varnames
+        };
+
+        let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
+            vec![
+                vec![None; usize::try_from(puzzle.width).context("width is negative")?];
+                usize::try_from(puzzle.height).context("height is negative")?
+            ];
+
+        let all_lits = solver.puzzleparse().all_var_varvals();
+
+        let complexity_vals: BTreeSet<_> = complexity.values().collect();
+
+        for l in all_lits {
+            if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
+                continue;
+            }
+
+            if !allowed_names.contains(l.var().name()) {
+                continue;
+            }
+
+            // TODO: Handle more than one variable matrix?
+            let index = l.var().indices().clone();
+            assert_eq!(index.len(), 2);
+            let i = usize::try_from(index[0]).context("negative index 0?")?;
+            let j = usize::try_from(index[1]).context("negative index 1?")?;
+
+            assert!(i > 0, "Variables should be 1-indexed");
+            assert!(j > 0, "Variables should be 1-indexed");
+
+            let i = i - 1;
+            let j = j - 1;
+
+            let mut tags = BTreeSet::new();
+
+            if let Some(val) = complexity.get(&l) {
+                let i = complexity_vals.iter().position(|&v| v == val).unwrap_or(0);
+                tags.insert(format!("highlight_con{}", i));
+                tags.insert("js_highlighter".to_string());
+            }
+
+            if known.contains(&PuzLit::new_eq(l.clone())) {
+                tags.insert("litknown".to_string());
+            }
+
+            if knowledgegrid[i][j].is_none() {
+                knowledgegrid[i][j] = Some(vec![]);
+            }
+
+            knowledgegrid[i][j].as_mut().unwrap().push(StateLit {
+                val: l.val(),
+                classes: Some(tags),
+            });
+        }
+
+        let statements = complexity_vals
+            .iter()
+            .enumerate()
+            .map(|(i, consize)| Statement {
+                content: format!("MUS size {}", consize),
                 classes: Some(vec![
                     format!("highlight_con{}", i),
                     "js_highlighter".to_string(),
