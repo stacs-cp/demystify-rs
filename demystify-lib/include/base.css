@@ -9,12 +9,12 @@
 }
 
 .litinmus .litbox {
+    stroke-width: 0.05;
     stroke: yellow;
 }
 
 .litknown {
-    color: purple;
-    fill: purple;
+    fill: grey;
     font-weight: bold;
 }
 .litinmus {
@@ -27,33 +27,57 @@
 }
 
 .litbox {
-    stroke-width: 0.02;
-    stroke: blue;
+    stroke-width: 0.01;
+    stroke:rgba(0,0,255,0.2);
     fill: none;
 }
 
-.highlight_con0 rect {
+.highlight_con0 rect, .constraintlist > div.highlight_con0 {
     background-color: #d0ffff;
-    fill:  #d0ffff;
+    fill: #d0ffff;
 }
 
-.highlight_con1 rect {
+.highlight_con1 rect, .constraintlist > div.highlight_con1 {
     background-color: #ffd0ff;
-    fill:  #ffd0ff;
-
+    fill: #ffd0ff;
 }
 
-.highlight_con2 rect {
+.highlight_con2 rect, .constraintlist > div.highlight_con2 {
     background-color: #ffffd0;
     fill: #ffffd0;
 }
 
-.highlight_con3 rect {
+.highlight_con3 rect, .constraintlist > div.highlight_con3 {
     background-color: #d0d0ff;
     fill: #d0d0ff;
 }
 
-.highlight_con4 rect {
+.highlight_con4 rect, .constraintlist > div.highlight_con4 {
     background-color: #d0ffd0;
     fill: #d0ffd0;
+}
+
+.highlight_con5 rect, .constraintlist > div.highlight_con5 {
+    background-color: #ffd0d0;
+    fill: #ffd0d0;
+}
+
+.highlight_con6 rect, .constraintlist > div.highlight_con6 {
+    background-color: #ffe0c0;
+    fill: #ffe0c0;
+}
+
+.highlight_con7 rect, .constraintlist > div.highlight_con7 {
+    background-color: #d0e8ff;
+    fill: #d0e8ff;
+}
+
+.highlight_con8 rect, .constraintlist > div.highlight_con8 {
+    background-color: #e0d0ff;
+    fill: #e0d0ff;
+}
+
+.highlight_con9 rect, .constraintlist > div.highlight_con9 {
+    background-color: #d0ffe0;
+    fill: #d0ffe0;
 }
