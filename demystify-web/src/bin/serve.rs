@@ -38,6 +38,7 @@ async fn main() {
         .route("/greet", get(greet))
         .route("/greetX", get(greet_x))
         .route("/uploadPuzzle", post(wrap::upload_files))
+        .route("/loadExample", post(wrap::load_example))
         .route("/quickFullSolve", post(wrap::dump_full_solve))
         .route("/bestNextStep", post(wrap::best_next_step))
         .route("/clickLiteral", post(wrap::click_literal))

@@ -1,6 +1,10 @@
 use anyhow::Context;
-use axum::{extract::Multipart, Json};
+use axum::{
+    extract::{Multipart, Query},
+    Json,
+};
 use axum_session::{Session, SessionNullPool};
+use serde::Deserialize;
 use serde_json::Value;
 
 use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
@@ -141,18 +145,98 @@ pub async fn upload_files(
         return Err(anyhow!("Did not upload a param file (either .eprime or .json) file").into());
     }
 
+    load_model(session, temp_dir, model, param)?;
+
+    Ok("upload successful!".to_string())
+}
+
+#[derive(Deserialize)]
+pub struct ExampleParams {
+    example_name: String,
+}
+
+pub async fn load_example(
+    session: Session<SessionNullPool>,
+    form: axum::extract::Form<ExampleParams>,
+) -> Result<String, util::AppError> {
+    // Extract the example name from the headers
+    let example_name = form.example_name.clone();
+
+    // Mock example database - maps example names to model and param file paths
+    // Define a macro to include file contents
+    macro_rules! include_model_file {
+        ($path:expr) => {
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
+        };
+    }
+
+    // Store examples with their embedded content
+    let examples = [
+        (
+            "Sudoku",
+            (
+                include_model_file!("../eprime/sudoku.eprime"),
+                include_model_file!("../eprime/sudoku/puzzlingexample.param"),
+            ),
+        ),
+        (
+            "MiracleSudoku",
+            (
+                include_model_file!("../eprime/miracle.eprime"),
+                include_model_file!("../eprime/miracle/original.param"),
+            ),
+        ),
+        (
+            "StarBattle",
+            (
+                include_model_file!("../eprime/star-battle.eprime"),
+                include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
+            ),
+        ),
+    ];
+
+    // Look up the selected example
+    let (model_content, param_content) = examples
+        .iter()
+        .find(|(name, _)| *name == example_name)
+        .map(|(_, content)| content)
+        .context(format!("Example '{}' not found", example_name))?;
+
+    // Create temporary directory
+    let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
+
+    // Write the model file to the temporary directory
+    let model_dest = temp_dir.path().join("upload.eprime");
+    std::fs::write(&model_dest, model_content).context("Failed to write model file")?;
+
+    // Write the param file to the temporary directory
+    let param_dest = temp_dir.path().join("upload.param");
+    std::fs::write(&param_dest, param_content).context("Failed to write param file")?;
+
+    // Load the model
+    load_model(
+        session,
+        temp_dir,
+        Some("upload.eprime".into()),
+        Some("upload.param".into()),
+    )?;
+
+    Ok("Example loaded successfully!".to_string())
+}
+
+fn load_model(
+    session: Session<SessionNullPool>,
+    temp_dir: tempfile::TempDir,
+    model: Option<PathBuf>,
+    param: Option<PathBuf>,
+) -> Result<(), util::AppError> {
     let puzzle = problem::parse::parse_essence(
         &temp_dir.path().join(model.unwrap()),
         &temp_dir.path().join(param.unwrap()),
     )?;
-
     let puzzle = Arc::new(puzzle);
-
     let puz = PuzzleSolver::new(puzzle)?;
-
     let plan = PuzzlePlanner::new(puz);
-
     set_solver_global(&session, plan);
-
-    Ok("upload successful!".to_string())
+    Ok(())
 }

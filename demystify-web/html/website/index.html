@@ -77,6 +77,24 @@ document.addEventListener('htmx:afterRequest', function() {
       </form>
     </div>
 
+    <div class="container mt-4"></div>
+      <h4>Or select an example problem</h4>
+      <div class="mb-3">
+        <select class="form-select" id="exampleSelect" name="example_name">
+          <option value="" selected disabled>Choose an example...</option>
+          <option value="Sudoku">Sudoku</option>
+          <option value="MiracleSudoku">Miracle Sudoku</option>
+          <option value="StarBattle">Star Battle</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-primary" 
+        hx-post="/loadExample" 
+        hx-target="#mainSpace"
+        hx-include="#exampleSelect"
+        hx-indicator="#indicator">
+        Load Example
+      </button>
+    </div>
 
 
     <div id="infoBox"><p>Info</p></div>
