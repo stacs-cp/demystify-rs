@@ -1,8 +1,5 @@
 use anyhow::Context;
-use axum::{
-    extract::{Multipart, Query},
-    Json,
-};
+use axum::{extract::Multipart, Json};
 use axum_session::{Session, SessionNullPool};
 use serde::Deserialize;
 use serde_json::Value;
