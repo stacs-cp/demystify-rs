@@ -86,6 +86,6 @@ g.selected rect {
       fill: red !important;
 }
 
-.constraintlist:has(.selected) {
+.constraintlist > div.selected {
   background-color: red;
 }

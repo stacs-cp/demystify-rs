@@ -162,9 +162,9 @@ pub async fn upload_files(
         return Err(anyhow!("Did not upload a param file (either .eprime or .json) file").into());
     }
 
-    load_model(session, temp_dir, model, param)?;
+    load_model(&session, temp_dir, model, param)?;
 
-    Ok("upload successful!".to_string())
+    refresh(session).await
 }
 
 #[derive(Deserialize)]
@@ -232,17 +232,17 @@ pub async fn load_example(
 
     // Load the model
     load_model(
-        session,
+        &session,
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
     )?;
 
-    Ok("Example loaded successfully!".to_string())
+    refresh(session).await
 }
 
 fn load_model(
-    session: Session<SessionNullPool>,
+    session: &Session<SessionNullPool>,
     temp_dir: tempfile::TempDir,
     model: Option<PathBuf>,
     param: Option<PathBuf>,
@@ -254,6 +254,6 @@ fn load_model(
     let puzzle = Arc::new(puzzle);
     let puz = PuzzleSolver::new(puzzle)?;
     let plan = PuzzlePlanner::new(puz);
-    set_solver_global(&session, plan);
+    set_solver_global(session, plan);
     Ok(())
 }
