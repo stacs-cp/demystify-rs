@@ -217,7 +217,7 @@ pub async fn load_example(
         .iter()
         .find(|(name, _)| *name == example_name)
         .map(|(_, content)| content)
-        .context(format!("Example '{}' not found", example_name))?;
+        .context(format!("Example '{example_name}' not found"))?;
 
     // Create temporary directory
     let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;

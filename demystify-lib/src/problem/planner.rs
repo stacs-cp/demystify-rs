@@ -335,7 +335,7 @@ impl PuzzlePlanner {
             .muses()
             .iter()
             .filter(|(_, v)| !v.is_empty())
-            .map(|(k, v)| (k.clone(), v.iter().next().unwrap().len()))
+            .map(|(k, v)| (*k, v.iter().next().unwrap().len()))
             .collect();
 
         self.quick_display_difficulty_step(base_difficulties)
@@ -397,61 +397,58 @@ impl PuzzlePlanner {
             .cloned()
             .collect();
 
-        match base_muses {
-            Some(base_muses) => {
-                // Map the 'muses' to a user-friendly representation
-                let muses = base_muses
-                    .iter()
-                    .map(|mus| self.mus_to_user_mus(mus))
-                    .collect_vec();
+        if let Some(base_muses) = base_muses {
+            // Map the 'muses' to a user-friendly representation
+            let muses = base_muses
+                .iter()
+                .map(|mus| self.mus_to_user_mus(mus))
+                .collect_vec();
 
-                let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
-                let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
+            let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
+            let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
 
-                let nice_deduced: String = deduced.iter().format(", ").to_string();
+            let nice_deduced: String = deduced.iter().format(", ").to_string();
 
-                let description = if constraints.is_empty() {
-                    format!("{nice_deduced:?} because of the design of the problem")
-                } else {
-                    format!(
-                        "{:?} because of {} constraints",
-                        nice_deduced,
-                        &constraints.len()
-                    )
-                };
-
-                let problem = Problem::new_from_puzzle_and_mus(
-                    &self.psolve,
-                    &tosolve_varvals,
-                    &known_puzlits,
-                    &deduced,
-                    &constraints,
-                    &description,
+            let description = if constraints.is_empty() {
+                format!("{nice_deduced:?} because of the design of the problem")
+            } else {
+                format!(
+                    "{:?} because of {} constraints",
+                    nice_deduced,
+                    &constraints.len()
                 )
-                .expect("Cannot make puzzle json");
+            };
 
-                let v = base_muses.iter().map(|(c, _)| c).copied().collect_vec();
-                for (m, _) in &base_muses {
-                    self.mark_lit_as_deduced(m);
-                }
+            let problem = Problem::new_from_puzzle_and_mus(
+                &self.psolve,
+                &tosolve_varvals,
+                &known_puzlits,
+                &deduced,
+                &constraints,
+                &description,
+            )
+            .expect("Cannot make puzzle json");
 
-                (create_html(&problem), v)
+            let v = base_muses.iter().map(|(c, _)| c).copied().collect_vec();
+            for (m, _) in &base_muses {
+                self.mark_lit_as_deduced(m);
             }
-            None => {
-                let deduced = BTreeSet::new();
-                let description = "Puzzle".to_string();
 
-                let problem = Problem::new_from_puzzle_and_state(
-                    &self.psolve,
-                    &tosolve_varvals,
-                    &known_puzlits,
-                    &deduced,
-                    &description,
-                )
-                .expect("Cannot make puzzle json");
+            (create_html(&problem), v)
+        } else {
+            let deduced = BTreeSet::new();
+            let description = "Puzzle".to_string();
 
-                (create_html(&problem), vec![])
-            }
+            let problem = Problem::new_from_puzzle_and_state(
+                &self.psolve,
+                &tosolve_varvals,
+                &known_puzlits,
+                &deduced,
+                &description,
+            )
+            .expect("Cannot make puzzle json");
+
+            (create_html(&problem), vec![])
         }
     }
 
@@ -463,7 +460,7 @@ impl PuzzlePlanner {
 
         let mut vvpmap: BTreeMap<VarValPair, usize> = BTreeMap::new();
 
-        for (lit, &val) in base_difficulties.iter() {
+        for (lit, &val) in &base_difficulties {
             for puzlit in self.psolve.puzzleparse().lit_to_vars(lit) {
                 let vvp = puzlit.varval();
                 vvpmap.insert(vvp, val);

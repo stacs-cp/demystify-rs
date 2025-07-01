@@ -582,10 +582,10 @@ impl PuzzleSolver {
                     .iter()
                     .enumerate()
                     .filter_map(|(j, &lit)| {
-                        if j % (max_size as usize + 1) != i as usize {
-                            Some(lit)
-                        } else {
+                        if j % (max_size as usize + 1) == i as usize {
                             None
+                        } else {
+                            Some(lit)
                         }
                     })
                     .collect()

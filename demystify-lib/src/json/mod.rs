@@ -200,18 +200,16 @@ impl Problem {
             .chain(known.iter().map(|x| x.var().name().clone()))
             .collect::<HashSet<String>>();
 
-        let allowed_names: HashSet<String> = if varnames.len() != 1 {
-            if !varnames.contains("grid") {
-                return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
-            } else {
-                {
-                    let mut set = HashSet::new();
-                    set.insert("grid".to_string());
-                    set
-                }
+        let allowed_names: HashSet<String> = if varnames.len() == 1 {
+            varnames
+        } else if varnames.contains("grid") {
+            {
+                let mut set = HashSet::new();
+                set.insert("grid".to_string());
+                set
             }
         } else {
-            varnames
+            return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
         };
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
@@ -323,18 +321,16 @@ impl Problem {
             .chain(known.iter().map(|x| x.var().name().clone()))
             .collect::<HashSet<String>>();
 
-        let allowed_names: HashSet<String> = if varnames.len() != 1 {
-            if !varnames.contains("grid") {
-                return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
-            } else {
-                {
-                    let mut set = HashSet::new();
-                    set.insert("grid".to_string());
-                    set
-                }
+        let allowed_names: HashSet<String> = if varnames.len() == 1 {
+            varnames
+        } else if varnames.contains("grid") {
+            {
+                let mut set = HashSet::new();
+                set.insert("grid".to_string());
+                set
             }
         } else {
-            varnames
+            return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
         };
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
@@ -372,7 +368,7 @@ impl Problem {
 
             if let Some(val) = complexity.get(&l) {
                 let i = complexity_vals.iter().position(|&v| v == val).unwrap_or(0);
-                tags.insert(format!("highlight_con{}", i));
+                tags.insert(format!("highlight_con{i}"));
                 tags.insert("js_highlighter".to_string());
             }
 
@@ -394,7 +390,7 @@ impl Problem {
             .iter()
             .enumerate()
             .map(|(i, consize)| Statement {
-                content: format!("MUS size {}", consize),
+                content: format!("MUS size {consize}"),
                 classes: Some(vec![
                     format!("highlight_con{}", i),
                     "js_highlighter".to_string(),

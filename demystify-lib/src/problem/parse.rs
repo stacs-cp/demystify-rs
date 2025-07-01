@@ -719,7 +719,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                 if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(
                         i32::try_from(litval)
-                            .with_context(|| format!("Number too large: {}", litval))?,
+                            .with_context(|| format!("Number too large: {litval}"))?,
                     )?;
                     let varid =
                         crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])

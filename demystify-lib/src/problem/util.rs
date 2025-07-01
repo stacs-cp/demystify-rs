@@ -24,7 +24,7 @@ impl FindVarConnections {
     pub fn new(sat: &SatInstance, all_var_lits: &HashSet<Lit>) -> FindVarConnections {
         let (cnf, _) = sat.clone().into_cnf();
         let mut lit_to_clauses: HashMap<Lit, HashSet<Lit>> = HashMap::new();
-        for clause in cnf.iter() {
+        for clause in &cnf {
             for &lit in clause {
                 let s = lit_to_clauses.entry(lit).or_default();
                 for &l in clause.iter() {
@@ -34,7 +34,7 @@ impl FindVarConnections {
         }
 
         // Blank out any literals in unit clauses
-        for clause in cnf.iter() {
+        for clause in &cnf {
             if clause.len() == 1 {
                 let &lit = clause.iter().next().unwrap();
                 lit_to_clauses.insert(lit, HashSet::new());
@@ -71,12 +71,12 @@ impl FindVarConnections {
                     if !found.contains(&lit) {
                         info!("Found {}\n", lit.to_ipasir());
                         found.insert(lit);
-                        if !self.all_var_lits.contains(&lit) {
+                        if self.all_var_lits.contains(&lit) {
+                            info!("In var_lits: {}\n", lit.to_ipasir());
+                        } else {
                             assert!(!self.all_var_lits.contains(&-lit));
                             info!("Add to todo: {}\n", lit.to_ipasir());
                             todo.push(lit);
-                        } else {
-                            info!("In var_lits: {}\n", lit.to_ipasir());
                         }
                     }
                 }
