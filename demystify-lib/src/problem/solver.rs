@@ -20,6 +20,25 @@ use crate::{
 
 use super::{musdict::MusDict, parse::PuzzleParse, PuzLit};
 
+/// The strategy to use when finding a minimal unsatisfiable subset (MUS)
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Strategy {
+    /// Uses a quick algorithm that may find larger MUSes
+    Quick,
+    /// Uses a slicing technique to find smaller MUSes
+    Slice,
+    /// Uses a "cake cutting" technique to find small MUSes
+    Cake,
+    /// Uses 'cake cutting' for smaller MUSes, slice for larger
+    Dynamic,
+}
+
+impl Default for Strategy {
+    fn default() -> Self {
+        Self::Dynamic
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct MusConfig {
     pub base_size_mus: i64,
@@ -27,6 +46,7 @@ pub struct MusConfig {
     pub mus_mult_step: i64,
     pub repeats: i64,
     pub find_bigger: bool,
+    pub strategy: Strategy,
 }
 
 impl Default for MusConfig {
@@ -35,8 +55,9 @@ impl Default for MusConfig {
             base_size_mus: 2,
             mus_add_step: 1,
             mus_mult_step: 2,
-            repeats: 5,
+            repeats: 2,
             find_bigger: false,
+            strategy: Strategy::default(),
         }
     }
 }
@@ -50,6 +71,7 @@ impl MusConfig {
             mus_mult_step: 2,
             repeats,
             find_bigger: false,
+            strategy: Strategy::default(),
         }
     }
 }
@@ -490,12 +512,12 @@ impl PuzzleSolver {
         Ok(muses.into_iter().collect_vec())
     }
 
-    /// Retrieves the minimal unsatisfiable subset (MUS) of variables which proves
+    /// Retrieves a minimal unsatisfiable subset (MUS) of variables which proves
     /// a given literal is required
     ///
     /// # Arguments
     ///
-    /// * `lit` - The literal to find a proof for (so we invert for the MUS).
+    /// * `lit` - The literal to find a proof for.
     ///
     /// # Returns
     ///
@@ -702,7 +724,19 @@ impl PuzzleSolver {
                     } else {
                         mus_test_size
                     };
-                    let ret = self.get_var_mus_slice(x, Some(mus_test_size));
+
+                    let ret = match config.strategy {
+                        Strategy::Slice => self.get_var_mus_slice(x, Some(mus_test_size)),
+                        Strategy::Cake => self.get_var_mus_cake(x, mus_test_size),
+                        Strategy::Quick => self.get_var_mus_quick(x, Some(mus_test_size)),
+                        Strategy::Dynamic => {
+                            if mus_test_size < 5 {
+                                self.get_var_mus_cake(x, mus_test_size)
+                            } else {
+                                self.get_var_mus_slice(x, Some(mus_test_size))
+                            }
+                        }
+                    };
                     if let Ok(Some(y)) = &ret {
                         best_mus_size.fetch_min(y.len() as i64, Relaxed);
                     }
