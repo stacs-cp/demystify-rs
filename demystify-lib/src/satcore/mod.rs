@@ -269,6 +269,7 @@ impl SatCore {
         }
         let mut core = core.unwrap();
 
+        let mut known_core = Vec::new();
         // Need to make a copy for actually searching over
         for &lit in lits {
             let location = core.iter().position(|&x| x == lit);
@@ -280,9 +281,16 @@ impl SatCore {
                     core = found;
                 } else {
                     known_size += 1;
+                    known_core.push(lit);
                     if let Some(max_size) = max_size {
-                        if known_size > max_size {
-                            return Ok(None);
+                        if known_size == max_size {
+                            // If there is a MUS, this has to be it!
+                            assert!(known_core.len() as i64 == max_size);
+                            let core = self.raw_assumption_solve_with_core(&known_core)?;
+                            if let Some(found) = &core {
+                                assert!(found.len() as i64 == known_size);
+                            };
+                            return Ok(core);
                         }
                     }
                 }
