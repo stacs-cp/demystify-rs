@@ -325,7 +325,7 @@ impl PuzzlePlanner {
 
     pub fn quick_solve_html_step(&mut self) -> (String, Vec<Lit>) {
         let base_muses = self.smallest_muses_with_config();
-        self.quick_display_html_step(base_muses)
+        self.quick_display_html_step(Some(base_muses))
     }
 
     pub fn quick_generate_html_difficulties(&mut self) -> String {
@@ -375,19 +375,13 @@ impl PuzzlePlanner {
 
         //
 
-        self.quick_display_html_step(vec)
+        self.quick_display_html_step(Some(vec))
     }
 
     pub fn quick_display_html_step(
         &mut self,
-        base_muses: Vec<(Lit, Vec<Lit>)>,
+        base_muses: Option<Vec<(Lit, Vec<Lit>)>>,
     ) -> (String, Vec<Lit>) {
-        // Map the 'muses' to a user-friendly representation
-        let muses = base_muses
-            .iter()
-            .map(|mus| self.mus_to_user_mus(mus))
-            .collect_vec();
-
         let varlits = self.psolve.get_provable_varlits().clone();
 
         let tosolve_varvals: BTreeSet<_> = varlits
@@ -403,38 +397,62 @@ impl PuzzlePlanner {
             .cloned()
             .collect();
 
-        let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
+        match base_muses {
+            Some(base_muses) => {
+                // Map the 'muses' to a user-friendly representation
+                let muses = base_muses
+                    .iter()
+                    .map(|mus| self.mus_to_user_mus(mus))
+                    .collect_vec();
 
-        let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
+                let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
+                let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
 
-        let nice_deduced: String = deduced.iter().format(", ").to_string();
+                let nice_deduced: String = deduced.iter().format(", ").to_string();
 
-        let description = if constraints.is_empty() {
-            format!("{nice_deduced:?} because of the design of the problem")
-        } else {
-            format!(
-                "{:?} because of {} constraints",
-                nice_deduced,
-                &constraints.len()
-            )
-        };
+                let description = if constraints.is_empty() {
+                    format!("{nice_deduced:?} because of the design of the problem")
+                } else {
+                    format!(
+                        "{:?} because of {} constraints",
+                        nice_deduced,
+                        &constraints.len()
+                    )
+                };
 
-        let problem = Problem::new_from_puzzle_and_mus(
-            &self.psolve,
-            &tosolve_varvals,
-            &known_puzlits,
-            &deduced,
-            &constraints,
-            &description,
-        )
-        .expect("Cannot make puzzle json");
+                let problem = Problem::new_from_puzzle_and_mus(
+                    &self.psolve,
+                    &tosolve_varvals,
+                    &known_puzlits,
+                    &deduced,
+                    &constraints,
+                    &description,
+                )
+                .expect("Cannot make puzzle json");
 
-        let v = base_muses.iter().map(|(c, _)| c).copied().collect_vec();
-        for (m, _) in &base_muses {
-            self.mark_lit_as_deduced(m);
+                let v = base_muses.iter().map(|(c, _)| c).copied().collect_vec();
+                for (m, _) in &base_muses {
+                    self.mark_lit_as_deduced(m);
+                }
+
+                (create_html(&problem), v)
+            }
+            None => {
+                let deduced = BTreeSet::new();
+                let description = "Puzzle".to_string();
+
+                let problem = Problem::new_from_puzzle_and_state(
+                    &self.psolve,
+                    &tosolve_varvals,
+                    &known_puzlits,
+                    &deduced,
+                    &description,
+                )
+                .expect("Cannot make puzzle json");
+
+                (create_html(&problem), vec![])
+            }
         }
-
-        (create_html(&problem), v)
     }
 
     pub fn quick_display_difficulty_step(

@@ -174,6 +174,16 @@ impl Problem {
         })
     }
 
+    pub fn new_from_puzzle_and_state(
+        solver: &PuzzleSolver,
+        tosolve: &BTreeSet<VarValPair>,
+        known: &BTreeSet<PuzLit>,
+        deduced_lits: &BTreeSet<PuzLit>,
+        description: &str,
+    ) -> anyhow::Result<Problem> {
+        Self::new_from_puzzle_and_mus(solver, tosolve, known, deduced_lits, &[], description)
+    }
+
     pub fn new_from_puzzle_and_mus(
         solver: &PuzzleSolver,
         tosolve: &BTreeSet<VarValPair>,

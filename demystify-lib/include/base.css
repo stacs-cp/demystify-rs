@@ -81,3 +81,11 @@
     background-color: #d0ffe0;
     fill: #d0ffe0;
 }
+
+g.selected rect {
+      fill: red !important;
+}
+
+.constraintlist:has(.selected) {
+  background-color: red;
+}

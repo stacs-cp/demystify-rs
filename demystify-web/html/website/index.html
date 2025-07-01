@@ -56,7 +56,7 @@ document.addEventListener('htmx:afterRequest', function() {
     <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
     </span>
 
-    <button type="button" id="Refresh" class="btn btn-primary" hx-indicator="#indicator">Refresh</button>
+    <button type="button"  hx-post="/refresh" hx-target="#mainSpace" id="Refresh" class="btn btn-primary" hx-indicator="#indicator">Refresh</button>
 
 
     <button type="button" hx-post="/bestNextStep" hx-target="#mainSpace" id="BestNextStep" class="btn btn-primary" hx-indicator="#indicator">Best Next Step</button>

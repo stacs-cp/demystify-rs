@@ -5,8 +5,7 @@ function applyHighlight(element) {
         if (className.startsWith('highlight_')) {
             const highlightedElements = document.getElementsByClassName(className);
             for (let j = 0; j < highlightedElements.length; j++) {
-                highlightedElements[j].style["background-color"] = '#F88889';
-                highlightedElements[j].style.fill = '#D20103';
+                highlightedElements[j].classList.add("selected");
             }
         }
     }
@@ -19,8 +18,7 @@ function removeHighlight(element) {
         if (className.startsWith('highlight_')) {
             const highlightedElements = document.getElementsByClassName(className);
             for (let j = 0; j < highlightedElements.length; j++) {
-                highlightedElements[j].style.removeProperty("background-color");
-                highlightedElements[j].style.removeProperty("fill");
+                 highlightedElements[j].classList.remove("selected");
             }
         }
     }

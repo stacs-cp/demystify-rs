@@ -46,6 +46,16 @@ pub async fn get_difficulties(session: Session<SessionNullPool>) -> Result<Strin
     Ok(solve)
 }
 
+pub async fn refresh(session: Session<SessionNullPool>) -> Result<String, util::AppError> {
+    let solver = get_solver_global(&session)?;
+
+    let mut solver = solver.lock().unwrap();
+
+    let (solve, _) = solver.quick_display_html_step(None);
+
+    Ok(solve)
+}
+
 pub async fn click_literal(
     headers: axum::http::header::HeaderMap,
     session: Session<SessionNullPool>,
