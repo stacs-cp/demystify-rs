@@ -197,6 +197,7 @@ impl PuzzleSolver {
             .assumption_solve(self.get_known_lits(), &litorig)
             .expect("Solving the basic problem took too long, solver timed out (type 2)")
     }
+    
 
     /// Retrieves variable literals which can be proved.
     ///
@@ -233,6 +234,41 @@ impl PuzzleSolver {
         }
 
         self.tosolvelits.as_ref().unwrap()
+    }
+
+    /// Retrieves literals which can be proved by a particular MUS.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing the provable variable literals.
+    #[must_use]
+    pub fn get_varlits_provable_by_mus(&mut self, candidates: &Vec<Lit>, mus: &Vec<Lit>) -> Vec<Lit> {
+        assert!(mus.iter().all(|c| self.puzzleparse.conset_lits.contains(c)));
+
+        let mut litorig = mus.clone();
+        litorig.extend_from_slice(&self.knownlits);
+
+        dbg!(self.get_literals_to_try_solving());
+
+            let provable: Vec<_> = candidates
+                .par_iter()
+                .filter_map(|&lit| {
+                    if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
+                        let mut lits = litorig.clone();
+                        lits.push(lit);
+                        if !self
+                            .get_satcore()
+                            .assumption_solve(self.get_known_lits(), &lits)
+                            .expect("Solving the basic problem took too long, solver timed out")
+                        {
+                            return Some(!lit);
+                        }
+                    }
+                    None
+                })
+                .collect();
+
+            provable
     }
 
     /// Generate a random solution. This will not enforce that the problem
@@ -789,6 +825,7 @@ mod tests {
 
     use crate::problem::solver::{MusConfig, PuzzleSolver, SolverConfig};
 
+    use itertools::Itertools;
     use rand::SeedableRng;
     use test_log::test;
 
@@ -934,6 +971,7 @@ mod tests {
         Ok(())
     }
 
+
     #[test]
     fn test_many_lits() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
@@ -979,6 +1017,18 @@ mod tests {
 
         assert_eq!(muses.min(), muses_2.min());
         assert_eq!(muses_quick.min(), muses_quick_2.min());
+
+        let varlist = varlits.iter().cloned().collect_vec();
+
+        for (l,btree) in muses_2.muses() {
+            for mus in btree {
+                let list = puz.get_varlits_provable_by_mus(&varlist, mus);
+                dbg!(&list);
+                dbg!(mus);
+                dbg!(l);
+                assert!(&list.contains(l));
+            }
+        }
 
         let neg_muses = puz.get_many_vars_mus_first(&(varlits.iter().map(|&x| !x).collect()), None);
         let neg_muses_quick =
