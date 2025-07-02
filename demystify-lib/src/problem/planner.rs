@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::Itertools;
 use rustsat::types::Lit;
@@ -38,6 +38,21 @@ pub struct PuzzlePlanner {
 
 type FilterType = Box<dyn Fn(&Lit, &mut PuzzlePlanner) -> bool>;
 
+/// A `PuzzlePlanner` is responsible for finding minimal unsatisfiable subsets (MUSes) in a puzzle
+/// and using them to generate solution steps.
+///
+/// The planner works by identifying the smallest sets of constraints that lead to logical deductions,
+/// allowing it to generate human-understandable solution steps. It can also analyze the difficulty
+/// of different parts of the puzzle and present solutions in various formats including HTML.
+///
+///
+/// The planner can find different types of MUSes:
+/// - Smallish MUSes (more efficient)
+/// - All MUSes including larger ones
+/// - Filtered MUSes that match specific criteria
+///
+/// It can also track the puzzle's state by marking literals as deduced and
+/// checking overall solvability.
 impl PuzzlePlanner {
     /// Creates a new `PuzzlePlanner` instance.
     ///
@@ -143,49 +158,6 @@ impl PuzzlePlanner {
         vec![muses[0].clone()]
     }
 
-    pub fn get_all_lits_in_scope_for_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
-
-        // First get all lits in the scopes of all constraints in the MUS
-        let mut lits = HashSet::new();
-        
-        for m in mus {
-            for l in self.psolve.puzzleparse().varlits_in_con.get(&m).unwrap() {
-                lits.insert(*l);
-            }
-        }
-
-        // Then get the vars of all those lits
-        let mut vars = HashSet::new();
-
-        for l in lits {
-            for pl in self.psolve.puzzleparse().invlitmap.get(&l).unwrap() {
-                vars.insert(pl.var());
-            }
-        }
-
-        // Then get the lits we still need to find, and check if they are in any of those variables
-        let mut check_lits = HashSet::new();
-        // This should always be in here, but let's add it just in case something goes wrong.
-        check_lits.insert(base);
-
-        for l in self.psolve.get_provable_varlits().clone() {
-            // Get all variables which refer to that literal
-            for pl in self.psolve.puzzleparse().invlitmap.get(&l).unwrap() {
-                if vars.contains(&pl.var()) {
-                    check_lits.insert(l);
-                }
-            }
-        }
-
-        check_lits.iter().cloned().collect_vec()
-    }
-
-    pub fn get_all_lits_solved_by_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
-        let candidates = self.get_all_lits_in_scope_for_mus(base, mus);
-
-        candidates
-    }
-
     /// Converts a MUS to a user-friendly MUS representation.
     ///
     /// # Arguments
@@ -268,7 +240,7 @@ impl PuzzlePlanner {
                 self.mark_lit_as_deduced(m);
             }
 
-            if muses.len() > 0 && muses[0].1.len() as i64 <= self.config.skip_small_threshold {
+            if !muses.is_empty() && muses[0].1.len() as i64 <= self.config.skip_small_threshold {
                 continue 'litloop;
             }
             // Map the 'muses' to a user-friendly representation
@@ -623,7 +595,7 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 36);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 27);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
@@ -649,7 +621,7 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 25);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 18);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
@@ -705,7 +677,7 @@ mod tests {
         let sequence = plan.quick_solve();
 
         // Should only be able to solve 15 steps, due to the 'wall'
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 15);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 14);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());

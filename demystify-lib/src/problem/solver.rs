@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops::Neg;
 use std::sync::Arc;
 use std::{collections::BTreeSet, sync::atomic::AtomicI64};
@@ -197,7 +198,6 @@ impl PuzzleSolver {
             .assumption_solve(self.get_known_lits(), &litorig)
             .expect("Solving the basic problem took too long, solver timed out (type 2)")
     }
-    
 
     /// Retrieves variable literals which can be proved.
     ///
@@ -242,33 +242,105 @@ impl PuzzleSolver {
     ///
     /// A vector containing the provable variable literals.
     #[must_use]
-    pub fn get_varlits_provable_by_mus(&mut self, candidates: &Vec<Lit>, mus: &Vec<Lit>) -> Vec<Lit> {
+    pub fn get_varlits_provable_by_mus(
+        &mut self,
+        candidates: &Vec<Lit>,
+        mus: &Vec<Lit>,
+    ) -> Vec<Lit> {
         assert!(mus.iter().all(|c| self.puzzleparse.conset_lits.contains(c)));
 
         let mut litorig = mus.clone();
         litorig.extend_from_slice(&self.knownlits);
 
-        dbg!(self.get_literals_to_try_solving());
-
-            let provable: Vec<_> = candidates
-                .par_iter()
-                .filter_map(|&lit| {
-                    if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
-                        let mut lits = litorig.clone();
-                        lits.push(lit);
-                        if !self
-                            .get_satcore()
-                            .assumption_solve(self.get_known_lits(), &lits)
-                            .expect("Solving the basic problem took too long, solver timed out")
-                        {
-                            return Some(!lit);
-                        }
+        let provable: Vec<_> = candidates
+            .iter()
+            .filter_map(|&lit| {
+                // This literal should be provable, so we invert it for testing
+                let lit = !lit;
+                if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
+                    let mut lits = litorig.clone();
+                    lits.push(lit);
+                    if !self
+                        .get_satcore()
+                        .assumption_solve(self.get_known_lits(), &lits)
+                        .expect("Solving the basic problem took too long, solver timed out")
+                    {
+                        return Some(!lit);
                     }
-                    None
-                })
-                .collect();
+                }
+                None
+            })
+            .collect();
 
-            provable
+        provable
+    }
+
+    /// Returns all literals in the scope of a MUS.
+    ///
+    /// This method collects all literals that are in the scope of the given MUS. The scope
+    /// is determined by looking at all constraints in the MUS and finding all literals that
+    /// are affected by those constraints.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - The base literal that is being proved by the MUS.
+    /// * `mus` - The Minimal Unsatisfiable Subset (MUS) as a vector of literals.
+    ///
+    /// # Returns
+    ///
+    /// A vector of literals that are in the scope of the given MUS.
+    pub fn get_all_lits_in_scope_for_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
+        // First get all lits in the scopes of all constraints in the MUS
+        let mut lits = HashSet::new();
+
+        for m in mus {
+            for l in self.puzzleparse().varlits_in_con.get(m).unwrap() {
+                lits.insert(*l);
+            }
+        }
+
+        // Then get the vars of all those lits
+        let mut vars = HashSet::new();
+
+        for l in lits {
+            for vvp in self.puzzleparse().direct_or_ordered_lit_to_varvalpair(&l) {
+                vars.insert(vvp.var().clone());
+            }
+        }
+
+        // Then get the lits we still need to find, and check if they are in any of those variables
+        let mut check_lits = HashSet::new();
+        // This should always be in here, but let's add it just in case something goes wrong.
+        check_lits.insert(base);
+
+        for l in self.get_provable_varlits().clone() {
+            // Get all variables which refer to that literal
+            for vvp in self.puzzleparse().direct_or_ordered_lit_to_varvalpair(&l) {
+                if vars.contains(vvp.var()) {
+                    check_lits.insert(l);
+                }
+            }
+        }
+
+        check_lits.iter().cloned().collect_vec()
+    }
+
+    /// Returns all literals that a given MUS can deduce.
+    ///
+    /// This method collects all literals that are in the scope of the given MUS, then
+    /// checks which of them can be deduced by `mus`.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - The base literal that is being proved by the MUS.
+    /// * `mus` - The Minimal Unsatisfiable Subset (MUS) as a vector of literals.
+    ///
+    /// # Returns
+    ///
+    /// A vector of literals that are can be deduced by this MUS.
+    pub fn get_all_lits_solved_by_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
+        let candidates = self.get_all_lits_in_scope_for_mus(base, mus);
+        self.get_varlits_provable_by_mus(&candidates, mus)
     }
 
     /// Generate a random solution. This will not enforce that the problem
@@ -821,7 +893,10 @@ impl PuzzleSolver {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::BTreeSet, sync::Arc};
+    use std::{
+        collections::{BTreeSet, HashSet},
+        sync::Arc,
+    };
 
     use crate::problem::solver::{MusConfig, PuzzleSolver, SolverConfig};
 
@@ -971,7 +1046,6 @@ mod tests {
         Ok(())
     }
 
-
     #[test]
     fn test_many_lits() -> anyhow::Result<()> {
         let result = crate::problem::util::test_utils::build_puzzleparse(
@@ -1018,15 +1092,18 @@ mod tests {
         assert_eq!(muses.min(), muses_2.min());
         assert_eq!(muses_quick.min(), muses_quick_2.min());
 
-        let varlist = varlits.iter().cloned().collect_vec();
+        let litlist = varlits.iter().cloned().collect_vec();
 
-        for (l,btree) in muses_2.muses() {
+        for (l, btree) in muses_2.muses() {
             for mus in btree {
-                let list = puz.get_varlits_provable_by_mus(&varlist, mus);
-                dbg!(&list);
-                dbg!(mus);
-                dbg!(l);
+                let list = puz.get_varlits_provable_by_mus(&litlist, mus);
+                let scopelist = puz.get_all_lits_solved_by_mus(*l, mus);
                 assert!(&list.contains(l));
+                assert!(&scopelist.contains(l));
+                assert_eq!(
+                    list.iter().collect::<HashSet<_>>(),
+                    scopelist.iter().collect::<HashSet<_>>()
+                );
             }
         }
 
