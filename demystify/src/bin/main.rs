@@ -19,8 +19,19 @@ struct Opt {
     #[arg(long)]
     param: String,
 
-    #[arg(long)]
-    merge: Option<i64>,
+    #[arg(
+        long,
+        default_value_t = 1,
+        help = "Merge MUSes of this size or smaller together in a single step (set to -1 to disable)"
+    )]
+    merge: i64,
+
+    #[arg(
+        long,
+        default_value_t = 0,
+        help = "Skip MUSes of this size or smaller (set to -1 to disable)"
+    )]
+    skip: i64,
 
     #[arg(long)]
     trace: bool,
@@ -73,6 +84,7 @@ fn main() -> anyhow::Result<()> {
     let planner_config = PlannerConfig {
         mus_config,
         merge_small_threshold: opt.merge,
+        skip_small_threshold: opt.skip,
     };
 
     let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);

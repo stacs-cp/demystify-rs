@@ -16,14 +16,16 @@ use super::{
 #[derive(Copy, Clone)]
 pub struct PlannerConfig {
     pub mus_config: MusConfig,
-    pub merge_small_threshold: Option<i64>,
+    pub merge_small_threshold: i64,
+    pub skip_small_threshold: i64,
 }
 
 impl Default for PlannerConfig {
     fn default() -> Self {
         Self {
             mus_config: MusConfig::default(),
-            merge_small_threshold: Some(1),
+            merge_small_threshold: 1,
+            skip_small_threshold: 0,
         }
     }
 }
@@ -134,10 +136,8 @@ impl PuzzlePlanner {
             return muses;
         }
 
-        if let Some(min) = self.config.merge_small_threshold {
-            if muses[0].1.len() as i64 <= min {
-                return muses;
-            }
+        if muses[0].1.len() as i64 <= self.config.merge_small_threshold {
+            return muses;
         }
 
         vec![muses[0].clone()]
@@ -218,13 +218,16 @@ impl PuzzlePlanner {
 
     fn quick_solve_impl(&mut self, progress: bool) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
         let mut solvesteps = vec![];
-        while !self.psolve.get_provable_varlits().is_empty() {
+        'litloop: while !self.psolve.get_provable_varlits().is_empty() {
             let muses = self.smallest_muses_with_config();
 
             for (m, _) in &muses {
                 self.mark_lit_as_deduced(m);
             }
 
+            if muses.len() > 0 && muses[0].1.len() as i64 <= self.config.skip_small_threshold {
+                continue 'litloop;
+            }
             // Map the 'muses' to a user-friendly representation
             let muses = muses
                 .into_iter()
