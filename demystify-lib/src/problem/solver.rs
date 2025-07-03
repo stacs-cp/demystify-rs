@@ -20,7 +20,7 @@ use crate::{
     satcore::{SatCore, SearchResult},
 };
 
-use super::{musdict::MusDict, parse::PuzzleParse, PuzLit};
+use super::{PuzLit, musdict::MusDict, parse::PuzzleParse};
 
 /// The strategy to use when finding a minimal unsatisfiable subset (MUS)
 #[derive(Copy, Clone, Debug, PartialEq)]

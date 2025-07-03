@@ -6,16 +6,16 @@ use tracing::info;
 
 use crate::{
     json::Problem,
-    problem::{musdict::MusContext, VarValPair},
+    problem::{VarValPair, musdict::MusContext},
     satcore::get_solver_calls,
     web::create_html,
 };
 
 use super::{
+    PuzLit,
     musdict::MusDict,
     parse::PuzzleParse,
     solver::{MusConfig, PuzzleSolver},
-    PuzLit,
 };
 
 #[derive(Copy, Clone)]

@@ -6,7 +6,7 @@
 /// The main struct in this module is `PuzzleParse`, which represents the result of parsing a DIMACS file.
 /// It contains various fields to store the parsed information, such as the annotations from the Essence' file,
 /// the SAT instance parsed from the DIMACS file, mappings between literals and SAT integers, and more.
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use itertools::Itertools;
 use regex::Regex;
 use rustsat::instances::{self, BasicVarManager, Cnf, SatInstance};
@@ -16,8 +16,8 @@ use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use std::fs;
-use std::io::prelude::*;
 use std::io::BufReader;
+use std::io::prelude::*;
 
 use std::mem::forget;
 use std::path::PathBuf;
@@ -32,8 +32,8 @@ use std::io;
 use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
 
-use super::util::{safe_insert, FindVarConnections};
 use super::VarValPair;
+use super::util::{FindVarConnections, safe_insert};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EPrimeAnnotations {
@@ -407,7 +407,10 @@ impl PuzzleParse {
 
                 // Check is we have used this name before
                 if usedconstraintnames.contains(&constraintname) {
-                    bail!(format!("CON name {:?} used twice. This should already have substitutions done, so if you see '{{' or '}}' check your formatting string.", constraintname))
+                    bail!(format!(
+                        "CON name {:?} used twice. This should already have substitutions done, so if you see '{{' or '}}' check your formatting string.",
+                        constraintname
+                    ))
                 }
                 usedconstraintnames.insert(constraintname.clone());
 

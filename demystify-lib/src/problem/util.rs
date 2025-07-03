@@ -127,7 +127,7 @@ mod tests {
 pub mod test_utils {
     use std::fs;
 
-    use crate::problem::parse::{parse_essence, PuzzleParse};
+    use crate::problem::parse::{PuzzleParse, parse_essence};
 
     // Here we put some utility functions used in various places
     #[must_use]

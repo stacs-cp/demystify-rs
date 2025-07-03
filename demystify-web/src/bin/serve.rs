@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::http::Request;
 use axum::response::Response;
 use axum::routing::post;
-use axum::{routing::get, Json, Router};
+use axum::{Json, Router, routing::get};
 use axum_session::{Session, SessionConfig, SessionLayer, SessionNullPool, SessionStore};
 use demystify_web::wrap;
 use serde::{Deserialize, Serialize};

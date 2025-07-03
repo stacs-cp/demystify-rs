@@ -5,7 +5,7 @@ use anyhow::Context;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::problem::{parse::PuzzleParse, solver::PuzzleSolver, PuzLit, VarValPair};
+use crate::problem::{PuzLit, VarValPair, parse::PuzzleParse, solver::PuzzleSolver};
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Puzzle {
@@ -209,7 +209,10 @@ impl Problem {
                 set
             }
         } else {
-            return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
+            return Err(anyhow::anyhow!(
+                "More than one variable matrix, and none called 'grid', so not sure what to print: {:?}",
+                varnames
+            ));
         };
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
@@ -330,7 +333,10 @@ impl Problem {
                 set
             }
         } else {
-            return Err(anyhow::anyhow!("More than one variable matrix, and none called 'grid', so not sure what to print: {:?}", varnames));
+            return Err(anyhow::anyhow!(
+                "More than one variable matrix, and none called 'grid', so not sure what to print: {:?}",
+                varnames
+            ));
         };
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =

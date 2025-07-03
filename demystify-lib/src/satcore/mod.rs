@@ -136,16 +136,16 @@ impl SatCore {
             let count = CONFLICT_COUNT.fetch_add(1, Relaxed);
             if count > 1000 {
                 let limit = CONFLICT_LIMIT.load(Relaxed);
-                eprintln!("Warning: The puzzle is hard to solve, increasing limits in SAT solver from {} to {}", limit, limit * 10);
+                eprintln!(
+                    "Warning: The puzzle is hard to solve, increasing limits in SAT solver from {} to {}",
+                    limit,
+                    limit * 10
+                );
                 CONFLICT_LIMIT.store(CONFLICT_LIMIT.load(Relaxed) * 10, Relaxed);
                 CONFLICT_COUNT.store(0, Relaxed);
             } else {
                 let _ = CONFLICT_COUNT.fetch_update(Relaxed, Relaxed, |count| {
-                    if count > 0 {
-                        Some(count - 1)
-                    } else {
-                        Some(0)
-                    }
+                    if count > 0 { Some(count - 1) } else { Some(0) }
                 });
             }
         }

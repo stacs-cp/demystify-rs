@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 
 use super::super::PuzVar;
 
