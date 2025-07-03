@@ -5,7 +5,10 @@ pub mod planner;
 pub mod solver;
 pub mod util;
 
-use std::fmt;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -161,6 +164,56 @@ impl PuzLit {
             equal: !self.equal,
         }
     }
+
+    pub fn nice_puzlit_list_string(puz_slice: &[PuzLit]) -> String {
+        // Group literals by variable
+        let mut var_literals: BTreeMap<PuzVar, BTreeMap<i64, bool>> = BTreeMap::new();
+
+        for lit in puz_slice {
+            let var = lit.var();
+            let val = lit.val();
+            let equal = lit.sign();
+
+            var_literals.entry(var).or_default().insert(val, equal);
+        }
+
+        // Generate formatted strings for each variable
+        let mut result_strings = Vec::new();
+
+        for (var, val_map) in var_literals {
+            // Check if there are any positive literals
+            if val_map.values().any(|&equal| equal) {
+                // Get all the positive values
+                let positives: Vec<i64> = val_map
+                    .iter()
+                    .filter_map(|(&val, &equal)| if equal { Some(val) } else { None })
+                    .collect();
+
+                // Format positive literals
+                for val in positives {
+                    result_strings.push(format!("{} = {}", var, val));
+                }
+            } else {
+                // All literals are negative
+                let negatives: BTreeSet<i64> = val_map
+                    .iter()
+                    .filter_map(|(&val, &equal)| if !equal { Some(val) } else { None })
+                    .collect();
+
+                if !negatives.is_empty() {
+                    let neg_values = negatives
+                        .iter()
+                        .map(|&val| val.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" or ");
+
+                    result_strings.push(format!("{} != {}", var, neg_values));
+                }
+            }
+        }
+
+        result_strings.join(", ")
+    }
 }
 
 /// Represents a constraint identifier.
@@ -248,5 +301,49 @@ mod tests {
         assert!(!vvl.is_lit(&lw));
         assert!(!vvlw.is_lit(&l));
         assert!(vvlw.is_lit(&lw));
+    }
+
+    #[test]
+    fn test_nice_puzlit_list_string() {
+        let v = PuzVar::new("v", vec![]);
+        let w = PuzVar::new("w", vec![]);
+        let x = PuzVar::new("x", vec![1, 2]);
+
+        // Test case 1: Single positive literal
+        let lit1 = PuzLit::new_eq(VarValPair::new(&v, 2));
+        assert_eq!(PuzLit::nice_puzlit_list_string(&[lit1.clone()]), "v[] = 2");
+
+        // Test case 2: Multiple positive literals for different variables
+        let lit2 = PuzLit::new_eq(VarValPair::new(&w, 3));
+        let lit3 = PuzLit::new_eq(VarValPair::new(&x, 5));
+        assert_eq!(
+            PuzLit::nice_puzlit_list_string(&[lit1, lit2, lit3]),
+            "v[] = 2, w[] = 3, x[1, 2] = 5"
+        );
+
+        // Test case 3: Single negative literal
+        let neq1 = PuzLit::new_neq(VarValPair::new(&v, 2));
+        assert_eq!(PuzLit::nice_puzlit_list_string(&[neq1.clone()]), "v[] != 2");
+
+        // Test case 4: Multiple negative literals for same variable
+        let neq2 = PuzLit::new_neq(VarValPair::new(&v, 3));
+        let neq3 = PuzLit::new_neq(VarValPair::new(&v, 4));
+        assert_eq!(
+            PuzLit::nice_puzlit_list_string(&[neq1, neq2, neq3]),
+            "v[] != 2 or 3 or 4"
+        );
+
+        // Test case 5: Mix of positive and negative literals
+        let mix1 = PuzLit::new_eq(VarValPair::new(&v, 5));
+        let mix2 = PuzLit::new_neq(VarValPair::new(&w, 1));
+        let mix3 = PuzLit::new_neq(VarValPair::new(&w, 2));
+        let mix4 = PuzLit::new_eq(VarValPair::new(&x, 7));
+        assert_eq!(
+            PuzLit::nice_puzlit_list_string(&[mix1, mix2, mix3, mix4]),
+            "v[] = 5, w[] != 1 or 2, x[1, 2] = 7"
+        );
+
+        // Test case 6: Empty list
+        assert_eq!(PuzLit::nice_puzlit_list_string(&[]), "");
     }
 }

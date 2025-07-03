@@ -85,6 +85,7 @@ fn main() -> anyhow::Result<()> {
         mus_config,
         merge_small_threshold: opt.merge,
         skip_small_threshold: opt.skip,
+        expand_to_all_deductions: true,
     };
 
     let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);

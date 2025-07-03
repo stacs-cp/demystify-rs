@@ -6,7 +6,10 @@ use tracing::info;
 
 use crate::{
     json::Problem,
-    problem::{VarValPair, musdict::MusContext},
+    problem::{
+        VarValPair,
+        musdict::{MusContext, merge_muscontexts},
+    },
     satcore::get_solver_calls,
     web::create_html,
 };
@@ -23,6 +26,7 @@ pub struct PlannerConfig {
     pub mus_config: MusConfig,
     pub merge_small_threshold: i64,
     pub skip_small_threshold: i64,
+    pub expand_to_all_deductions: bool,
 }
 
 impl Default for PlannerConfig {
@@ -31,6 +35,7 @@ impl Default for PlannerConfig {
             mus_config: MusConfig::default(),
             merge_small_threshold: 1,
             skip_small_threshold: 0,
+            expand_to_all_deductions: true,
         }
     }
 }
@@ -157,10 +162,14 @@ impl PuzzlePlanner {
         }
 
         if muses[0].mus_len() as i64 <= self.config.merge_small_threshold {
-            return muses;
+            return merge_muscontexts(&muses);
         }
 
-        vec![muses[0].clone()]
+        if self.config.expand_to_all_deductions {
+            vec![self.psolve.get_all_lits_solved_by_mus(&muses[0])]
+        } else {
+            vec![muses[0].clone()]
+        }
     }
 
     /// Converts a MUS to a user-friendly MUS representation.
@@ -436,6 +445,15 @@ impl PuzzlePlanner {
             let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
             let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
 
+            let pre_string = if base_muses.len() > 1 {
+                format!(
+                    "{} simple deductions are being shown here in a single step. ",
+                    base_muses.len()
+                )
+            } else {
+                "".to_owned()
+            };
+
             let nice_deduced: String = deduced.iter().format(", ").to_string();
 
             let description = if constraints.is_empty() {
@@ -448,13 +466,15 @@ impl PuzzlePlanner {
                 )
             };
 
+            let full_description = pre_string + &description;
+
             let problem = Problem::new_from_puzzle_and_mus(
                 &self.psolve,
                 &tosolve_varvals,
                 &known_puzlits,
                 &deduced,
                 &constraints,
-                &description,
+                &full_description,
             )
             .expect("Cannot make puzzle json");
 
@@ -566,7 +586,7 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 16);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 8);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
@@ -610,7 +630,7 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 27);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 21);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
@@ -636,7 +656,7 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 18);
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 9);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());
@@ -691,8 +711,9 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        // Should only be able to solve 15 steps, due to the 'wall'
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 14);
+        // Warning: This number may change as MUS detection / merging improves.
+        // Changes should be sanity checked by printing out the sequence.
+        assert_eq!(sequence.iter().flatten().collect_vec().len(), 8);
 
         for (litset, cons) in sequence.iter().flatten() {
             assert!(!litset.is_empty());

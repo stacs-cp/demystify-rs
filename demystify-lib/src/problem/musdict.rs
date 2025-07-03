@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use rustsat::types::Lit;
 
@@ -126,6 +126,40 @@ impl MusContext {
     }
 }
 
+/// Merges `MusContext` objects with identical `mus` values.
+///
+/// This function takes a list of `MusContext` objects and combines those that have
+/// the same `mus` field by merging their `lits` fields together. The resulting list
+/// contains `MusContext` objects where each unique `mus` appears exactly once, with
+/// all associated literals consolidated.
+///
+/// # Arguments
+///
+/// * `v` - A slice of `MusContext` objects to be merged
+///
+/// # Returns
+///
+/// A new `Vec<MusContext>` where each `MusContext` has a unique `mus` field and
+/// contains all literals from the original `MusContext` objects with the same `mus`.
+///
+pub fn merge_muscontexts(v: &[MusContext]) -> Vec<MusContext> {
+    let mut mus_map: BTreeMap<&BTreeSet<Lit>, BTreeSet<Lit>> = BTreeMap::new();
+
+    // Group literals by their MUS
+    for mc in v {
+        mus_map
+            .entry(&mc.mus)
+            .or_insert_with(BTreeSet::new)
+            .extend(&mc.lits);
+    }
+
+    // Create new MusContext objects with merged literals
+    mus_map
+        .into_iter()
+        .map(|(mus, lits)| MusContext::new_multi_lit(lits, mus.clone()))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,6 +255,100 @@ mod tests {
         assert_eq!(mus_dict.muses().get(&lit2), Some(&bts2));
         assert_eq!(mus_dict.min(), Some(2));
         assert!(!mus_dict.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_muscontexts_empty() {
+        let v: Vec<MusContext> = Vec::new();
+        let result = merge_muscontexts(&v);
+        assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_merge_muscontexts_single_entry() -> anyhow::Result<()> {
+        let lit = Lit::from_ipasir(1)?;
+        let mus = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+        let mc = MusContext::new(lit, mus);
+        let v = vec![mc.clone()];
+
+        let result = merge_muscontexts(&v);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], mc);
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_muscontexts_identical_mus() -> anyhow::Result<()> {
+        let lit1 = Lit::from_ipasir(1)?;
+        let lit2 = Lit::from_ipasir(2)?;
+        let mus = BTreeSet::from([Lit::from_ipasir(3)?, Lit::from_ipasir(4)?]);
+
+        let mc1 = MusContext::new(lit1, mus.clone());
+        let mc2 = MusContext::new(lit2, mus);
+
+        let v = vec![mc1, mc2];
+        let result = merge_muscontexts(&v);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].mus_len(), 2);
+        assert_eq!(result[0].lits.len(), 2);
+        assert!(result[0].lits.contains(&lit1));
+        assert!(result[0].lits.contains(&lit2));
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_muscontexts_different_mus() -> anyhow::Result<()> {
+        let lit = Lit::from_ipasir(1)?;
+        let mus1 = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(4)?, Lit::from_ipasir(5)?]);
+
+        let mc1 = MusContext::new(lit, mus1);
+        let mc2 = MusContext::new(lit, mus2);
+
+        let v = vec![mc1, mc2];
+        let result = merge_muscontexts(&v);
+
+        assert_eq!(result.len(), 2);
+        // Elements are sorted by mus content because of BTreeMap
+        assert!(result[0].mus.contains(&Lit::from_ipasir(2)?));
+        assert!(result[1].mus.contains(&Lit::from_ipasir(4)?));
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_muscontexts_complex_case() -> anyhow::Result<()> {
+        let lit1 = Lit::from_ipasir(1)?;
+        let lit2 = Lit::from_ipasir(2)?;
+        let lit3 = Lit::from_ipasir(3)?;
+
+        let mus1 = BTreeSet::from([Lit::from_ipasir(10)?, Lit::from_ipasir(11)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(20)?, Lit::from_ipasir(21)?]);
+
+        // Both lit1 and lit2 share mus1
+        let mc1 = MusContext::new(lit1, mus1.clone());
+        let mc2 = MusContext::new(lit2, mus1);
+        // lit3 has a different mus
+        let mc3 = MusContext::new(lit3, mus2);
+
+        let v = vec![mc1, mc2, mc3];
+        let result = merge_muscontexts(&v);
+
+        assert_eq!(result.len(), 2);
+
+        // Find the merged entry with lit1 and lit2
+        let merged_entry = result.iter().find(|mc| mc.lits.contains(&lit1)).unwrap();
+        assert_eq!(merged_entry.lits.len(), 2);
+        assert!(merged_entry.lits.contains(&lit1));
+        assert!(merged_entry.lits.contains(&lit2));
+
+        // Find the entry with lit3
+        let single_entry = result.iter().find(|mc| mc.lits.contains(&lit3)).unwrap();
+        assert_eq!(single_entry.lits.len(), 1);
+        assert!(single_entry.lits.contains(&lit3));
+
         Ok(())
     }
 }

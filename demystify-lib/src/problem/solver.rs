@@ -292,7 +292,7 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// A vector of literals that are in the scope of the given MUS.
-    pub fn get_all_lits_in_scope_for_mus(&mut self, mc: &MusContext) -> BTreeSet<Lit> {
+    fn get_all_lits_in_scope_for_mus(&mut self, mc: &MusContext) -> BTreeSet<Lit> {
         // First get all lits in the scopes of all constraints in the MUS
         let mut lits = BTreeSet::new();
 
