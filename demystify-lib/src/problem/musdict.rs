@@ -107,6 +107,19 @@ impl MusContext {
         Self { lits, mus }
     }
 
+    pub fn new_with_more_lits(mut lits: Vec<Lit>, mc: &Self) -> Self {
+        for l in &mc.lits {
+            if !lits.contains(l) {
+                lits.push(*l);
+            }
+        }
+
+        Self {
+            lits,
+            mus: mc.mus.clone(),
+        }
+    }
+
     pub fn mus_len(&self) -> usize {
         self.mus.len()
     }

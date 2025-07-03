@@ -337,14 +337,15 @@ impl PuzzleSolver {
     /// # Arguments
     ///
     /// * `base` - The base literal that is being proved by the MUS.
-    /// * `mus` - The Minimal Unsatisfiable Subset (MUS) as a vector of literals.
+    /// * `mc` - The Minimal Unsatisfiable Subset (MUS).
     ///
     /// # Returns
     ///
-    /// A vector of literals that are can be deduced by this MUS.
-    pub fn get_all_lits_solved_by_mus(&mut self, mus: &MusContext) -> Vec<Lit> {
-        let candidates = self.get_all_lits_in_scope_for_mus(mus);
-        self.get_varlits_provable_by_mus(&candidates, mus)
+    /// A new MUS.
+    pub fn get_all_lits_solved_by_mus(&mut self, mc: &MusContext) -> MusContext {
+        let candidates = self.get_all_lits_in_scope_for_mus(mc);
+        let filtered = self.get_varlits_provable_by_mus(&candidates, mc);
+        MusContext::new_with_more_lits(filtered, mc)
     }
 
     /// Generate a random solution. This will not enforce that the problem
@@ -1103,10 +1104,10 @@ mod tests {
                 let list = puz.get_varlits_provable_by_mus(&litlist, mus);
                 let scopelist = puz.get_all_lits_solved_by_mus(mus);
                 assert!(&list.contains(l));
-                assert!(&scopelist.contains(l));
+                assert!(&scopelist.lits.contains(l));
                 assert_eq!(
                     list.iter().collect::<HashSet<_>>(),
-                    scopelist.iter().collect::<HashSet<_>>()
+                    scopelist.lits.iter().collect::<HashSet<_>>()
                 );
             }
         }
