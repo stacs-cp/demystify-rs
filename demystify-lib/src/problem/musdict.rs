@@ -40,7 +40,7 @@ impl MusDict {
     ///
     /// * `lit` - The literal associated with the mus.
     /// * `new_mus` - The new mus to be added.
-    pub fn add_mus(&mut self, lit: Lit, new_mus: Vec<Lit>) {
+    pub fn add_mus(&mut self, lit: Lit, new_mus: BTreeSet<Lit>) {
         if let Some(mus_list) = self.muses.get_mut(&lit) {
             let len = if let Some(element) = mus_list.iter().next() {
                 element.mus_len()
@@ -94,24 +94,25 @@ impl MusDict {
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct MusContext {
-    pub lits: Vec<Lit>,
-    pub mus: Vec<Lit>,
+    pub lits: BTreeSet<Lit>,
+    pub mus: BTreeSet<Lit>,
 }
 
 impl MusContext {
-    pub fn new(l: Lit, mus: Vec<Lit>) -> Self {
-        Self { lits: vec![l], mus }
+    pub fn new(l: Lit, mus: BTreeSet<Lit>) -> Self {
+        Self {
+            lits: BTreeSet::from([l]),
+            mus,
+        }
     }
 
-    pub fn new_multi_lit(lits: Vec<Lit>, mus: Vec<Lit>) -> Self {
+    pub fn new_multi_lit(lits: BTreeSet<Lit>, mus: BTreeSet<Lit>) -> Self {
         Self { lits, mus }
     }
 
-    pub fn new_with_more_lits(mut lits: Vec<Lit>, mc: &Self) -> Self {
+    pub fn new_with_more_lits(mut lits: BTreeSet<Lit>, mc: &Self) -> Self {
         for l in &mc.lits {
-            if !lits.contains(l) {
-                lits.push(*l);
-            }
+            lits.insert(*l);
         }
 
         Self {
@@ -140,8 +141,8 @@ mod tests {
     fn test_add_mus_existing_literal_smaller_length() -> anyhow::Result<()> {
         let mut mus_dict = MusDict::new();
         let lit = Lit::from_ipasir(1)?;
-        let mus1 = vec![Lit::from_ipasir(2)?, Lit::from_ipasir(3)?];
-        let mus2 = vec![Lit::from_ipasir(4)?];
+        let mus1 = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(4)?]);
         mus_dict.add_mus(lit, mus1.clone());
         mus_dict.add_mus(lit, mus2.clone());
 
@@ -154,8 +155,8 @@ mod tests {
     fn test_add_mus_existing_literal_equal_length() -> anyhow::Result<()> {
         let mut mus_dict = MusDict::new();
         let lit = Lit::from_ipasir(1)?;
-        let mus1 = vec![Lit::from_ipasir(2)?, Lit::from_ipasir(3)?];
-        let mus2 = vec![Lit::from_ipasir(4)?, Lit::from_ipasir(5)?];
+        let mus1 = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(4)?, Lit::from_ipasir(5)?]);
         mus_dict.add_mus(lit, mus1.clone());
         mus_dict.add_mus(lit, mus2.clone());
         let bts: BTreeSet<_> = vec![MusContext::new(lit, mus1), MusContext::new(lit, mus2)]
@@ -172,8 +173,8 @@ mod tests {
         let mut mus_dict = MusDict::new();
         let lit = Lit::from_ipasir(1)?;
         let lit2 = Lit::from_ipasir(2)?;
-        let mus1 = vec![Lit::from_ipasir(2)?, Lit::from_ipasir(3)?];
-        let mus2 = vec![Lit::from_ipasir(4)?, Lit::from_ipasir(5)?];
+        let mus1 = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(4)?, Lit::from_ipasir(5)?]);
         mus_dict.add_mus(lit, mus1.clone());
         mus_dict.add_mus(lit, mus2.clone());
         assert_eq!(mus_dict.min_lit(lit), Some(2));
@@ -193,8 +194,8 @@ mod tests {
     fn test_add_mus_existing_literal_larger_length() -> anyhow::Result<()> {
         let mut mus_dict = MusDict::new();
         let lit = Lit::from_ipasir(1)?;
-        let mus1 = vec![Lit::from_ipasir(2)?, Lit::from_ipasir(3)?];
-        let mus2 = vec![Lit::from_ipasir(4)?];
+        let mus1 = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(4)?]);
         mus_dict.add_mus(lit, mus2.clone());
         mus_dict.add_mus(lit, mus1.clone());
         let bts: BTreeSet<_> = std::iter::once(MusContext::new(lit, mus2)).collect();
@@ -209,8 +210,8 @@ mod tests {
         let mut mus_dict = MusDict::new();
         let lit1 = Lit::from_ipasir(1)?;
         let lit2 = Lit::from_ipasir(2)?;
-        let mus1 = vec![Lit::from_ipasir(3)?, Lit::from_ipasir(4)?];
-        let mus2 = vec![Lit::from_ipasir(5)?, Lit::from_ipasir(6)?];
+        let mus1 = BTreeSet::from([Lit::from_ipasir(3)?, Lit::from_ipasir(4)?]);
+        let mus2 = BTreeSet::from([Lit::from_ipasir(5)?, Lit::from_ipasir(6)?]);
         mus_dict.add_mus(lit1, mus1.clone());
         mus_dict.add_mus(lit2, mus2.clone());
         let bts1: BTreeSet<_> = std::iter::once(MusContext::new(lit1, mus1)).collect();
