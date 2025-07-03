@@ -165,11 +165,14 @@ impl PuzLit {
         }
     }
 
-    pub fn nice_puzlit_list_string(puz_slice: &[PuzLit]) -> String {
+    pub fn nice_puzlit_list_string<'a, I>(puz_container: I) -> String
+    where
+        I: IntoIterator<Item = &'a PuzLit>,
+    {
         // Group literals by variable
         let mut var_literals: BTreeMap<PuzVar, BTreeMap<i64, bool>> = BTreeMap::new();
 
-        for lit in puz_slice {
+        for lit in puz_container {
             let var = lit.var();
             let val = lit.val();
             let equal = lit.sign();

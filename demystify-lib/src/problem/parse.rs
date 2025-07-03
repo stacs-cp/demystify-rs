@@ -349,7 +349,7 @@ impl PuzzleParse {
                 // as we need all of 'varset' to be complete first
                 // So here we just allow the name
             } else {
-                bail!("Cannot identify {:?}", puzlit);
+                bail!("Cannot identify {:?}, should it be marked as AUX?", puzlit);
             }
         }
 

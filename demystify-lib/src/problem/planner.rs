@@ -447,20 +447,20 @@ impl PuzzlePlanner {
 
             let pre_string = if base_muses.len() > 1 {
                 format!(
-                    "{} simple deductions are being shown here in a single step. ",
+                    "{} simple deductions are being shown here in a single step. <br/>",
                     base_muses.len()
                 )
             } else {
                 "".to_owned()
             };
 
-            let nice_deduced: String = deduced.iter().format(", ").to_string();
+            let nice_deduced: String = PuzLit::nice_puzlit_list_string(&deduced);
 
             let description = if constraints.is_empty() {
                 format!("{nice_deduced:?} because of the design of the problem")
             } else {
                 format!(
-                    "{:?} because of {} constraints",
+                    "{:?} because of {} constraints:<br/>",
                     nice_deduced,
                     &constraints.len()
                 )
