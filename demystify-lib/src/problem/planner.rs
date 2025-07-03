@@ -1,10 +1,15 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use itertools::Itertools;
 use rustsat::types::Lit;
 use tracing::info;
 
-use crate::{json::Problem, problem::VarValPair, satcore::get_solver_calls, web::create_html};
+use crate::{
+    json::Problem,
+    problem::{musdict::MusContext, VarValPair},
+    satcore::get_solver_calls,
+    web::create_html,
+};
 
 use super::{
     musdict::MusDict,
@@ -115,7 +120,7 @@ impl PuzzlePlanner {
     /// # Returns
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
-    pub fn smallest_muses(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn smallest_muses(&mut self) -> Vec<MusContext> {
         //let mut t = QuickTimer::new("smallest_muses");
         let muses = self.all_smallish_muses();
 
@@ -129,10 +134,10 @@ impl PuzzlePlanner {
 
         let mut vec = vec![];
 
-        for (&lit, v) in muses.muses() {
+        for v in muses.muses().values() {
             if let Some(m) = v.iter().next() {
-                if m.len() == min {
-                    vec.push((lit, m.clone()));
+                if m.mus_len() == min {
+                    vec.push(m.clone());
                 }
             }
         }
@@ -145,17 +150,59 @@ impl PuzzlePlanner {
     /// # Returns
     ///
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
-    pub fn smallest_muses_with_config(&mut self) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn smallest_muses_with_config(&mut self) -> Vec<MusContext> {
         let muses = self.smallest_muses();
         if muses.is_empty() {
             return muses;
         }
 
-        if muses[0].1.len() as i64 <= self.config.merge_small_threshold {
+        if muses[0].mus_len() as i64 <= self.config.merge_small_threshold {
             return muses;
         }
 
         vec![muses[0].clone()]
+    }
+
+    pub fn get_all_lits_in_scope_for_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
+        // First get all lits in the scopes of all constraints in the MUS
+        let mut lits = HashSet::new();
+
+        for m in mus {
+            for l in self.psolve.puzzleparse().varlits_in_con.get(&m).unwrap() {
+                lits.insert(*l);
+            }
+        }
+
+        // Then get the vars of all those lits
+        let mut vars = HashSet::new();
+
+        for l in lits {
+            for pl in self.psolve.puzzleparse().invlitmap.get(&l).unwrap() {
+                vars.insert(pl.var());
+            }
+        }
+
+        // Then get the lits we still need to find, and check if they are in any of those variables
+        let mut check_lits = HashSet::new();
+        // This should always be in here, but let's add it just in case something goes wrong.
+        check_lits.insert(base);
+
+        for l in self.psolve.get_provable_varlits().clone() {
+            // Get all variables which refer to that literal
+            for pl in self.psolve.puzzleparse().invlitmap.get(&l).unwrap() {
+                if vars.contains(&pl.var()) {
+                    check_lits.insert(l);
+                }
+            }
+        }
+
+        check_lits.iter().cloned().collect_vec()
+    }
+
+    pub fn get_all_lits_solved_by_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
+        let candidates = self.get_all_lits_in_scope_for_mus(base, mus);
+
+        candidates
     }
 
     /// Converts a MUS to a user-friendly MUS representation.
@@ -167,10 +214,14 @@ impl PuzzlePlanner {
     /// # Returns
     ///
     /// A tuple containing a set of user-friendly literals and a vector of user-friendly constraints.
-    pub fn mus_to_user_mus(&self, mus: &(Lit, Vec<Lit>)) -> (BTreeSet<PuzLit>, Vec<String>) {
-        let (l, x) = mus;
+    pub fn mus_to_user_mus(&self, mc: &MusContext) -> (BTreeSet<PuzLit>, Vec<String>) {
+        let lits = &mc.lits;
+        let x = &mc.mus;
         (
-            self.psolve.puzzleparse().lit_to_vars(l).clone(),
+            lits.iter()
+                .flat_map(|l| self.psolve.puzzleparse().lit_to_vars(l))
+                .cloned()
+                .collect(),
             x.iter()
                 .map(|c| self.psolve.puzzleparse().lit_to_con(c))
                 .cloned()
@@ -236,11 +287,13 @@ impl PuzzlePlanner {
         'litloop: while !self.psolve.get_provable_varlits().is_empty() {
             let muses = self.smallest_muses_with_config();
 
-            for (m, _) in &muses {
-                self.mark_lit_as_deduced(m);
+            for mus in &muses {
+                for lit in &mus.lits {
+                    self.mark_lit_as_deduced(lit);
+                }
             }
 
-            if !muses.is_empty() && muses[0].1.len() as i64 <= self.config.skip_small_threshold {
+            if !muses.is_empty() && muses[0].mus_len() as i64 <= self.config.skip_small_threshold {
                 continue 'litloop;
             }
             // Map the 'muses' to a user-friendly representation
@@ -353,7 +406,7 @@ impl PuzzlePlanner {
             .muses()
             .iter()
             .filter(|(_, v)| !v.is_empty())
-            .map(|(k, v)| (*k, v.iter().next().unwrap().len()))
+            .map(|(k, v)| (*k, v.iter().next().unwrap().mus_len()))
             .collect();
 
         self.quick_display_difficulty_step(base_difficulties)
@@ -383,10 +436,10 @@ impl PuzzlePlanner {
 
         let mut vec = vec![];
 
-        for (&lit, v) in muses.muses() {
+        for v in muses.muses().values() {
             if let Some(m) = v.iter().next() {
-                if m.len() == min {
-                    vec.push((lit, m.clone()));
+                if m.mus_len() == min {
+                    vec.push(m.clone());
                 }
             }
         }
@@ -398,7 +451,7 @@ impl PuzzlePlanner {
 
     pub fn quick_display_html_step(
         &mut self,
-        base_muses: Option<Vec<(Lit, Vec<Lit>)>>,
+        base_muses: Option<Vec<MusContext>>,
     ) -> (String, Vec<Lit>) {
         let varlits = self.psolve.get_provable_varlits().clone();
 
@@ -447,8 +500,12 @@ impl PuzzlePlanner {
             )
             .expect("Cannot make puzzle json");
 
-            let v = base_muses.iter().map(|(c, _)| c).copied().collect_vec();
-            for (m, _) in &base_muses {
+            let v = base_muses
+                .iter()
+                .flat_map(|mc| &mc.lits)
+                .cloned()
+                .collect_vec();
+            for m in &v {
                 self.mark_lit_as_deduced(m);
             }
 

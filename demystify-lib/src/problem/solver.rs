@@ -14,6 +14,7 @@ use rustsat::types::Lit;
 use thread_local::ThreadLocal;
 use tracing::info;
 
+use crate::problem::musdict::MusContext;
 use crate::{
     problem::{PuzVar, VarValPair},
     satcore::{SatCore, SearchResult},
@@ -245,8 +246,9 @@ impl PuzzleSolver {
     pub fn get_varlits_provable_by_mus(
         &mut self,
         candidates: &Vec<Lit>,
-        mus: &Vec<Lit>,
+        mc: &MusContext,
     ) -> Vec<Lit> {
+        let mus = &mc.mus;
         assert!(mus.iter().all(|c| self.puzzleparse.conset_lits.contains(c)));
 
         let mut litorig = mus.clone();
@@ -289,11 +291,11 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// A vector of literals that are in the scope of the given MUS.
-    pub fn get_all_lits_in_scope_for_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
+    pub fn get_all_lits_in_scope_for_mus(&mut self, mc: &MusContext) -> Vec<Lit> {
         // First get all lits in the scopes of all constraints in the MUS
         let mut lits = HashSet::new();
 
-        for m in mus {
+        for m in &mc.mus {
             for l in self.puzzleparse().varlits_in_con.get(m).unwrap() {
                 lits.insert(*l);
             }
@@ -311,7 +313,9 @@ impl PuzzleSolver {
         // Then get the lits we still need to find, and check if they are in any of those variables
         let mut check_lits = HashSet::new();
         // This should always be in here, but let's add it just in case something goes wrong.
-        check_lits.insert(base);
+        for l in &mc.lits {
+            check_lits.insert(*l);
+        }
 
         for l in self.get_provable_varlits().clone() {
             // Get all variables which refer to that literal
@@ -338,8 +342,8 @@ impl PuzzleSolver {
     /// # Returns
     ///
     /// A vector of literals that are can be deduced by this MUS.
-    pub fn get_all_lits_solved_by_mus(&mut self, base: Lit, mus: &Vec<Lit>) -> Vec<Lit> {
-        let candidates = self.get_all_lits_in_scope_for_mus(base, mus);
+    pub fn get_all_lits_solved_by_mus(&mut self, mus: &MusContext) -> Vec<Lit> {
+        let candidates = self.get_all_lits_in_scope_for_mus(mus);
         self.get_varlits_provable_by_mus(&candidates, mus)
     }
 
@@ -1097,7 +1101,7 @@ mod tests {
         for (l, btree) in muses_2.muses() {
             for mus in btree {
                 let list = puz.get_varlits_provable_by_mus(&litlist, mus);
-                let scopelist = puz.get_all_lits_solved_by_mus(*l, mus);
+                let scopelist = puz.get_all_lits_solved_by_mus(mus);
                 assert!(&list.contains(l));
                 assert!(&scopelist.contains(l));
                 assert_eq!(

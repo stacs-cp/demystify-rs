@@ -5,7 +5,7 @@ use rustsat::types::Lit;
 /// A dictionary for storing muses (minimal unsatisfiable subsets) associated with literals.
 #[derive(Clone)]
 pub struct MusDict {
-    muses: HashMap<Lit, BTreeSet<Vec<Lit>>>,
+    muses: HashMap<Lit, BTreeSet<MusContext>>,
 }
 
 impl Default for MusDict {
@@ -43,19 +43,19 @@ impl MusDict {
     pub fn add_mus(&mut self, lit: Lit, new_mus: Vec<Lit>) {
         if let Some(mus_list) = self.muses.get_mut(&lit) {
             let len = if let Some(element) = mus_list.iter().next() {
-                element.len()
+                element.mus_len()
             } else {
                 usize::MAX
             };
 
             if new_mus.len() < len {
                 mus_list.clear();
-                mus_list.insert(new_mus);
+                mus_list.insert(MusContext::new(lit, new_mus));
             } else if new_mus.len() == len {
-                mus_list.insert(new_mus);
+                mus_list.insert(MusContext::new(lit, new_mus));
             }
         } else {
-            let hs: BTreeSet<_> = std::iter::once(new_mus).collect();
+            let hs: BTreeSet<_> = std::iter::once(MusContext::new(lit, new_mus)).collect();
             self.muses.insert(lit, hs);
         }
     }
@@ -63,7 +63,7 @@ impl MusDict {
     #[must_use]
     pub fn min_lit(&self, lit: Lit) -> Option<usize> {
         if let Some(mus_list) = self.muses.get(&lit) {
-            mus_list.iter().next().map(std::vec::Vec::len)
+            mus_list.iter().next().map(|mc| mc.mus_len())
         } else {
             None
         }
@@ -71,7 +71,7 @@ impl MusDict {
 
     /// Returns a reference to the muses in the dictionary.
     #[must_use]
-    pub fn muses(&self) -> &HashMap<Lit, BTreeSet<Vec<Lit>>> {
+    pub fn muses(&self) -> &HashMap<Lit, BTreeSet<MusContext>> {
         &self.muses
     }
 
@@ -87,8 +87,28 @@ impl MusDict {
     pub fn min(&self) -> Option<usize> {
         self.muses
             .values()
-            .flat_map(|sets| sets.iter().map(std::vec::Vec::len))
+            .flat_map(|sets| sets.iter().map(|x| x.mus_len()))
             .min()
+    }
+}
+
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub struct MusContext {
+    pub lits: Vec<Lit>,
+    pub mus: Vec<Lit>,
+}
+
+impl MusContext {
+    pub fn new(l: Lit, mus: Vec<Lit>) -> Self {
+        Self { lits: vec![l], mus }
+    }
+
+    pub fn new_multi_lit(lits: Vec<Lit>, mus: Vec<Lit>) -> Self {
+        Self { lits, mus }
+    }
+
+    pub fn mus_len(&self) -> usize {
+        self.mus.len()
     }
 }
 
@@ -125,7 +145,9 @@ mod tests {
         let mus2 = vec![Lit::from_ipasir(4)?, Lit::from_ipasir(5)?];
         mus_dict.add_mus(lit, mus1.clone());
         mus_dict.add_mus(lit, mus2.clone());
-        let bts: BTreeSet<_> = vec![mus1, mus2].into_iter().collect();
+        let bts: BTreeSet<_> = vec![MusContext::new(lit, mus1), MusContext::new(lit, mus2)]
+            .into_iter()
+            .collect();
         assert_eq!(mus_dict.muses().get(&lit), Some(&bts));
         assert_eq!(mus_dict.min(), Some(2));
         assert!(!mus_dict.is_empty());
@@ -162,7 +184,7 @@ mod tests {
         let mus2 = vec![Lit::from_ipasir(4)?];
         mus_dict.add_mus(lit, mus2.clone());
         mus_dict.add_mus(lit, mus1.clone());
-        let bts: BTreeSet<_> = std::iter::once(mus2).collect();
+        let bts: BTreeSet<_> = std::iter::once(MusContext::new(lit, mus2)).collect();
         assert_eq!(mus_dict.muses().get(&lit), Some(&bts));
         assert_eq!(mus_dict.min(), Some(1));
         assert!(!mus_dict.is_empty());
@@ -178,8 +200,8 @@ mod tests {
         let mus2 = vec![Lit::from_ipasir(5)?, Lit::from_ipasir(6)?];
         mus_dict.add_mus(lit1, mus1.clone());
         mus_dict.add_mus(lit2, mus2.clone());
-        let bts1: BTreeSet<_> = std::iter::once(mus1).collect();
-        let bts2: BTreeSet<_> = std::iter::once(mus2).collect();
+        let bts1: BTreeSet<_> = std::iter::once(MusContext::new(lit1, mus1)).collect();
+        let bts2: BTreeSet<_> = std::iter::once(MusContext::new(lit2, mus2)).collect();
         assert_eq!(mus_dict.muses().get(&lit1), Some(&bts1));
         assert_eq!(mus_dict.min(), Some(2));
         assert_eq!(mus_dict.muses().get(&lit2), Some(&bts2));
