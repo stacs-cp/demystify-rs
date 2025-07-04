@@ -1,7 +1,5 @@
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 use std::sync::OnceLock;
-use std::io;
 use which::which;
 
 /// Enum representing the method used to run commands
@@ -10,6 +8,19 @@ pub enum RunMethod {
     Native,
     Docker,
     Podman,
+}
+
+impl std::str::FromStr for RunMethod {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "native" => Ok(RunMethod::Native),
+            "docker" => Ok(RunMethod::Docker),
+            "podman" => Ok(RunMethod::Podman),
+            _ => Err(format!("Invalid RunMethod: {}", s)),
+        }
+    }
 }
 
 /// Global configuration for the runner
@@ -31,16 +42,16 @@ fn detect_run_method() -> RunMethod {
     if which("conjure").is_ok() && which("savilerow").is_ok() {
         return RunMethod::Native;
     }
-    
+
     // Check for container tools
     if which("podman").is_ok() {
         return RunMethod::Podman;
     }
-    
+
     if which("docker").is_ok() {
         return RunMethod::Docker;
     }
-    
+
     // Default to native if we couldn't detect anything
     // This might fail later, but at least we tried
     RunMethod::Native
@@ -50,35 +61,36 @@ fn detect_run_method() -> RunMethod {
 pub struct ProgramRunner;
 
 impl ProgramRunner {
-    /// Run a command from the specified directory
-    pub fn run(program: &str, args: &[&str], working_dir: impl AsRef<Path>) -> io::Result<Output> {
+    /// Prepare a `Command` to run a program, either natively or in a container
+    pub fn prepare(program: &str, localdir: &std::path::Path) -> Command {
         match get_run_method() {
             RunMethod::Native => {
-                let mut command = Command::new(program);
-                command.args(args);
-                command.current_dir(working_dir.as_ref());
-                command.output()
-            },
+                // Create a native command
+                let mut cmd = Command::new(program);
+                cmd.current_dir(localdir);
+                cmd
+            }
             RunMethod::Docker | RunMethod::Podman => {
-                let container_cmd = if get_run_method() == RunMethod::Docker { "docker" } else { "podman" };
-                
-                // Get the absolute path to working directory
-                let abs_path = working_dir.as_ref().canonicalize()?;
-                
+                let container_cmd = if get_run_method() == RunMethod::Docker {
+                    "docker"
+                } else {
+                    "podman"
+                };
+
                 // Build the container command
                 let mut container_command = Command::new(container_cmd);
                 container_command
+                    .current_dir(localdir)
                     .arg("run")
                     .arg("--rm")
                     .arg("-v")
-                    .arg(format!("{}:/workspace:Z", abs_path.to_str()
-                        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Path is not valid UTF-8"))?))
+                    .arg(".:/workspace:Z")
                     .arg("-w")
                     .arg("/workspace")
                     .arg("ghcr.io/conjure-cp/conjure:main")
-                    .arg(program).args(args).current_dir(working_dir.as_ref());
-                
-                container_command.output()
+                    .arg(program);
+
+                container_command
             }
         }
     }

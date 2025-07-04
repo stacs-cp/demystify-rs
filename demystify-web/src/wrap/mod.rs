@@ -213,7 +213,7 @@ pub async fn load_example(
         (
             "Binairo",
             (
-                include_model_file!("../eprime/binairo.eprime"),
+                include_model_file!("../eprime/binairo.essence"),
                 include_model_file!("../eprime/binairo/diiscu.param"),
             ),
         ),

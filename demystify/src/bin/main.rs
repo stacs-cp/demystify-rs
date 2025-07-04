@@ -4,6 +4,7 @@ use demystify_lib::{
         self,
         planner::{PlannerConfig, PuzzlePlanner},
         solver::{MusConfig, PuzzleSolver, SolverConfig},
+        util::exec::{RunMethod, set_run_method},
     },
     web::{base_css, base_javascript},
 };
@@ -44,12 +45,24 @@ struct Opt {
 
     #[arg(long)]
     searches: Option<i64>,
+
+    #[arg(
+        long,
+        value_enum,
+        help = "Specify the method to run the solver (Native, Docker, Podman)"
+    )]
+    conjure: Option<RunMethod>,
 }
 
 fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
 
     let (non_block, _guard) = tracing_appender::non_blocking(File::create("demystify.trace")?);
+
+    // Choose how we run conjure, native, docker or podman
+    if let Some(method) = opt.conjure {
+        set_run_method(method);
+    }
 
     if opt.trace {
         tracing_subscriber::fmt()

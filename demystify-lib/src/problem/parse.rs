@@ -21,7 +21,6 @@ use std::io::prelude::*;
 
 use std::mem::forget;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tracing::{debug, info};
@@ -29,6 +28,7 @@ use tracing::{debug, info};
 use std::fs::File;
 use std::io;
 
+use crate::problem::util::exec::ProgramRunner;
 use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
 
@@ -804,13 +804,12 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     // If input is essence, translate to essence' for savilerow
     if is_essence {
         info!(target: "parser", "Running {:?} {:?} through conjure", eprime, eprimeparam);
-        let output = Command::new("conjure")
+        let output = ProgramRunner::prepare("conjure", tdir.path())
             .arg("solve")
             .arg("-o")
-            .arg(tdir.path().to_str().unwrap())
-            .arg(&eprime)
-            .arg(eprimeparam)
-            .current_dir(&tdir)
+            .arg(".")
+            .arg(&eprime.file_name().unwrap())
+            .arg(eprimeparam.file_name().unwrap())
             .output()
             .expect("Failed to execute command");
 
@@ -842,11 +841,11 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 
     info!(target: "parser", "Running savilerow on {:?} {:?}", finaleprime, finaleprimeparam);
 
-    let makedimacs = Command::new("savilerow")
+    let makedimacs = ProgramRunner::prepare("savilerow", &tdir.path())
         .arg("-in-eprime")
-        .arg(&finaleprime)
+        .arg(&finaleprime.file_name().unwrap())
         .arg("-in-param")
-        .arg(&finaleprimeparam)
+        .arg(&finaleprimeparam.file_name().unwrap())
         .arg("-sat-output-mapping")
         .arg("-sat")
         .arg("-sat-family")
@@ -855,7 +854,6 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         .arg("-O0")
         .arg("-reduce-domains")
         .arg("-aggregate")
-        .current_dir(&tdir)
         .output()
         .expect("Failed to find 'savilerow' -- have you installed savilerow and conjure?");
 
@@ -911,12 +909,11 @@ fn pretty_print_essence(
     fs::copy(file, &temp_file)?;
 
     info!(target: "parser", "Pretty printing {:?} as {}", temp_file, format);
-    let output = Command::new("conjure")
+    let output = ProgramRunner::prepare("conjure", tdir.path())
         .arg("pretty")
         .arg("--output-format")
         .arg(format)
-        .arg(&temp_file)
-        .current_dir(&tdir)
+        .arg(&temp_file.file_name().unwrap())
         .output()
         .expect("Failed to execute command");
 

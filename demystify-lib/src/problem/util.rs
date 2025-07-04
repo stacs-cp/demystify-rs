@@ -5,6 +5,7 @@ use itertools::Itertools;
 use rustsat::{instances::SatInstance, types::Lit};
 use tracing::info;
 
+pub mod exec;
 pub mod parsing;
 
 pub fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> anyhow::Result<()> {
