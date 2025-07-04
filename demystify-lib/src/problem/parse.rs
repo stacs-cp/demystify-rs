@@ -810,6 +810,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
             .arg(tdir.path().to_str().unwrap())
             .arg(&eprime)
             .arg(eprimeparam)
+            .current_dir(&tdir)
             .output()
             .expect("Failed to execute command");
 
@@ -854,6 +855,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         .arg("-O0")
         .arg("-reduce-domains")
         .arg("-aggregate")
+        .current_dir(&tdir)
         .output()
         .expect("Failed to find 'savilerow' -- have you installed savilerow and conjure?");
 
@@ -904,12 +906,17 @@ fn pretty_print_essence(
     file: &PathBuf,
     format: &str,
 ) -> anyhow::Result<BTreeMap<String, serde_json::value::Value>> {
-    info!(target: "parser", "Pretty printing {:?} as {}", file, format);
+    let tdir = TempDir::new().unwrap();
+    let temp_file = tdir.path().join(file.file_name().unwrap());
+    fs::copy(file, &temp_file)?;
+
+    info!(target: "parser", "Pretty printing {:?} as {}", temp_file, format);
     let output = Command::new("conjure")
         .arg("pretty")
         .arg("--output-format")
         .arg(format)
-        .arg(file)
+        .arg(&temp_file)
+        .current_dir(&tdir)
         .output()
         .expect("Failed to execute command");
 
