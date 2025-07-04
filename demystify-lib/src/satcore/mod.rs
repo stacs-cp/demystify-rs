@@ -289,7 +289,7 @@ impl SatCore {
                             let core = self.raw_assumption_solve_with_core(&known_core)?;
                             if let Some(found) = &core {
                                 assert!(found.len() as i64 == known_size);
-                            };
+                            }
                             return Ok(core);
                         }
                     }

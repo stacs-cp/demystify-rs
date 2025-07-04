@@ -8,10 +8,10 @@ use crate::problem::parse::PuzzleParse;
 
 /// Splits a Savile Row name into base name and indices
 ///
-/// Takes a name like "var_00001_n00002" and returns ("var", [1, -2])
+/// Takes a name like "`var_00001_n00002`" and returns ("var", [1, -2])
 /// This parsing is non-trivial as names can also contain _
 /// This would break if someone actually named a variable something
-/// like var_00001, but then so does savilerow!
+/// like `var_00001`, but then so does savilerow!
 fn split_savile_row_name(n: &str) -> (String, Vec<i64>) {
     let mut current = n.to_string();
     let mut indices = Vec::new();
@@ -30,7 +30,7 @@ fn split_savile_row_name(n: &str) -> (String, Vec<i64>) {
             };
 
             // Check if the remainder is a number with at least 5 digits
-            if value_str.len() >= 5 && value_str.chars().all(|c| c.is_digit(10)) {
+            if value_str.len() >= 5 && value_str.chars().all(|c| c.is_ascii_digit()) {
                 if let Ok(mut num) = value_str.parse::<i64>() {
                     if negate {
                         num = -num;
@@ -59,12 +59,12 @@ pub fn parse_savile_row_name(dimacs: &PuzzleParse, n: &str) -> anyhow::Result<Op
 
     if !has_match {
         if !dimacs.eprime.auxvars.contains(&name) && !n.starts_with("conjure_aux") {
-            eprintln!("Do not recognise variable '{}' -- should it be AUX?", name);
+            eprintln!("Do not recognise variable '{name}' -- should it be AUX?");
         }
         return Ok(None);
     }
 
-    return Ok(Some(PuzVar::new(&name, indices)));
+    Ok(Some(PuzVar::new(&name, indices)))
 }
 
 pub fn parse_constraint_name(

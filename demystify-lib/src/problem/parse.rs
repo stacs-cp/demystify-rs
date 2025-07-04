@@ -808,7 +808,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
             .arg("solve")
             .arg("-o")
             .arg(".")
-            .arg(&eprime.file_name().unwrap())
+            .arg(eprime.file_name().unwrap())
             .arg(eprimeparam.file_name().unwrap())
             .output()
             .expect("Failed to execute command");
@@ -841,11 +841,11 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 
     info!(target: "parser", "Running savilerow on {:?} {:?}", finaleprime, finaleprimeparam);
 
-    let makedimacs = ProgramRunner::prepare("savilerow", &tdir.path())
+    let makedimacs = ProgramRunner::prepare("savilerow", tdir.path())
         .arg("-in-eprime")
-        .arg(&finaleprime.file_name().unwrap())
+        .arg(finaleprime.file_name().unwrap())
         .arg("-in-param")
-        .arg(&finaleprimeparam.file_name().unwrap())
+        .arg(finaleprimeparam.file_name().unwrap())
         .arg("-sat-output-mapping")
         .arg("-sat")
         .arg("-sat-family")
@@ -913,7 +913,7 @@ fn pretty_print_essence(
         .arg("pretty")
         .arg("--output-format")
         .arg(format)
-        .arg(&temp_file.file_name().unwrap())
+        .arg(temp_file.file_name().unwrap())
         .output()
         .expect("Failed to execute command");
 

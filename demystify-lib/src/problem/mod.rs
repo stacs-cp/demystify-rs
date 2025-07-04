@@ -194,13 +194,13 @@ impl PuzLit {
 
                 // Format positive literals
                 for val in positives {
-                    result_strings.push(format!("{} = {}", var, val));
+                    result_strings.push(format!("{var} = {val}"));
                 }
             } else {
                 // All literals are negative
                 let negatives: BTreeSet<i64> = val_map
                     .iter()
-                    .filter_map(|(&val, &equal)| if !equal { Some(val) } else { None })
+                    .filter_map(|(&val, &equal)| if equal { None } else { Some(val) })
                     .collect();
 
                 if !negatives.is_empty() {
@@ -210,7 +210,7 @@ impl PuzLit {
                         .collect::<Vec<_>>()
                         .join(" or ");
 
-                    result_strings.push(format!("{} != {}", var, neg_values));
+                    result_strings.push(format!("{var} != {neg_values}"));
                 }
             }
         }

@@ -451,7 +451,7 @@ impl PuzzlePlanner {
                     base_muses.len()
                 )
             } else {
-                "".to_owned()
+                String::new()
             };
 
             let nice_deduced: String = PuzLit::nice_puzlit_list_string(&deduced);
@@ -481,7 +481,7 @@ impl PuzzlePlanner {
             let v = base_muses
                 .iter()
                 .flat_map(|mc| &mc.lits)
-                .cloned()
+                .copied()
                 .collect_vec();
             for m in &v {
                 self.mark_lit_as_deduced(m);

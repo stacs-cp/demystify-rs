@@ -63,7 +63,7 @@ impl MusDict {
     #[must_use]
     pub fn min_lit(&self, lit: Lit) -> Option<usize> {
         if let Some(mus_list) = self.muses.get(&lit) {
-            mus_list.iter().next().map(|mc| mc.mus_len())
+            mus_list.iter().next().map(MusContext::mus_len)
         } else {
             None
         }
@@ -87,7 +87,7 @@ impl MusDict {
     pub fn min(&self) -> Option<usize> {
         self.muses
             .values()
-            .flat_map(|sets| sets.iter().map(|x| x.mus_len()))
+            .flat_map(|sets| sets.iter().map(MusContext::mus_len))
             .min()
     }
 }
@@ -99,6 +99,7 @@ pub struct MusContext {
 }
 
 impl MusContext {
+    #[must_use]
     pub fn new(l: Lit, mus: BTreeSet<Lit>) -> Self {
         Self {
             lits: BTreeSet::from([l]),
@@ -106,10 +107,12 @@ impl MusContext {
         }
     }
 
+    #[must_use]
     pub fn new_multi_lit(lits: BTreeSet<Lit>, mus: BTreeSet<Lit>) -> Self {
         Self { lits, mus }
     }
 
+    #[must_use]
     pub fn new_with_more_lits(mut lits: BTreeSet<Lit>, mc: &Self) -> Self {
         for l in &mc.lits {
             lits.insert(*l);
@@ -121,6 +124,7 @@ impl MusContext {
         }
     }
 
+    #[must_use]
     pub fn mus_len(&self) -> usize {
         self.mus.len()
     }
@@ -142,15 +146,13 @@ impl MusContext {
 /// A new `Vec<MusContext>` where each `MusContext` has a unique `mus` field and
 /// contains all literals from the original `MusContext` objects with the same `mus`.
 ///
+#[must_use]
 pub fn merge_muscontexts(v: &[MusContext]) -> Vec<MusContext> {
     let mut mus_map: BTreeMap<&BTreeSet<Lit>, BTreeSet<Lit>> = BTreeMap::new();
 
     // Group literals by their MUS
     for mc in v {
-        mus_map
-            .entry(&mc.mus)
-            .or_insert_with(BTreeSet::new)
-            .extend(&mc.lits);
+        mus_map.entry(&mc.mus).or_default().extend(&mc.lits);
     }
 
     // Create new MusContext objects with merged literals

@@ -18,7 +18,7 @@ impl std::str::FromStr for RunMethod {
             "native" => Ok(RunMethod::Native),
             "docker" => Ok(RunMethod::Docker),
             "podman" => Ok(RunMethod::Podman),
-            _ => Err(format!("Invalid RunMethod: {}", s)),
+            _ => Err(format!("Invalid RunMethod: {s}")),
         }
     }
 }
@@ -28,7 +28,7 @@ pub static RUN_METHOD: OnceLock<RunMethod> = OnceLock::new();
 
 /// Get the current run method, auto-detecting if not already initialized
 pub fn get_run_method() -> RunMethod {
-    *RUN_METHOD.get_or_init(|| detect_run_method())
+    *RUN_METHOD.get_or_init(detect_run_method)
 }
 
 /// Set the run method explicitly
@@ -62,6 +62,7 @@ pub struct ProgramRunner;
 
 impl ProgramRunner {
     /// Prepare a `Command` to run a program, either natively or in a container
+    #[must_use]
     pub fn prepare(program: &str, localdir: &std::path::Path) -> Command {
         match get_run_method() {
             RunMethod::Native => {

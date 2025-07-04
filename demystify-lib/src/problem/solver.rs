@@ -261,7 +261,7 @@ impl PuzzleSolver {
                 // This literal should be provable, so we invert it for testing
                 let lit = !lit;
                 if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
-                    let mut lits = litorig.iter().cloned().collect_vec();
+                    let mut lits = litorig.iter().copied().collect_vec();
                     lits.push(lit);
                     if !self
                         .get_satcore()
@@ -774,7 +774,7 @@ impl PuzzleSolver {
             .collect();
         let mut md = musdict.unwrap_or_default();
         for (k, v) in muses {
-            let bts: BTreeSet<Lit> = v.iter().cloned().collect();
+            let bts: BTreeSet<Lit> = v.iter().copied().collect();
             md.add_mus(k, bts);
         }
         md
@@ -819,7 +819,7 @@ impl PuzzleSolver {
         if !muses.is_empty() && !config.find_bigger {
             info!(target: "solve", "found tiny muses");
             for (k, v) in muses {
-                let bts = v.iter().cloned().collect();
+                let bts = v.iter().copied().collect();
                 md.add_mus(k, bts);
             }
             return md;
@@ -865,7 +865,7 @@ impl PuzzleSolver {
                 .collect();
 
             for (k, v) in muses {
-                let bts = v.iter().cloned().collect();
+                let bts = v.iter().copied().collect();
                 md.add_mus(k, bts);
             }
 
