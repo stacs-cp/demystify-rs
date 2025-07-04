@@ -27,6 +27,7 @@ rayon = "1.0"
 thread_local = "1.1"
 svg = "0.18"
 thiserror = "2"
+which = "8"
 
 [dev-dependencies]
 insta = "1"
