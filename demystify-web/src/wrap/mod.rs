@@ -210,6 +210,13 @@ pub async fn load_example(
                 include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
             ),
         ),
+        (
+            "Binairo",
+            (
+                include_model_file!("../eprime/binairo.eprime"),
+                include_model_file!("../eprime/binairo/diiscu.param"),
+            ),
+        ),
     ];
 
     // Look up the selected example

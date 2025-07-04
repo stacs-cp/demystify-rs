@@ -65,7 +65,7 @@ document.addEventListener('htmx:afterRequest', function() {
 
     <div class="container">
       <h4>Upload eprime/essence + param</h4>
-      <form id="fileUploadForm" hx-encoding="multipart/form-data" hx-post="/uploadPuzzle" hx-target="#uploadMessage" hx-target-error="#uploadMessage">
+      <form id="fileUploadForm" hx-encoding="multipart/form-data" hx-post="/uploadPuzzle" hx-target="#mainSpace" hx-target-error="#uploadMessage">
       <div class="mb-3"></div>
         <label for="modelInput" class="form-label">Select model file:</label>
         <input type="file" class="form-control" id="modelInput" name="model" required />
@@ -87,6 +87,7 @@ document.addEventListener('htmx:afterRequest', function() {
           <option value="Sudoku">Sudoku</option>
           <option value="MiracleSudoku">Miracle Sudoku</option>
           <option value="StarBattle">Star Battle</option>
+          <option value="Binairo">Binairo</option>
         </select>
       </div>
       <button type="button" class="btn btn-primary" 
