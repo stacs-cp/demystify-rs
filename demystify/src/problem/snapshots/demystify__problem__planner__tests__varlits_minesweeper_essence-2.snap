@@ -1,6 +1,7 @@
 ---
-source: demystify-lib/src/problem/planner.rs
+source: demystify/src/problem/planner.rs
 expression: all_steps
+snapshot_kind: text
 ---
 {
     {

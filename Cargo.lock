@@ -596,7 +596,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "demystify-lib"
+name = "demystify"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -632,7 +632,7 @@ dependencies = [
  "anyhow",
  "axum",
  "axum_session",
- "demystify-lib",
+ "demystify",
  "rustsat",
  "serde",
  "serde_json",

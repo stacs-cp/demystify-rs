@@ -1,5 +1,5 @@
 use clap::Parser;
-use demystify_lib::{
+use demystify::{
     problem::{
         self,
         planner::{PlannerConfig, PuzzlePlanner},

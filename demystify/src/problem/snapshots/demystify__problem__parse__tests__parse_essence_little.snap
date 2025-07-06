@@ -1,6 +1,7 @@
 ---
-source: demystify-lib/src/problem/parse.rs
+source: demystify/src/problem/parse.rs
 expression: scopes
+snapshot_kind: text
 ---
 [
     (

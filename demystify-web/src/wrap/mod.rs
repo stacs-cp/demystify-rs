@@ -10,7 +10,7 @@ use anyhow::anyhow;
 
 use crate::util::{self, get_solver_global, set_solver_global};
 
-use demystify_lib::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+use demystify::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
 
 pub async fn dump_full_solve(
     session: Session<SessionNullPool>,

@@ -10,7 +10,7 @@ use axum::{
 };
 
 use axum_session::{Session, SessionNullPool};
-use demystify_lib::problem::planner::PuzzlePlanner;
+use demystify::problem::planner::PuzzlePlanner;
 use uuid::Uuid;
 
 // Make our own error that wraps `anyhow::Error`.

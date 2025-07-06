@@ -1,5 +1,5 @@
 [package]
-name = "demystify-lib"
+name = "demystify"
 version = "0.1.0"
 edition = "2024"
 
@@ -33,7 +33,7 @@ which = "8"
 insta = "1"
 
 [lib]
-name = "demystify_lib"
+name = "demystify"
 path = "src/lib.rs"
 
 [[bin]]

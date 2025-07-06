@@ -1,6 +1,7 @@
 ---
-source: demystify-lib/src/problem/solver.rs
+source: demystify/src/problem/solver.rs
 expression: varlits
+snapshot_kind: text
 ---
 {
     x0,

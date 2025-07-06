@@ -15,7 +15,7 @@ serde_json = "1"
 serde = "1"
 anyhow = "1"
 tempfile = "3"
-demystify-lib = { path = "../demystify-lib" }
+demystify = { path = "../demystify" }
 uuid = "1"
 
 rustsat = { version = "0.6", features=["ipasir-display"] }

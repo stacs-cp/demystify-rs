@@ -64,14 +64,14 @@ async fn main() {
         .route(
             "/base/base.css",
             get(move |_: Request<Body>| async {
-                Ok::<_, Infallible>(Response::new(Body::from(demystify_lib::web::base_css())))
+                Ok::<_, Infallible>(Response::new(Body::from(demystify::web::base_css())))
             }),
         )
         .route(
             "/base/base.js",
             get(move |_: Request<Body>| async {
                 Ok::<_, Infallible>(Response::new(Body::from(
-                    demystify_lib::web::base_javascript(),
+                    demystify::web::base_javascript(),
                 )))
             }),
         )
