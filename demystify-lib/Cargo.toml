@@ -31,3 +31,19 @@ which = "8"
 
 [dev-dependencies]
 insta = "1"
+
+[lib]
+name = "demystify_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "main"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "makesvg"
+path = "src/bin/makesvg.rs"
+
+[dependencies.clap]
+version = "4.0"
+features = ["derive"]

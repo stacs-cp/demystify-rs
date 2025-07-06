@@ -600,6 +600,7 @@ name = "demystify-lib"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap 4.5.40",
  "insta",
  "itertools 0.14.0",
  "rand 0.9.1",
@@ -622,22 +623,6 @@ dependencies = [
  "tracing-core",
  "tracing-subscriber",
  "which",
-]
-
-[[package]]
-name = "demystify-rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.5.40",
- "demystify-lib",
- "rand 0.9.1",
- "rand_chacha 0.9.0",
- "serde_json",
- "tempfile",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
 ]
 
 [[package]]

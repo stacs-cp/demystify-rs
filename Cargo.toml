@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "demystify",
     "demystify-lib",
     "demystify-web",
     "cute-sqlite-kv",
