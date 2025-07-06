@@ -2,6 +2,5 @@
 members = [
     "demystify",
     "demystify-web",
-    "cute-sqlite-kv",
 ]
 resolver = "2"
