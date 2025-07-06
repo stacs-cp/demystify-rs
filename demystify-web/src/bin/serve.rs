@@ -70,9 +70,7 @@ async fn main() {
         .route(
             "/base/base.js",
             get(move |_: Request<Body>| async {
-                Ok::<_, Infallible>(Response::new(Body::from(
-                    demystify::web::base_javascript(),
-                )))
+                Ok::<_, Infallible>(Response::new(Body::from(demystify::web::base_javascript())))
             }),
         )
         .layer(cors)
