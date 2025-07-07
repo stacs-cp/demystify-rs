@@ -1,105 +1,111 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8"/>
-    <title>Demystify</title>
-    <link href="ext/bootstrap.min.css" rel="stylesheet">
-    <script src="ext/bootstrap.bundle.min.js"></script>
-    <script src="ext/htmx.js"></script>
-    <script src="ext/response-targets.js"></script>
-    <link href="base/base.css" rel="stylesheet">
-    <script src="base/base.js"></script>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demystify Puzzle Solver</title>
+    <link href="/ext/bootstrap.min.css" rel="stylesheet">
+    <link href="/base/base.css" rel="stylesheet">
+    <script src="/ext/htmx.js"></script>
+    <script src="/ext/bootstrap.bundle.min.js"></script>
+    <script src="/ext/response-targets.js"></script>
+    <script src="/base/base.js"></script>
     <script>
-      window.addEventListener('load', function() {
+    window.addEventListener('load', function() {
         htmx.onLoad(x => {doJavascript()});
-      });
-
-      document.addEventListener('htmx:beforeRequest', function() {
-  document.querySelectorAll('button').forEach(btn => {
-    if (!btn.disabled) {
-      btn.disabled = true;
-      btn.dataset.htmxDisabled = "true"; // Mark this button
-    }
-  });
-});
-
-document.addEventListener('htmx:afterRequest', function() {
-  document.querySelectorAll('[data-htmx-disabled="true"]').forEach(btn => {
-    btn.disabled = false;
-    delete btn.dataset.htmxDisabled; // Clean up
-  });
-});
-
-
+    });
     </script>
-  </head>
-  <body hx-ext="response-targets">
-    <h1>Demystify-Web</h1>
-    <div id="puzzle"></div>
+
+</head>
+<body class="container mt-4">
+
+        <div id="puzzleControls" class="mb-3" style="display: none;">
+        <div class="btn-group">
+            <button class="btn btn-outline-primary" hx-post="/refresh" hx-target="#mainSpace" hx-indicator="#indicator">
+                Refresh
+            </button>
+            <button class="btn btn-outline-primary" hx-post="/bestNextStep" hx-target="#mainSpace" hx-indicator="#indicator">
+                Best Next Step
+            </button>
+            <button class="btn btn-outline-primary" hx-post="/getDifficulties" hx-target="#mainSpace" hx-indicator="#indicator">
+                Get Difficulties
+            </button>
+        </div>
+    </div>
+
+    <div id="mainSpace" class="card">
+        <div class="card-body">
+            <div class="text-center text-muted">
+                <p>Please upload a puzzle or select an example to begin.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="my-4"></div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Upload Puzzle</h4>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm" hx-post="/uploadPuzzle" hx-encoding="multipart/form-data" hx-target="#mainSpace">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="model" class="form-label">Model File (.eprime/.essence)</label>
+                                <input type="file" class="form-control" id="model" name="model" accept=".eprime,.essence" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="parameter" class="form-label">Parameter File (.param/.json)</label>
+                                <input type="file" class="form-control" id="parameter" name="parameter" accept=".param,.json" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3" hx-indicator="#indicator">
+                            Upload and Solve
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Load Example</h4>
+                </div>
+                <div class="card-body">
+                    <form id="exampleForm" hx-post="/loadExample" hx-target="#exampleParams">
+                        <select name="example_name" class="form-select" required>
+                            <option value="" selected disabled>Select an example...</option>
+                            <option value="Sudoku">Sudoku</option>
+                            <option value="MiracleSudoku">Miracle Sudoku</option>
+                            <option value="StarBattle">Star Battle</option>
+                            <option value="Binairo">Binairo</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary mt-3" hx-indicator="#indicator">
+                            Load Example
+                        </button>
+                    </form>
+                    <div id="exampleParams" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="indicator" class="htmx-indicator text-center my-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
     <script>
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            // Show controls if we get puzzle content
+            if (evt.detail.target.id === 'mainSpace' && 
+                !evt.detail.target.innerHTML.includes('Please upload')) {
+                document.getElementById('puzzleControls').style.display = 'block';
+            }
+        });
     </script>
-
-
-
-    <div class="container-fluid" id="mainSpace">
-      <div class="row">
-        <div class="col-md-8 bg-light shadow p-3">
-          <!-- Left side content -->
-        </div>
-        <div class="col-md-4 bg-light shadow p-3">
-          <!-- Right side content -->
-        </div>
-      </div>
-    </div>
-
-    <span id="indicator" class="htmx-indicator ms-2">
-    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-    </span>
-
-    <button type="button"  hx-post="/refresh" hx-target="#mainSpace" id="Refresh" class="btn btn-primary" hx-indicator="#indicator">Refresh</button>
-
-
-    <button type="button" hx-post="/bestNextStep" hx-target="#mainSpace" id="BestNextStep" class="btn btn-primary" hx-indicator="#indicator">Best Next Step</button>
-
-        <button type="button" hx-post="/getDifficulties" hx-target="#mainSpace" id="GetDifficulties" class="btn btn-primary" hx-indicator="#indicator">Get Difficulties</button>
-
-    <div class="container">
-      <h4>Upload eprime/essence + param</h4>
-      <form id="fileUploadForm" hx-encoding="multipart/form-data" hx-post="/uploadPuzzle" hx-target="#mainSpace" hx-target-error="#uploadMessage">
-      <div class="mb-3"></div>
-        <label for="modelInput" class="form-label">Select model file:</label>
-        <input type="file" class="form-control" id="modelInput" name="model" required />
-      </div>
-      <div class="mb-3">
-        <label for="paramInput" class="form-label">Select parameter file (optional):</label>
-        <input type="file" class="form-control" id="paramInput" name="parameter" />
-      </div>
-      <button type="submit" id="uploadButton" class="btn btn-primary">Upload</button>
-      <div id="uploadMessage">uploadMessage</div>
-      </form>
-    </div>
-
-    <div class="container mt-4">
-      <h4>Or select an example problem</h4>
-      <div class="mb-3">
-        <select class="form-select" id="exampleSelect" name="example_name">
-          <option value="" selected disabled>Choose an example...</option>
-          <option value="Sudoku">Sudoku</option>
-          <option value="MiracleSudoku">Miracle Sudoku</option>
-          <option value="StarBattle">Star Battle</option>
-          <option value="Binairo">Binairo</option>
-        </select>
-      </div>
-      <button type="button" class="btn btn-primary" 
-        hx-post="/loadExample" 
-        hx-target="#paramEditor"
-        hx-include="#exampleSelect"
-        hx-indicator="#indicator">
-        Load Example
-      </button>
-      <div id="paramEditor" class="mt-3"></div>
-    </div>
-
-  </body>
-
+</body>
 </html>

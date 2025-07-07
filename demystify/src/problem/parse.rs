@@ -859,7 +859,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 
     if !makedimacs.status.success() {
         bail!(
-            "savilerow failed\n{}\n{}",
+            "savilerow failed. The most likely reason for this is your file is malformed.\n{}\n{}",
             String::from_utf8_lossy(&makedimacs.stdout),
             String::from_utf8_lossy(&makedimacs.stderr)
         );
@@ -880,7 +880,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 
     read_dimacs(&in_dimacs_path, &mut eprimeparse).context("reading variable info from dimacs")?;
 
-    eprimeparse.finalise().context("finalisation of parsing")?;
+    eprimeparse.finalise().context("finalisation of parsing failed. The most likely reason for this is you gave a puzzle which has no solutions!")?;
 
     forget(tdir);
 

@@ -33,7 +33,11 @@ pub async fn best_next_step(session: Session<SessionNullPool>) -> Result<String,
 
     solver.mark_lits_as_deduced(&lits);
 
-    Ok(solve)
+    if solve.is_empty() {
+        Ok("Please upload a puzzle or select an example to begin.".to_string())
+    } else {
+        Ok(solve)
+    }
 }
 
 pub async fn get_difficulties(session: Session<SessionNullPool>) -> Result<String, util::AppError> {
@@ -155,16 +159,38 @@ pub async fn upload_files(
     }
 
     if model.is_none() {
-        return Err(anyhow!("Did not upload a .eprime or .essence file").into());
+        return Ok(r###"
+            <div class="alert alert-danger">
+                <h4>Upload Error</h4>
+                <p>Please upload a model file (.eprime or .essence)</p>
+            </div>
+        "###
+        .to_string());
     }
 
     if param.is_none() {
-        return Err(anyhow!("Did not upload a param file (either .eprime or .json) file").into());
+        return Ok(r###"
+            <div class="alert alert-danger">
+                <h4>Upload Error</h4>
+                <p>Please upload a parameter file (.param or .json)</p>
+            </div>
+        "###
+        .to_string());
     }
 
-    load_model(&session, temp_dir, model, param)?;
-
-    refresh(session).await
+    match load_model(&session, temp_dir, model, param) {
+        Ok(_) => refresh(session).await,
+        Err(e) => Ok(format!(
+            r###"
+            <div class="alert alert-danger">
+                <h4>Failed to upload puzzle</h4>
+                <pre class="text-danger">{:#}</pre>
+                <p>Please check your files and try again.</p>
+            </div>
+            "###,
+            e
+        )),
+    }
 }
 
 #[derive(Deserialize)]
@@ -215,7 +241,8 @@ pub async fn load_example(
         .map(|(_, content)| *content)
         .context(format!("Example '{example_name}' not found"))?;
 
-    Ok(format!(r###"
+    Ok(format!(
+        r###"
         <h5>Edit Parameters for {example_name}</h5>
         <form id="paramForm" hx-post="/submitExample" hx-target="#mainSpace">
             <input type="hidden" name="example_name" value="{example_name}">
@@ -224,7 +251,8 @@ pub async fn load_example(
                 Submit Edited Parameters
             </button>
         </form>
-    "###))
+    "###
+    ))
 }
 
 pub async fn submit_example(
@@ -241,10 +269,7 @@ pub async fn submit_example(
     }
 
     let examples = [
-        (
-            "Sudoku",
-            include_model_file!("../eprime/sudoku.eprime"),
-        ),
+        ("Sudoku", include_model_file!("../eprime/sudoku.eprime")),
         (
             "MiracleSudoku",
             include_model_file!("../eprime/miracle.eprime"),
@@ -253,10 +278,7 @@ pub async fn submit_example(
             "StarBattle",
             include_model_file!("../eprime/star-battle.eprime"),
         ),
-        (
-            "Binairo",
-            include_model_file!("../eprime/binairo.essence"),
-        ),
+        ("Binairo", include_model_file!("../eprime/binairo.essence")),
     ];
 
     let model_content = examples
@@ -273,14 +295,24 @@ pub async fn submit_example(
     let param_dest = temp_dir.path().join("upload.param");
     std::fs::write(&param_dest, param_content).context("Failed to write param file")?;
 
-    load_model(
+    match load_model(
         &session,
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
-    )?;
-
-    refresh(session).await
+    ) {
+        Ok(_) => refresh(session).await,
+        Err(e) => Ok(format!(
+            r###"
+            <div class="alert alert-danger">
+                <h4>Failed to load puzzle</h4>
+                <pre class="text-danger">{:#}</pre>
+                <p>Please check your parameter file and try again.</p>
+            </div>
+            "###,
+            e
+        )),
+    }
 }
 
 fn load_model(
@@ -288,7 +320,7 @@ fn load_model(
     temp_dir: tempfile::TempDir,
     model: Option<PathBuf>,
     param: Option<PathBuf>,
-) -> Result<(), util::AppError> {
+) -> anyhow::Result<()> {
     let puzzle = problem::parse::parse_essence(
         &temp_dir.path().join(model.unwrap()),
         &temp_dir.path().join(param.unwrap()),
