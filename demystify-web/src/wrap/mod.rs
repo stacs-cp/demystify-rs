@@ -172,72 +172,107 @@ pub struct ExampleParams {
     example_name: String,
 }
 
+#[derive(Deserialize)]
+pub struct SubmitExampleParams {
+    param_content: String,
+    example_name: String,
+}
+
 pub async fn load_example(
     session: Session<SessionNullPool>,
     form: axum::extract::Form<ExampleParams>,
 ) -> Result<String, util::AppError> {
-    // Extract the example name from the headers
     let example_name = form.example_name.clone();
 
-    // Mock example database - maps example names to model and param file paths
-    // Define a macro to include file contents
     macro_rules! include_model_file {
         ($path:expr) => {
             include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
         };
     }
 
-    // Store examples with their embedded content
     let examples = [
         (
             "Sudoku",
-            (
-                include_model_file!("../eprime/sudoku.eprime"),
-                include_model_file!("../eprime/sudoku/puzzlingexample.param"),
-            ),
+            include_model_file!("../eprime/sudoku/puzzlingexample.param"),
         ),
         (
             "MiracleSudoku",
-            (
-                include_model_file!("../eprime/miracle.eprime"),
-                include_model_file!("../eprime/miracle/original.param"),
-            ),
+            include_model_file!("../eprime/miracle/original.param"),
         ),
         (
             "StarBattle",
-            (
-                include_model_file!("../eprime/star-battle.eprime"),
-                include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
-            ),
+            include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
         ),
         (
             "Binairo",
-            (
-                include_model_file!("../eprime/binairo.essence"),
-                include_model_file!("../eprime/binairo/diiscu.param"),
-            ),
+            include_model_file!("../eprime/binairo/diiscu.param"),
         ),
     ];
 
-    // Look up the selected example
-    let (model_content, param_content) = examples
+    let param_content = examples
         .iter()
         .find(|(name, _)| *name == example_name)
-        .map(|(_, content)| content)
+        .map(|(_, content)| *content)
         .context(format!("Example '{example_name}' not found"))?;
 
-    // Create temporary directory
+    Ok(format!(r###"
+        <h5>Edit Parameters for {example_name}</h5>
+        <form id="paramForm" hx-post="/submitExample" hx-target="#mainSpace">
+            <input type="hidden" name="example_name" value="{example_name}">
+            <textarea name="param_content" class="form-control" rows="15" style="font-family: monospace;">{param_content}</textarea>
+            <button type="submit" class="btn btn-primary mt-2" hx-indicator="#indicator">
+                Submit Edited Parameters
+            </button>
+        </form>
+    "###))
+}
+
+pub async fn submit_example(
+    session: Session<SessionNullPool>,
+    form: axum::extract::Form<SubmitExampleParams>,
+) -> Result<String, util::AppError> {
+    let example_name = form.example_name.clone();
+    let param_content = form.param_content.clone();
+
+    macro_rules! include_model_file {
+        ($path:expr) => {
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
+        };
+    }
+
+    let examples = [
+        (
+            "Sudoku",
+            include_model_file!("../eprime/sudoku.eprime"),
+        ),
+        (
+            "MiracleSudoku",
+            include_model_file!("../eprime/miracle.eprime"),
+        ),
+        (
+            "StarBattle",
+            include_model_file!("../eprime/star-battle.eprime"),
+        ),
+        (
+            "Binairo",
+            include_model_file!("../eprime/binairo.essence"),
+        ),
+    ];
+
+    let model_content = examples
+        .iter()
+        .find(|(name, _)| *name == example_name)
+        .map(|(_, content)| *content)
+        .context(format!("Example '{example_name}' not found"))?;
+
     let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
 
-    // Write the model file to the temporary directory
     let model_dest = temp_dir.path().join("upload.eprime");
     std::fs::write(&model_dest, model_content).context("Failed to write model file")?;
 
-    // Write the param file to the temporary directory
     let param_dest = temp_dir.path().join("upload.param");
     std::fs::write(&param_dest, param_content).context("Failed to write param file")?;
 
-    // Load the model
     load_model(
         &session,
         temp_dir,

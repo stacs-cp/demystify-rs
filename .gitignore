@@ -12,3 +12,4 @@ demystify.trace
 *.minion
 dist
 tarpaulin-report.html
+.aider*

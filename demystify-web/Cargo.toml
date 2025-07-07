@@ -6,6 +6,7 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4.0"
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { version = "1.45", features = ["full"] }
 tower = "0.5"
