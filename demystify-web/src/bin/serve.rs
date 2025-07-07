@@ -37,6 +37,7 @@ async fn main() {
     let app = Router::new()
         .route("/greet", get(greet))
         .route("/greetX", get(greet_x))
+        .route("/getExampleNames", get(wrap::get_example_names))
         .route("/uploadPuzzle", post(wrap::upload_files))
         .route("/loadExample", post(wrap::load_example))
         .route("/submitExample", post(wrap::submit_example))

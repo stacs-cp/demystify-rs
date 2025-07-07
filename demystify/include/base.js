@@ -47,6 +47,7 @@ function doJavascript() {
         btn.dataset.htmxDisabled = "true"; // Mark this button
       }
     });
+    document.body.style.cursor = "wait";
   });
 
   document.addEventListener("htmx:afterRequest", function () {
@@ -54,5 +55,6 @@ function doJavascript() {
       btn.disabled = false;
       delete btn.dataset.htmxDisabled; // Clean up
     });
+    document.body.style.cursor = "default";
   });
 }

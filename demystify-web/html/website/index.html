@@ -74,18 +74,7 @@
                     <h4>Load Example</h4>
                 </div>
                 <div class="card-body">
-                    <form id="exampleForm" hx-post="/loadExample" hx-target="#exampleParams">
-                        <select name="example_name" class="form-select" required>
-                            <option value="" selected disabled>Select an example...</option>
-                            <option value="Sudoku">Sudoku</option>
-                            <option value="MiracleSudoku">Miracle Sudoku</option>
-                            <option value="StarBattle">Star Battle</option>
-                            <option value="Binairo">Binairo</option>
-                        </select>
-                        <button type="submit" class="btn btn-primary mt-3" hx-indicator="#indicator">
-                            Load Example
-                        </button>
-                    </form>
+                    <div hx-get="/getExampleNames" hx-trigger="load" hx-swap="outerHTML"></div>
                     <div id="exampleParams" class="mt-3"></div>
                 </div>
             </div>

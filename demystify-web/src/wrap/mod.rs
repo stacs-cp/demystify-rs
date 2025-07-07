@@ -1,6 +1,7 @@
 use anyhow::Context;
 use axum::{Json, extract::Multipart};
 use axum_session::{Session, SessionNullPool};
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -11,6 +12,37 @@ use anyhow::anyhow;
 use crate::util::{self, get_solver_global, set_solver_global};
 
 use demystify::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+
+macro_rules! include_model_file {
+    ($path:expr) => {
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
+    };
+}
+
+static EXAMPLES: Lazy<[(&str, &str, &str); 4]> = Lazy::new(|| {
+    [
+        (
+            "Sudoku",
+            include_model_file!("../eprime/sudoku.eprime"),
+            include_model_file!("../eprime/sudoku/puzzlingexample.param"),
+        ),
+        (
+            "MiracleSudoku",
+            include_model_file!("../eprime/miracle.eprime"),
+            include_model_file!("../eprime/miracle/original.param"),
+        ),
+        (
+            "StarBattle",
+            include_model_file!("../eprime/star-battle.eprime"),
+            include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
+        ),
+        (
+            "Binairo",
+            include_model_file!("../eprime/binairo.essence"),
+            include_model_file!("../eprime/binairo/diiscu.param"),
+        ),
+    ]
+});
 
 pub async fn dump_full_solve(
     session: Session<SessionNullPool>,
@@ -205,40 +237,15 @@ pub struct SubmitExampleParams {
 }
 
 pub async fn load_example(
-    session: Session<SessionNullPool>,
+    _session: Session<SessionNullPool>,
     form: axum::extract::Form<ExampleParams>,
 ) -> Result<String, util::AppError> {
     let example_name = form.example_name.clone();
 
-    macro_rules! include_model_file {
-        ($path:expr) => {
-            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
-        };
-    }
-
-    let examples = [
-        (
-            "Sudoku",
-            include_model_file!("../eprime/sudoku/puzzlingexample.param"),
-        ),
-        (
-            "MiracleSudoku",
-            include_model_file!("../eprime/miracle/original.param"),
-        ),
-        (
-            "StarBattle",
-            include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
-        ),
-        (
-            "Binairo",
-            include_model_file!("../eprime/binairo/diiscu.param"),
-        ),
-    ];
-
-    let param_content = examples
+    let param_content = EXAMPLES
         .iter()
-        .find(|(name, _)| *name == example_name)
-        .map(|(_, content)| *content)
+        .find(|(name, _, _)| *name == example_name)
+        .map(|(_, _, content)| *content)
         .context(format!("Example '{example_name}' not found"))?;
 
     Ok(format!(
@@ -255,6 +262,27 @@ pub async fn load_example(
     ))
 }
 
+pub async fn get_example_names() -> String {
+    let options = EXAMPLES
+        .iter()
+        .map(|(name, _, _)| format!("<option value=\"{}\">{}</option>", name, name))
+        .collect::<Vec<_>>()
+        .join("");
+
+    r###"<form id="exampleForm" hx-post="/loadExample" hx-target="#exampleParams">
+                        <select name="example_name" class="form-select" required>
+    "###
+    .to_owned()
+        + &options
+        + r###" 
+                        </select>
+                        <button type="submit" class="btn btn-primary mt-3" hx-indicator="#indicator">
+                            Load Example
+                        </button>
+                    </form>
+    "###
+}
+
 pub async fn submit_example(
     session: Session<SessionNullPool>,
     form: axum::extract::Form<SubmitExampleParams>,
@@ -262,29 +290,10 @@ pub async fn submit_example(
     let example_name = form.example_name.clone();
     let param_content = form.param_content.clone();
 
-    macro_rules! include_model_file {
-        ($path:expr) => {
-            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
-        };
-    }
-
-    let examples = [
-        ("Sudoku", include_model_file!("../eprime/sudoku.eprime")),
-        (
-            "MiracleSudoku",
-            include_model_file!("../eprime/miracle.eprime"),
-        ),
-        (
-            "StarBattle",
-            include_model_file!("../eprime/star-battle.eprime"),
-        ),
-        ("Binairo", include_model_file!("../eprime/binairo.essence")),
-    ];
-
-    let model_content = examples
+    let model_content = EXAMPLES
         .iter()
-        .find(|(name, _)| *name == example_name)
-        .map(|(_, content)| *content)
+        .find(|(name, _, _)| *name == example_name)
+        .map(|(_, content, _)| *content)
         .context(format!("Example '{example_name}' not found"))?;
 
     let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
