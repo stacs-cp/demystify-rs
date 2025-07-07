@@ -216,11 +216,10 @@ pub async fn upload_files(
             r###"
             <div class="alert alert-danger">
                 <h4>Failed to upload puzzle</h4>
-                <pre class="text-danger">{:#}</pre>
+                <pre class="text-danger">{e:#}</pre>
                 <p>Please check your files and try again.</p>
             </div>
-            "###,
-            e
+            "###
         )),
     }
 }
@@ -265,7 +264,7 @@ pub async fn load_example(
 pub async fn get_example_names() -> String {
     let options = EXAMPLES
         .iter()
-        .map(|(name, _, _)| format!("<option value=\"{}\">{}</option>", name, name))
+        .map(|(name, _, _)| format!("<option value=\"{name}\">{name}</option>"))
         .collect::<Vec<_>>()
         .join("");
 
@@ -315,11 +314,10 @@ pub async fn submit_example(
             r###"
             <div class="alert alert-danger">
                 <h4>Failed to load puzzle</h4>
-                <pre class="text-danger">{:#}</pre>
+                <pre class="text-danger">{e:#}</pre>
                 <p>Please check your parameter file and try again.</p>
             </div>
-            "###,
-            e
+            "###
         )),
     }
 }
