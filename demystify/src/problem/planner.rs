@@ -385,7 +385,7 @@ impl PuzzlePlanner {
             for puzlit in puzlit_list {
                 let mut indices = puzlit.var().indices().clone();
                 indices.push(puzlit.val());
-                if dbg!(indices) == lit_def {
+                if indices == lit_def {
                     return true;
                 }
             }
