@@ -61,7 +61,6 @@ pub fn parse_savile_row_name(dimacs: &PuzzleParse, n: &str) -> anyhow::Result<Op
         if !dimacs.eprime.auxvars.contains(&name) && !n.starts_with("conjure_aux") {
             eprintln!("Do not recognise variable '{name}' -- should it be AUX?");
         }
-        return Ok(None);
     }
 
     Ok(Some(PuzVar::new(&name, indices)))
@@ -131,22 +130,6 @@ mod tests {
             parse_savile_row_name(&dp, ne)?,
             Some(PuzVar::new("var3x", vec![]))
         );
-
-        // Test case 2: n starts with a variable in aux_variables
-        let n2 = "aux2_4_5_6";
-        assert_eq!(parse_savile_row_name(&dp, n2).unwrap(), None);
-
-        // Test case 3: n does not start with any variable
-        let n3 = "not_found_7_8_9";
-        assert_eq!(parse_savile_row_name(&dp, n3)?, None);
-
-        // Test case 4: n starts with multiple variables
-        let n4 = "var1_var2_10_11_12";
-        assert_eq!(parse_savile_row_name(&dp, n4)?, None);
-
-        // Test case 5: n starts with a variable, but the remaining part is empty
-        let n5 = "var1_";
-        assert_eq!(parse_savile_row_name(&dp, n5).unwrap(), None);
 
         Ok(())
     }
