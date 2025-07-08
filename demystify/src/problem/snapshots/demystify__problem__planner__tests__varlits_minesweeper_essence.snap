@@ -1,7 +1,6 @@
 ---
 source: demystify/src/problem/planner.rs
 expression: first_step
-snapshot_kind: text
 ---
 {
     {
@@ -10,81 +9,6 @@ snapshot_kind: text
                 var: PuzVar {
                     name: "grid",
                     indices: [
-                        1,
-                        1,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
-                        1,
-                        2,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
-                        2,
-                        1,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
-                        2,
-                        2,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
-                        3,
-                        1,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
                         3,
                         2,
                     ],
@@ -142,21 +66,6 @@ snapshot_kind: text
                     name: "grid",
                     indices: [
                         4,
-                        1,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
-                        4,
                         2,
                     ],
                 },
@@ -176,21 +85,6 @@ snapshot_kind: text
                 val: 1,
             },
             equal: false,
-        },
-    },
-    {
-        PuzLit {
-            varval: VarValPair {
-                var: PuzVar {
-                    name: "grid",
-                    indices: [
-                        5,
-                        1,
-                    ],
-                },
-                val: 0,
-            },
-            equal: true,
         },
     },
     {

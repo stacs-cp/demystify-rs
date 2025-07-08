@@ -109,7 +109,7 @@ pub async fn click_literal(
 
     session.set("click_cell", &cell);
 
-    let (html, lits) = solver.quick_solve_html_step_for_literal(dbg!(cell));
+    let (html, lits) = solver.quick_solve_html_step_for_literal(cell);
 
     let lidx_lits: Vec<_> = lits.iter().map(|x| x.lidx()).collect();
     session.set("lidx_lits", &lidx_lits);

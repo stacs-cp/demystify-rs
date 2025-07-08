@@ -609,7 +609,7 @@ impl PuzzleSolver {
             .assumption_solve(self.get_known_lits(), &just_lit)?;
 
         if !solvable {
-            return Ok(vec![]);
+            return Ok(vec![vec![]]);
         }
 
         let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
@@ -624,6 +624,33 @@ impl PuzzleSolver {
         self.get_var_mus_size_1_loop(lit, count, left, &mut muses)?;
         self.get_var_mus_size_1_loop(lit, count, right, &mut muses)?;
         Ok(muses.into_iter().collect_vec())
+    }
+
+    /// Check if there is a MUS of size 0 for a given literal
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The literal to find a proof for (so we invert for the MUS).
+    ///
+    /// # Returns
+    ///
+    /// A boolean, true if there is a MUS of size 0 for this literal.
+    pub fn check_var_mus_size_0(&self, lit: Lit) -> bool {
+        // First of all, check if there is a MUS of size 0,
+        // mainly because it makes the rest of this algorithm
+        // degenerate.
+        let just_lit = vec![!lit];
+
+        let solvable = self
+            .get_satcore()
+            .assumption_solve(self.get_known_lits(), &just_lit);
+
+        if let Ok(solvable) = solvable {
+            !solvable
+        } else {
+            // Treat a solver timeout as 'no MUS'
+            false
+        }
     }
 
     /// Retrieves a minimal unsatisfiable subset (MUS) of variables which proves
@@ -746,6 +773,26 @@ impl PuzzleSolver {
         }
 
         Ok(None)
+    }
+
+    /// Retrieves the literals which can be solved with a size 0 MUS.
+    ///
+    /// # Arguments
+    ///
+    /// * `lits` - The literals to check MUSes for.
+    ///
+    /// # Returns
+    ///
+    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
+    /// Literals where no MUS was found are omitted from the output.
+    pub fn get_many_vars_mus_size_0(&self, lits: &BTreeSet<Lit>) -> BTreeSet<Lit> {
+        let lits = lits
+            .par_iter()
+            .filter(|&x| self.check_var_mus_size_0(*x))
+            .cloned()
+            .collect();
+
+        lits
     }
 
     /// Retrieves an explanation for each element of a list of literals. This will often be

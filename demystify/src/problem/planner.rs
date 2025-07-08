@@ -75,10 +75,12 @@ impl PuzzlePlanner {
     /// A new `PuzzlePlanner` instance.
     #[must_use]
     pub fn new(psolve: PuzzleSolver) -> PuzzlePlanner {
-        PuzzlePlanner {
+        let mut pp = PuzzlePlanner {
             psolve,
             config: PlannerConfig::default(),
-        }
+        };
+        pp.mark_trivial_lits_as_deduced();
+        pp
     }
 
     /// Creates a new `PuzzlePlanner` instance with a custom configuration.
@@ -93,7 +95,9 @@ impl PuzzlePlanner {
     /// A new `PuzzlePlanner` instance with the specified configuration.
     #[must_use]
     pub fn new_with_config(psolve: PuzzleSolver, config: PlannerConfig) -> PuzzlePlanner {
-        PuzzlePlanner { psolve, config }
+        let mut pp = PuzzlePlanner { psolve, config };
+        pp.mark_trivial_lits_as_deduced();
+        pp
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle,
@@ -136,12 +140,11 @@ impl PuzzlePlanner {
         }
 
         let min = min.unwrap();
-
         let mut vec = vec![];
 
         for v in muses.muses().values() {
             if let Some(m) = v.iter().next() {
-                if m.mus_len() == min {
+                if m.mus_len() <= min {
                     vec.push(m.clone());
                 }
             }
@@ -200,6 +203,16 @@ impl PuzzlePlanner {
                 .cloned()
                 .collect_vec(),
         )
+    }
+
+    /// Deal with MUSes of 0 (which mean the puzzle has deduction that can be made without
+    /// any 'user' constraints. These often arise from initial setup.
+    pub fn mark_trivial_lits_as_deduced(&mut self) {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let trivial_lits = self.psolve.get_many_vars_mus_size_0(&varlits);
+        for l in trivial_lits {
+            self.mark_lit_as_deduced(&l);
+        }
     }
 
     /// Marks a literal as deduced.
