@@ -5,7 +5,7 @@ use rustsat::types::Lit;
 use tracing::info;
 
 use crate::{
-    json::Problem,
+    json::{DescriptionStatement, Problem},
     problem::{
         VarValPair,
         musdict::{MusContext, merge_muscontexts},
@@ -161,9 +161,15 @@ impl PuzzlePlanner {
             return muses;
         }
 
+        // Merge identical MUSes
+        let muses = merge_muscontexts(&muses);
+
+        // Return all MUSes if they are small enough
         if muses[0].mus_len() as i64 <= self.config.merge_small_threshold {
-            return merge_muscontexts(&muses);
+            return muses;
         }
+
+        // Todo: Try to pick a 'good' MUS, instead of the first one?
 
         if self.config.expand_to_all_deductions {
             vec![self.psolve.get_all_lits_solved_by_mus(&muses[0])]
@@ -442,8 +448,7 @@ impl PuzzlePlanner {
                 .map(|mus| self.mus_to_user_mus(mus))
                 .collect_vec();
 
-            let deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
-            let constraints = muses.iter().flat_map(|x| x.1.clone()).collect_vec();
+            let all_deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
 
             let pre_string = if base_muses.len() > 1 {
                 format!(
@@ -451,30 +456,30 @@ impl PuzzlePlanner {
                     base_muses.len()
                 )
             } else {
-                String::new()
-            };
-
-            let nice_deduced: String = PuzLit::nice_puzlit_list_string(&deduced);
-
-            let description = if constraints.is_empty() {
-                format!("{nice_deduced:?} because of the design of the problem")
-            } else {
                 format!(
-                    "{:?} because of {} constraints:<br/>",
-                    nice_deduced,
-                    &constraints.len()
+                    "Deduced {} literals using {} constraints.<br/>",
+                    muses[0].0.len(),
+                    muses[0].1.len()
                 )
             };
 
-            let full_description = pre_string + &description;
+            let mut description_list: Vec<DescriptionStatement> = Vec::new();
+
+            for mus in &muses {
+                let deduced = PuzLit::nice_puzlit_list_string(&mus.0);
+                description_list.push(DescriptionStatement {
+                    result: deduced,
+                    constraints: mus.1.clone(),
+                });
+            }
 
             let problem = Problem::new_from_puzzle_and_mus(
                 &self.psolve,
                 &tosolve_varvals,
                 &known_puzlits,
-                &deduced,
-                &constraints,
-                &full_description,
+                &all_deduced,
+                &description_list,
+                &pre_string,
             )
             .expect("Cannot make puzzle json");
 

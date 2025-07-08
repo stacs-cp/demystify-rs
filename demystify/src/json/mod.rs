@@ -156,13 +156,27 @@ pub struct State {
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Statement {
     pub content: String,
-    pub classes: Option<Vec<String>>,
+    pub classes: Vec<String>,
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Problem {
     pub puzzle: Puzzle,
     pub state: Option<State>,
+}
+
+pub struct DescriptionStatement {
+    pub result: String,
+    pub constraints: Vec<String>,
+}
+
+impl DescriptionStatement {
+    pub fn new(result: String, constraints: Vec<String>) -> Self {
+        Self {
+            result,
+            constraints,
+        }
+    }
 }
 
 impl Problem {
@@ -179,9 +193,9 @@ impl Problem {
         tosolve: &BTreeSet<VarValPair>,
         known: &BTreeSet<PuzLit>,
         deduced_lits: &BTreeSet<PuzLit>,
-        description: &str,
+        comments: &str,
     ) -> anyhow::Result<Problem> {
-        Self::new_from_puzzle_and_mus(solver, tosolve, known, deduced_lits, &[], description)
+        Self::new_from_puzzle_and_mus(solver, tosolve, known, deduced_lits, &[], comments)
     }
 
     pub fn new_from_puzzle_and_mus(
@@ -189,8 +203,8 @@ impl Problem {
         tosolve: &BTreeSet<VarValPair>,
         known: &BTreeSet<PuzLit>,
         deduced_lits: &BTreeSet<PuzLit>,
-        constraints: &[String],
-        description: &str,
+        deduction_list: &[DescriptionStatement],
+        comments: &str,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
@@ -221,15 +235,24 @@ impl Problem {
                 usize::try_from(puzzle.height).context("height is negative")?
             ];
 
+        // Start by getting a list of all constraints, and assigning a number to each of them.
+        let mut constraint_num: HashMap<String, usize> = HashMap::new();
+        // Make a list of the tags we need to attach to each varvalpair in the scope of each constraint
         let mut constraint_tags: HashMap<VarValPair, BTreeSet<String>> = HashMap::new();
 
-        // Start by getting a map of all the constraints which need tagging
-        for (i, con) in constraints.iter().enumerate() {
-            let scope = solver.puzzleparse().constraint_scope(con);
-            for p in scope {
-                let tags = constraint_tags.entry(p).or_default();
-                tags.insert(format!("highlight_con{i}"));
-                tags.insert("js_highlighter".to_string());
+        for deduction in deduction_list {
+            for constraint in &deduction.constraints {
+                // constraint_num makes sure we only tag each constraint once
+                if !constraint_num.contains_key(constraint) {
+                    let len = constraint_num.len();
+                    constraint_num.insert(constraint.clone(), len);
+                    let scope = solver.puzzleparse().constraint_scope(constraint);
+                    for p in scope {
+                        let tags = constraint_tags.entry(p).or_default();
+                        tags.insert(format!("highlight_con{len}"));
+                        tags.insert("js_highlighter".to_string());
+                    }
+                }
             }
         }
 
@@ -285,22 +308,29 @@ impl Problem {
             });
         }
 
-        let statements = constraints
-            .iter()
-            .enumerate()
-            .map(|(i, con)| Statement {
-                content: con.clone(),
-                classes: Some(vec![
-                    format!("highlight_con{}", i),
-                    "js_highlighter".to_string(),
-                ]),
-            })
-            .collect_vec();
+        let mut statements = Vec::new();
+
+        for deduction in deduction_list {
+            statements.push(Statement {
+                content: deduction.result.clone(),
+                classes: vec![],
+            });
+            for constraint in &deduction.constraints {
+                let num = constraint_num.get(constraint).unwrap();
+                statements.push(Statement {
+                    content: constraint.clone(),
+                    classes: vec![
+                        format!("highlight_con{}", num),
+                        "js_highlighter".to_string(),
+                    ],
+                });
+            }
+        }
 
         let state = State {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
-            description: Some(description.to_owned()),
+            description: Some(comments.to_owned()),
         };
 
         Ok(Problem {
@@ -397,10 +427,7 @@ impl Problem {
             .enumerate()
             .map(|(i, consize)| Statement {
                 content: format!("MUS size {consize}"),
-                classes: Some(vec![
-                    format!("highlight_con{}", i),
-                    "js_highlighter".to_string(),
-                ]),
+                classes: vec![format!("highlight_con{}", i), "js_highlighter".to_string()],
             })
             .collect_vec();
 
