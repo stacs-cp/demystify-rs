@@ -209,9 +209,7 @@ impl PuzzleSolver {
         if self.tosolvelits.is_none() {
             let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
             litorig.extend_from_slice(&self.knownlits);
-
             let lits = self.get_literals_to_try_solving();
-
             let provable: BTreeSet<_> = lits
                 .par_iter()
                 .filter_map(|&lit| {
@@ -441,7 +439,7 @@ impl PuzzleSolver {
             .collect()
     }
 
-    /// Adds a literal which is known to be true.
+    /// Sets a literal as known, which could previously be proved.
     ///
     /// # Arguments
     ///
@@ -457,13 +455,24 @@ impl PuzzleSolver {
         self.add_known_lit_unchecked(lit);
     }
 
+    /// Adds a literal which is known to be true, but cannot be proved true.
+    /// This exists because it invalidates a number of internal caches.
+    ///
+    /// # Arguments
+    ///
+    /// * `lit` - The literal to add.
+    pub fn add_not_provable_known_lit(&mut self, lit: Lit) {
+        self.add_known_lit_unchecked(lit);
+        self.tosolvelits = None;
+    }
+
     /// Forces a literal to be true, without checking if
     /// this can be logically deduced.
     ///
     /// # Arguments
     ///
     /// * `lit` - The literal to add.
-    pub fn add_known_lit_unchecked(&mut self, lit: Lit) {
+    fn add_known_lit_unchecked(&mut self, lit: Lit) {
         if self.knownlits.contains(&lit) {
             return;
         }
