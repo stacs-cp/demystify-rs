@@ -8,10 +8,11 @@
 `demystify-rs` requires `conjure`, a tool for constraint satisfaction and optimization problems. There are 2 ways to run conjure:
 
 * Follow the instructions on the [Conjure GitHub page](https://www.github.com/conjure-cp/conjure) to install `conjure`.
-* If you have docker, or podman, installed then if `conjure` isn't in your path it will be automatically downloaded via docker/podman.
+* If you have docker, or podman, installed then if `conjure` isn't in your path it will be automatically downloaded via docker/podman. On **windows**, you must use docker.
 
+You will also need a reasonably recent version of `rust`. There are various ways to install Rust, but the easiest is probably with [rustup](https://rustup.rs/)
 
-You will also need a reasonably recent version of `rust`. There are various ways to install Rust, but the easiest is probably with [rustup](https://rustup.rs/).
+If you are on **windows**, you also need LLVM, you can get it by running `winget install LLVM.LLVM`.
 
 Once `conjure` and `rust` are installed, you can proceed to set up `demystify-rs`.
 
