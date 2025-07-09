@@ -4,7 +4,12 @@
 
 ## Installation
 
-Before installing `demystify-rs`, you need to install `conjure`, a tool for constraint satisfaction and optimization problems. Follow the instructions on the [Conjure GitHub page](https://www.github.com/conjure-cp/conjure) to install `conjure`.
+
+`demystify-rs` requires `conjure`, a tool for constraint satisfaction and optimization problems. There are 2 ways to run conjure:
+
+* Follow the instructions on the [Conjure GitHub page](https://www.github.com/conjure-cp/conjure) to install `conjure`.
+* If you have docker, or podman, installed then if `conjure` isn't in your path it will be automatically downloaded via docker/podman.
+
 
 You will also need a reasonably recent version of `rust`. There are various ways to install Rust, but the easiest is probably with [rustup](https://rustup.rs/).
 
@@ -16,10 +21,15 @@ Once `conjure` and `rust` are installed, you can proceed to set up `demystify-rs
    cd demystify-rs
    ```
 
-2. Build the project using Cargo:
-   ```sh
-   cargo build --release
-   ```
+## Quick Start - Web Interface
+
+The easiest way to get started with `demystify-rs` is with the web interface. Just run:
+
+```sh
+cargo run --release --bin serve
+```
+
+The go to the webpage it mentions (usually `https://localhost:8008` )
 
 ## Quick Start
 
