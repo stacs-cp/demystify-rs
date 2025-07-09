@@ -3,7 +3,6 @@ $ basically one grid, with many "tutorial" steps
 
 letting grid_size be 10
 letting starcount be 2
-letting numblocks be 10
 
 
 letting cages be

@@ -3,7 +3,6 @@ $ ROW OR COLUMN ELIMINATION: http://www.tectonicpuzzel.eu/star-battle-puzzle-sol
 
 letting grid_size be 10
 letting starcount be 2
-letting numblocks be 10
 
 letting cages be
 [
