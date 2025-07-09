@@ -22,6 +22,17 @@ Once `conjure` and `rust` are installed, you can proceed to set up `demystify-rs
    cd demystify-rs
    ```
 
+
+## Testing your installation
+
+If you want to test demystify is working correctly, run it's tests:
+
+```sh
+cargo test --workspace
+```
+
+Note that this may take a long time the first time you run it (including warnings about 'Tests taking longer than 30 seconds'), if docker or podman is being used, as the Conjure image must be downloaded the first time it is used.
+
 ## Quick Start - Web Interface
 
 The easiest way to get started with `demystify-rs` is with the web interface. Just run:
