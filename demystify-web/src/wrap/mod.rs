@@ -254,7 +254,7 @@ pub async fn load_example(
             <input type="hidden" name="example_name" value="{example_name}">
             <textarea name="param_content" class="form-control" rows="15" style="font-family: monospace;">{param_content}</textarea>
             <button type="submit" class="btn btn-primary mt-2" hx-indicator="#indicator">
-                Submit Edited Parameters
+                Submit Parameters
             </button>
         </form>
     "###

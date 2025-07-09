@@ -508,7 +508,7 @@ impl PuzzlePlanner {
             (create_html(&problem), v)
         } else {
             let deduced = BTreeSet::new();
-            let description = "Puzzle".to_string();
+            let description = "The initial puzzle state".to_string();
 
             let problem = Problem::new_from_puzzle_and_state(
                 &self.psolve,
