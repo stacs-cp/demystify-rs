@@ -2,7 +2,6 @@ language ESSENCE' 1.0
 
 letting grid_size be 5
 letting starcount be 1
-letting numblocks be 5
 
 
 letting cages be 
