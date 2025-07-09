@@ -469,11 +469,7 @@ impl PuzzlePlanner {
                     base_muses.len()
                 )
             } else {
-                format!(
-                    "Deduced {} literals using {} constraints.<br/>",
-                    muses[0].0.len(),
-                    muses[0].1.len()
-                )
+                "Made the following deductions:<br/>".to_owned()
             };
 
             let mut description_list: Vec<DescriptionStatement> = Vec::new();
