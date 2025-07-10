@@ -67,6 +67,6 @@ fn map_statements(statements: &Vec<Statement>) -> String {
 
     context.insert("statements", statements);
 
-    tera::Tera::one_off(constraint_template, &context, true)
+    tera::Tera::one_off(constraint_template, &context, false)
         .expect("IE: Fatal internal formatting error")
 }

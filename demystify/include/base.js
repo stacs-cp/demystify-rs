@@ -3,6 +3,7 @@ function applyHighlight(element) {
   for (let i = 0; i < classes.length; i++) {
     const className = classes[i];
     if (className.startsWith("highlight_")) {
+      console.log(className)
       const highlightedElements = document.getElementsByClassName(className);
       for (let j = 0; j < highlightedElements.length; j++) {
         highlightedElements[j].classList.add("selected");
