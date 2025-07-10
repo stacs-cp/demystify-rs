@@ -288,10 +288,14 @@ impl Problem {
 
             if deduced_lits.contains(&PuzLit::new_eq(l.clone())) {
                 tags.insert("litpos".to_string());
+                tags.insert("highlight_".to_string() + &l.to_css_string());
+                tags.insert("js_highlighter".to_string());
             }
 
             if deduced_lits.contains(&PuzLit::new_neq(l.clone())) {
                 tags.insert("litneg".to_string());
+                tags.insert("highlight_".to_string() + &l.to_css_string());
+                tags.insert("js_highlighter".to_string());
             }
 
             if known.contains(&PuzLit::new_eq(l.clone())) {

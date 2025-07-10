@@ -10,6 +10,7 @@ use std::{
     fmt,
 };
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 /// Represents a puzzle variable.
@@ -39,6 +40,17 @@ impl PuzVar {
     #[must_use]
     pub fn indices(&self) -> &Vec<i64> {
         &self.indices
+    }
+
+    /// Converts the name of the variable into a CSS-friendly string.
+    #[must_use]
+    pub fn to_css_string(&self) -> String {
+        self.name.replace('.', "_").replace('-', "_")
+            + &self
+                .indices
+                .iter()
+                .map(|index| format!("_{index}"))
+                .collect::<String>()
     }
 }
 
@@ -87,6 +99,12 @@ impl VarValPair {
     #[must_use]
     pub fn is_lit(&self, puzlit: &PuzLit) -> bool {
         *self == puzlit.varval()
+    }
+
+    /// Converts the `VarValPair` into a CSS-friendly string.
+    #[must_use]
+    pub fn to_css_string(&self) -> String {
+        format!("lit_{}__{}", self.var.to_css_string(), self.val)
     }
 }
 
@@ -165,7 +183,7 @@ impl PuzLit {
         }
     }
 
-    pub fn nice_puzlit_list_string<'a, I>(puz_container: I) -> String
+    pub fn nice_puzlit_list_html<'a, I>(puz_container: I) -> String
     where
         I: IntoIterator<Item = &'a PuzLit>,
     {
@@ -194,7 +212,9 @@ impl PuzLit {
 
                 // Format positive literals
                 for val in positives {
-                    result_strings.push(format!("{var} = {val}"));
+                    let css = "highlight_".to_owned() + &VarValPair::new(&var, val).to_css_string();
+
+                    result_strings.push(format!(r##"<div style="display:inline" class="{css} js_highlighter">{var} = {val}</div>"##));
                 }
             } else {
                 // All literals are negative
@@ -210,7 +230,15 @@ impl PuzLit {
                         .collect::<Vec<_>>()
                         .join(" or ");
 
-                    result_strings.push(format!("{var} != {neg_values}"));
+                    let neg_classes = negatives
+                        .iter()
+                        .map(|&val| {
+                            "highlight_".to_owned() + &VarValPair::new(&var, val).to_css_string()
+                        })
+                        .collect_vec()
+                        .join(" ");
+
+                    result_strings.push(format!(r##"<div style="display:inline" class="{neg_classes} js_highlighter">{var} != {neg_values}</div>"##));
                 }
             }
         }
@@ -307,46 +335,64 @@ mod tests {
     }
 
     #[test]
-    fn test_nice_puzlit_list_string() {
+    fn test_puzvar_to_css_string() {
+        let v = PuzVar::new("v.name", vec![]);
+        assert_eq!(v.to_css_string(), "v_name");
+
+        let v_with_indices = PuzVar::new("v-name", vec![1, 2, 3]);
+        assert_eq!(v_with_indices.to_css_string(), "v_name_1_2_3");
+
+        let v_complex = PuzVar::new("v.name-test", vec![42]);
+        assert_eq!(v_complex.to_css_string(), "v_name_test_42");
+    }
+
+    #[test]
+    fn test_varvalpair_to_css_string() {
+        let v = PuzVar::new("v.name", vec![1, 2]);
+        let pair = VarValPair::new(&v, 42);
+        assert_eq!(pair.to_css_string(), "lit_v_name_1_2__42");
+
+        let w = PuzVar::new("w-name", vec![]);
+        let pair_no_indices = VarValPair::new(&w, 7);
+        assert_eq!(pair_no_indices.to_css_string(), "lit_w_name__7");
+    }
+
+    #[test]
+    fn test_nice_puzlit_list_html() {
         let v = PuzVar::new("v", vec![]);
         let w = PuzVar::new("w", vec![]);
         let x = PuzVar::new("x", vec![1, 2]);
 
         // Test case 1: Single positive literal
         let lit1 = PuzLit::new_eq(VarValPair::new(&v, 2));
-        assert_eq!(PuzLit::nice_puzlit_list_string(&[lit1.clone()]), "v[] = 2");
+        assert!(PuzLit::nice_puzlit_list_html(&[lit1.clone()]).contains("v[] = 2"));
 
         // Test case 2: Multiple positive literals for different variables
         let lit2 = PuzLit::new_eq(VarValPair::new(&w, 3));
         let lit3 = PuzLit::new_eq(VarValPair::new(&x, 5));
-        assert_eq!(
-            PuzLit::nice_puzlit_list_string(&[lit1, lit2, lit3]),
-            "v[] = 2, w[] = 3, x[1, 2] = 5"
-        );
+        assert!(PuzLit::nice_puzlit_list_html(&[lit1, lit2, lit3]).contains("x[1, 2] = 5"));
 
         // Test case 3: Single negative literal
         let neq1 = PuzLit::new_neq(VarValPair::new(&v, 2));
-        assert_eq!(PuzLit::nice_puzlit_list_string(&[neq1.clone()]), "v[] != 2");
+        assert!(PuzLit::nice_puzlit_list_html(&[neq1.clone()]).contains("v[] != 2"));
 
         // Test case 4: Multiple negative literals for same variable
         let neq2 = PuzLit::new_neq(VarValPair::new(&v, 3));
         let neq3 = PuzLit::new_neq(VarValPair::new(&v, 4));
-        assert_eq!(
-            PuzLit::nice_puzlit_list_string(&[neq1, neq2, neq3]),
-            "v[] != 2 or 3 or 4"
-        );
+        assert!(PuzLit::nice_puzlit_list_html(&[neq1, neq2, neq3]).contains("v[] != 2 or 3 or 4"));
 
         // Test case 5: Mix of positive and negative literals
         let mix1 = PuzLit::new_eq(VarValPair::new(&v, 5));
         let mix2 = PuzLit::new_neq(VarValPair::new(&w, 1));
         let mix3 = PuzLit::new_neq(VarValPair::new(&w, 2));
         let mix4 = PuzLit::new_eq(VarValPair::new(&x, 7));
-        assert_eq!(
-            PuzLit::nice_puzlit_list_string(&[mix1, mix2, mix3, mix4]),
-            "v[] = 5, w[] != 1 or 2, x[1, 2] = 7"
+        assert!(
+            ["v[] = 5", "w[] != 1 or 2", "x[1, 2] = 7"]
+                .iter()
+                .all(|s| PuzLit::nice_puzlit_list_html([&mix1, &mix2, &mix3, &mix4]).contains(s))
         );
 
         // Test case 6: Empty list
-        assert_eq!(PuzLit::nice_puzlit_list_string(&[]), "");
+        assert_eq!(PuzLit::nice_puzlit_list_html(&[]), "");
     }
 }

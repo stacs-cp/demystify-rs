@@ -4,8 +4,12 @@
     fill: blue;
 }
 .litneg {
-    color: red;
-    fill: red;
+    color: blue;
+    fill: blue;
+}
+
+.litneg text {
+    text-decoration: line-through;
 }
 
 .litinmus .litbox {
@@ -31,6 +35,17 @@
     stroke:rgba(0,0,255,0.2);
     fill: none;
 }
+
+
+g.selected rect {
+      fill: red !important;
+}
+
+.constraintlist div.selected {
+  background-color: red !important;
+}
+
+
 
 .highlight_con0 rect, .constraintlist > div.highlight_con0 {
     background-color: #d0ffff;
@@ -285,12 +300,4 @@
 .highlight_con50 rect, .constraintlist > div.highlight_con50 {
     background-color: #e0ece8;
     fill: #e0ece8;
-}
-
-g.selected rect {
-      fill: red !important;
-}
-
-.constraintlist > div.selected {
-  background-color: red;
 }
