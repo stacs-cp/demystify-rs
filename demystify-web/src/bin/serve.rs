@@ -12,8 +12,18 @@ use tokio::net::TcpListener;
 
 use tower_http::cors::{Any, CorsLayer};
 
+use demystify::problem::util::exec::ProgramRunner;
+
 #[tokio::main]
 async fn main() {
+    println!("Finding conjure...");
+    let conjure_version = ProgramRunner::get_conjure_version();
+
+    match conjure_version {
+        Ok(s) => println!("{s}"),
+        Err(s) => panic!("Can't find conjure: {s}"),
+    };
+
     let session_config = SessionConfig::default().with_table_name("sessions_table");
 
     // create SessionStore and initiate the database tables
