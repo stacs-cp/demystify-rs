@@ -478,7 +478,7 @@ impl PuzzlePlanner {
                 let deduced = PuzLit::nice_puzlit_list_html(&mus.0);
                 description_list.push(DescriptionStatement {
                     result: deduced,
-                    constraints: mus.1.clone(),
+                    constraints: mus.1.iter().map(|s| tera::escape_html(s)).collect(),
                 });
             }
 
