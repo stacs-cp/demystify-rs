@@ -23,6 +23,16 @@ impl std::str::FromStr for RunMethod {
     }
 }
 
+impl std::fmt::Display for RunMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RunMethod::Native => write!(f, "native"),
+            RunMethod::Docker => write!(f, "docker"),
+            RunMethod::Podman => write!(f, "podman"),
+        }
+    }
+}
+
 /// Global configuration for the runner
 pub static RUN_METHOD: OnceLock<RunMethod> = OnceLock::new();
 
@@ -40,15 +50,31 @@ pub fn set_run_method(method: RunMethod) {
 fn detect_run_method() -> RunMethod {
     // Check if we have the necessary tools for native execution
     if which("conjure").is_ok() && which("savilerow").is_ok() {
-        return RunMethod::Native;
+        let output = Command::new("conjure")
+            .arg("--version")
+            .output()
+            .expect("Failed to execute conjure --version");
+
+        if !output.status.success() {
+            eprintln!(
+                "ERROR: The command 'conjure' does not appear to be constraint tool, you have another 'conjure' program installed:"
+            );
+            eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+            eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+            eprintln!("Going to try docker or podman instead.")
+        } else {
+            return RunMethod::Native;
+        }
     }
 
     // Check for container tools
     if which("podman").is_ok() {
+        eprintln!("Using podman");
         return RunMethod::Podman;
     }
 
     if which("docker").is_ok() {
+        eprintln!("Using docker");
         return RunMethod::Docker;
     }
 
@@ -61,6 +87,31 @@ fn detect_run_method() -> RunMethod {
 pub struct ProgramRunner;
 
 impl ProgramRunner {
+    /// Run `conjure --version` and return its output
+    pub fn get_conjure_version() -> Result<String, String> {
+        let current_dir =
+            std::env::current_dir().map_err(|e| format!("Failed to get current directory: {e}"))?;
+        let mut cmd = Self::prepare("conjure", &current_dir);
+        cmd.arg("--version");
+
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to execute conjure: {e}"))?;
+
+        if output.status.success() {
+            Ok("Using ".to_owned()
+                + &get_run_method().to_string()
+                + " conjure, version:\n"
+                + &String::from_utf8_lossy(&output.stdout))
+        } else {
+            Err(format!(
+                "Conjure failed with status {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            ))
+        }
+    }
+
     /// Prepare a `Command` to run a program, either natively or in a container
     #[must_use]
     pub fn prepare(program: &str, localdir: &std::path::Path) -> Command {
