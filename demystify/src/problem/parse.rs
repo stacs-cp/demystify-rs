@@ -723,12 +723,22 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
     ))
 }
 
-fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()> {
+fn read_dimacs_to_maps(
+    in_path: &PathBuf,
+) -> anyhow::Result<(
+    BTreeMap<PuzLit, Lit>,
+    BTreeMap<PuzVar, HashSet<Lit>>,
+    BTreeMap<Lit, PuzVar>,
+)> {
     let dvarmatch = Regex::new(r"c Var '(.*)' direct represents '(.*)' with '(.*)'").unwrap();
     let ovarmatch = Regex::new(r"c Var '(.*)' order represents '(.*)' with '(.*)'").unwrap();
 
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
+
+    let mut litmap = BTreeMap::new();
+    let mut order_encoding_map: BTreeMap<PuzVar, HashSet<Lit>> = BTreeMap::new();
+    let mut inv_order_encoding_map = BTreeMap::new();
 
     for line in reader.lines() {
         let line = line?;
@@ -756,7 +766,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                             &varid,
                             match_[2].parse::<i64>().unwrap(),
                         ));
-                        safe_insert(&mut dimacs.litmap, puzlit, satlit)?;
+                        safe_insert(&mut litmap, puzlit, satlit)?;
                     }
                 }
             } else {
@@ -771,33 +781,57 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                         })?;
 
                     if let Some(varid) = varid {
-                        // Not currently using exact literal
-                        // let puzlit = PuzLit::new_eq_val(&varid, match_[2].parse::<i64>().unwrap());
-                        dimacs
-                            .order_encoding_map
+                        order_encoding_map
                             .entry(varid.clone())
                             .or_default()
                             .insert(satlit);
-                        dimacs
-                            .order_encoding_map
+                        order_encoding_map
                             .entry(varid.clone())
                             .or_default()
                             .insert(-satlit);
-                        dimacs.order_encoding_all_lits.insert(satlit);
-                        dimacs.order_encoding_all_lits.insert(-satlit);
-                        if let Some(val) = dimacs.inv_order_encoding_map.get(&satlit) {
+                        if let Some(val) = inv_order_encoding_map.get(&satlit) {
                             if *val != varid {
                                 bail!("{} used for two variables: {} {}", satlit, val, varid);
                             }
                         }
-                        safe_insert(&mut dimacs.inv_order_encoding_map, satlit, varid.clone())?;
-                        safe_insert(&mut dimacs.inv_order_encoding_map, -satlit, varid.clone())?;
+                        safe_insert(&mut inv_order_encoding_map, satlit, varid.clone())?;
+                        safe_insert(&mut inv_order_encoding_map, -satlit, varid.clone())?;
                     }
                 }
             }
         }
     }
+
+    Ok((litmap, order_encoding_map, inv_order_encoding_map))
+}
+
+fn update_puzzle_parse_with_maps(
+    dimacs: &mut PuzzleParse,
+    litmap: BTreeMap<PuzLit, Lit>,
+    order_encoding_map: BTreeMap<PuzVar, HashSet<Lit>>,
+    inv_order_encoding_map: BTreeMap<Lit, PuzVar>,
+) -> anyhow::Result<()> {
+    // Update litmap
+    dimacs.litmap = litmap;
+
+    // Update order encoding maps
+    dimacs.order_encoding_map = order_encoding_map;
+    dimacs.inv_order_encoding_map = inv_order_encoding_map;
+
+    // Rebuild order_encoding_all_lits from order_encoding_map
+    dimacs.order_encoding_all_lits = BTreeSet::new();
+    for lits in dimacs.order_encoding_map.values() {
+        for &lit in lits {
+            dimacs.order_encoding_all_lits.insert(lit);
+        }
+    }
+
     Ok(())
+}
+
+fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()> {
+    let (litmap, order_encoding_map, inv_order_encoding_map) = read_dimacs_to_maps(in_path)?;
+    update_puzzle_parse_with_maps(dimacs, litmap, order_encoding_map, inv_order_encoding_map)
 }
 
 pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Result<PuzzleParse> {
