@@ -568,7 +568,15 @@ impl PuzzleParse {
     }
 }
 
-fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
+struct ParsedEprimeData {
+    vars: BTreeSet<String>,
+    auxvars: BTreeSet<String>,
+    cons: BTreeMap<String, String>,
+    factvars: BTreeMap<String, String>,
+    kind: Option<String>,
+}
+
+fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     info!(target: "parser", "reading DIMACS {:?}", in_path);
 
     let mut vars: BTreeSet<String> = BTreeSet::new();
@@ -692,11 +700,26 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
 
     info!(target: "parser", "Names parsed from ESSENCE': vars: {:?} auxvars: {:?} cons {:?}", vars, auxvars, cons);
 
-    // Read parameters in as a JSON object
+    Ok(ParsedEprimeData {
+        vars,
+        auxvars,
+        cons,
+        factvars,
+        kind,
+    })
+}
+
+fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
+    let parsed_eprime = parse_eprime_file(in_path)?;
     let params = read_essence_param(eprimeparam)?;
 
     Ok(PuzzleParse::new_from_eprime(
-        vars, auxvars, cons, factvars, params, kind,
+        parsed_eprime.vars,
+        parsed_eprime.auxvars,
+        parsed_eprime.cons,
+        parsed_eprime.factvars,
+        params,
+        parsed_eprime.kind,
     ))
 }
 
@@ -724,11 +747,10 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                         i32::try_from(litval)
                             .with_context(|| format!("Number too large: {litval}"))?,
                     )?;
-                    let varid =
-                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])
-                            .with_context(|| {
-                                format!("Failed parsing savile row name {}", &match_[1])
-                            })?;
+                    let varid = crate::problem::util::parsing::parse_savile_row_name(&match_[1])
+                        .with_context(|| {
+                            format!("Failed parsing savile row name {}", &match_[1])
+                        })?;
                     if let Some(varid) = varid {
                         let puzlit = PuzLit::new_eq(VarValPair::new(
                             &varid,
@@ -743,11 +765,10 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
                 info!(target: "parser", "matches: {:?}", match_);
                 if !match_[1].starts_with("aux") && litval != 9_223_372_036_854_775_807 {
                     let satlit = Lit::from_ipasir(i32::try_from(litval)?)?;
-                    let varid =
-                        crate::problem::util::parsing::parse_savile_row_name(dimacs, &match_[1])
-                            .with_context(|| {
-                                format!("Failed parsing savile row name {}", &match_[1])
-                            })?;
+                    let varid = crate::problem::util::parsing::parse_savile_row_name(&match_[1])
+                        .with_context(|| {
+                            format!("Failed parsing savile row name {}", &match_[1])
+                        })?;
 
                     if let Some(varid) = varid {
                         // Not currently using exact literal

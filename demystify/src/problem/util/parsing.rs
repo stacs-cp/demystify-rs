@@ -4,8 +4,6 @@ use anyhow::Context;
 
 use super::super::PuzVar;
 
-use crate::problem::parse::PuzzleParse;
-
 /// Splits a Savile Row name into base name and indices
 ///
 /// Takes a name like "`var_00001_n00002`" and returns ("var", [1, -2])
@@ -49,19 +47,8 @@ fn split_savile_row_name(n: &str) -> (String, Vec<i64>) {
     (current, indices)
 }
 
-pub fn parse_savile_row_name(dimacs: &PuzzleParse, n: &str) -> anyhow::Result<Option<PuzVar>> {
+pub fn parse_savile_row_name(n: &str) -> anyhow::Result<Option<PuzVar>> {
     let (name, indices) = split_savile_row_name(n);
-
-    let has_match = dimacs.eprime.vars.contains(&name)
-        || dimacs.eprime.cons.contains_key(&name)
-        || dimacs.eprime.reveal.contains_key(&name)
-        || dimacs.eprime.reveal_values.contains(&name);
-
-    if !has_match {
-        if !dimacs.eprime.auxvars.contains(&name) && !n.starts_with("conjure_aux") {
-            eprintln!("Do not recognise variable '{name}' -- should it be AUX?");
-        }
-    }
 
     Ok(Some(PuzVar::new(&name, indices)))
 }
@@ -80,6 +67,8 @@ pub fn parse_constraint_name(
 
 #[cfg(test)]
 mod tests {
+    use crate::problem::parse::PuzzleParse;
+
     use super::*;
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -102,32 +91,32 @@ mod tests {
 
         let reveal = BTreeMap::new();
 
-        let dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, reveal, params, None);
+        let _dp = PuzzleParse::new_from_eprime(vars, auxvars, cons, reveal, params, None);
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_00001_00002_00003";
         let expected1 = Some(PuzVar::new("var1", vec![1, 2, 3]));
-        assert_eq!(parse_savile_row_name(&dp, n1).unwrap(), expected1);
+        assert_eq!(parse_savile_row_name(n1).unwrap(), expected1);
 
         let n1b = "var1_00001_00002_00010";
         let expected1b = Some(PuzVar::new("var1", vec![1, 2, 10]));
-        assert_eq!(parse_savile_row_name(&dp, n1b).unwrap(), expected1b);
+        assert_eq!(parse_savile_row_name(n1b).unwrap(), expected1b);
 
         let n1c = "var1_n00001_00002_n00010";
         let expected1c = Some(PuzVar::new("var1", vec![-1, 2, -10]));
-        assert_eq!(parse_savile_row_name(&dp, n1c).unwrap(), expected1c);
+        assert_eq!(parse_savile_row_name(n1c).unwrap(), expected1c);
 
         let n1d = "var1";
         let expected1d = Some(PuzVar::new("var1", vec![]));
-        assert_eq!(parse_savile_row_name(&dp, n1d).unwrap(), expected1d);
+        assert_eq!(parse_savile_row_name(n1d).unwrap(), expected1d);
 
         let ncon = "con1";
         let expectedcon = Some(PuzVar::new("con1", vec![]));
-        assert_eq!(parse_savile_row_name(&dp, ncon).unwrap(), expectedcon);
+        assert_eq!(parse_savile_row_name(ncon).unwrap(), expectedcon);
 
         let ne = "var3x";
         assert_eq!(
-            parse_savile_row_name(&dp, ne)?,
+            parse_savile_row_name(ne)?,
             Some(PuzVar::new("var3x", vec![]))
         );
 
