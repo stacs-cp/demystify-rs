@@ -23,23 +23,23 @@ static EXAMPLES: Lazy<[(&str, &str, &str); 4]> = Lazy::new(|| {
     [
         (
             "Sudoku",
-            include_model_file!("../eprime/sudoku.eprime"),
-            include_model_file!("../eprime/sudoku/puzzlingexample.param"),
+            include_model_file!("examples/eprime/sudoku.eprime"),
+            include_model_file!("examples/eprime/sudoku/puzzlingexample.param"),
         ),
         (
             "MiracleSudoku",
-            include_model_file!("../eprime/miracle.eprime"),
-            include_model_file!("../eprime/miracle/original.param"),
+            include_model_file!("examples/eprime/miracle.eprime"),
+            include_model_file!("examples/eprime/miracle/original.param"),
         ),
         (
             "StarBattle",
-            include_model_file!("../eprime/star-battle.eprime"),
-            include_model_file!("../eprime/star-battle/FATAtalkexample.param"),
+            include_model_file!("examples/eprime/star-battle.eprime"),
+            include_model_file!("examples/eprime/star-battle/FATAtalkexample.param"),
         ),
         (
             "Binairo",
-            include_model_file!("../eprime/binairo.essence"),
-            include_model_file!("../eprime/binairo/diiscu.param"),
+            include_model_file!("examples/eprime/binairo.essence"),
+            include_model_file!("examples/eprime/binairo/diiscu.param"),
         ),
     ]
 });
