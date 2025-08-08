@@ -2,6 +2,12 @@
 name = "demystify-web"
 version = "0.1.0"
 edition = "2024"
+description = "A web front end to demystify, a constraint solving tool for explaining puzzles"
+license = "MPL-2.0"
+repository = "https://github.com/stacs-cp/demystify"
+homepage = "https://github.com/stacs-cp/demystify"
+documentation = "https://docs.rs/demystify-web"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
