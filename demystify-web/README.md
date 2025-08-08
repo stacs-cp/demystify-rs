@@ -19,7 +19,7 @@ The web interface will automatically handle the installation of `conjure` (via D
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/stacs-cp/demystify
+   git clone https://github.com/stacs-cp/demystify-rs
    cd demystify-web
    ```
 
@@ -49,7 +49,7 @@ Note: The first test run may take longer if Docker/Podman needs to download the 
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open issues and submit pull requests on the [GitHub repository](https://github.com/stacs-cp/demystify).
+Contributions are welcome! Please feel free to open issues and submit pull requests on the [GitHub repository](https://github.com/stacs-cp/demystify-rs).
 
 ## License
 
