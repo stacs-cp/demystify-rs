@@ -1,6 +1,6 @@
 [package]
 name = "demystify"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A constraint solving tool for explaining puzzles"
 license = "MPL-2.0"
