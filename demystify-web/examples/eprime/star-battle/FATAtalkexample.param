@@ -1,0 +1,19 @@
+$ Size of grid (also number of cages)
+letting grid_size be 8
+$ Number of stars per row,column, and cage
+letting starcount be 1
+
+$ Position of cages. Each cage is represented
+$ by a number between 1 and grid_size
+letting cages be
+[
+    [1,2,3,3,3,3,3,3],
+    [1,2,3,3,3,3,3,3],
+    [2,2,4,3,3,3,3,3],
+    [4,2,4,4,5,3,6,3],
+    [4,2,4,4,5,6,6,3],
+    [4,4,4,4,5,5,6,3],
+    [4,4,4,5,5,7,6,6],
+    [4,8,8,5,7,7,7,7]
+]
+
