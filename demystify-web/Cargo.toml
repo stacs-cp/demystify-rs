@@ -1,6 +1,6 @@
 [package]
 name = "demystify-web"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A web front end to demystify, a constraint solving tool for explaining puzzles"
 license = "MPL-2.0"
@@ -23,7 +23,7 @@ serde_json = "1"
 serde = "1"
 anyhow = "1"
 tempfile = "3"
-demystify = { path = "../demystify", version = "0.1.0" }
+demystify = { path = "../demystify", version = "0.1.1" }
 uuid = "1"
 
 rustsat = { version = "0.7", features=["ipasir-display"] }
