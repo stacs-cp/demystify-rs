@@ -1,4 +1,4 @@
-name: "demystify-rs"
+name: "demystify"
 
 on:
   push:
