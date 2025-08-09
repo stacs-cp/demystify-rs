@@ -27,3 +27,7 @@ demystify = { path = "../demystify", version = "0.1.1" }
 uuid = "1"
 
 rustsat = { version = "0.7", features=["ipasir-display"] }
+
+[[bin]]
+name = "demystify-web"
+path = "src/bin/serve.rs"

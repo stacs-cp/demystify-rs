@@ -38,7 +38,7 @@ Note that this may take a long time the first time you run it (including warning
 The easiest way to get started with `demystify` is with the web interface. Just run:
 
 ```sh
-cargo run --release --bin serve
+cargo run --release --bin demystify-web
 ```
 
 The go to the webpage it mentions (usually `https://localhost:8008` )
@@ -48,7 +48,7 @@ The go to the webpage it mentions (usually `https://localhost:8008` )
 To quickly get started with `demystify`, you can run the following command to solve a Sudoku puzzle and generate an explanatory HTML file:
 
 ```sh
-cargo run --bin main --release -- --model eprime/sudoku.eprime --param eprime/sudoku/redditexample.param --html --quick --trace > sudoku.html
+cargo run --bin demystify --release -- --model eprime/sudoku.eprime --param eprime/sudoku/redditexample.param --html --quick --trace > sudoku.html
 ```
 
 After running this command, open `sudoku.html` in your web browser to view the solution and its detailed explanation.

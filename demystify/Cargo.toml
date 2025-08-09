@@ -42,11 +42,11 @@ name = "demystify"
 path = "src/lib.rs"
 
 [[bin]]
-name = "main"
+name = "demystify"
 path = "src/bin/main.rs"
 
 [[bin]]
-name = "makesvg"
+name = "demystify-makesvg"
 path = "src/bin/makesvg.rs"
 
 [dependencies.clap]
