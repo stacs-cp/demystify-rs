@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.1.1...demystify-v0.1.2) - 2025-08-09
+
+### Other
+
+- Give better names to executables, so they are more useful when installed
+- Fix github rep
+
 ## [0.1.1](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.1.0...demystify-v0.1.1) - 2025-08-08
 
 ### Other
