@@ -28,7 +28,7 @@ The web interface will automatically handle the installation of `conjure` (via D
 To start the web server:
 
 ```sh
-cargo run --release --bin serve
+cargo run --release --bin demystify-web
 ```
 
 Then navigate to the URL displayed in your terminal (typically `http://localhost:8008`).
