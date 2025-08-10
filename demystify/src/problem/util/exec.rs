@@ -74,9 +74,11 @@ fn detect_run_method() -> RunMethod {
     }
 
     if which("docker").is_ok() {
-        eprintln!("Using docker");
+        eprintln!("Using docker. Make sure docker is installed!");
         return RunMethod::Docker;
     }
+
+    eprintln!("Cannot find conjure, or podman or docker (so I can install them). The easist fix is to install docker or podman!");
 
     // Default to native if we couldn't detect anything
     // This might fail later, but at least we tried
