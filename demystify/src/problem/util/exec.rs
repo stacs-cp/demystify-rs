@@ -74,7 +74,7 @@ fn detect_run_method() -> RunMethod {
     }
 
     if which("docker").is_ok() {
-        eprintln!("Using docker. Make sure docker is installed!");
+        eprintln!("Using docker. Make sure docker is installed and running!");
         return RunMethod::Docker;
     }
 
