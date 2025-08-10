@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.1.2...demystify-v0.1.3) - 2025-08-10
+
+### Other
+
+- Improve error message
+- Add a better error message
+
 ## [0.1.2](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.1.1...demystify-v0.1.2) - 2025-08-09
 
 ### Other
