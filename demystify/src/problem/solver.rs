@@ -157,8 +157,7 @@ impl PuzzleSolver {
     /// The corresponding `Lit` instance.
     pub fn puzlit_to_lit(&self, puzlit: &PuzLit) -> Lit {
         *self.puzzleparse.litmap.get(puzlit).unwrap_or_else(|| {
-            dbg!(&self.puzzleparse.litmap);
-            panic!("Missing puzlit: {puzlit}");
+            panic!("Expected to find the following variable, but could not find it: {puzlit}");
         })
     }
 

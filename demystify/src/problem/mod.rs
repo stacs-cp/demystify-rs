@@ -12,6 +12,7 @@ use std::{
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 
 /// Represents a puzzle variable.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -51,6 +52,60 @@ impl PuzVar {
                 .iter()
                 .map(|index| format!("_{index}"))
                 .collect::<String>()
+    }
+
+    /// Returns a new `PuzVar` with the given prefix added to the name.
+    #[must_use]
+    pub fn with_prefix(&self, prefix: &str) -> PuzVar {
+        PuzVar {
+            name: format!("{}{}", prefix, self.name),
+            indices: self.indices.clone(),
+        }
+    }
+
+    pub fn insert_assignment_to_json_map(
+        json_obj: &mut serde_json::Value,
+        puzvar: &PuzVar,
+        val: i64,
+    ) {
+        let name = puzvar.name();
+        let indices = puzvar.indices();
+
+        // Start at the top-level object
+        let obj = json_obj
+            .as_object_mut()
+            .expect("Expected a JSON object at the root");
+
+        // Get or insert the variable name as an object
+        let mut current = obj.entry(name).or_insert_with(|| json!({}));
+
+        // Traverse or create nested objects for each index except the last
+        for idx in &indices[..indices.len().saturating_sub(1)] {
+            let idx_str = idx.to_string();
+            if !current.get(&idx_str).is_some() {
+                current
+                    .as_object_mut()
+                    .expect("Expected object")
+                    .insert(idx_str.clone(), json!({}));
+            }
+            current = current.get_mut(&idx_str).expect("Index missing");
+        }
+
+        // Insert the value at the last index, or directly if no indices
+        if let Some(last_idx) = indices.last() {
+            let last_idx_str = last_idx.to_string();
+            let map = current.as_object_mut().expect("Expected object");
+            if map.contains_key(&last_idx_str) {
+                panic!("Assignment already exists for {:?}", puzvar);
+            }
+            map.insert(last_idx_str, Value::from(val));
+        } else {
+            // No indices: assign directly to the variable name
+            if !current.is_null() && !current.as_object().map_or(false, |o| o.is_empty()) {
+                panic!("Assignment already exists for {:?}", puzvar);
+            }
+            *current = Value::from(val);
+        }
     }
 }
 
@@ -266,6 +321,7 @@ mod tests {
     use crate::problem::VarValPair;
 
     use super::{PuzLit, PuzVar};
+    use serde_json::json;
     use std::sync::Arc;
 
     #[test]
@@ -394,5 +450,148 @@ mod tests {
 
         // Test case 6: Empty list
         assert_eq!(PuzLit::nice_puzlit_list_html(&[]), "");
+    }
+
+    #[test]
+    fn test_with_prefix() {
+        let v = PuzVar::new("foo", vec![1, 2]);
+        let prefixed = v.with_prefix("bar_");
+        assert_eq!(prefixed.name(), &"bar_foo".to_string());
+        assert_eq!(prefixed.indices(), &vec![1, 2]);
+        // Ensure original is unchanged
+        assert_eq!(v.name(), &"foo".to_string());
+        assert_eq!(v.indices(), &vec![1, 2]);
+    }
+    #[test]
+    fn test_insert_assignment_no_indices() {
+        let puzvar = PuzVar::new("foo", vec![]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 42);
+
+        assert_eq!(json_obj, json!({"foo": 42}));
+    }
+
+    #[test]
+    fn test_insert_assignment_single_index() {
+        let puzvar = PuzVar::new("bar", vec![1]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 99);
+
+        assert_eq!(json_obj, json!({"bar": {"1": 99}}));
+    }
+
+    #[test]
+    fn test_insert_assignment_multiple_indices() {
+        let puzvar = PuzVar::new("baz", vec![1, 2, 3]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 55);
+
+        assert_eq!(json_obj, json!({"baz": {"1": {"2": {"3": 55}}}}));
+    }
+
+    #[test]
+    fn test_insert_multiple_assignments() {
+        let var1 = PuzVar::new("var1", vec![]);
+        let var2 = PuzVar::new("var2", vec![5]);
+        let var3 = PuzVar::new("var3", vec![1, 2]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &var1, 10);
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &var2, 20);
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &var3, 30);
+
+        assert_eq!(
+            json_obj,
+            json!({
+                "var1": 10,
+                "var2": {"5": 20},
+                "var3": {"1": {"2": 30}}
+            })
+        );
+    }
+
+    #[test]
+    fn test_insert_same_variable_different_indices() {
+        let grid1 = PuzVar::new("grid", vec![1, 1]);
+        let grid2 = PuzVar::new("grid", vec![1, 2]);
+        let grid3 = PuzVar::new("grid", vec![2, 1]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &grid1, 1);
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &grid2, 2);
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &grid3, 3);
+
+        assert_eq!(
+            json_obj,
+            json!({
+                "grid": {
+                    "1": {
+                        "1": 1,
+                        "2": 2
+                    },
+                    "2": {
+                        "1": 3
+                    }
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_insert_into_existing_json() {
+        let puzvar = PuzVar::new("new_var", vec![10]);
+        let mut json_obj = json!({
+            "existing_var": 42,
+            "another_var": {"5": 99}
+        });
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 77);
+
+        assert_eq!(
+            json_obj,
+            json!({
+                "existing_var": 42,
+                "another_var": {"5": 99},
+                "new_var": {"10": 77}
+            })
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Assignment already exists")]
+    fn test_insert_duplicate_no_indices() {
+        let puzvar = PuzVar::new("foo", vec![]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 1);
+        // This should panic because we're inserting to the same variable again
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 2);
+    }
+
+    #[test]
+    #[should_panic(expected = "Assignment already exists")]
+    fn test_insert_duplicate_with_indices() {
+        let puzvar = PuzVar::new("grid", vec![1, 2]);
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 5);
+        // This should panic because we're inserting to the same variable with the same indices
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 10);
+    }
+
+    #[test]
+    #[should_panic(expected = "Assignment already exists")]
+    fn test_insert_duplicate_with_different_depths() {
+        let puzvar = PuzVar::new("grid", vec![1, 2]);
+        let puzvar2 = PuzVar::new("grid", vec![1]);
+
+        let mut json_obj = json!({});
+
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 2);
+        // This should panic because we're inserting to the same variable with different index depth
+        PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar2, 10);
     }
 }
