@@ -63,11 +63,7 @@ impl PuzVar {
         }
     }
 
-    pub fn insert_assignment_to_json_map(
-        json_obj: &mut serde_json::Value,
-        puzvar: &PuzVar,
-        val: i64,
-    ) {
+    fn insert_assignment_to_json_map(json_obj: &mut serde_json::Value, puzvar: &PuzVar, val: i64) {
         let name = puzvar.name();
         let indices = puzvar.indices();
 
@@ -108,7 +104,10 @@ impl PuzVar {
         }
     }
 
-    pub fn to_json_map(assignments: &BTreeMap<PuzVar, i64>) -> serde_json::Value {
+    pub fn to_json_map<M>(assignments: &M) -> serde_json::Value
+    where
+        for<'a> &'a M: IntoIterator<Item = (&'a PuzVar, &'a i64)>,
+    {
         let mut json_obj = serde_json::json!({});
 
         for (puzvar, val) in assignments {
