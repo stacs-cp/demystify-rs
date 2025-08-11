@@ -789,10 +789,10 @@ fn read_dimacs_to_maps(
                             .entry(varid.clone())
                             .or_default()
                             .insert(-satlit);
-                        if let Some(val) = inv_order_encoding_map.get(&satlit) {
-                            if *val != varid {
-                                bail!("{} used for two variables: {} {}", satlit, val, varid);
-                            }
+                        if let Some(val) = inv_order_encoding_map.get(&satlit)
+                            && *val != varid
+                        {
+                            bail!("{} used for two variables: {} {}", satlit, val, varid);
                         }
                         safe_insert(&mut inv_order_encoding_map, satlit, varid.clone())?;
                         safe_insert(&mut inv_order_encoding_map, -satlit, varid.clone())?;

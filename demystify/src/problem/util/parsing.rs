@@ -28,15 +28,16 @@ fn split_savile_row_name(n: &str) -> (String, Vec<i64>) {
             };
 
             // Check if the remainder is a number with at least 5 digits
-            if value_str.len() >= 5 && value_str.chars().all(|c| c.is_ascii_digit()) {
-                if let Ok(mut num) = value_str.parse::<i64>() {
-                    if negate {
-                        num = -num;
-                    }
-                    indices.insert(0, num);
-                    current = base.to_string();
-                    continue;
+            if value_str.len() >= 5
+                && value_str.chars().all(|c| c.is_ascii_digit())
+                && let Ok(mut num) = value_str.parse::<i64>()
+            {
+                if negate {
+                    num = -num;
                 }
+                indices.insert(0, num);
+                current = base.to_string();
+                continue;
             }
         }
 

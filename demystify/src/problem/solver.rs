@@ -712,10 +712,10 @@ impl PuzzleSolver {
 
         let mut percentage_reduce = 0.4;
 
-        if let Some(size) = max_size {
-            if size > 0 {
-                percentage_reduce = 1.0 - (size as f64) / (conset.len() as f64);
-            }
+        if let Some(size) = max_size
+            && size > 0
+        {
+            percentage_reduce = 1.0 - (size as f64) / (conset.len() as f64);
         }
 
         percentage_reduce = percentage_reduce.clamp(0.4, 0.9999);
@@ -794,13 +794,10 @@ impl PuzzleSolver {
     /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
     /// Literals where no MUS was found are omitted from the output.
     pub fn get_many_vars_mus_size_0(&self, lits: &BTreeSet<Lit>) -> BTreeSet<Lit> {
-        let lits = lits
-            .par_iter()
+        lits.par_iter()
             .filter(|&x| self.check_var_mus_size_0(*x))
             .cloned()
-            .collect();
-
-        lits
+            .collect()
     }
 
     /// Retrieves an explanation for each element of a list of literals. This will often be

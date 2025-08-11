@@ -143,10 +143,10 @@ impl PuzzlePlanner {
         let mut vec = vec![];
 
         for v in muses.muses().values() {
-            if let Some(m) = v.iter().next() {
-                if m.mus_len() <= min {
-                    vec.push(m.clone());
-                }
+            if let Some(m) = v.iter().next()
+                && m.mus_len() <= min
+            {
+                vec.push(m.clone());
             }
         }
 
@@ -423,10 +423,10 @@ impl PuzzlePlanner {
         let mut vec = vec![];
 
         for v in muses.muses().values() {
-            if let Some(m) = v.iter().next() {
-                if m.mus_len() == min {
-                    vec.push(m.clone());
-                }
+            if let Some(m) = v.iter().next()
+                && m.mus_len() == min
+            {
+                vec.push(m.clone());
             }
         }
 

@@ -46,7 +46,7 @@ impl PuzVar {
     /// Converts the name of the variable into a CSS-friendly string.
     #[must_use]
     pub fn to_css_string(&self) -> String {
-        self.name.replace('.', "_").replace('-', "_")
+        self.name.replace(['.', '-'], "_")
             + &self
                 .indices
                 .iter()
@@ -82,7 +82,7 @@ impl PuzVar {
         // Traverse or create nested objects for each index except the last
         for idx in &indices[..indices.len().saturating_sub(1)] {
             let idx_str = idx.to_string();
-            if !current.get(&idx_str).is_some() {
+            if current.get(&idx_str).is_none() {
                 current
                     .as_object_mut()
                     .expect("Expected object")
@@ -101,7 +101,7 @@ impl PuzVar {
             map.insert(last_idx_str, Value::from(val));
         } else {
             // No indices: assign directly to the variable name
-            if !current.is_null() && !current.as_object().map_or(false, |o| o.is_empty()) {
+            if !current.is_null() && !current.as_object().is_some_and(|o| o.is_empty()) {
                 panic!("Assignment already exists for {:?}", puzvar);
             }
             *current = Value::from(val);

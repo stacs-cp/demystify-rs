@@ -55,11 +55,11 @@ impl Puzzle {
             let var = problem.eprime.vars.iter().next().unwrap();
 
             let indices = problem.get_matrix_indices(var);
-            if let Some(v) = indices {
-                if v.len() == 2 {
-                    width = Some(v[1]);
-                    height = Some(v[0]);
-                }
+            if let Some(v) = indices
+                && v.len() == 2
+            {
+                width = Some(v[1]);
+                height = Some(v[0]);
             }
         }
 

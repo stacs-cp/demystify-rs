@@ -77,10 +77,10 @@ impl PuzzleDraw {
             self.fill_fixed_state(&mut cells, start_grid);
         }
 
-        if let Some(state) = &puzjson.state {
-            if let Some(knowledge_grid) = &state.knowledge_grid {
-                self.fill_knowledge(&mut cells, &puzzle.start_grid, knowledge_grid);
-            }
+        if let Some(state) = &puzjson.state
+            && let Some(knowledge_grid) = &state.knowledge_grid
+        {
+            self.fill_knowledge(&mut cells, &puzzle.start_grid, knowledge_grid);
         }
 
         /*
@@ -366,10 +366,10 @@ impl PuzzleDraw {
                     if self.decorations.sudoku_grid && i % 3 == 0 {
                         stroke = self.mid_width;
                     }
-                    if let Some(cages) = cages {
-                        if cages[j][i] != cages[j][i - 1] {
-                            stroke = self.thick_width;
-                        }
+                    if let Some(cages) = cages
+                        && cages[j][i] != cages[j][i - 1]
+                    {
+                        stroke = self.thick_width;
                     }
                 }
                 let i_f = i as f64;
@@ -400,10 +400,10 @@ impl PuzzleDraw {
                     if self.decorations.sudoku_grid && j % 3 == 0 {
                         stroke = self.mid_width;
                     }
-                    if let Some(cages) = cages {
-                        if cages[j][i] != cages[j - 1][i] {
-                            stroke = self.thick_width;
-                        }
+                    if let Some(cages) = cages
+                        && cages[j][i] != cages[j - 1][i]
+                    {
+                        stroke = self.thick_width;
                     }
                 }
                 let i_f = i as f64;
