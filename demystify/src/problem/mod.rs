@@ -107,6 +107,16 @@ impl PuzVar {
             *current = Value::from(val);
         }
     }
+
+    pub fn to_json_map(assignments: &BTreeMap<PuzVar, i64>) -> serde_json::Value {
+        let mut json_obj = serde_json::json!({});
+
+        for (puzvar, val) in assignments {
+            Self::insert_assignment_to_json_map(&mut json_obj, puzvar, *val);
+        }
+
+        json_obj
+    }
 }
 
 impl fmt::Display for PuzVar {
@@ -322,7 +332,7 @@ mod tests {
 
     use super::{PuzLit, PuzVar};
     use serde_json::json;
-    use std::sync::Arc;
+    use std::{collections::BTreeMap, sync::Arc};
 
     #[test]
     fn var() {
@@ -593,5 +603,40 @@ mod tests {
         PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar, 2);
         // This should panic because we're inserting to the same variable with different index depth
         PuzVar::insert_assignment_to_json_map(&mut json_obj, &puzvar2, 10);
+    }
+
+    #[test]
+    fn test_to_json_map_empty() {
+        let assignments: BTreeMap<PuzVar, i64> = BTreeMap::new();
+        let result = PuzVar::to_json_map(&assignments);
+        assert_eq!(result, json!({}));
+    }
+
+    #[test]
+    fn test_to_json_map_multiple_vars() {
+        let mut assignments: BTreeMap<PuzVar, i64> = BTreeMap::new();
+
+        assignments.insert(PuzVar::new("x", vec![]), 42);
+        assignments.insert(PuzVar::new("y", vec![1]), 10);
+        assignments.insert(PuzVar::new("z", vec![1, 2]), 99);
+        assignments.insert(PuzVar::new("grid", vec![2, 3]), 5);
+        assignments.insert(PuzVar::new("grid", vec![2, 4]), 7);
+
+        let result = PuzVar::to_json_map(&assignments);
+
+        assert_eq!(
+            result,
+            json!({
+                "x": 42,
+                "y": {"1": 10},
+                "z": {"1": {"2": 99}},
+                "grid": {
+                    "2": {
+                        "3": 5,
+                        "4": 7
+                    }
+                }
+            })
+        );
     }
 }
