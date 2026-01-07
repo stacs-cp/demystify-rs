@@ -51,6 +51,8 @@ pub struct EPrimeAnnotations {
     params: BTreeMap<String, serde_json::value::Value>,
     /// The kind of puzzle
     pub kind: Option<String>,
+    /// Informational strings collected from $#INFO directives
+    pub info: Vec<String>,
 }
 
 impl EPrimeAnnotations {
@@ -267,6 +269,7 @@ impl PuzzleParse {
         reveal: BTreeMap<String, String>,
         params: BTreeMap<String, serde_json::value::Value>,
         kind: Option<String>,
+        info: Vec<String>,
     ) -> PuzzleParse {
         PuzzleParse {
             eprime: EPrimeAnnotations {
@@ -277,6 +280,7 @@ impl PuzzleParse {
                 reveal_values: reveal.values().cloned().collect(),
                 params,
                 kind,
+                info,
             },
             satinstance: SatInstance::new(),
             cnf: None,
@@ -574,6 +578,7 @@ struct ParsedEprimeData {
     cons: BTreeMap<String, String>,
     factvars: BTreeMap<String, String>,
     kind: Option<String>,
+    info: Vec<String>,
 }
 
 fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
@@ -587,6 +592,8 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     let mut cons: BTreeMap<String, String> = BTreeMap::new();
 
     let mut factvars: BTreeMap<String, String> = BTreeMap::new();
+
+    let mut info: Vec<String> = Vec::new();
 
     let mut kind: Option<String> = None;
 
@@ -660,6 +667,11 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                     bail!("Cannot have two 'KIND' statements");
                 }
                 kind = Some(v);
+            } else if line.starts_with("$#INFO") {
+                // Collect the rest of the line after $#INFO as an info string
+                let info_string = line["$#INFO ".len()..].trim().to_string();
+                info!(target: "parser", "Found INFO: '{}'", info_string);
+                info.push(info_string);
             } else if line.starts_with("$#REVEAL ") {
                 if parts.len() != 3 {
                     bail!(format!(
@@ -706,6 +718,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         cons,
         factvars,
         kind,
+        info,
     })
 }
 
@@ -720,6 +733,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
         parsed_eprime.factvars,
         params,
         parsed_eprime.kind,
+        parsed_eprime.info,
     ))
 }
 
@@ -1180,5 +1194,62 @@ mod tests {
         // Do not want to output the whole tree
         let k: BTreeSet<_> = parse.unwrap().keys().cloned().collect();
         insta::assert_debug_snapshot!(k);
+    }
+
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_info_directives() {
+        // Create a temporary eprime file with INFO directives
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#VAR y").unwrap();
+        writeln!(temp_file, "$#CON con1 \"x != y\"").unwrap();
+        writeln!(temp_file, "$#KIND sudoku").unwrap();
+        writeln!(temp_file, "$#INFO This is a test info message").unwrap();
+        writeln!(temp_file, "$#INFO Another info message with spaces").unwrap();
+        writeln!(temp_file, "$#INFO Info with special chars: !@#$%^&*()").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+
+        // Parse the file
+        let result = super::parse_eprime_file(&path);
+
+        assert!(result.is_ok(), "Parsing should succeed");
+        let parsed = result.unwrap();
+
+        // Verify the info field contains our messages
+        assert_eq!(parsed.info.len(), 3, "Should have 3 info messages");
+        assert_eq!(parsed.info[0], "This is a test info message");
+        assert_eq!(parsed.info[1], "Another info message with spaces");
+        assert_eq!(parsed.info[2], "Info with special chars: !@#$%^&*()");
+
+        // Verify other fields are still parsed correctly
+        assert_eq!(parsed.vars.len(), 2);
+        assert!(parsed.vars.contains("x"));
+        assert!(parsed.vars.contains("y"));
+        assert_eq!(parsed.cons.len(), 1);
+        assert!(parsed.cons.contains_key("con1"));
+        assert_eq!(parsed.kind, Some("sudoku".to_string()));
+    }
+
+    #[test]
+    fn test_parse_empty_info() {
+        // Create a temporary eprime file without INFO directives
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#KIND puzzle").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+
+        // Parse the file
+        let result = super::parse_eprime_file(&path);
+
+        assert!(result.is_ok(), "Parsing should succeed");
+        let parsed = result.unwrap();
+
+        // Verify the info field is empty
+        assert_eq!(parsed.info.len(), 0, "Should have no info messages");
     }
 }
