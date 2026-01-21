@@ -1,0 +1,310 @@
+//! Planner wrapper for Lua.
+
+use std::sync::{Arc, Mutex};
+
+use mlua::prelude::*;
+
+use demystify::problem::{
+    planner::PuzzlePlanner,
+    solver::PuzzleSolver,
+    PuzLit,
+};
+
+use crate::puzzle::LuaPuzzle;
+
+/// A wrapper around PuzzlePlanner that can be used from Lua.
+pub struct LuaPlanner {
+    inner: Arc<Mutex<PuzzlePlanner>>,
+}
+
+impl LuaUserData for LuaPlanner {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        // Check if the puzzle is fully solved
+        methods.add_method("is_solved", |_, this, ()| {
+            let planner = this.inner.lock().unwrap();
+            Ok(planner.get_all_known_lits().len() > 0
+                && planner.puzzle().varset_lits.iter().all(|lit| {
+                    planner.get_all_known_lits().contains(lit)
+                        || planner.get_all_known_lits().contains(&(!*lit))
+                }))
+        });
+
+        // Get the number of remaining provable literals
+        methods.add_method_mut("num_provable", |_, this, ()| {
+            let mut planner = this.inner.lock().unwrap();
+            Ok(planner.get_provable_varlits().len())
+        });
+
+        // Get the list of provable literals
+        methods.add_method_mut("provable_literals", |lua, this, ()| {
+            let mut planner = this.inner.lock().unwrap();
+            let provable = planner.get_provable_varlits();
+
+            let result = lua.create_table()?;
+            let mut idx = 1;
+            for lit in &provable {
+                let puzlits = planner.puzzle().lit_to_vars(lit);
+                for puzlit in puzlits {
+                    result.set(idx, format_puzlit(puzlit))?;
+                    idx += 1;
+                }
+            }
+
+            Ok(result)
+        });
+
+        // Manually fix/deduce a literal by its string representation
+        // The literal string should be in the format "var[i,j,...]=val" or "var[i,j,...]!=val"
+        methods.add_method_mut("fix_literal", |_, this, lit_str: String| {
+            let mut planner = this.inner.lock().unwrap();
+
+            // Parse the literal string to find the matching Lit
+            let provable = planner.get_provable_varlits();
+
+            // First check provable literals
+            for lit in &provable {
+                let puzlits = planner.puzzle().lit_to_vars(&lit);
+                for puzlit in puzlits {
+                    if format_puzlit(puzlit) == lit_str {
+                        let lit_copy = lit;
+                        planner.mark_lit_as_deduced(&lit_copy);
+                        return Ok(true);
+                    }
+                }
+            }
+
+            // If not found in provable, check all literals in litmap
+            // We need to collect the matching literal first to avoid borrow issues
+            let matching_lit = {
+                let mut found = None;
+                for (puzlit, sat_lit) in planner.puzzle().litmap.iter() {
+                    if format_puzlit(puzlit) == lit_str {
+                        found = Some(*sat_lit);
+                        break;
+                    }
+                }
+                found
+            };
+
+            if let Some(lit) = matching_lit {
+                planner.mark_lit_as_deduced(&lit);
+                return Ok(true);
+            }
+
+            Ok(false)
+        });
+
+        // Get the best next step
+        methods.add_method_mut("best_step", |lua, this, ()| {
+            let mut planner = this.inner.lock().unwrap();
+
+            let muses = planner.smallest_muses_with_config();
+
+            if muses.is_empty() {
+                return Ok(LuaValue::Nil);
+            }
+
+            // Convert to user-friendly representation
+            let mut all_lits = Vec::new();
+            let mut all_constraints = Vec::new();
+
+            for mus in &muses {
+                let (lits, cons) = planner.mus_to_user_mus(mus);
+                for lit in lits {
+                    all_lits.push(format_puzlit(&lit));
+                }
+                all_constraints.extend(cons);
+            }
+
+            // Mark the literals as deduced
+            for mus in &muses {
+                for lit in &mus.lits {
+                    planner.mark_lit_as_deduced(lit);
+                }
+            }
+
+            // Build the result table
+            let result = lua.create_table()?;
+
+            let literals_table = lua.create_table()?;
+            for (i, lit) in all_lits.iter().enumerate() {
+                literals_table.set(i + 1, lit.clone())?;
+            }
+            result.set("literals", literals_table)?;
+
+            let constraints_table = lua.create_table()?;
+            for (i, con) in all_constraints.iter().enumerate() {
+                constraints_table.set(i + 1, con.clone())?;
+            }
+            result.set("constraints", constraints_table)?;
+
+            result.set("mus_size", muses.first().map(|m| m.mus_len()).unwrap_or(0))?;
+            result.set("num_muses", muses.len())?;
+
+            Ok(LuaValue::Table(result))
+        });
+
+        // Solve the entire puzzle and return all steps
+        methods.add_method_mut("quick_solve", |lua, this, ()| {
+            let mut planner = this.inner.lock().unwrap();
+            let solve = planner.quick_solve();
+
+            let result = lua.create_table()?;
+            for (step_idx, step) in solve.iter().enumerate() {
+                let step_table = lua.create_table()?;
+
+                for (mus_idx, (lits, cons)) in step.iter().enumerate() {
+                    let mus_table = lua.create_table()?;
+
+                    let literals_table = lua.create_table()?;
+                    for (i, lit) in lits.iter().enumerate() {
+                        literals_table.set(i + 1, format_puzlit(lit))?;
+                    }
+                    mus_table.set("literals", literals_table)?;
+
+                    let constraints_table = lua.create_table()?;
+                    for (i, con) in cons.iter().enumerate() {
+                        constraints_table.set(i + 1, con.clone())?;
+                    }
+                    mus_table.set("constraints", constraints_table)?;
+
+                    step_table.set(mus_idx + 1, mus_table)?;
+                }
+
+                result.set(step_idx + 1, step_table)?;
+            }
+
+            Ok(result)
+        });
+
+        // Get difficulties for all deductions
+        methods.add_method_mut("difficulties", |lua, this, ()| {
+            let mut planner = this.inner.lock().unwrap();
+            let muses = planner.all_muses_with_larger();
+
+            let result = lua.create_table()?;
+            for (lit, mus_set) in muses.muses() {
+                if let Some(mus) = mus_set.iter().next() {
+                    let lit_str = {
+                        let puzlits = planner.puzzle().lit_to_vars(lit);
+                        if let Some(first) = puzlits.iter().next() {
+                            format_puzlit(first)
+                        } else {
+                            continue;
+                        }
+                    };
+                    result.set(lit_str, mus.mus_len())?;
+                }
+            }
+
+            Ok(result)
+        });
+
+        // Get all known literals
+        methods.add_method("known_literals", |lua, this, ()| {
+            let planner = this.inner.lock().unwrap();
+            let result = lua.create_table()?;
+
+            for (i, lit) in planner.get_all_known_lits().iter().enumerate() {
+                let puzlits = planner.puzzle().lit_to_vars(lit);
+                if let Some(first) = puzlits.iter().next() {
+                    result.set(i + 1, format_puzlit(first))?;
+                }
+            }
+
+            Ok(result)
+        });
+
+        // Get current assignments as a table
+        methods.add_method("current_state", |lua, this, ()| {
+            let planner = this.inner.lock().unwrap();
+            let result = lua.create_table()?;
+
+            for lit in planner.get_all_known_lits() {
+                let puzlits = planner.puzzle().lit_to_vars(lit);
+                for puzlit in puzlits {
+                    if puzlit.sign() {
+                        // This is a positive assignment (var = val)
+                        let var_name = puzlit.var().name().clone();
+                        let indices = puzlit.var().indices().clone();
+                        let val = puzlit.val();
+
+                        // Build nested table structure for indexed variables
+                        let mut current = result.clone();
+
+                        // Get or create the variable's table
+                        let var_table: LuaTable = match current.get::<LuaTable>(var_name.clone()) {
+                            Ok(t) => t,
+                            Err(_) => {
+                                let t = lua.create_table()?;
+                                current.set(var_name.clone(), t.clone())?;
+                                t
+                            }
+                        };
+                        current = var_table;
+
+                        // Navigate/create nested tables for indices
+                        for (idx_pos, &idx) in indices.iter().enumerate() {
+                            if idx_pos == indices.len() - 1 {
+                                // Last index - set the value
+                                current.set(idx, val)?;
+                            } else {
+                                // Not the last - get or create nested table
+                                let next: LuaTable = match current.get::<LuaTable>(idx) {
+                                    Ok(t) => t,
+                                    Err(_) => {
+                                        let t = lua.create_table()?;
+                                        current.set(idx, t.clone())?;
+                                        t
+                                    }
+                                };
+                                current = next;
+                            }
+                        }
+
+                        // Handle variables with no indices
+                        if indices.is_empty() {
+                            result.set(var_name, val)?;
+                        }
+                    }
+                }
+            }
+
+            Ok(result)
+        });
+    }
+}
+
+/// Format a PuzLit as a human-readable string
+fn format_puzlit(lit: &PuzLit) -> String {
+    let var = lit.var();
+    let val = lit.val();
+    let sign = if lit.sign() { "=" } else { "!=" };
+
+    if var.indices().is_empty() {
+        format!("{}{}{}", var.name(), sign, val)
+    } else {
+        format!("{}{:?}{}{}", var.name(), var.indices(), sign, val)
+    }
+}
+
+/// Create a new planner from a puzzle
+fn new_planner(_lua: &Lua, puzzle: LuaPuzzle) -> LuaResult<LuaPlanner> {
+    let solver = PuzzleSolver::new(puzzle.inner)
+        .map_err(|e| LuaError::RuntimeError(format!("Failed to create solver: {}", e)))?;
+
+    let planner = PuzzlePlanner::new(solver);
+
+    Ok(LuaPlanner {
+        inner: Arc::new(Mutex::new(planner)),
+    })
+}
+
+/// Create the Planner class table for Lua
+pub fn create_planner_class(lua: &Lua) -> LuaResult<LuaTable> {
+    let class = lua.create_table()?;
+
+    class.set("new", lua.create_function(new_planner)?)?;
+
+    Ok(class)
+}

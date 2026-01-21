@@ -48,7 +48,7 @@ pub struct EPrimeAnnotations {
     /// values from the 'reveal' map (for ease of searching)
     pub reveal_values: BTreeSet<String>,
     /// The parameters read from the param file
-    params: BTreeMap<String, serde_json::value::Value>,
+    pub(crate) params: BTreeMap<String, serde_json::value::Value>,
     /// The kind of puzzle
     pub kind: Option<String>,
     /// Informational strings collected from $#INFO directives
@@ -56,6 +56,12 @@ pub struct EPrimeAnnotations {
 }
 
 impl EPrimeAnnotations {
+    /// Returns a reference to all parameters
+    #[must_use]
+    pub fn params(&self) -> &BTreeMap<String, serde_json::value::Value> {
+        &self.params
+    }
+
     #[must_use]
     pub fn has_param(&self, s: &str) -> bool {
         self.params.contains_key(s)

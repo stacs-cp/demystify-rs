@@ -1,0 +1,15 @@
+[package]
+name = "demystify-lua"
+version = "0.1.0"
+edition = "2024"
+description = "Lua bindings for demystify, a constraint solving tool for explaining puzzles"
+license = "MPL-2.0"
+repository = "https://github.com/stacs-cp/demystify-rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+demystify = { path = "../demystify", version = "0.1.3" }
+mlua = { version = "0.10", features = ["lua54", "module"] }
+anyhow = "1.0"

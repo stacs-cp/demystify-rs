@@ -13,3 +13,12 @@ demystify.trace
 dist
 tarpaulin-report.html
 .aider*
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

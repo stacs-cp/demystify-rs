@@ -2,5 +2,6 @@
 members = [
     "demystify",
     "demystify-web",
+    "demystify-lua",
 ]
 resolver = "2"

@@ -52,6 +52,18 @@ struct Opt {
         help = "Specify the method to run the solver (Native, Docker, Podman)"
     )]
     conjure: Option<RunMethod>,
+
+    #[arg(
+        long,
+        help = "Save the parsed puzzle to a JSON file (for use with Lua interface or to skip parsing later)"
+    )]
+    save_parsed: Option<PathBuf>,
+
+    #[arg(
+        long,
+        help = "Load a pre-parsed puzzle from JSON instead of parsing .eprime/.param files"
+    )]
+    load_parsed: Option<PathBuf>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -76,8 +88,20 @@ fn main() -> anyhow::Result<()> {
             .init();
     }
 
-    let puzzle =
-        problem::parse::parse_essence(&PathBuf::from(opt.model), &PathBuf::from(opt.param))?;
+    // Load puzzle either from pre-parsed JSON or by parsing .eprime/.param files
+    let puzzle = if let Some(ref load_path) = opt.load_parsed {
+        eprintln!("Loading pre-parsed puzzle from {:?}", load_path);
+        problem::parse::PuzzleParse::load_from_json(load_path)?
+    } else {
+        problem::parse::parse_essence(&PathBuf::from(&opt.model), &PathBuf::from(&opt.param))?
+    };
+
+    // Save parsed puzzle to JSON if requested
+    if let Some(ref save_path) = opt.save_parsed {
+        eprintln!("Saving parsed puzzle to {:?}", save_path);
+        puzzle.save_to_json(save_path)?;
+        eprintln!("Saved successfully.");
+    }
 
     let puzzle = Arc::new(puzzle);
 
