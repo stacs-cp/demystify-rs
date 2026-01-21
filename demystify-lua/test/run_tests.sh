@@ -89,12 +89,18 @@ trap "rm -rf $TEMP_DIR" EXIT
 
 ln -sf "$LIB_PATH" "$TEMP_DIR/demystify.so"
 
-echo "Running LuaJIT tests..."
+# Run pure Lua helper tests first (no native library needed)
+echo "Running helper tests (pure Lua)..."
+echo
+cd "$TEST_DIR"
+LUA_PATH="$TEST_DIR/?.lua;;" luajit test_helpers.lua
+
 echo
 
-# Run the tests
-cd "$TEST_DIR"
-LUA_CPATH="$TEMP_DIR/?.so;;" luajit test_demystify.lua "$PUZZLE_JSON"
+# Run the demystify library tests
+echo "Running demystify library tests..."
+echo
+LUA_CPATH="$TEMP_DIR/?.so;;" LUA_PATH="$TEST_DIR/?.lua;;" luajit test_demystify.lua "$PUZZLE_JSON"
 
 echo
 echo -e "${GREEN}=== All LuaJIT tests completed successfully ===${NC}"
