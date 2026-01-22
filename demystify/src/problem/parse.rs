@@ -216,6 +216,12 @@ impl EPrimeAnnotations {
 
         Ok(ret)
     }
+
+    /// Parses the concatenated `info` strings as a JSON object
+    pub fn parse_info_json<T: serde::de::DeserializeOwned>(&self) -> anyhow::Result<T> {
+        let json_str = self.info.concat();
+        serde_json::from_str(&json_str).context("Failed to parse info as JSON")
+    }
 }
 
 /// Represents the result of parsing a DIMACS file.
