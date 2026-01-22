@@ -524,6 +524,10 @@ impl PuzzleParse {
         self.invconset.keys().cloned().collect()
     }
 
+    pub fn constraint_roots(&self) -> BTreeSet<String> {
+        self.eprime.cons.keys().cloned().collect()
+    }
+
     #[must_use]
     pub fn constraint_scope(&self, con: &String) -> BTreeSet<VarValPair> {
         let lit = self.invconset.get(con).expect("IE: Bad constraint name");

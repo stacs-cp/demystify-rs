@@ -4,11 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use mlua::prelude::*;
 
-use demystify::problem::{
-    planner::PuzzlePlanner,
-    solver::PuzzleSolver,
-    PuzLit,
-};
+use demystify::problem::{PuzLit, planner::PuzzlePlanner, solver::PuzzleSolver};
 
 use crate::puzzle::LuaPuzzle;
 

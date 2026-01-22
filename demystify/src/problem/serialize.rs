@@ -139,7 +139,11 @@ impl TryFrom<&PuzzleParse> for SerializablePuzzleParse {
                 .iter()
                 .map(|(&k, v)| (lit_to_i32(k).to_string(), v.clone()))
                 .collect(),
-            domainmap: p.domainmap.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            domainmap: p
+                .domainmap
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
             conset: p
                 .conset
                 .iter()
@@ -289,7 +293,8 @@ impl PuzzleParse {
         let serializable = SerializablePuzzleParse::try_from(self)?;
         let file = File::create(path).context("Failed to create output file")?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, &serializable).context("Failed to serialize puzzle")?;
+        serde_json::to_writer_pretty(writer, &serializable)
+            .context("Failed to serialize puzzle")?;
         Ok(())
     }
 

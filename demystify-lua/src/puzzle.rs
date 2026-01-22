@@ -3,8 +3,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use mlua::prelude::*;
 use mlua::FromLua;
+use mlua::prelude::*;
 
 use demystify::problem::parse::PuzzleParse;
 
@@ -30,9 +30,7 @@ impl FromLua for LuaPuzzle {
 impl LuaUserData for LuaPuzzle {
     fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
         // Get the puzzle kind (e.g., "sudoku", "binairo")
-        methods.add_method("kind", |_, this, ()| {
-            Ok(this.inner.eprime.kind.clone())
-        });
+        methods.add_method("kind", |_, this, ()| Ok(this.inner.eprime.kind.clone()));
 
         // Get info strings from the puzzle
         methods.add_method("info", |lua, this, ()| {

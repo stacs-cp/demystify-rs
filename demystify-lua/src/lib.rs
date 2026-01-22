@@ -35,10 +35,7 @@ fn demystify(lua: &Lua) -> LuaResult<LuaTable> {
     let exports = lua.create_table()?;
 
     // Add the load_puzzle function
-    exports.set(
-        "load_puzzle",
-        lua.create_function(puzzle::load_puzzle)?,
-    )?;
+    exports.set("load_puzzle", lua.create_function(puzzle::load_puzzle)?)?;
 
     // Add the Planner class
     exports.set("Planner", planner::create_planner_class(lua)?)?;
