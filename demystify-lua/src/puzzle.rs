@@ -1,4 +1,32 @@
 //! Puzzle wrapper for Lua.
+//!
+//! This module provides the [`LuaPuzzle`] type, which wraps a parsed puzzle
+//! and exposes it to Lua code. The puzzle object provides methods for:
+//!
+//! - Querying puzzle metadata (kind, info, parameters)
+//! - Listing variables and constraints
+//! - Inspecting variable domains
+//! - Finding which variables are involved in constraints
+//!
+//! # Lua Methods
+//!
+//! | Method | Description |
+//! |--------|-------------|
+//! | `kind()` | Returns puzzle type (e.g., "Sudoku") |
+//! | `info()` | Returns array of info strings |
+//! | `variables()` | Returns array of variable names |
+//! | `aux_variables()` | Returns array of auxiliary variable names |
+//! | `constraints()` | Returns array of constraint names |
+//! | `constraint(name)` | Returns constraint text by name |
+//! | `variable_domain(var)` | Returns possible values for a variable |
+//! | `all_domains()` | Returns all variable domains |
+//! | `constraint_variables(name)` | Returns variables involved in a constraint |
+//! | `has_param(name)` | Checks if parameter exists |
+//! | `param_int(name)` | Gets integer parameter |
+//! | `param_bool(name)` | Gets boolean parameter |
+//! | `num_clauses()` | Returns number of CNF clauses |
+//! | `num_var_lits()` | Returns number of variable literals |
+//! | `num_con_lits()` | Returns number of constraint literals |
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;

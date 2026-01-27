@@ -1,4 +1,46 @@
 //! Planner wrapper for Lua.
+//!
+//! This module provides the [`LuaPlanner`] type, which wraps the puzzle planner
+//! and exposes step-by-step solving functionality to Lua. The planner computes
+//! minimal explanations (MUSes) for each deduction step.
+//!
+//! # Usage
+//!
+//! ```lua
+//! local planner = demystify.Planner.new(puzzle)
+//!
+//! while not planner:is_solved() do
+//!     local step = planner:best_step()
+//!     if step then
+//!         print("Deduced:", step.literals)
+//!         print("Using:", step.constraints)
+//!     end
+//! end
+//! ```
+//!
+//! # Lua Methods
+//!
+//! | Method | Description |
+//! |--------|-------------|
+//! | `is_solved()` | Returns true if puzzle is fully solved |
+//! | `num_provable()` | Returns count of currently provable literals |
+//! | `provable_literals()` | Returns array of provable literal strings |
+//! | `best_step()` | Returns next deduction step with smallest MUS |
+//! | `quick_solve()` | Solves entire puzzle, returns all steps |
+//! | `difficulties()` | Returns difficulty (MUS size) for each deduction |
+//! | `known_literals()` | Returns array of all known literals |
+//! | `current_state()` | Returns nested table of current assignments |
+//! | `fix_literal(str)` | Manually fixes a literal by string |
+//! | `fix_var(name, indices, value)` | Fixes literal by components |
+//! | `fix(table)` | Fixes literal by table with name/indices/value/equal |
+//!
+//! # Step Structure
+//!
+//! The `best_step()` method returns a table with:
+//! - `literals`: Array of deduced literal strings
+//! - `constraints`: Array of constraint names used in the proof
+//! - `mus_size`: Number of constraints in the minimal proof
+//! - `num_muses`: Number of alternative minimal proofs found
 
 use std::sync::{Arc, Mutex};
 
