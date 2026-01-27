@@ -220,7 +220,11 @@ impl EPrimeAnnotations {
     /// Parses the concatenated `info` strings as a JSON object
     pub fn parse_info_json<T: serde::de::DeserializeOwned>(&self) -> anyhow::Result<T> {
         let json_str = self.info.concat();
-        serde_json::from_str(&json_str).context("Failed to parse info as JSON")
+        if json_str.trim().is_empty() {
+            serde_json::from_str("{}").context("Failed to parse empty info as JSON object")
+        } else {
+            serde_json::from_str(&json_str).context("Failed to parse info as JSON")
+        }
     }
 }
 
