@@ -107,7 +107,14 @@ echo
 # Set up Lua path to find the module
 # LuaJIT loads .so files directly, so we create a symlink named demystify.so
 TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
+
+# Cleanup function to remove temp dir and generated JSON files
+cleanup() {
+    rm -rf "$TEMP_DIR"
+    # Clean up generated test puzzle JSON files
+    rm -f "$TEST_DIR"/test_*.json
+}
+trap cleanup EXIT
 
 ln -sf "$LIB_PATH" "$TEMP_DIR/demystify.so"
 
