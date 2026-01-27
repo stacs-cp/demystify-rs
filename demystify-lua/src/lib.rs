@@ -20,12 +20,19 @@
 //!     print("Deduced:", step.literals)
 //!     print("Using constraints:", table.concat(step.constraints, ", "))
 //! end
+//!
+//! -- Use bundled helpers for parsing literals
+//! local lit = demystify.helpers.parse_literal("grid[1, 2]=5")
+//! print(lit.name, lit.value)  -- "grid", 5
 //! ```
 
 mod planner;
 mod puzzle;
 
 use mlua::prelude::*;
+
+/// Embedded helpers.lua module for literal parsing utilities.
+const HELPERS_LUA: &str = include_str!("../lua/helpers.lua");
 
 /// Main entry point for the Lua module.
 ///
@@ -42,6 +49,14 @@ fn demystify(lua: &Lua) -> LuaResult<LuaTable> {
 
     // Add version info
     exports.set("version", env!("CARGO_PKG_VERSION"))?;
+
+    // Load and expose bundled helpers module
+    let helpers: LuaTable = lua
+        .load(HELPERS_LUA)
+        .set_name("helpers.lua")
+        .eval()
+        .map_err(|e| LuaError::RuntimeError(format!("Failed to load helpers: {}", e)))?;
+    exports.set("helpers", helpers)?;
 
     Ok(exports)
 }

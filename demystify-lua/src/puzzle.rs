@@ -1,12 +1,71 @@
 //! Puzzle wrapper for Lua.
 
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use mlua::FromLua;
 use mlua::prelude::*;
 
+use demystify::problem::PuzVar;
 use demystify::problem::parse::PuzzleParse;
+
+/// Parse a variable string like "grid[1, 2]" or "x" into a PuzVar.
+fn parse_var_string(s: &str) -> Option<PuzVar> {
+    let s = s.trim();
+
+    // Try to match "name[indices]" pattern
+    if let Some(bracket_pos) = s.find('[') {
+        let name = s[..bracket_pos].trim();
+        if name.is_empty() {
+            return None;
+        }
+
+        // Find closing bracket
+        let close_bracket = s.rfind(']')?;
+        if close_bracket <= bracket_pos {
+            return None;
+        }
+
+        let indices_str = &s[bracket_pos + 1..close_bracket];
+
+        // Parse comma-separated integers
+        let mut indices = Vec::new();
+        for part in indices_str.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let idx: i64 = part.parse().ok()?;
+            indices.push(idx);
+        }
+
+        Some(PuzVar::new(name, indices))
+    } else {
+        // No brackets - just a name
+        if s.is_empty() || !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            return None;
+        }
+        Some(PuzVar::new(s, vec![]))
+    }
+}
+
+/// Format a PuzVar as a string like "grid[1, 2]" or "x".
+fn format_puzvar(var: &PuzVar) -> String {
+    if var.indices().is_empty() {
+        var.name().clone()
+    } else {
+        format!(
+            "{}[{}]",
+            var.name(),
+            var.indices()
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
 
 /// A wrapper around PuzzleParse that can be used from Lua.
 #[derive(Clone)]
@@ -107,6 +166,84 @@ impl LuaUserData for LuaPuzzle {
                 .eprime
                 .param_bool(&name)
                 .map_err(|e| LuaError::RuntimeError(e.to_string()))
+        });
+
+        // Get the domain (possible values) for a specific variable
+        // Input: variable string like "grid[1, 2]" or "x"
+        // Returns: table of possible values, or nil if variable not found
+        methods.add_method("variable_domain", |lua, this, var_str: String| {
+            let puzvar = match parse_var_string(&var_str) {
+                Some(v) => v,
+                None => {
+                    return Err(LuaError::RuntimeError(format!(
+                        "Invalid variable format: {}",
+                        var_str
+                    )));
+                }
+            };
+
+            // Look up in domainmap
+            if let Some(domain) = this.inner.domainmap.get(&puzvar) {
+                let table = lua.create_table()?;
+                for (i, &val) in domain.iter().enumerate() {
+                    table.set(i + 1, val)?;
+                }
+                Ok(LuaValue::Table(table))
+            } else {
+                Ok(LuaValue::Nil)
+            }
+        });
+
+        // Get all variable domains as a table
+        // Returns: { "var_name[indices]" = {values...}, ... }
+        methods.add_method("all_domains", |lua, this, ()| {
+            let table = lua.create_table()?;
+
+            for (puzvar, domain) in &this.inner.domainmap {
+                let var_str = format_puzvar(puzvar);
+                let domain_table = lua.create_table()?;
+                for (i, &val) in domain.iter().enumerate() {
+                    domain_table.set(i + 1, val)?;
+                }
+                table.set(var_str, domain_table)?;
+            }
+
+            Ok(table)
+        });
+
+        // Get the variables involved in a constraint
+        // Input: constraint name
+        // Returns: table of variable strings, or nil if constraint not found
+        methods.add_method("constraint_variables", |lua, this, con_name: String| {
+            // Look up constraint literal
+            let con_lit = match this.inner.invconset.get(&con_name) {
+                Some(lit) => *lit,
+                None => return Ok(LuaValue::Nil),
+            };
+
+            // Get variable literals involved in this constraint
+            let var_lits = match this.inner.varlits_in_con.get(&con_lit) {
+                Some(lits) => lits,
+                None => return Ok(LuaValue::Nil),
+            };
+
+            // Collect unique variable names
+            let mut var_names: BTreeSet<String> = BTreeSet::new();
+            for lit in var_lits {
+                if let Some(puzlits) = this.inner.invlitmap.get(lit) {
+                    for puzlit in puzlits {
+                        var_names.insert(format_puzvar(&puzlit.var()));
+                    }
+                }
+            }
+
+            // Build result table
+            let table = lua.create_table()?;
+            for (i, name) in var_names.iter().enumerate() {
+                table.set(i + 1, name.clone())?;
+            }
+
+            Ok(LuaValue::Table(table))
         });
     }
 }

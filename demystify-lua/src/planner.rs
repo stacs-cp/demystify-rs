@@ -4,7 +4,9 @@ use std::sync::{Arc, Mutex};
 
 use mlua::prelude::*;
 
-use demystify::problem::{PuzLit, planner::PuzzlePlanner, solver::PuzzleSolver};
+use demystify::problem::{
+    PuzLit, PuzVar, VarValPair, planner::PuzzlePlanner, solver::PuzzleSolver,
+};
 
 use crate::puzzle::LuaPuzzle;
 
@@ -84,6 +86,84 @@ impl LuaUserData for LuaPlanner {
 
             if let Some(lit) = matching_lit {
                 planner.mark_lit_as_deduced(&lit);
+                return Ok(true);
+            }
+
+            Ok(false)
+        });
+
+        // Fix a literal by its components (positional arguments)
+        // Args: name (string), indices (table of integers), value (integer)
+        // Returns: true if literal was found and fixed, false otherwise
+        methods.add_method_mut(
+            "fix_var",
+            |_, this, (name, indices, value): (String, LuaTable, i64)| {
+                let mut planner = this.inner.lock().unwrap();
+
+                // Convert Lua table to Vec<i64>
+                let mut idx_vec: Vec<i64> = Vec::new();
+                for pair in indices.pairs::<i64, i64>() {
+                    let (_, idx) = pair?;
+                    idx_vec.push(idx);
+                }
+
+                // Build PuzVar and PuzLit
+                let puzvar = PuzVar::new(&name, idx_vec);
+                let varval = VarValPair::new(&puzvar, value);
+                let puzlit = PuzLit::new_eq(varval);
+
+                // Look up in litmap
+                if let Some(&sat_lit) = planner.puzzle().litmap.get(&puzlit) {
+                    planner.mark_lit_as_deduced(&sat_lit);
+                    return Ok(true);
+                }
+
+                Ok(false)
+            },
+        );
+
+        // Fix a literal by its components (table argument)
+        // Args: table with {name = string, indices = table, value = integer, [equal = boolean]}
+        // Returns: true if literal was found and fixed, false otherwise
+        methods.add_method_mut("fix", |_, this, args: LuaTable| {
+            let mut planner = this.inner.lock().unwrap();
+
+            // Extract name
+            let name: String = args
+                .get("name")
+                .map_err(|_| LuaError::RuntimeError("missing 'name' field".to_string()))?;
+
+            // Extract indices
+            let indices_table: LuaTable = args
+                .get("indices")
+                .map_err(|_| LuaError::RuntimeError("missing 'indices' field".to_string()))?;
+
+            let mut idx_vec: Vec<i64> = Vec::new();
+            for pair in indices_table.pairs::<i64, i64>() {
+                let (_, idx) = pair?;
+                idx_vec.push(idx);
+            }
+
+            // Extract value
+            let value: i64 = args
+                .get("value")
+                .map_err(|_| LuaError::RuntimeError("missing 'value' field".to_string()))?;
+
+            // Extract optional 'equal' field (defaults to true)
+            let equal: bool = args.get("equal").unwrap_or(true);
+
+            // Build PuzVar and PuzLit
+            let puzvar = PuzVar::new(&name, idx_vec);
+            let varval = VarValPair::new(&puzvar, value);
+            let puzlit = if equal {
+                PuzLit::new_eq(varval)
+            } else {
+                PuzLit::new_neq(varval)
+            };
+
+            // Look up in litmap
+            if let Some(&sat_lit) = planner.puzzle().litmap.get(&puzlit) {
+                planner.mark_lit_as_deduced(&sat_lit);
                 return Ok(true);
             }
 
