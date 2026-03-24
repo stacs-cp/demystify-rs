@@ -7,6 +7,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::{PuzLit, VarValPair, parse::PuzzleParse, solver::PuzzleSolver};
 
+/// One instantiated constraint from a `$#CON` class, with the grid cells it covers.
+#[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ConstraintInstance {
+    /// Rendered human-readable description of this constraint instance.
+    pub description: String,
+    /// Grid cells (0-indexed [row, col]) that this constraint's scope covers.
+    pub cells: Vec<[i64; 2]>,
+}
+
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Puzzle {
     pub kind: String,
@@ -25,6 +34,11 @@ pub struct Puzzle {
     pub less_than: Option<Vec<[i64; 4]>>,
     /// Cage sums indexed by cage ID (1-indexed): cage_sums[cage_id - 1] = target sum.
     pub cage_sums: Option<Vec<i64>>,
+    /// Lines from `$#INFO` directives in the .eprime file.
+    pub info: Option<Vec<String>>,
+    /// All instantiated constraints grouped by their `$#CON` class name.
+    /// Built once at puzzle-load time; templates rendered in parse.rs, not here.
+    pub constraint_classes: Option<BTreeMap<String, Vec<ConstraintInstance>>>,
 }
 
 impl Puzzle {
@@ -189,6 +203,59 @@ impl Puzzle {
             }
         }
 
+        // $#INFO lines
+        let info = if problem.eprime.info.is_empty() {
+            None
+        } else {
+            Some(problem.eprime.info.clone())
+        };
+
+        // Build constraint_classes: group all instantiated constraint descriptions by $#CON class.
+        // Templates were already rendered in parse.rs (conset); we just reorganise here.
+        // Only keep instances whose scope includes at least one 2D grid cell (vacuous instances
+        // — where Essence' guard failed — have no SAT connections and are not useful to show).
+        // Cap each class at MAX_INSTANCES_PER_CLASS to keep the HTML payload manageable.
+        const MAX_INSTANCES_PER_CLASS: usize = 50;
+        let constraint_classes = if problem.conset.is_empty() {
+            None
+        } else {
+            let mut classes: BTreeMap<String, Vec<ConstraintInstance>> = BTreeMap::new();
+            for (lit, description) in &problem.conset {
+                // Recover the class name from invlitmap (Lit → PuzLit → PuzVar.name)
+                if let Some(puzlits) = problem.invlitmap.get(lit) {
+                    if let Some(puzlit) = puzlits.iter().find(|p| p.val() == 1) {
+                        let class = puzlit.var().name().clone();
+                        // Skip if this class is already at the cap.
+                        let entries = classes.entry(class.clone()).or_default();
+                        if entries.len() >= MAX_INSTANCES_PER_CLASS {
+                            continue;
+                        }
+                        // Collect the unique grid cells this constraint covers (0-indexed).
+                        let scope = problem.constraint_scope(description);
+                        let cells: Vec<[i64; 2]> = scope
+                            .iter()
+                            .filter(|vvp| vvp.var().indices().len() == 2)
+                            .map(|vvp| {
+                                let idx = vvp.var().indices();
+                                [idx[0] - 1, idx[1] - 1]
+                            })
+                            .collect::<BTreeSet<_>>()
+                            .into_iter()
+                            .collect();
+                        // Skip vacuous instances (guard failed → no SAT connections → no cells).
+                        if cells.is_empty() {
+                            continue;
+                        }
+                        entries.push(ConstraintInstance {
+                            description: description.clone(),
+                            cells,
+                        });
+                    }
+                }
+            }
+            if classes.is_empty() { None } else { Some(classes) }
+        };
+
         Ok(Puzzle {
             kind,
             width: width.context("'width' not given as a param, and unable to deduce")?,
@@ -203,6 +270,8 @@ impl Puzzle {
             thermometers,
             less_than,
             cage_sums,
+            info,
+            constraint_classes,
         })
     }
 }

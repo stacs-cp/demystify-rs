@@ -38,8 +38,32 @@ function applyHighlightFunctions() {
   }
 }
 
+function applyConstraintPreview(element) {
+  const cells = element.dataset.cells ? element.dataset.cells.split(" ") : [];
+  cells.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("con-preview");
+  });
+}
+
+function removeConstraintPreview(element) {
+  const cells = element.dataset.cells ? element.dataset.cells.split(" ") : [];
+  cells.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove("con-preview");
+  });
+}
+
+function applyConstraintPreviewFunctions() {
+  document.querySelectorAll(".js_con_preview").forEach(el => {
+    el.addEventListener("mouseover", () => applyConstraintPreview(el));
+    el.addEventListener("mouseleave", () => removeConstraintPreview(el));
+  });
+}
+
 function doJavascript() {
   applyHighlightFunctions();
+  applyConstraintPreviewFunctions();
 
   document.addEventListener("htmx:beforeRequest", function () {
     document.querySelectorAll("button").forEach((btn) => {

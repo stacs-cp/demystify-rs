@@ -301,3 +301,11 @@ g.selected rect {
     background-color: #e0ece8;
     fill: #e0ece8;
 }
+
+g.con-preview rect {
+    fill: #ffe066 \!important;
+}
+
+.constraint-instance:hover {
+    background-color: #f5f5f5;
+}

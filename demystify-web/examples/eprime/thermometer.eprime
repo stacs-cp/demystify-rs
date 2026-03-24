@@ -1,5 +1,7 @@
 language ESSENCE' 1.0
 
+$#INFO Fill mercury into thermometers: cells must be filled from the bulb end, and each row/column must contain the given number of filled cells.
+
 given width, height: int
 given step: int
 given thermcount: int

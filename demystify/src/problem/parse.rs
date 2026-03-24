@@ -228,51 +228,97 @@ impl EPrimeAnnotations {
     }
 }
 
-/// Represents the result of parsing a DIMACS file.
-
+/// The fully-parsed puzzle, combining the Essence' annotations with all SAT encoding maps.
+///
+/// # Architecture overview
+///
+/// Conjure translates an `.eprime` model + `.param` file into a DIMACS CNF.  That CNF uses two
+/// distinct encodings for the puzzle variables:
+///
+/// * **Direct encoding** — each assignment `var[i,j] = v` becomes one SAT literal.
+///   `litmap` / `invlitmap` translate between these puzzle-level assignments and raw SAT literals.
+///
+/// * **Order encoding** — each threshold `var[i,j] >= v` becomes one SAT literal.
+///   `order_encoding_map` / `inv_order_encoding_map` handle this encoding.
+///   Most code only needs the direct encoding; the order maps are used when scanning the full SAT
+///   instance (e.g. `all_var_related_lits`).
+///
+/// ## Key maps and their relationships
+///
+/// ```text
+/// PuzLit (var[i,j]=v, eq/neq)  ←→  Lit (raw SAT integer)
+///     litmap:     PuzLit → Lit
+///     invlitmap:  Lit → BTreeSet<PuzLit>   (set because order-encoding Lits map to many PuzLits)
+///
+/// PuzVar (var[i,j])  →  domain values
+///     domainmap:  PuzVar → BTreeSet<i64>
+///
+/// Constraint instances ($#CON class[i,j,...] = true):
+///     conset:         Lit(CON=true) → rendered English description
+///     invconset:      description   → Lit(CON=true)     (inverse of conset)
+///     varlits_in_con: Lit(CON=true) → Vec<Lit>          (the VAR-encoding lits reachable from
+///                                                         this constraint in the SAT formula;
+///                                                         use direct_or_ordered_lit_to_varvalpair
+///                                                         to convert these back to PuzLits)
+///
+/// Convenience sets:
+///     varset_lits:     all positive direct-encoding Lits for $#VAR variables
+///     varset_lits_neg: all negative direct-encoding Lits for $#VAR variables
+///     conset_lits:     all positive direct-encoding Lits for $#CON variables
+/// ```
+///
+/// ## Reveal map
+///
+/// `$#AUX` variables expose "extra" assignments when their trigger literal is proved.
+/// `reveal_map[x] = y` means: when `x` is deduced true, also treat `y` as known.
 #[derive(Debug, Clone, PartialEq)]
-
 pub struct PuzzleParse {
-    /// The annotations from the Essence' file
+    /// Annotations extracted from the `.eprime` file (VAR/CON/AUX names, param values, etc.).
     pub eprime: EPrimeAnnotations,
-    /// The SAT instance parsed from the DIMACS file.
+    /// The full SAT instance (all clauses added by Conjure).
     pub satinstance: SatInstance,
-    // A Copy of the CNF of the SAT instance (as we frequently need this)
+    /// Cached CNF form of `satinstance` (computed once, reused frequently).
     pub cnf: Option<Arc<Cnf>>,
-    /// A mapping from literals in the direct representation to their corresponding SAT integer.
+
+    // ── Direct encoding ──────────────────────────────────────────────────────
+    /// `PuzLit(var[i,j]=v, eq)` → raw SAT `Lit`.  Covers both $#VAR and $#CON variables.
     pub litmap: BTreeMap<PuzLit, Lit>,
-    /// A mapping from SAT integers to the direct representation.
+    /// Raw SAT `Lit` → set of `PuzLit`s it encodes.
+    /// A set because the same Lit can appear in multiple order-encoding threshold assignments.
     pub invlitmap: BTreeMap<Lit, BTreeSet<PuzLit>>,
-    /// A mapping from each variable to its domain
+    /// `PuzVar` → the set of integer values in its domain.
     pub domainmap: BTreeMap<PuzVar, BTreeSet<i64>>,
-    /// List of all literals representing constraints in the problem, and their English-readable name
+
+    // ── Constraint maps ($#CON) ───────────────────────────────────────────────
+    /// `Lit(CON_instance=true)` → rendered English description of that constraint instance.
+    /// Keys are identical to `conset_lits`.
     pub conset: BTreeMap<Lit, String>,
-    /// Inverse of conset
+    /// Rendered description → `Lit(CON_instance=true)`.  Inverse of `conset`.
     pub invconset: BTreeMap<String, Lit>,
-    /// Lits of all literals in each constraint
+    /// For each CON instance Lit, the list of VAR-encoding Lits reachable from it in the SAT
+    /// formula (via `FindVarConnections`).  Use `direct_or_ordered_lit_to_varvalpair` to convert
+    /// these back to `VarValPair`s.
     pub varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
-    /// List of all literals in a VAR in the direct encoding
+
+    // ── Convenience literal sets ──────────────────────────────────────────────
+    /// All positive direct-encoding Lits for $#VAR variables (`var[i,j]=v` true).
     pub varset_lits: BTreeSet<Lit>,
-    /// Lits of all literals in a VAR in the direct encoding, representing a variable becoming unassigned
+    /// All negative direct-encoding Lits for $#VAR variables (`var[i,j]=v` false).
     pub varset_lits_neg: BTreeSet<Lit>,
-    /// List of all literals which turn on CON
+    /// All positive Lits for $#CON instances (`CON[...]=true`).  Same keys as `conset`.
     pub conset_lits: BTreeSet<Lit>,
 
-    /// A mapping from variables in the order representation to their corresponding SAT integers.
-    /// These are generally not useful, but are sometimes used when scanning
-    /// the entire problem
+    // ── Order encoding (rarely needed directly) ───────────────────────────────
+    /// `PuzVar` → set of SAT Lits used to order-encode it (`var >= v` thresholds).
     pub order_encoding_map: BTreeMap<PuzVar, HashSet<Lit>>,
-    /// A mapping from lits to the order representation they represent.
-    /// These are generally not useful, but are sometimes used when scanning
-    /// the entire problem
+    /// SAT `Lit` → the `PuzVar` whose order encoding it belongs to.
     pub inv_order_encoding_map: BTreeMap<Lit, PuzVar>,
-    /// List of all literals in tbe order encoding of a variable
-    /// These are generally not useful, but are sometimes used when scanning
-    /// the SAT instance
+    /// Union of all Lits across all order encodings.
     pub order_encoding_all_lits: BTreeSet<Lit>,
 
-    /// Whenever a lit 'x' is proved, then `reveal_map`(x) should also be
-    /// added to the known lits.
+    // ── Reveal map ($#AUX) ────────────────────────────────────────────────────
+    /// When `x` is deduced true, `reveal_map[x]` should also be added to the known-lit set.
+    /// Populated from `$#AUX` directives.
     pub reveal_map: BTreeMap<Lit, Lit>,
 }
 
