@@ -64,11 +64,7 @@ fn render_overview(puzzle: &Puzzle) -> String {
         return String::new();
     }
 
-    let mut html = String::from(
-        "<details class='constraint-overview mt-2'>\
-         <summary style='cursor:pointer; font-weight:bold; padding:4px;'>Puzzle Overview</summary>\
-         <div style='padding:4px;'>",
-    );
+    let mut html = String::from("<div class='constraint-overview mt-2'>");
 
     if let Some(info) = &puzzle.info {
         for line in info {
@@ -90,7 +86,7 @@ fn render_overview(puzzle: &Puzzle) -> String {
         html.push_str("</div></details>");
     }
 
-    html.push_str("</div></details>");
+    html.push_str("</div>");
     html
 }
 

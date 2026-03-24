@@ -679,6 +679,15 @@ fn make_cell(i: i64, j: i64, step: f64) -> element::Group {
             step * 0.9
         ),
     );
+
+    // Transparent background rect — always present so CSS can target it for highlighting
+    // (e.g. g.con-preview .cell-bg { fill: ... }).  Sized to fill the 0..1 cell coordinate space.
+    let mut bg = element::Rectangle::new();
+    bg.assign("class", "cell-bg");
+    bg.assign("width", 1);
+    bg.assign("height", 1);
+    g.append(bg);
+
     g
 }
 

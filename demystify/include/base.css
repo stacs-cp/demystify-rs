@@ -302,8 +302,12 @@ g.selected rect {
     fill: #e0ece8;
 }
 
-g.con-preview rect {
-    fill: #ffe066 \!important;
+.cell-bg {
+    fill: none;
+}
+
+g.con-preview .cell-bg {
+    fill: #ffe066 !important;
 }
 
 .constraint-instance:hover {
