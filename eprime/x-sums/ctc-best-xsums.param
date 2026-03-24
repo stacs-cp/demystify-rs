@@ -1,7 +1,5 @@
 language ESSENCE' 1.0
 
-$#DESC "The clues outside the grid show the sum of the first X digits from that direction, where X is the first of those digits."
-
 $Example See Cracking the Cryptic video:
 $ "The BEST X-Sums Sudoku I've Ever Seen"
 $ by Tom Collyer
