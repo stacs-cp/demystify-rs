@@ -19,7 +19,7 @@ macro_rules! include_model_file {
     };
 }
 
-static EXAMPLES: Lazy<[(&str, &str, &str); 4]> = Lazy::new(|| {
+static EXAMPLES: Lazy<[(&str, &str, &str); 7]> = Lazy::new(|| {
     [
         (
             "Sudoku",
@@ -40,6 +40,21 @@ static EXAMPLES: Lazy<[(&str, &str, &str); 4]> = Lazy::new(|| {
             "Binairo",
             include_model_file!("examples/eprime/binairo.essence"),
             include_model_file!("examples/eprime/binairo/diiscu.param"),
+        ),
+        (
+            "Thermometer",
+            include_model_file!("examples/eprime/thermometer.eprime"),
+            include_model_file!("examples/eprime/thermometer/thermometer-1.param"),
+        ),
+        (
+            "Futoshiki",
+            include_model_file!("examples/eprime/futoshiki.eprime"),
+            include_model_file!("examples/eprime/futoshiki/nfutoshiki-1.param"),
+        ),
+        (
+            "KillerSudoku",
+            include_model_file!("examples/eprime/killersudoku.eprime"),
+            include_model_file!("examples/eprime/killersudoku/killersudoku.param"),
         ),
     ]
 });

@@ -19,7 +19,7 @@ struct Decorations {
 impl Decorations {
     pub fn new(kind: &str) -> Decorations {
         let kind = kind.to_lowercase();
-        if kind == "sudoku" {
+        if kind == "sudoku" || kind == "killer sudoku" || kind == "miracle" || kind == "x-sums" {
             Decorations {
                 sudoku_grid: true,
                 blank_input_val: Some(0),
@@ -100,6 +100,9 @@ impl PuzzleDraw {
             }
         */
 
+        // Thermometer overlays drawn before cells so grid lines appear on top.
+        out.append(self.draw_thermometers(puzzle));
+
         let mut cellgrp = element::Group::new();
 
         for row in cells {
@@ -109,6 +112,10 @@ impl PuzzleDraw {
         }
 
         out.append(cellgrp);
+
+        // Overlays drawn after cells.
+        out.append(self.draw_less_than(puzzle));
+        out.append(self.draw_cage_sums(puzzle));
 
         let out = self.fill_outside_labels(out, puzzle);
 
@@ -429,6 +436,184 @@ impl PuzzleDraw {
 
         topgrp.append(grp);
         topgrp
+    }
+
+    /// Draw thermometer paths (bulb circle + tube line) as SVG overlays.
+    fn draw_thermometers(&self, puzzle: &Puzzle) -> element::Group {
+        let mut grp = element::Group::new();
+        let therms = match &puzzle.thermometers {
+            Some(t) => t,
+            None => return grp,
+        };
+
+        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
+        let radius = step * 0.38;
+        let tube_width = step * 0.5;
+        let outline_extra = step * 0.06;
+        let fill_color = "#d8d8d8";
+        let outline_color = "#888888";
+
+        // Two-pass rendering: outlines first, then fills, so fills appear on top.
+        let mut outlines = element::Group::new();
+        let mut fills = element::Group::new();
+
+        for therm in therms {
+            if therm.is_empty() {
+                continue;
+            }
+
+            let points: String = therm
+                .iter()
+                .map(|[r, c]| format!("{},{}", step * (*c as f64 + 0.5), step * (*r as f64 + 0.5)))
+                .collect::<Vec<_>>()
+                .join(" ");
+
+            if therm.len() > 1 {
+                let mut poly_outline = element::Polyline::new();
+                poly_outline.assign("points", points.clone());
+                poly_outline.assign("fill", "none");
+                poly_outline.assign("stroke", outline_color);
+                poly_outline.assign("stroke-width", tube_width + outline_extra);
+                poly_outline.assign("stroke-linecap", "round");
+                poly_outline.assign("stroke-linejoin", "round");
+                outlines.append(poly_outline);
+
+                let mut poly_fill = element::Polyline::new();
+                poly_fill.assign("points", points);
+                poly_fill.assign("fill", "none");
+                poly_fill.assign("stroke", fill_color);
+                poly_fill.assign("stroke-width", tube_width);
+                poly_fill.assign("stroke-linecap", "round");
+                poly_fill.assign("stroke-linejoin", "round");
+                fills.append(poly_fill);
+            }
+
+            // Bulb circle at the first cell.
+            let [br, bc] = therm[0];
+            let cx = step * (bc as f64 + 0.5);
+            let cy = step * (br as f64 + 0.5);
+
+            let mut bulb_outline = element::Circle::new();
+            bulb_outline.assign("cx", cx);
+            bulb_outline.assign("cy", cy);
+            bulb_outline.assign("r", radius + outline_extra / 2.0);
+            bulb_outline.assign("fill", outline_color);
+            outlines.append(bulb_outline);
+
+            let mut bulb_fill = element::Circle::new();
+            bulb_fill.assign("cx", cx);
+            bulb_fill.assign("cy", cy);
+            bulb_fill.assign("r", radius);
+            bulb_fill.assign("fill", fill_color);
+            fills.append(bulb_fill);
+        }
+
+        grp.append(outlines);
+        grp.append(fills);
+        grp
+    }
+
+    /// Draw less-than symbols between adjacent cells with inequality constraints.
+    fn draw_less_than(&self, puzzle: &Puzzle) -> element::Group {
+        let mut grp = element::Group::new();
+        let pairs = match &puzzle.less_than {
+            Some(p) => p,
+            None => return grp,
+        };
+
+        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
+        let font_size = step * 0.45;
+
+        for &[r1, c1, r2, c2] in pairs {
+            // Only render for directly adjacent cells.
+            let dr = (r2 - r1).abs();
+            let dc = (c2 - c1).abs();
+            if dr + dc != 1 {
+                continue;
+            }
+
+            let symbol;
+            let x;
+            let y;
+
+            if dr == 0 {
+                // Horizontal neighbours, same row.
+                // field[r1][c1] < field[r2][c2]
+                // Rendered left-to-right: if c1 < c2, left < right → "<"
+                symbol = if c1 < c2 { "<" } else { ">" };
+                let gap_col = c1.min(c2) + 1; // column boundary index (0-indexed)
+                x = step * gap_col as f64;
+                y = step * (r1 as f64 + 0.5) + font_size * 0.35;
+            } else {
+                // Vertical neighbours, same column.
+                // field[r1][c1] < field[r2][c2]
+                // Rendered top-to-bottom: if r1 < r2, top < bottom → "v"
+                symbol = if r1 < r2 { "v" } else { "^" };
+                let gap_row = r1.min(r2) + 1;
+                x = step * (c1 as f64 + 0.5) - font_size * 0.25;
+                y = step * gap_row as f64 + font_size * 0.35;
+            }
+
+            let mut text = svg::node::element::Text::new(symbol);
+            text.assign("x", x);
+            text.assign("y", y);
+            text.assign("font-size", font_size);
+            text.assign("text-anchor", "middle");
+            text.assign("dominant-baseline", "middle");
+            text.assign("fill", "#444444");
+            text.assign("font-weight", "bold");
+            grp.append(text);
+        }
+
+        grp
+    }
+
+    /// Draw small cage sum labels in the top-left corner of each cage's top-left cell.
+    fn draw_cage_sums(&self, puzzle: &Puzzle) -> element::Group {
+        let mut grp = element::Group::new();
+        let cages = match &puzzle.cages {
+            Some(c) => c,
+            None => return grp,
+        };
+        let cage_sums = match &puzzle.cage_sums {
+            Some(s) => s,
+            None => return grp,
+        };
+
+        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
+        let font_size = step * 0.28;
+        let height = usize::try_from(puzzle.height).expect("negative height");
+        let width = usize::try_from(puzzle.width).expect("negative width");
+
+        // For each cage ID, find the top-left cell (min row, then min col).
+        let mut cage_topleft: std::collections::BTreeMap<i64, (usize, usize)> =
+            std::collections::BTreeMap::new();
+        for r in 0..height {
+            for c in 0..width {
+                if let Some(Some(cage_id)) = cages.get(r).and_then(|row| row.get(c)) {
+                    cage_topleft.entry(*cage_id).or_insert((r, c));
+                }
+            }
+        }
+
+        for (cage_id, (r, c)) in cage_topleft {
+            let idx = (cage_id - 1) as usize;
+            if idx >= cage_sums.len() {
+                continue;
+            }
+            let sum = cage_sums[idx];
+            let x = step * c as f64 + step * 0.04;
+            let y = step * r as f64 + font_size + step * 0.03;
+
+            let mut text = svg::node::element::Text::new(sum.to_string());
+            text.assign("x", x);
+            text.assign("y", y);
+            text.assign("font-size", font_size);
+            text.assign("fill", "#111111");
+            grp.append(text);
+        }
+
+        grp
     }
 
     fn make_cells(&self, puzzle: &Puzzle) -> Vec<Vec<element::Group>> {

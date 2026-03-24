@@ -19,6 +19,12 @@ pub struct Puzzle {
     pub bottom_labels: Option<Vec<String>>,
     pub left_labels: Option<Vec<String>>,
     pub right_labels: Option<Vec<String>>,
+    /// Thermometer paths: each thermometer is an ordered list of [row, col] (0-indexed), bulb first.
+    pub thermometers: Option<Vec<Vec<[i64; 2]>>>,
+    /// Less-than constraints: each entry is [r1, c1, r2, c2] (0-indexed), meaning cell (r1,c1) < cell (r2,c2).
+    pub less_than: Option<Vec<[i64; 4]>>,
+    /// Cage sums indexed by cage ID (1-indexed): cage_sums[cage_id - 1] = target sum.
+    pub cage_sums: Option<Vec<i64>>,
 }
 
 impl Puzzle {
@@ -115,6 +121,64 @@ impl Puzzle {
             cages = Some(problem.eprime.param_vec_vec_option_i64("cages")?);
         }
 
+        // Killer Sudoku uses "grid" for cage IDs (not the solver variable) and "hints" for sums.
+        if problem.eprime.has_param("grid")
+            && !problem.eprime.vars.contains("grid")
+            && problem.eprime.has_param("hints")
+        {
+            cages = Some(problem.eprime.param_vec_vec_option_i64("grid")?);
+        }
+
+        let mut thermometers = None;
+        let mut less_than = None;
+        let mut cage_sums = None;
+
+        // Parse thermometer paths from therms[col][row] = therm_id * step + position.
+        if problem.eprime.has_param("therms") && problem.eprime.has_param("step") {
+            let step = problem.eprime.param_i64("step")?;
+            let therms_raw = problem.eprime.param_vec_vec_i64("therms")?;
+            // therms_raw[col_0][row_0] (0-indexed), outer index = col, inner index = row.
+            let mut therm_paths: BTreeMap<i64, BTreeMap<i64, [i64; 2]>> = BTreeMap::new();
+            for (col_0, col_data) in therms_raw.iter().enumerate() {
+                for (row_0, &val) in col_data.iter().enumerate() {
+                    if val == 0 {
+                        continue;
+                    }
+                    let therm_id = val / step;
+                    let pos = val % step;
+                    therm_paths
+                        .entry(therm_id)
+                        .or_default()
+                        .insert(pos, [row_0 as i64, col_0 as i64]);
+                }
+            }
+            let paths: Vec<Vec<[i64; 2]>> = therm_paths
+                .into_values()
+                .map(|path| path.into_values().collect())
+                .collect();
+            if !paths.is_empty() {
+                thermometers = Some(paths);
+            }
+        }
+
+        // Parse less-than constraints: lt[i] = [r1, c1, r2, c2] (1-indexed).
+        if problem.eprime.has_param("lt") {
+            let lt_raw = problem.eprime.param_vec_vec_i64("lt")?;
+            let pairs: Vec<[i64; 4]> = lt_raw
+                .iter()
+                .map(|v| [v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1])
+                .collect();
+            if !pairs.is_empty() {
+                less_than = Some(pairs);
+            }
+        }
+
+        // Parse cage sums from "hints" (used by Killer Sudoku).
+        if problem.eprime.has_param("hints") {
+            let hints = problem.eprime.param_vec_i64("hints")?;
+            cage_sums = Some(hints);
+        }
+
         if width.is_none() || height.is_none() {
             if start_grid.is_some() {
                 width = Some(start_grid.as_ref().unwrap()[0].len() as i64);
@@ -136,6 +200,9 @@ impl Puzzle {
             bottom_labels,
             left_labels,
             right_labels,
+            thermometers,
+            less_than,
+            cage_sums,
         })
     }
 }

@@ -1,0 +1,59 @@
+language ESSENCE' 1.0
+
+given width, height: int
+given step: int
+given thermcount: int
+letting X be int(1..width)
+letting Y be int(1..height)
+
+given therms: matrix indexed by [X,Y] of int(0..step*thermcount)
+given row_sums: matrix indexed by [X] of int
+given col_sums: matrix indexed by [Y] of int
+
+$#VAR grid
+find grid: matrix indexed by [X,Y] of bool
+
+$#CON fluid "thermometer {{index[0]}} is valid"
+find fluid: matrix indexed by [int(0..thermcount-1)] of bool
+
+$#CON rowup "at least {{params['row_sums'][index[0]]}} mercury in row {{index[0]}}"
+$#CON rowdown "at most {{params['row_sums'][index[0]]}} mercury in row {{index[0]}}"
+find rowup: matrix indexed by [X] of bool
+find rowdown: matrix indexed by [X] of bool
+
+$#CON colup "at least {{params['col_sums'][index[0]]}} mercury in column {{index[0]}}"
+$#CON coldown "at most {{params['col_sums'][index[0]]}} mercury in column {{index[0]}}"
+find colup: matrix indexed by [Y] of bool
+find coldown: matrix indexed by [Y] of bool
+
+such that
+
+$ Column sums
+forAll i:X.
+row_sums[i] != -1 -> (rowup[i] -> ((sum j:Y. toInt(grid[i,j]>0)) >= row_sums[i])),
+
+forAll i:X.
+row_sums[i] != -1 -> (rowdown[i] -> ((sum j:Y. toInt(grid[i,j]>0)) <= row_sums[i])),
+
+$ Row sums
+forAll j:Y.
+col_sums[j] != -1 -> (colup[j] -> ((sum i:X. toInt(grid[i,j]>0)) >= col_sums[j])),
+
+forAll j:Y.
+col_sums[j] != -1 -> (coldown[j] -> ((sum i:X. toInt(grid[i,j]>0)) >= col_sums[j])),
+
+
+$ todo: This is a lot of pain for savile row
+forAll f:int(0..thermcount-1).
+fluid[f] ->
+(
+    forAll i1: X. forAll j1: Y.
+    (
+        (therms[i1,j1]/step = f) ->
+        forAll i2: X. forAll j2: Y.
+        (
+            (therms[i2,j2]/step = f /\ therms[i1,j1]+1=therms[i2,j2])
+            -> (grid[i2,j2] -> grid[i1,j1])
+        )
+    )
+)
