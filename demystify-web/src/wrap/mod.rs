@@ -19,7 +19,7 @@ macro_rules! include_model_file {
     };
 }
 
-static EXAMPLES: Lazy<[(&str, &str, &str); 7]> = Lazy::new(|| {
+static EXAMPLES: Lazy<[(&str, &str, &str); 10]> = Lazy::new(|| {
     [
         (
             "Sudoku",
@@ -55,6 +55,21 @@ static EXAMPLES: Lazy<[(&str, &str, &str); 7]> = Lazy::new(|| {
             "KillerSudoku",
             include_model_file!("examples/eprime/killersudoku.eprime"),
             include_model_file!("examples/eprime/killersudoku/killersudoku.param"),
+        ),
+        (
+            "Skyscrapers",
+            include_model_file!("examples/eprime/skyscrapers.eprime"),
+            include_model_file!("examples/eprime/skyscrapers/skyscrapers-1.param"),
+        ),
+        (
+            "XSums",
+            include_model_file!("examples/eprime/x-sums.eprime"),
+            include_model_file!("examples/eprime/x-sums/ctc-best-xsums.param"),
+        ),
+        (
+            "Kakurasu",
+            include_model_file!("examples/eprime/kakurasu.eprime"),
+            include_model_file!("examples/eprime/kakurasu/kakurasu.param"),
         ),
     ]
 });
