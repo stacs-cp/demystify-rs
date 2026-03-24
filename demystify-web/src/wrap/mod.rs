@@ -64,7 +64,7 @@ static EXAMPLES: Lazy<[(&str, &str, &str); 10]> = Lazy::new(|| {
         (
             "XSums",
             include_model_file!("examples/eprime/x-sums.eprime"),
-            include_model_file!("examples/eprime/x-sums/ctc-best-xsums.param"),
+            include_model_file!("examples/eprime/x-sums/easy-xsums.param"),
         ),
         (
             "Kakurasu",

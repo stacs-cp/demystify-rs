@@ -1,0 +1,82 @@
+language ESSENCE' 1.0
+
+$ Simple X-Sums Sudoku for demystify demo
+$ Uses a standard cyclic sudoku solution with x-sums clues from all four sides.
+$ Solution:
+$  1 2 3 4 5 6 7 8 9
+$  4 5 6 7 8 9 1 2 3
+$  7 8 9 1 2 3 4 5 6
+$  2 3 4 5 6 7 8 9 1
+$  5 6 7 8 9 1 2 3 4
+$  8 9 1 2 3 4 5 6 7
+$  3 4 5 6 7 8 9 1 2
+$  6 7 8 9 1 2 3 4 5
+$  9 1 2 3 4 5 6 7 8
+
+$ side_labels[1,..] left clues (from left, one per row)
+$ side_labels[2,..] top clues (from top, one per col)
+$ side_labels[3,..] right clues (from right, one per row)
+$ side_labels[4,..] bottom clues (from bottom, one per col)
+$
+$ Computed from the solution above:
+$  Left: X=first cell of row, sum first X cells
+$   Row 1: X=1 → 1
+$   Row 2: X=4 → 4+5+6+7=22
+$   Row 3: X=7 → 7+8+9+1+2+3+4=34
+$   Row 4: X=2 → 2+3=5
+$   Row 5: X=5 → 5+6+7+8+9=35
+$   Row 6: X=8 → 8+9+1+2+3+4+5+6=38
+$   Row 7: X=3 → 3+4+5=12
+$   Row 8: X=6 → 6+7+8+9+1+2=33
+$   Row 9: X=9 → 45
+$  Top: X=first cell of column
+$   Col 1: X=1 → 1
+$   Col 2: X=2 → 2+5=7
+$   Col 3: X=3 → 3+6+9=18
+$   Col 4: X=4 → 4+7+1+5=17
+$   Col 5: X=5 → 5+8+2+6+9=30
+$   Col 6: X=6 → 6+9+3+7+1+4=30
+$   Col 7: X=7 → 7+1+4+8+2+5+9=36
+$   Col 8: X=8 → 8+2+5+9+3+6+1+4=38
+$   Col 9: X=9 → 45
+$  Right: X=last cell of row (reversed row)
+$   Row 1: reversed [9,8,7,6,5,4,3,2,1] X=9 → 45
+$   Row 2: reversed [3,2,1,9,8,7,6,5,4] X=3 → 3+2+1=6
+$   Row 3: reversed [6,5,4,3,2,1,9,8,7] X=6 → 6+5+4+3+2+1=21
+$   Row 4: reversed [1,9,8,7,6,5,4,3,2] X=1 → 1
+$   Row 5: reversed [4,3,2,1,9,8,7,6,5] X=4 → 4+3+2+1=10
+$   Row 6: reversed [7,6,5,4,3,2,1,9,8] X=7 → 7+6+5+4+3+2+1=28
+$   Row 7: reversed [2,1,9,8,7,6,5,4,3] X=2 → 2+1=3
+$   Row 8: reversed [5,4,3,2,1,9,8,7,6] X=5 → 5+4+3+2+1=15
+$   Row 9: reversed [8,7,6,5,4,3,2,1,9] X=8 → 8+7+6+5+4+3+2+1=36
+$  Bottom: X=last cell of column (reversed col)
+$   Col 1: reversed col [9,6,3,8,5,2,7,4,1] X=9 → 45
+$   Col 2: reversed col [1,7,4,9,6,3,8,5,2] X=1 → 1
+$   Col 3: reversed col [2,8,5,1,7,4,9,6,3] X=2 → 2+8=10
+$   Col 4: reversed col [3,9,6,2,8,5,1,7,4] X=3 → 3+9+6=18
+$   Col 5: reversed col [4,1,7,3,9,6,2,8,5] X=4 → 4+1+7+3=15
+$   Col 6: reversed col [5,2,8,4,1,7,3,9,6] X=5 → 5+2+8+4+1=20
+$   Col 7: reversed col [6,3,9,5,2,8,4,1,7] X=6 → 6+3+9+5+2+8=33
+$   Col 8: reversed col [7,4,1,6,3,9,5,2,8] X=7 → 7+4+1+6+3+9+5=35
+$   Col 9: reversed col [8,5,2,7,4,1,6,3,9] X=8 → 8+5+2+7+4+1+6+3=36
+
+letting side_labels be
+[
+  [ 1, 22, 34,  5, 35, 38, 12, 33, 45 ],
+  [ 1,  7, 18, 17, 30, 30, 36, 38, 45 ],
+  [45,  6, 21,  1, 10, 28,  3, 15, 36 ],
+  [45,  1, 10, 18, 15, 20, 33, 35, 36 ]
+]
+
+letting GRID be
+[
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0]
+]
