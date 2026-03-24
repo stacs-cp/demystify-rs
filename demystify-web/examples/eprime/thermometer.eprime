@@ -7,40 +7,40 @@ letting X be int(1..width)
 letting Y be int(1..height)
 
 given therms: matrix indexed by [X,Y] of int(0..step*thermcount)
-given row_sums: matrix indexed by [X] of int
-given col_sums: matrix indexed by [Y] of int
+given row_sums: matrix indexed by [Y] of int
+given col_sums: matrix indexed by [X] of int
 
 $#VAR grid
-find grid: matrix indexed by [X,Y] of bool
+find grid: matrix indexed by [Y,X] of bool
 
 $#CON fluid "thermometer {{index[0]}} is valid"
 find fluid: matrix indexed by [int(0..thermcount-1)] of bool
 
 $#CON rowup "at least {{params['row_sums'][index[0]]}} mercury in row {{index[0]}}"
 $#CON rowdown "at most {{params['row_sums'][index[0]]}} mercury in row {{index[0]}}"
-find rowup: matrix indexed by [X] of bool
-find rowdown: matrix indexed by [X] of bool
+find rowup: matrix indexed by [Y] of bool
+find rowdown: matrix indexed by [Y] of bool
 
 $#CON colup "at least {{params['col_sums'][index[0]]}} mercury in column {{index[0]}}"
 $#CON coldown "at most {{params['col_sums'][index[0]]}} mercury in column {{index[0]}}"
-find colup: matrix indexed by [Y] of bool
-find coldown: matrix indexed by [Y] of bool
+find colup: matrix indexed by [X] of bool
+find coldown: matrix indexed by [X] of bool
 
 such that
 
+$ Row sums (j iterates over Y = rows, i iterates over X = cols)
+forAll j:Y.
+row_sums[j] != -1 -> (rowup[j] -> ((sum i:X. toInt(grid[j,i]>0)) >= row_sums[j])),
+
+forAll j:Y.
+row_sums[j] != -1 -> (rowdown[j] -> ((sum i:X. toInt(grid[j,i]>0)) <= row_sums[j])),
+
 $ Column sums
 forAll i:X.
-row_sums[i] != -1 -> (rowup[i] -> ((sum j:Y. toInt(grid[i,j]>0)) >= row_sums[i])),
+col_sums[i] != -1 -> (colup[i] -> ((sum j:Y. toInt(grid[j,i]>0)) >= col_sums[i])),
 
 forAll i:X.
-row_sums[i] != -1 -> (rowdown[i] -> ((sum j:Y. toInt(grid[i,j]>0)) <= row_sums[i])),
-
-$ Row sums
-forAll j:Y.
-col_sums[j] != -1 -> (colup[j] -> ((sum i:X. toInt(grid[i,j]>0)) >= col_sums[j])),
-
-forAll j:Y.
-col_sums[j] != -1 -> (coldown[j] -> ((sum i:X. toInt(grid[i,j]>0)) >= col_sums[j])),
+col_sums[i] != -1 -> (coldown[i] -> ((sum j:Y. toInt(grid[j,i]>0)) >= col_sums[i])),
 
 
 $ todo: This is a lot of pain for savile row
@@ -53,7 +53,7 @@ fluid[f] ->
         forAll i2: X. forAll j2: Y.
         (
             (therms[i2,j2]/step = f /\ therms[i1,j1]+1=therms[i2,j2])
-            -> (grid[i2,j2] -> grid[i1,j1])
+            -> (grid[j2,i2] -> grid[j1,i1])
         )
     )
 )
