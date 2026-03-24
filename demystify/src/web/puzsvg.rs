@@ -513,7 +513,10 @@ impl PuzzleDraw {
         grp
     }
 
-    /// Draw less-than symbols between adjacent cells with inequality constraints.
+    /// Draw less-than chevrons between adjacent cells with inequality constraints.
+    ///
+    /// Each chevron is two SVG line segments forming a ‹/›/∧/∨ shape.
+    /// The tip points toward the smaller cell (r1,c1).
     fn draw_less_than(&self, puzzle: &Puzzle) -> element::Group {
         let mut grp = element::Group::new();
         let pairs = match &puzzle.less_than {
@@ -522,47 +525,75 @@ impl PuzzleDraw {
         };
 
         let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-        let font_size = step * 0.45;
+        let s = step * 0.14; // half-arm length
+        let stroke_w = step * 0.03;
 
         for &[r1, c1, r2, c2] in pairs {
             // Only render for directly adjacent cells.
-            let dr = (r2 - r1).abs();
-            let dc = (c2 - c1).abs();
-            if dr + dc != 1 {
+            if (r2 - r1).abs() + (c2 - c1).abs() != 1 {
                 continue;
             }
 
-            let symbol;
-            let x;
-            let y;
+            // Centre of the symbol sits on the shared cell boundary.
+            // Chevron: two lines (ax,ay)→(mx,my) and (mx,my)→(bx,by).
+            // (mx,my) is the tip, pointing toward the smaller cell (r1,c1).
+            let (ax, ay, mx, my, bx, by);
 
-            if dr == 0 {
-                // Horizontal neighbours, same row.
-                // field[r1][c1] < field[r2][c2]
-                // Rendered left-to-right: if c1 < c2, left < right → "<"
-                symbol = if c1 < c2 { "<" } else { ">" };
-                let gap_col = c1.min(c2) + 1; // column boundary index (0-indexed)
-                x = step * gap_col as f64;
-                y = step * (r1 as f64 + 0.5) + font_size * 0.35;
+            if r1 == r2 {
+                // Horizontal neighbours.
+                let cx = step * (c1.min(c2) as f64 + 1.0);
+                let cy = step * (r1 as f64 + 0.5);
+                if c1 < c2 {
+                    // smaller on left → tip points left  (<)
+                    ax = cx + s;
+                    ay = cy - s;
+                    mx = cx - s;
+                    my = cy;
+                    bx = cx + s;
+                    by = cy + s;
+                } else {
+                    // smaller on right → tip points right  (>)
+                    ax = cx - s;
+                    ay = cy - s;
+                    mx = cx + s;
+                    my = cy;
+                    bx = cx - s;
+                    by = cy + s;
+                }
             } else {
-                // Vertical neighbours, same column.
-                // field[r1][c1] < field[r2][c2]
-                // Rendered top-to-bottom: if r1 < r2, top < bottom → "v"
-                symbol = if r1 < r2 { "v" } else { "^" };
-                let gap_row = r1.min(r2) + 1;
-                x = step * (c1 as f64 + 0.5) - font_size * 0.25;
-                y = step * gap_row as f64 + font_size * 0.35;
+                // Vertical neighbours.
+                let cx = step * (c1 as f64 + 0.5);
+                let cy = step * (r1.min(r2) as f64 + 1.0);
+                if r1 < r2 {
+                    // smaller on top → tip points up  (^)
+                    ax = cx - s;
+                    ay = cy + s;
+                    mx = cx;
+                    my = cy - s;
+                    bx = cx + s;
+                    by = cy + s;
+                } else {
+                    // smaller on bottom → tip points down  (v)
+                    ax = cx - s;
+                    ay = cy - s;
+                    mx = cx;
+                    my = cy + s;
+                    bx = cx + s;
+                    by = cy - s;
+                }
             }
 
-            let mut text = svg::node::element::Text::new(symbol);
-            text.assign("x", x);
-            text.assign("y", y);
-            text.assign("font-size", font_size);
-            text.assign("text-anchor", "middle");
-            text.assign("dominant-baseline", "middle");
-            text.assign("fill", "#444444");
-            text.assign("font-weight", "bold");
-            grp.append(text);
+            for (x1, y1, x2, y2) in [(ax, ay, mx, my), (mx, my, bx, by)] {
+                let mut line = element::Line::new();
+                line.assign("x1", x1);
+                line.assign("y1", y1);
+                line.assign("x2", x2);
+                line.assign("y2", y2);
+                line.assign("stroke", "#444444");
+                line.assign("stroke-width", stroke_w);
+                line.assign("stroke-linecap", "round");
+                grp.append(line);
+            }
         }
 
         grp
