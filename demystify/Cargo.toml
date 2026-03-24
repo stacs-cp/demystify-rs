@@ -36,6 +36,11 @@ which = "8"
 
 [dev-dependencies]
 insta = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "solve"
+harness = false
 
 [lib]
 name = "demystify"

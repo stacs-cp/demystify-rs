@@ -124,42 +124,38 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+/// Utilities for building `PuzzleParse` instances from `.eprime`/`.param` files.
+/// Used by tests and benchmarks.
 pub mod test_utils {
     use std::fs;
+    use std::path::Path;
 
     use crate::problem::parse::{PuzzleParse, parse_essence};
 
-    // Here we put some utility functions used in various places
+    /// Parse an Essence' model + parameter file pair into a `PuzzleParse`.
+    ///
+    /// Runs Conjure in a temporary directory.  Panics on parse failure — intended for
+    /// tests and benchmarks where a bad parse is always a bug.
     #[must_use]
     pub fn build_puzzleparse(eprime_path: &str, eprimeparam_path: &str) -> PuzzleParse {
-        // Create temporary directory for test files
         let eprime_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprime_path;
         let eprimeparam_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprimeparam_path;
+
         let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
 
-        // Copy eprime file to temporary directory
-        let temp_eprime_path = temp_dir.path().join("binairo.eprime");
-        fs::copy(dbg!(eprime_path), &temp_eprime_path).expect("Failed to copy eprime file");
+        // Preserve original filenames so Conjure output filenames are predictable.
+        let eprime_name = Path::new(&eprime_path).file_name().unwrap();
+        let param_name = Path::new(&eprimeparam_path).file_name().unwrap();
+        let temp_eprime = temp_dir.path().join(eprime_name);
+        let temp_param = temp_dir.path().join(param_name);
 
-        // Copy eprimeparam file to temporary directory
-        let temp_eprimeparam_path = temp_dir.path().join("binairo-1.param");
+        fs::copy(&eprime_path, &temp_eprime).expect("Failed to copy eprime file");
+        fs::copy(&eprimeparam_path, &temp_param).expect("Failed to copy param file");
 
-        fs::copy(dbg!(eprimeparam_path), &temp_eprimeparam_path)
-            .expect("Failed to copy eprimeparam file");
-
-        // Call parse_essence function
-        let result = parse_essence(&temp_eprime_path, &temp_eprimeparam_path);
-
+        let result = parse_essence(&temp_eprime, &temp_param);
         assert!(result.is_ok(), "Bad parse: {result:?}");
-        // Assert that the function returns Ok
-        assert!(result.is_ok());
 
-        // Clean up temporary directory
-        temp_dir
-            .close()
-            .expect("Failed to clean up temporary directory");
-
+        temp_dir.close().expect("Failed to clean up temporary directory");
         result.unwrap()
     }
 }

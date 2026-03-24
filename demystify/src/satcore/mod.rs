@@ -37,12 +37,15 @@ pub fn set_global_conflict_limit(val: i64) {
 }
 
 /// Get the number of solver calls made.
-///
-/// # Returns
-///
-/// The number of solver calls.
 pub fn get_solver_calls() -> i64 {
     SOLVER_CALLS.load(Relaxed)
+}
+
+/// Reset the solver call counter to zero.
+///
+/// Intended for use between benchmark iterations so per-run call counts can be measured.
+pub fn reset_solver_calls() {
+    SOLVER_CALLS.store(0, Relaxed);
 }
 
 use thiserror::Error;
