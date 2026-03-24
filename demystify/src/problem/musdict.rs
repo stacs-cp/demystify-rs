@@ -90,6 +90,26 @@ impl MusDict {
             .flat_map(|sets| sets.iter().map(MusContext::mus_len))
             .min()
     }
+
+    /// Like `min`, but only considers entries whose literal is still in `valid_lits`.
+    /// Use this when the dict may contain stale entries from previous solving steps.
+    #[must_use]
+    pub fn min_filtered(&self, valid_lits: &BTreeSet<Lit>) -> Option<usize> {
+        self.muses
+            .iter()
+            .filter(|(lit, _)| valid_lits.contains(lit))
+            .flat_map(|(_, sets)| sets.iter().map(MusContext::mus_len))
+            .min()
+    }
+
+    /// Merges all entries from `other` into this dict (keeping smallest MUSes).
+    pub fn merge(&mut self, other: &MusDict) {
+        for (lit, mus_set) in &other.muses {
+            for mc in mus_set {
+                self.add_mus(*lit, mc.mus.clone());
+            }
+        }
+    }
 }
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]

@@ -44,6 +44,11 @@ impl Default for PlannerConfig {
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
     config: PlannerConfig,
+    /// Cross-step MUS cache. Adding known lits only tightens the SAT problem, so a MUS found
+    /// in an earlier step is still a valid unsatisfiable subset in later steps (though it may
+    /// no longer be minimal). We carry it forward so we can skip re-searching lits whose cached
+    /// MUS size already meets the current search target.
+    mus_cache: MusDict,
 }
 
 type FilterType = Box<dyn Fn(&Lit, &mut PuzzlePlanner) -> bool>;
@@ -78,6 +83,7 @@ impl PuzzlePlanner {
         let mut pp = PuzzlePlanner {
             psolve,
             config: PlannerConfig::default(),
+            mus_cache: MusDict::new(),
         };
         pp.mark_trivial_lits_as_deduced();
         pp
@@ -95,7 +101,11 @@ impl PuzzlePlanner {
     /// A new `PuzzlePlanner` instance with the specified configuration.
     #[must_use]
     pub fn new_with_config(psolve: PuzzleSolver, config: PlannerConfig) -> PuzzlePlanner {
-        let mut pp = PuzzlePlanner { psolve, config };
+        let mut pp = PuzzlePlanner {
+            psolve,
+            config,
+            mus_cache: MusDict::new(),
+        };
         pp.mark_trivial_lits_as_deduced();
         pp
     }
@@ -103,8 +113,22 @@ impl PuzzlePlanner {
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle,
     pub fn all_smallish_muses(&mut self) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
-        self.psolve
-            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config, None)
+        let full_result = self.psolve.get_many_vars_small_mus_quick(
+            &varlits,
+            &self.config.mus_config,
+            Some(self.mus_cache.clone()),
+        );
+        // Update cache (skip size-0 MUSes — those are trivial deductions).
+        for (lit, mus_set) in full_result.muses() {
+            for mc in mus_set {
+                if !mc.mus.is_empty() {
+                    self.mus_cache.add_mus(*lit, mc.mus.clone());
+                }
+            }
+        }
+        // Return only entries for the current varlits — the full_result may also contain
+        // stale entries from earlier steps that must not be seen by callers.
+        Self::filter_musdict_to_lits(full_result, &varlits)
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle.
@@ -120,8 +144,32 @@ impl PuzzlePlanner {
     pub fn filtered_muses(&mut self, filter: FilterType) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
         let varlits: BTreeSet<_> = varlits.into_iter().filter(|l| filter(l, self)).collect();
-        self.psolve
-            .get_many_vars_small_mus_quick(&varlits, &self.config.mus_config, None)
+        let full_result = self.psolve.get_many_vars_small_mus_quick(
+            &varlits,
+            &self.config.mus_config,
+            Some(self.mus_cache.clone()),
+        );
+        for (lit, mus_set) in full_result.muses() {
+            for mc in mus_set {
+                if !mc.mus.is_empty() {
+                    self.mus_cache.add_mus(*lit, mc.mus.clone());
+                }
+            }
+        }
+        Self::filter_musdict_to_lits(full_result, &varlits)
+    }
+
+    /// Filters a `MusDict` to only contain entries whose literal is in `lits`.
+    fn filter_musdict_to_lits(dict: MusDict, lits: &BTreeSet<Lit>) -> MusDict {
+        let mut result = MusDict::new();
+        for lit in lits {
+            if let Some(mus_set) = dict.muses().get(lit) {
+                for mc in mus_set {
+                    result.add_mus(*lit, mc.mus.clone());
+                }
+            }
+        }
+        result
     }
 
     /// Returns a vector of the smallest MUSes of the puzzle.

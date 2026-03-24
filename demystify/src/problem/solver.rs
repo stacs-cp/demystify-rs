@@ -855,7 +855,17 @@ impl PuzzleSolver {
 
         info!(target: "solve", "scanning for tiny muses");
 
-        let muses: Vec<_> = lits
+        // Skip lits already cached at size ≤ 1 (only when not hunting for bigger MUSes).
+        let tiny_scan_lits: BTreeSet<Lit> = if config.find_bigger {
+            lits.clone()
+        } else {
+            lits.iter()
+                .copied()
+                .filter(|&lit| md.min_lit(lit).map_or(true, |s| s > 1))
+                .collect()
+        };
+
+        let muses: Vec<_> = tiny_scan_lits
             .iter()
             .par_bridge()
             .map(|&x| {
@@ -881,11 +891,21 @@ impl PuzzleSolver {
         loop {
             info!(target: "solver", "scanning for muses size {}", mus_size);
             best_mus_size.store(mus_size, Relaxed);
-            let muses: Vec<_> = lits
+
+            // Skip lits already cached at a size that meets the current target.
+            let search_lits: Vec<&Lit> = if config.find_bigger {
+                lits.iter().collect()
+            } else {
+                lits.iter()
+                    .filter(|&&lit| md.min_lit(lit).map_or(true, |s| s as i64 > mus_size))
+                    .collect()
+            };
+
+            let muses: Vec<_> = search_lits
                 .iter()
-                .flat_map(|x| std::iter::repeat_n(x, config.repeats as usize))
+                .flat_map(|&&x| std::iter::repeat_n(x, config.repeats as usize))
                 .par_bridge()
-                .map(|&x| {
+                .map(|x| {
                     let mus_test_size = best_mus_size.load(Relaxed);
                     let mus_test_size = if config.find_bigger {
                         mus_test_size + 3 * 3
@@ -921,7 +941,9 @@ impl PuzzleSolver {
                 md.add_mus(k, bts);
             }
 
-            if let Some(mus_min) = md.min() {
+            // Use min_filtered so stale cache entries from previous steps don't
+            // cause premature termination.
+            if let Some(mus_min) = md.min_filtered(lits) {
                 let met_target = if config.find_bigger {
                     (mus_min as i64) * 3 + 3 <= mus_size
                 } else {
