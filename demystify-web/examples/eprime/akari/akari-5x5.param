@@ -1,0 +1,22 @@
+language ESSENCE' 1.0
+
+$ 5x5 Akari puzzle.
+$ Black cells (B) and numbered clues:
+$
+$   .  .  .  .  .
+$   .  B0 .  .  .
+$   .  .  .  .  B1
+$   .  .  .  B1 .
+$   .  .  .  .  .
+$
+$ Encoding: -1=black(no number), 0-4=numbered black, 5=white
+
+letting height be 5
+letting width be 5
+letting puzzle be [
+    [ 5, 5, 5, 5, 5],
+    [ 5, 0, 5, 5, 5],
+    [ 5, 5, 5, 5, 1],
+    [ 5, 5, 5, 1, 5],
+    [ 5, 5, 5, 5, 5]
+]

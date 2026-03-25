@@ -1,0 +1,18 @@
+language ESSENCE' 1.0
+
+$ 3x3 Akari: centre cell is black (no number).
+$ Unique solution: bulbs at (1,2), (2,1), (2,3), (3,2).
+$
+$   W W W
+$   W B W
+$   W W W
+$
+$ Encoding: -1=black(no number), 0-4=numbered black, 5=white
+
+letting height be 3
+letting width be 3
+letting puzzle be [
+    [ 5, 5, 5],
+    [ 5,-1, 5],
+    [ 5, 5, 5]
+]

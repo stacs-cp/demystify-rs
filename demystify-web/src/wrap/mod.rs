@@ -19,7 +19,7 @@ macro_rules! include_model_file {
     };
 }
 
-static EXAMPLES: Lazy<[(&str, &str, &str); 10]> = Lazy::new(|| {
+static EXAMPLES: Lazy<[(&str, &str, &str); 11]> = Lazy::new(|| {
     [
         (
             "Sudoku",
@@ -70,6 +70,11 @@ static EXAMPLES: Lazy<[(&str, &str, &str); 10]> = Lazy::new(|| {
             "Kakurasu",
             include_model_file!("examples/eprime/kakurasu.eprime"),
             include_model_file!("examples/eprime/kakurasu/kakurasu.param"),
+        ),
+        (
+            "Akari",
+            include_model_file!("examples/eprime/akari.eprime"),
+            include_model_file!("examples/eprime/akari/akari-5x5.param"),
         ),
     ]
 });

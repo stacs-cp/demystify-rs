@@ -1,0 +1,95 @@
+language ESSENCE' 1.0
+
+$ Akari (Light Up) puzzle solver
+$
+$ Place light bulbs in white cells such that:
+$   1. Every white cell is illuminated (a bulb in the same row or column,
+$      with no black cell between them).
+$   2. No two bulbs illuminate each other (no two bulbs in the same
+$      row/column segment between black cells).
+$   3. Each numbered black cell has exactly that many orthogonally
+$      adjacent bulbs.
+$
+$ Parameter encoding for puzzle[row, col]:
+$   -1 = black cell, no number
+$    0 = black cell, requires 0 adjacent bulbs
+$    1 = black cell, requires 1 adjacent bulb
+$    2 = black cell, requires 2 adjacent bulbs
+$    3 = black cell, requires 3 adjacent bulbs
+$    4 = black cell, requires 4 adjacent bulbs
+$    5 = white cell
+
+$#INFO Akari (Light Up): place bulbs in white cells. Each white cell must be illuminated by a bulb in the same row or column (no black cell between them). No two bulbs may see each other. Numbered black cells must have exactly that many adjacent bulbs.
+
+given height, width : int(1..)
+
+given puzzle : matrix indexed by [int(1..height), int(1..width)] of int(-1..5)
+
+$ grid[row, col] = 1 if a bulb is placed here, 0 otherwise
+$#VAR grid
+find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
+
+$ Constraint: two cells in the same row segment (no black between them) cannot both hold bulbs.
+$ Indexed by [row, col1, col2] with col1 < col2.
+$#CON no_two_row "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) are in the same row segment and cannot both be bulbs"
+find no_two_row : matrix indexed by [int(1..height), int(1..width), int(1..width)] of bool
+
+$ Constraint: two cells in the same column segment cannot both hold bulbs.
+$ Indexed by [row1, row2, col] with row1 < row2.
+$#CON no_two_col "cells ({{index[0]}},{{index[2]}}) and ({{index[1]}},{{index[2]}}) are in the same column segment and cannot both be bulbs"
+find no_two_col : matrix indexed by [int(1..height), int(1..height), int(1..width)] of bool
+
+$ Constraint: each white cell must be illuminated.
+$#CON illuminated "cell ({{index[0]}},{{index[1]}}) must be illuminated by a bulb in its row or column"
+find illuminated : matrix indexed by [int(1..height), int(1..width)] of bool
+
+$ Constraint: each numbered black cell has exactly the required number of adjacent bulbs.
+$#CON clue "numbered cell ({{index[0]}},{{index[1]}}) requires exactly {{params['puzzle'][index[0]][index[1]]}} adjacent bulb(s)"
+find clue : matrix indexed by [int(1..height), int(1..width)] of bool
+
+such that
+
+$ Bulbs can only be placed in white cells
+forAll r : int(1..height) . forAll c : int(1..width) .
+    puzzle[r,c] < 5 -> grid[r,c] = 0,
+
+$ no_two_row: two white cells with no black between them in the same row cannot both be bulbs.
+$ The sum counts black cells strictly between c1 and c2; if it is 0, they are in the same segment.
+forAll r : int(1..height) . forAll c1 : int(1..width) . forAll c2 : int(1..width) .
+    (c1 < c2 /\
+     puzzle[r,c1] = 5 /\ puzzle[r,c2] = 5 /\
+     (sum c3 : int(1..width) .
+         toInt(c3 > c1 /\ c3 < c2) * toInt(puzzle[r,c3] < 5)) = 0) ->
+    (no_two_row[r,c1,c2] -> grid[r,c1] + grid[r,c2] <= 1),
+
+$ no_two_col: two white cells with no black between them in the same column cannot both be bulbs.
+forAll c : int(1..width) . forAll r1 : int(1..height) . forAll r2 : int(1..height) .
+    (r1 < r2 /\
+     puzzle[r1,c] = 5 /\ puzzle[r2,c] = 5 /\
+     (sum r3 : int(1..height) .
+         toInt(r3 > r1 /\ r3 < r2) * toInt(puzzle[r3,c] < 5)) = 0) ->
+    (no_two_col[r1,r2,c] -> grid[r1,c] + grid[r2,c] <= 1),
+
+$ illuminated: every white cell must have a visible bulb in its row or column.
+$ "Visible" means in the same segment (no black between the cell and the bulb).
+forAll r : int(1..height) . forAll c : int(1..width) .
+    puzzle[r,c] = 5 ->
+    (illuminated[r,c] ->
+     ((exists c2 : int(1..width) .
+         puzzle[r,c2] = 5 /\ grid[r,c2] = 1 /\
+         (sum c3 : int(1..width) .
+             toInt(c3 > min(c,c2) /\ c3 < max(c,c2)) * toInt(puzzle[r,c3] < 5)) = 0) \/
+      (exists r2 : int(1..height) .
+         puzzle[r2,c] = 5 /\ grid[r2,c] = 1 /\
+         (sum r3 : int(1..height) .
+             toInt(r3 > min(r,r2) /\ r3 < max(r,r2)) * toInt(puzzle[r3,c] < 5)) = 0))),
+
+$ clue: each numbered black cell must have exactly the required count of adjacent bulbs.
+$ Use comprehension guards to avoid out-of-bounds access at grid edges.
+forAll r : int(1..height) . forAll c : int(1..width) .
+    (puzzle[r,c] >= 0 /\ puzzle[r,c] <= 4) ->
+    (clue[r,c] ->
+     (sum([grid[r2,c] | r2 : int(1..height), r2 = r-1 \/ r2 = r+1]) +
+      sum([grid[r,c2] | c2 : int(1..width),  c2 = c-1 \/ c2 = c+1]) = puzzle[r,c])),
+
+true
