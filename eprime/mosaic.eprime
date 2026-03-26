@@ -1,0 +1,30 @@
+language ESSENCE' 1.0
+
+$ Mosaic (Minesweeper)
+$ Each numbered cell indicates how many of the up-to-9 cells in its 3x3
+$ neighbourhood (including itself) are black. Blank cells (-1) have no constraint.
+
+$#KIND mosaic
+$#INFO Mosaic: each number counts how many black cells are in its 3x3 neighbourhood (including itself)
+
+given height, width : int(1..)
+
+$ start_grid[r,c] = -1 means no clue; 0..9 = exact count of black cells in 3x3 neighbourhood
+given start_grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..9)
+
+$#VAR grid
+find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
+
+$#CON clue "cell ({{index[0]}},{{index[1]}}) has {{params['start_grid'][index[0]][index[1]]}} black neighbour(s) in its 3x3 region"
+find clue : matrix indexed by [int(1..height), int(1..width)] of bool
+
+such that
+
+$ clue[r,c] -> the neighbourhood count matches the clue (trivially true when no clue)
+forAll r : int(1..height) . forAll c : int(1..width) .
+    clue[r,c] ->
+    (start_grid[r,c] < 0 \/
+     sum([ grid[r2,c2] | r2 : int(1..height), c2 : int(1..width),
+           r2 >= r-1 /\ r2 <= r+1 /\ c2 >= c-1 /\ c2 <= c+1 ]) = start_grid[r,c]),
+
+true

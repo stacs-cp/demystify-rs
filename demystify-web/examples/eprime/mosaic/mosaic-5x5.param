@@ -1,0 +1,20 @@
+$ Solution:
+$   W W W W W
+$   W B B B W
+$   W B W B W
+$   W B B B W
+$   W W W W W
+$ Clue grid (all cells given):
+$   1 2 3 2 1
+$   2 3 5 3 2
+$   3 5 8 5 3
+$   2 3 5 3 2
+$   1 2 3 2 1
+letting height be 5
+letting width be 5
+letting start_grid be
+    [[ 1,  2,  3,  2,  1],
+     [ 2,  3,  5,  3,  2],
+     [ 3,  5,  8,  5,  3],
+     [ 2,  3,  5,  3,  2],
+     [ 1,  2,  3,  2,  1]]

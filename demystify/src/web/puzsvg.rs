@@ -29,6 +29,11 @@ impl Decorations {
                 sudoku_grid: false,
                 blank_input_val: Some(2),
             }
+        } else if kind == "mosaic" {
+            Decorations {
+                sudoku_grid: false,
+                blank_input_val: Some(-1),
+            }
         } else {
             //println!("Unknown puzzle type: {kind}");
             Decorations {
