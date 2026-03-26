@@ -1,0 +1,53 @@
+language ESSENCE' 1.0
+
+$ Nonogram (Picross)
+$ Each row has a sequence of clue numbers specifying the lengths of runs of
+$ consecutive black cells, in order, separated by at least one white cell.
+$ row_clues[r,k] = 0 means run k does not exist (trailing padding).
+$
+$ Note: column constraints are not yet included.
+
+$#INFO Nonogram: fill cells black/white so each row has the given runs of consecutive black cells in order
+
+given height, width, maxruns : int(1..)
+
+$ row_clues[r,k] = length of k-th run in row r; 0 = no run (padding)
+$ Runs are in left-to-right order; trailing zeros are padding.
+given row_clues : matrix indexed by [int(1..height), int(1..maxruns)] of int(0..width)
+
+$#VAR grid
+find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
+
+$ Start column of the k-th run in row r (only meaningful when run is active)
+$#AUX row_start
+find row_start : matrix indexed by [int(1..height), int(1..maxruns)] of int(1..width)
+
+$ End column of the k-th run in row r (only meaningful when run is active)
+$#AUX row_end
+find row_end : matrix indexed by [int(1..height), int(1..maxruns)] of int(1..width)
+
+$#CON row_run "row {{index[0]}} run {{index[1]}}: {{params['row_clues'][index[0]][index[1]]}} consecutive black cells"
+find row_run : matrix indexed by [int(1..height), int(1..maxruns)] of bool
+
+such that
+
+$ Run length: if the run is active, end = start + length - 1, and must fit within the grid.
+$ Inactive runs (clue = 0) are unconstrained and trivially satisfy the implication.
+forAll r : int(1..height) . forAll k : int(1..maxruns) .
+    row_run[r,k] ->
+    (row_clues[r,k] = 0 \/
+     (row_end[r,k] = row_start[r,k] + row_clues[r,k] - 1 /\
+      row_end[r,k] <= width)),
+
+$ Ordering: consecutive active runs are placed left-to-right with at least one white cell gap.
+forAll r : int(1..height) . forAll k : int(1..maxruns-1) .
+    (row_clues[r,k] > 0 /\ row_clues[r,k+1] > 0) ->
+    row_start[r,k+1] >= row_end[r,k] + 2,
+
+$ Coverage: cell (r,c) is black iff it falls within at least one active run in row r.
+$ Since active runs are ordered and non-overlapping, the sum is at most 1.
+forAll r : int(1..height) . forAll c : int(1..width) .
+    grid[r,c] = sum([ toInt(row_start[r,k] <= c /\ c <= row_end[r,k]) |
+                      k : int(1..maxruns), row_clues[r,k] > 0 ]),
+
+true

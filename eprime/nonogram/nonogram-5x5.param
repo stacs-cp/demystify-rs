@@ -1,0 +1,22 @@
+$ 5x5 nonogram — row clues only (column constraints not yet in model)
+$
+$ Each row's clues exactly fill the width=5, so the solution is unique from rows alone:
+$   Row 1: [5]     -> B B B B B
+$   Row 2: [1,3]   -> B . B B B
+$   Row 3: [3,1]   -> B B B . B
+$   Row 4: [2,2]   -> B B . B B
+$   Row 5: [1,1,1] -> B . B . B
+$
+$ Column clues (for later):
+$   Col 1: [5]     Col 2: [1,2]   Col 3: [3,1]   Col 4: [2,1]   Col 5: [5]
+
+letting height be 5
+letting width be 5
+letting maxruns be 3
+
+letting row_clues be
+    [[ 5, 0, 0],
+     [ 1, 3, 0],
+     [ 3, 1, 0],
+     [ 2, 2, 0],
+     [ 1, 1, 1]]
