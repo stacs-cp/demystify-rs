@@ -39,6 +39,9 @@ pub struct Puzzle {
     /// All instantiated constraints grouped by their `$#CON` class name.
     /// Built once at puzzle-load time; templates rendered in parse.rs, not here.
     pub constraint_classes: Option<BTreeMap<String, Vec<ConstraintInstance>>>,
+    /// SVG decoration flags from `$#DEC` directives (e.g. "sudoku_grid", "blank_input_val=2").
+    #[serde(default)]
+    pub decorations: Vec<String>,
 }
 
 impl Puzzle {
@@ -272,6 +275,7 @@ impl Puzzle {
             cage_sums,
             info,
             constraint_classes,
+            decorations: problem.eprime.decs.clone(),
         })
     }
 }
@@ -287,6 +291,10 @@ pub struct State {
     pub knowledge_grid: Option<Vec<Vec<Option<Vec<StateLit>>>>>,
     pub statements: Option<Vec<Statement>>,
     pub description: Option<String>,
+    /// Cells (0-indexed [row, col]) that have no deducable literals at this step.
+    /// Populated only in difficulty view to show non-deducable cells visually.
+    #[serde(default)]
+    pub blocked_cells: Option<Vec<[i64; 2]>>,
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -471,6 +479,7 @@ impl Problem {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
             description: Some(comments.to_owned()),
+            blocked_cells: None,
         };
 
         Ok(Problem {
@@ -571,10 +580,27 @@ impl Problem {
             })
             .collect_vec();
 
+        // Collect cells that have no deducable or known literals — shown as blocked in SVG.
+        let height = usize::try_from(puzzle.height).unwrap_or(0);
+        let width = usize::try_from(puzzle.width).unwrap_or(0);
+        let blocked: Vec<[i64; 2]> = (0..height)
+            .flat_map(|r| (0..width).map(move |c| (r, c)))
+            .filter(|&(r, c)| {
+                knowledgegrid[r][c].is_none()
+                    && !puzzle
+                        .start_grid
+                        .as_ref()
+                        .is_some_and(|sg| sg[r][c].is_some())
+            })
+            .map(|(r, c)| [r as i64, c as i64])
+            .collect();
+        let blocked_cells = if blocked.is_empty() { None } else { Some(blocked) };
+
         let state = State {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
             description: Some(description.to_owned()),
+            blocked_cells,
         };
 
         Ok(Problem {

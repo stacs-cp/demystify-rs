@@ -53,6 +53,8 @@ pub struct EPrimeAnnotations {
     pub kind: Option<String>,
     /// Informational strings collected from $#INFO directives
     pub info: Vec<String>,
+    /// SVG decoration flags collected from $#DEC directives
+    pub decs: Vec<String>,
 }
 
 impl EPrimeAnnotations {
@@ -343,6 +345,7 @@ impl PuzzleParse {
                 params,
                 kind,
                 info,
+                decs: vec![],
             },
             satinstance: SatInstance::new(),
             cnf: None,
@@ -645,6 +648,7 @@ struct ParsedEprimeData {
     factvars: BTreeMap<String, String>,
     kind: Option<String>,
     info: Vec<String>,
+    decs: Vec<String>,
 }
 
 fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
@@ -660,6 +664,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     let mut factvars: BTreeMap<String, String> = BTreeMap::new();
 
     let mut info: Vec<String> = Vec::new();
+    let mut decs: Vec<String> = Vec::new();
 
     let mut kind: Option<String> = None;
 
@@ -738,6 +743,10 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 let info_string = line["$#INFO ".len()..].trim().to_string();
                 info!(target: "parser", "Found INFO: '{}'", info_string);
                 info.push(info_string);
+            } else if line.starts_with("$#DEC ") {
+                let dec_string = line["$#DEC ".len()..].trim().to_string();
+                info!(target: "parser", "Found DEC: '{}'", dec_string);
+                decs.push(dec_string);
             } else if line.starts_with("$#REVEAL ") {
                 if parts.len() != 3 {
                     bail!(format!(
@@ -785,6 +794,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         factvars,
         kind,
         info,
+        decs,
     })
 }
 
@@ -792,7 +802,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
     let parsed_eprime = parse_eprime_file(in_path)?;
     let params = read_essence_param(eprimeparam)?;
 
-    Ok(PuzzleParse::new_from_eprime(
+    let mut puzzleparse = PuzzleParse::new_from_eprime(
         parsed_eprime.vars,
         parsed_eprime.auxvars,
         parsed_eprime.cons,
@@ -800,7 +810,9 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
         params,
         parsed_eprime.kind,
         parsed_eprime.info,
-    ))
+    );
+    puzzleparse.eprime.decs = parsed_eprime.decs;
+    Ok(puzzleparse)
 }
 
 fn read_dimacs_to_maps(

@@ -16,7 +16,7 @@ pub fn base_javascript() -> &'static str {
 
 #[must_use]
 pub fn create_html(puzjson: &Problem) -> String {
-    let pd = PuzzleDraw::new(&puzjson.puzzle.kind);
+    let pd = PuzzleDraw::new_with_decs(&puzjson.puzzle.kind, &puzjson.puzzle.decorations);
     let svg = pd.draw_puzzle(puzjson);
 
     let statements = if let Some(ref state) = puzjson.state {

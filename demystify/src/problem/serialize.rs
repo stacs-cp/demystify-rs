@@ -30,6 +30,8 @@ pub struct SerializableEPrimeAnnotations {
     pub params: BTreeMap<String, serde_json::Value>,
     pub kind: Option<String>,
     pub info: Vec<String>,
+    #[serde(default)]
+    pub decs: Vec<String>,
 }
 
 impl From<&EPrimeAnnotations> for SerializableEPrimeAnnotations {
@@ -43,6 +45,7 @@ impl From<&EPrimeAnnotations> for SerializableEPrimeAnnotations {
             params: e.params().clone(),
             kind: e.kind.clone(),
             info: e.info.clone(),
+            decs: e.decs.clone(),
         }
     }
 }
@@ -58,6 +61,7 @@ impl From<SerializableEPrimeAnnotations> for EPrimeAnnotations {
             params: s.params,
             kind: s.kind,
             info: s.info,
+            decs: s.decs,
         }
     }
 }

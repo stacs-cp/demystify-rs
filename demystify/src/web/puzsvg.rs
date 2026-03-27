@@ -11,36 +11,69 @@ use svg::Node;
 
 use svg::node::element;
 
+/// Individual SVG decoration flags that can be composed freely.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum DecorationKind {
+    /// Draw thicker grid lines at 3-cell intervals (Sudoku-style box boundaries).
+    SudokuGrid,
+    /// Treat this value in `start_grid` as "no clue" and skip rendering it.
+    BlankInputVal(i64),
+}
+
+/// A composable set of SVG decoration flags for a puzzle.
+///
+/// Built from:
+/// 1. `$#DEC` annotations in the `.eprime` file (via `puzzle.decorations`)
+/// 2. Kind-string defaults for backward compatibility
 struct Decorations {
-    sudoku_grid: bool,
-    blank_input_val: Option<i64>,
+    flags: BTreeSet<DecorationKind>,
 }
 
 impl Decorations {
-    pub fn new(kind: &str) -> Decorations {
+    /// Build from explicit decoration strings (from `$#DEC` directives) plus kind fallback.
+    pub fn new(kind: &str, decs: &[String]) -> Decorations {
+        let mut flags: BTreeSet<DecorationKind> = BTreeSet::new();
+
+        // Explicit $#DEC annotations take full control when present.
+        if !decs.is_empty() {
+            for dec in decs {
+                if dec == "sudoku_grid" {
+                    flags.insert(DecorationKind::SudokuGrid);
+                } else if let Some(val_str) = dec.strip_prefix("blank_input_val=") {
+                    if let Ok(val) = val_str.parse::<i64>() {
+                        flags.insert(DecorationKind::BlankInputVal(val));
+                    }
+                }
+            }
+            return Decorations { flags };
+        }
+
+        // Fall back to kind-string defaults for puzzles without $#DEC annotations.
         let kind = kind.to_lowercase();
         if kind == "sudoku" || kind == "killer sudoku" || kind == "miracle" || kind == "x-sums" {
-            Decorations {
-                sudoku_grid: true,
-                blank_input_val: Some(0),
-            }
+            flags.insert(DecorationKind::SudokuGrid);
+            flags.insert(DecorationKind::BlankInputVal(0));
         } else if kind == "binairo" {
-            Decorations {
-                sudoku_grid: false,
-                blank_input_val: Some(2),
-            }
+            flags.insert(DecorationKind::BlankInputVal(2));
         } else if kind == "mosaic" {
-            Decorations {
-                sudoku_grid: false,
-                blank_input_val: Some(-1),
-            }
-        } else {
-            //println!("Unknown puzzle type: {kind}");
-            Decorations {
-                sudoku_grid: false,
-                blank_input_val: None,
-            }
+            flags.insert(DecorationKind::BlankInputVal(-1));
         }
+
+        Decorations { flags }
+    }
+
+    fn sudoku_grid(&self) -> bool {
+        self.flags.contains(&DecorationKind::SudokuGrid)
+    }
+
+    fn blank_input_val(&self) -> Option<i64> {
+        self.flags.iter().find_map(|f| {
+            if let DecorationKind::BlankInputVal(v) = f {
+                Some(*v)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -64,7 +97,17 @@ impl PuzzleDraw {
             base_width: 0.005,
             mid_width: 0.01,
             thick_width: 0.02,
-            decorations: Decorations::new(kind),
+            decorations: Decorations::new(kind, &[]),
+        }
+    }
+
+    #[must_use]
+    pub fn new_with_decs(kind: &str, decs: &[String]) -> Self {
+        PuzzleDraw {
+            base_width: 0.005,
+            mid_width: 0.01,
+            thick_width: 0.02,
+            decorations: Decorations::new(kind, decs),
         }
     }
 }
@@ -86,6 +129,12 @@ impl PuzzleDraw {
             && let Some(knowledge_grid) = &state.knowledge_grid
         {
             self.fill_knowledge(&mut cells, &puzzle.start_grid, knowledge_grid);
+        }
+
+        if let Some(state) = &puzjson.state
+            && let Some(blocked) = &state.blocked_cells
+        {
+            self.fill_blocked_cells(&mut cells, puzzle, blocked);
         }
 
         /*
@@ -216,7 +265,7 @@ impl PuzzleDraw {
     }
 
     fn fixed_cell_is_used(&self, cell: Option<i64>) -> bool {
-        cell.is_some_and(|c| Some(c) != self.decorations.blank_input_val)
+        cell.is_some_and(|c| Some(c) != self.decorations.blank_input_val())
     }
 
     fn fill_fixed_state(
@@ -320,6 +369,43 @@ impl PuzzleDraw {
         }
     }
 
+    /// Mark cells that have no deducable literals with a grey background and a "?" indicator.
+    /// Mark cells that have no deducable literals with a grey background and a "?" indicator.
+    /// The cell coordinate space is 0..1 (established by `make_cell`'s transform).
+    fn fill_blocked_cells(
+        &self,
+        cells: &mut Vec<Vec<element::Group>>,
+        _puzzle: &Puzzle,
+        blocked: &[[i64; 2]],
+    ) {
+        for &[r, c] in blocked {
+            let i = r as usize;
+            let j = c as usize;
+            if i >= cells.len() || j >= cells[i].len() {
+                continue;
+            }
+
+            // Grey background covering the cell (0..1 coordinate space).
+            let mut bg = element::Rectangle::new();
+            bg.assign("width", 1);
+            bg.assign("height", 1);
+            bg.assign("fill", "#cccccc");
+            bg.assign("opacity", 0.5);
+            cells[i][j].append(bg);
+
+            // "?" text centered in the cell.
+            let mut text = svg::node::element::Text::new("?");
+            text.assign("font-size", 0.7);
+            text.assign("x", 0.5);
+            text.assign("y", 0.75);
+            text.assign("dominant-baseline", "middle");
+            text.assign("text-anchor", "middle");
+            text.assign("fill", "#888888");
+            text.assign("class", "litundeducable");
+            cells[i][j].append(text);
+        }
+    }
+
     fn draw_grid(&self, puzzle: &Puzzle) -> element::Group {
         let mut topgrp = element::Group::new();
 
@@ -375,7 +461,7 @@ impl PuzzleDraw {
                 if i == 0 || i == width {
                     stroke = self.thick_width;
                 } else {
-                    if self.decorations.sudoku_grid && i % 3 == 0 {
+                    if self.decorations.sudoku_grid() && i % 3 == 0 {
                         stroke = self.mid_width;
                     }
                     if let Some(cages) = cages
@@ -409,7 +495,7 @@ impl PuzzleDraw {
                 if j == 0 || j == height {
                     stroke = self.thick_width;
                 } else {
-                    if self.decorations.sudoku_grid && j % 3 == 0 {
+                    if self.decorations.sudoku_grid() && j % 3 == 0 {
                         stroke = self.mid_width;
                     }
                     if let Some(cages) = cages
