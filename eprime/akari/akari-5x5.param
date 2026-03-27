@@ -4,10 +4,18 @@ $ 5x5 Akari puzzle.
 $ Black cells (B) and numbered clues:
 $
 $   .  .  .  .  .
-$   .  B0 .  .  .
-$   .  .  .  .  B1
-$   .  .  .  B1 .
+$   .  B0 .  B0 .
+$   .  .  B0 .  .
+$   .  B0 .  B0 .
 $   .  .  .  .  .
+$
+$ Unique solution: bulbs at (1,3), (3,1), (3,5), (5,3).
+$
+$ Deduction chain:
+$   1. B0@(3,3) blocks (2,3) and (4,3) -> col 3 upper/lower segments must use (1,3) and (5,3)
+$   2. (1,3) bulb in all-white row 1 eliminates (1,1) and (1,5)
+$   3. (5,3) bulb in all-white row 5 eliminates (5,1) and (5,5)
+$   4. Col 1 only viable position is (3,1); col 5 only viable position is (3,5)
 $
 $ Encoding: -1=black(no number), 0-4=numbered black, 5=white
 
@@ -15,8 +23,8 @@ letting height be 5
 letting width be 5
 letting puzzle be [
     [ 5, 5, 5, 5, 5],
-    [ 5, 0, 5, 5, 5],
-    [ 5, 5, 5, 5, 1],
-    [ 5, 5, 5, 1, 5],
+    [ 5, 0, 5, 0, 5],
+    [ 5, 5, 0, 5, 5],
+    [ 5, 0, 5, 0, 5],
     [ 5, 5, 5, 5, 5]
 ]
