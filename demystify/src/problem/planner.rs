@@ -430,6 +430,12 @@ impl PuzzlePlanner {
 
     pub fn quick_solve_html_step(&mut self) -> (String, Vec<Lit>) {
         let base_muses = self.smallest_muses_with_config();
+        if base_muses.is_empty() {
+            return self.quick_display_html_step_impl(
+                None,
+                "There are no more values to deduce",
+            );
+        }
         self.quick_display_html_step(Some(base_muses))
     }
 
@@ -463,7 +469,7 @@ impl PuzzlePlanner {
         let min = muses.min();
 
         if min.is_none() {
-            return ("No MUS".to_owned(), vec![]);
+            return self.quick_display_html_step_impl(None, "There are no more values to deduce");
         }
 
         let min = min.unwrap();
@@ -486,6 +492,14 @@ impl PuzzlePlanner {
     pub fn quick_display_html_step(
         &mut self,
         base_muses: Option<Vec<MusContext>>,
+    ) -> (String, Vec<Lit>) {
+        self.quick_display_html_step_impl(base_muses, "The initial puzzle state")
+    }
+
+    fn quick_display_html_step_impl(
+        &mut self,
+        base_muses: Option<Vec<MusContext>>,
+        fallback_description: &str,
     ) -> (String, Vec<Lit>) {
         let varlits = self.psolve.get_provable_varlits().clone();
 
@@ -552,14 +566,13 @@ impl PuzzlePlanner {
             (create_html(&problem), v)
         } else {
             let deduced = BTreeSet::new();
-            let description = "The initial puzzle state".to_string();
 
             let problem = Problem::new_from_puzzle_and_state(
                 &self.psolve,
                 &tosolve_varvals,
                 &known_puzlits,
                 &deduced,
-                &description,
+                fallback_description,
             )
             .expect("Cannot make puzzle json");
 
