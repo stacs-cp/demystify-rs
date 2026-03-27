@@ -319,6 +319,7 @@ impl PuzzlePlanner {
     fn quick_solve_impl(&mut self, progress: bool) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
         let mut solvesteps = vec![];
         'litloop: while !self.psolve.get_provable_varlits().is_empty() {
+            let _step_timer = crate::stats::PhaseTimer::solve_step();
             let muses = self.smallest_muses_with_config();
 
             for mus in &muses {

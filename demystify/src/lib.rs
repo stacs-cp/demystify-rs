@@ -118,4 +118,5 @@
 pub mod json;
 pub mod problem;
 pub mod satcore;
+pub mod stats;
 pub mod web;

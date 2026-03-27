@@ -1,5 +1,6 @@
 use std::ops::Neg;
 use std::sync::Arc;
+use std::time::Instant;
 use std::{collections::BTreeSet, sync::atomic::AtomicI64};
 
 use std::sync::atomic::Ordering::Relaxed;
@@ -853,6 +854,8 @@ impl PuzzleSolver {
         let mut mus_size = config.base_size_mus;
         let best_mus_size = AtomicI64::new(config.base_size_mus);
 
+        let _batch_timer = crate::stats::PhaseTimer::batch_mus();
+
         info!(target: "solve", "scanning for tiny muses");
 
         // Skip lits already cached at size ≤ 1 (only when not hunting for bigger MUSes).
@@ -913,6 +916,7 @@ impl PuzzleSolver {
                         mus_test_size
                     };
 
+                    let t0 = Instant::now();
                     let ret = match config.strategy {
                         Strategy::Slice => self.get_var_mus_slice(x, Some(mus_test_size)),
                         Strategy::Cake => self.get_var_mus_cake(x, mus_test_size),
@@ -925,6 +929,13 @@ impl PuzzleSolver {
                             }
                         }
                     };
+                    let elapsed = t0.elapsed();
+                    let outcome = match &ret {
+                        Ok(Some(mus)) => crate::stats::MusOutcome::Found(mus.len()),
+                        Ok(None) => crate::stats::MusOutcome::NotFound,
+                        Err(_) => crate::stats::MusOutcome::Timeout,
+                    };
+                    crate::stats::record_mus_search(elapsed, outcome);
                     if let Ok(Some(y)) = &ret {
                         best_mus_size.fetch_min(y.len() as i64, Relaxed);
                     }
