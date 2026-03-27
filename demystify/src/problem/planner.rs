@@ -496,28 +496,18 @@ impl PuzzlePlanner {
         self.quick_display_html_step_impl(base_muses, "The initial puzzle state")
     }
 
+    /// Like `quick_display_html_step(None)` but with a description suitable for a refresh.
+    pub fn refresh_html_step(&mut self) -> (String, Vec<Lit>) {
+        self.quick_display_html_step_impl(None, "Current puzzle state")
+    }
+
     fn quick_display_html_step_impl(
         &mut self,
         base_muses: Option<Vec<MusContext>>,
         fallback_description: &str,
     ) -> (String, Vec<Lit>) {
-        let varlits = self.psolve.get_provable_varlits().clone();
-
-        let tosolve_varvals: BTreeSet<_> = varlits
-            .iter()
-            .flat_map(|x| self.psolve.lit_to_puzlit(x))
-            .map(super::PuzLit::varval)
-            .collect();
-
-        let known_puzlits: BTreeSet<PuzLit> = self
-            .get_all_known_lits()
-            .iter()
-            .flat_map(|x| self.psolve.lit_to_puzlit(x))
-            .cloned()
-            .collect();
-
         if let Some(base_muses) = base_muses {
-            // Map the 'muses' to a user-friendly representation
+            // Build description from the MUS *before* marking deductions (context is the same).
             let muses = base_muses
                 .iter()
                 .map(|mus| self.mus_to_user_mus(mus))
@@ -535,7 +525,6 @@ impl PuzzlePlanner {
             };
 
             let mut description_list: Vec<DescriptionStatement> = Vec::new();
-
             for mus in &muses {
                 let deduced = PuzLit::nice_puzlit_list_html(&mus.0);
                 description_list.push(DescriptionStatement {
@@ -543,6 +532,32 @@ impl PuzzlePlanner {
                     constraints: mus.1.iter().map(|s| tera::escape_html(s)).collect(),
                 });
             }
+
+            // Mark deductions *before* building the grid so the rendered state reflects
+            // any newly provable cells (including those unlocked by $#REVEAL cascades).
+            let v = base_muses
+                .iter()
+                .flat_map(|mc| &mc.lits)
+                .copied()
+                .collect_vec();
+            for m in &v {
+                self.mark_lit_as_deduced(m);
+            }
+
+            // Recompute grid state post-deduction.
+            let varlits = self.psolve.get_provable_varlits().clone();
+            let tosolve_varvals: BTreeSet<_> = varlits
+                .iter()
+                .flat_map(|x| self.psolve.lit_to_puzlit(x))
+                .map(super::PuzLit::varval)
+                .collect();
+
+            let known_lits = self.get_all_known_lits().clone();
+            let known_puzlits: BTreeSet<PuzLit> = known_lits
+                .iter()
+                .flat_map(|x| self.psolve.lit_to_puzlit(x))
+                .cloned()
+                .collect();
 
             let problem = Problem::new_from_puzzle_and_mus(
                 &self.psolve,
@@ -554,17 +569,23 @@ impl PuzzlePlanner {
             )
             .expect("Cannot make puzzle json");
 
-            let v = base_muses
-                .iter()
-                .flat_map(|mc| &mc.lits)
-                .copied()
-                .collect_vec();
-            for m in &v {
-                self.mark_lit_as_deduced(m);
-            }
-
             (create_html(&problem), v)
         } else {
+            let varlits = self.psolve.get_provable_varlits().clone();
+
+            let tosolve_varvals: BTreeSet<_> = varlits
+                .iter()
+                .flat_map(|x| self.psolve.lit_to_puzlit(x))
+                .map(super::PuzLit::varval)
+                .collect();
+
+            let known_puzlits: BTreeSet<PuzLit> = self
+                .get_all_known_lits()
+                .iter()
+                .flat_map(|x| self.psolve.lit_to_puzlit(x))
+                .cloned()
+                .collect();
+
             let deduced = BTreeSet::new();
 
             let problem = Problem::new_from_puzzle_and_state(

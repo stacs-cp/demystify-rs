@@ -137,7 +137,7 @@ pub async fn refresh(session: Session<SessionNullPool>) -> Result<String, util::
 
     let mut solver = solver.lock().unwrap();
 
-    let (solve, _) = solver.quick_display_html_step(None);
+    let (solve, _) = solver.refresh_html_step();
 
     Ok(solve)
 }
