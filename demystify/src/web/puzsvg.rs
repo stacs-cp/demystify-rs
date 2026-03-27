@@ -23,6 +23,10 @@ enum DecorationKind {
     /// Use for puzzles where the clue is metadata and the cell still has a deducable domain
     /// (e.g. Mosaic: clue = neighbour count, domain = mine/safe 0/1).
     ClueInCorner,
+    /// Cells where `start_grid[r][c] < N` are rendered as walled/black cells: a thick inward
+    /// dark border with a lighter interior. Clue numbers (value >= 0) are shown centered inside.
+    /// Negative values (e.g. -1 = black unnumbered) get the wall visual but no text.
+    WallBelow(i64),
 }
 
 /// A composable set of SVG decoration flags for a puzzle.
@@ -50,6 +54,10 @@ impl Decorations {
                     }
                 } else if dec == "clue_in_corner" {
                     flags.insert(DecorationKind::ClueInCorner);
+                } else if let Some(val_str) = dec.strip_prefix("wall_below=") {
+                    if let Ok(val) = val_str.parse::<i64>() {
+                        flags.insert(DecorationKind::WallBelow(val));
+                    }
                 }
             }
             return Decorations { flags };
@@ -86,6 +94,16 @@ impl Decorations {
 
     fn clue_in_corner(&self) -> bool {
         self.flags.contains(&DecorationKind::ClueInCorner)
+    }
+
+    fn wall_below(&self) -> Option<i64> {
+        self.flags.iter().find_map(|f| {
+            if let DecorationKind::WallBelow(v) = f {
+                Some(*v)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -285,10 +303,53 @@ impl PuzzleDraw {
         cells: &mut Vec<Vec<element::Group>>,
         contents: &Vec<Vec<Option<i64>>>,
     ) {
+        let wall_below = self.decorations.wall_below();
+
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {
-                if self.fixed_cell_is_used(contents[i][j]) {
-                    let cell = contents[i][j].unwrap();
+                let val = contents[i][j];
+
+                // Wall cell: start_grid value < wall_below threshold → draw thick inward border.
+                if let Some(wb) = wall_below {
+                    if val.is_some_and(|v| v < wb) {
+                        // Dark outer rect fills the entire cell.
+                        let mut outer = element::Rectangle::new();
+                        outer.assign("width", 1);
+                        outer.assign("height", 1);
+                        outer.assign("fill", "#666666");
+                        outer.assign("class", "wall-cell");
+                        cells[i][j].append(outer);
+
+                        // White inner rect — leaves a thick dark border around the edge.
+                        let mut inner = element::Rectangle::new();
+                        inner.assign("x", 0.1);
+                        inner.assign("y", 0.1);
+                        inner.assign("width", 0.8);
+                        inner.assign("height", 0.8);
+                        inner.assign("fill", "white");
+                        cells[i][j].append(inner);
+
+                        // Show clue number only for numbered cells (value >= 0).
+                        // Negative values (e.g. -1) mean "black, no number".
+                        if let Some(v) = val {
+                            if v >= 0 {
+                                let mut node =
+                                    svg::node::element::Text::new(v.to_string());
+                                node.assign("font-size", 0.5);
+                                node.assign("x", 0.5);
+                                node.assign("y", 0.65);
+                                node.assign("dominant-baseline", "middle");
+                                node.assign("text-anchor", "middle");
+                                cells[i][j].append(node);
+                            }
+                        }
+                        continue;
+                    }
+                }
+
+                // Normal fixed cell rendering.
+                if self.fixed_cell_is_used(val) {
+                    let cell = val.unwrap();
                     let s = cell.to_string();
 
                     let mut node = svg::node::element::Text::new(s);
