@@ -1,0 +1,59 @@
+language ESSENCE' 1.0
+
+$ Minesweeper solver with hidden-information reveal.
+$
+$ known[r,c] = true  → cell is revealed (its mine/safe status is visible)
+$ mines[r,c] = true  → the cell is actually a mine (hidden ground truth)
+$
+$ When the solver deduces grid[r,c] = 0 (safe), the REVEAL mechanism
+$ fires the sumcheck constraint for that cell, simulating clicking it open
+$ and using its neighbour count to make further deductions.
+
+$#KIND minesweeper
+$#INFO Minesweeper: deduce which hidden cells are mines. When a safe cell is deduced, its neighbour count is revealed and used for further reasoning.
+
+given height, width : int(1..)
+
+$ known[r,c]: true = this cell is already revealed at the start
+given known : matrix indexed by [int(1..height), int(1..width)] of bool
+
+$ mines[r,c]: the hidden ground truth (true = mine)
+given mines : matrix indexed by [int(1..height), int(1..width)] of bool
+
+$ grid[r,c]: what we are deducing — 1 = mine, 0 = safe
+$#VAR grid
+find grid : matrix indexed by [int(1..height), int(1..width)] of bool
+
+$ sumcheck[r,c]: constraint that revealed safe cell (r,c) has the correct neighbour mine count
+$#CON sumcheck "neighbour count at ({{index[0]}},{{index[1]}}) matches"
+find sumcheck : matrix indexed by [int(1..height), int(1..width)] of bool
+
+$ facts[r,c,d]: hidden-information bridge — when grid[r,c]=d is deduced,
+$ the corresponding sumcheck constraint becomes active.
+$#REVEAL grid facts
+find facts : matrix indexed by [int(1..height), int(1..width), int(0..1)] of bool
+
+letting neighbours be domain int(-1..1)
+
+such that
+
+$ Known cells are fixed to their true values.
+forAll r : int(1..height) . forAll c : int(1..width) .
+    known[r,c] -> (grid[r,c] = mines[r,c]),
+
+$ For revealed safe cells: their neighbour mine count in the grid must match reality.
+forAll r : int(1..height) . forAll c : int(1..width) .
+    (known[r,c] /\ !mines[r,c]) ->
+    (sumcheck[r,c] ->
+     (sum([mines[r+a, c+b] | a, b : neighbours]) =
+      sum([grid[r+a, c+b] | a, b : neighbours]))),
+
+$ Reveal: when a cell is deduced safe (d=0), fire its sumcheck constraint.
+forAll r : int(1..height) . forAll c : int(1..width) .
+    forAll d : int(0..0) .
+    sumcheck[r,c] ->
+    (facts[r,c,d] ->
+     (sum([mines[r+a, c+b] | a, b : neighbours]) =
+      sum([grid[r+a, c+b] | a, b : neighbours]))),
+
+true

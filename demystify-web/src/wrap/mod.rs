@@ -19,7 +19,7 @@ macro_rules! include_model_file {
     };
 }
 
-static EXAMPLES: Lazy<[(&str, &str, &str); 13]> = Lazy::new(|| {
+static EXAMPLES: Lazy<[(&str, &str, &str); 14]> = Lazy::new(|| {
     [
         (
             "Sudoku",
@@ -85,6 +85,11 @@ static EXAMPLES: Lazy<[(&str, &str, &str); 13]> = Lazy::new(|| {
             "Nonogram",
             include_model_file!("examples/eprime/nonogram.eprime"),
             include_model_file!("examples/eprime/nonogram/duck-8x9.param"),
+        ),
+        (
+            "Minesweeper",
+            include_model_file!("examples/eprime/minesweeper.eprime"),
+            include_model_file!("examples/eprime/minesweeper/minesweeper-5x5.param"),
         ),
     ]
 });

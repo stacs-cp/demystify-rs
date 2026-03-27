@@ -1,0 +1,38 @@
+language ESSENCE' 1.0
+
+$ 5x5 Minesweeper puzzle.
+$
+$ Initial board (? = hidden, . = revealed safe):
+$
+$   .  .  ?  ?  ?
+$   .  .  ?  ?  ?
+$   .  ?  ?  ?  ?
+$   .  ?  ?  ?  ?
+$   .  ?  ?  ?  ?
+$
+$ Hidden mines: (1,3) and (5,2)
+$
+$ Deduction: revealed cells in the top-left corner propagate via
+$ neighbour-count constraints. The $#REVEAL mechanism fires each time
+$ a safe cell is deduced, unlocking further constraints.
+
+letting height be 5
+letting width be 5
+
+$ known[r,c]: true = revealed at start
+letting known be [
+    [true,  true,  false, false, false],
+    [true,  true,  false, false, false],
+    [true,  false, false, false, false],
+    [true,  false, false, false, false],
+    [true,  false, false, false, false]
+]
+
+$ mines[r,c]: the hidden ground truth
+letting mines be [
+    [false, false, true,  false, false],
+    [false, false, false, false, false],
+    [false, false, false, false, false],
+    [false, false, false, false, false],
+    [false, true,  false, false, false]
+]
