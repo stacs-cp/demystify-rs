@@ -18,6 +18,11 @@ enum DecorationKind {
     SudokuGrid,
     /// Treat this value in `start_grid` as "no clue" and skip rendering it.
     BlankInputVal(i64),
+    /// Render `start_grid` clue values as small corner labels rather than large centered text,
+    /// and allow domain candidates to be displayed alongside the clue in the same cell.
+    /// Use for puzzles where the clue is metadata and the cell still has a deducable domain
+    /// (e.g. Mosaic: clue = neighbour count, domain = mine/safe 0/1).
+    ClueInCorner,
 }
 
 /// A composable set of SVG decoration flags for a puzzle.
@@ -43,6 +48,8 @@ impl Decorations {
                     if let Ok(val) = val_str.parse::<i64>() {
                         flags.insert(DecorationKind::BlankInputVal(val));
                     }
+                } else if dec == "clue_in_corner" {
+                    flags.insert(DecorationKind::ClueInCorner);
                 }
             }
             return Decorations { flags };
@@ -57,6 +64,7 @@ impl Decorations {
             flags.insert(DecorationKind::BlankInputVal(2));
         } else if kind == "mosaic" {
             flags.insert(DecorationKind::BlankInputVal(-1));
+            flags.insert(DecorationKind::ClueInCorner);
         }
 
         Decorations { flags }
@@ -74,6 +82,10 @@ impl Decorations {
                 None
             }
         })
+    }
+
+    fn clue_in_corner(&self) -> bool {
+        self.flags.contains(&DecorationKind::ClueInCorner)
     }
 }
 
@@ -280,8 +292,15 @@ impl PuzzleDraw {
                     let s = cell.to_string();
 
                     let mut node = svg::node::element::Text::new(s);
-                    node.assign("font-size", 1);
-                    node.assign("transform", "translate(0.2, 0.9)");
+                    if self.decorations.clue_in_corner() {
+                        // Small corner label — leaves most of the cell free for domain candidates.
+                        node.assign("font-size", 0.35);
+                        node.assign("x", 0.05);
+                        node.assign("y", 0.38);
+                    } else {
+                        node.assign("font-size", 1);
+                        node.assign("transform", "translate(0.2, 0.9)");
+                    }
 
                     cells[i][j].append(node);
                 }
@@ -297,11 +316,13 @@ impl PuzzleDraw {
     ) {
         for i in 0..contents.len() {
             for j in 0..contents[i].len() {
-                // The only reason we have 'fixed_contents' is because we do not want to
-                // put knowledge in these cells
-                if fixed_contents
-                    .as_ref()
-                    .is_some_and(|c| self.fixed_cell_is_used(c[i][j]))
+                // Skip cells that already have a fixed (given) value — unless clue_in_corner
+                // is active, in which case the clue is shown small in the corner and the
+                // domain candidates are still rendered in the main cell area.
+                if !self.decorations.clue_in_corner()
+                    && fixed_contents
+                        .as_ref()
+                        .is_some_and(|c| self.fixed_cell_is_used(c[i][j]))
                 {
                     continue;
                 }

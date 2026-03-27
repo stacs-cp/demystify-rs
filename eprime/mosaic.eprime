@@ -5,6 +5,8 @@ $ Each numbered cell indicates how many of the up-to-9 cells in its 3x3
 $ neighbourhood (including itself) are black. Blank cells (-1) have no constraint.
 
 $#KIND mosaic
+$#DEC blank_input_val=-1
+$#DEC clue_in_corner
 $#INFO Mosaic: each number counts how many black cells are in its 3x3 neighbourhood (including itself)
 
 given height, width : int(1..)
