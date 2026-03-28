@@ -139,6 +139,7 @@ impl PuzzlePlanner {
         let varlits = self.psolve.get_provable_varlits().clone();
         let mut conf_clone = self.config.mus_config;
         conf_clone.find_bigger = true;
+        conf_clone.find_one = false;
         self.psolve
             .get_many_vars_small_mus_quick(&varlits, &conf_clone, None)
     }

@@ -52,6 +52,12 @@ struct Opt {
 
     #[arg(
         long,
+        help = "Find all MUSes (disables find_one optimization that stops after the first MUS per batch)"
+    )]
+    all_muses: bool,
+
+    #[arg(
+        long,
         value_enum,
         help = "Specify the method to run the solver (Native, Docker, Podman)"
     )]
@@ -116,10 +122,16 @@ fn main() -> anyhow::Result<()> {
         },
     )?;
 
-    let mus_config: MusConfig = if let Some(searches) = opt.searches {
-        MusConfig::new_with_repeats(searches)
-    } else {
-        MusConfig::default()
+    let mus_config: MusConfig = {
+        let mut cfg = if let Some(searches) = opt.searches {
+            MusConfig::new_with_repeats(searches)
+        } else {
+            MusConfig::default()
+        };
+        if opt.all_muses {
+            cfg.find_one = false;
+        }
+        cfg
     };
 
     let planner_config = PlannerConfig {

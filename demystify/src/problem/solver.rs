@@ -48,6 +48,7 @@ pub struct MusConfig {
     pub mus_mult_step: i64,
     pub repeats: i64,
     pub find_bigger: bool,
+    pub find_one: bool,
     pub strategy: Strategy,
 }
 
@@ -59,6 +60,7 @@ impl Default for MusConfig {
             mus_mult_step: 2,
             repeats: 2,
             find_bigger: false,
+            find_one: true,
             strategy: Strategy::default(),
         }
     }
@@ -73,6 +75,7 @@ impl MusConfig {
             mus_mult_step: 2,
             repeats,
             find_bigger: false,
+            find_one: true,
             strategy: Strategy::default(),
         }
     }
@@ -860,6 +863,7 @@ impl PuzzleSolver {
 
         let mut mus_size = config.base_size_mus;
         let best_mus_size = AtomicI64::new(config.base_size_mus);
+        let target_mus_size = AtomicI64::new(config.base_size_mus);
 
         let _batch_timer = crate::stats::PhaseTimer::batch_mus();
 
@@ -909,6 +913,7 @@ impl PuzzleSolver {
         loop {
             info!(target: "solver", "scanning for muses size {}", mus_size);
             best_mus_size.store(mus_size, Relaxed);
+            target_mus_size.store(best_mus_size.load(Relaxed), Relaxed);
 
             // Skip lits already cached at a size that meets the current target.
             let search_lits: Vec<&Lit> = if config.find_bigger {
@@ -924,7 +929,10 @@ impl PuzzleSolver {
                 .flat_map(|&&x| std::iter::repeat_n(x, config.repeats as usize))
                 .par_bridge()
                 .map(|x| {
-                    let mus_test_size = best_mus_size.load(Relaxed);
+                    let mus_test_size = target_mus_size.load(Relaxed);
+                    if mus_test_size <= 1 {
+                        return (x, Ok(None));
+                    }
                     let mus_test_size = if config.find_bigger {
                         mus_test_size + 3 * 3
                     } else {
@@ -952,7 +960,10 @@ impl PuzzleSolver {
                     };
                     crate::stats::record_mus_search(elapsed, outcome, func);
                     if let Ok(Some(y)) = &ret {
-                        best_mus_size.fetch_min(y.len() as i64, Relaxed);
+                        let s = y.len() as i64;
+                        best_mus_size.fetch_min(s, Relaxed);
+                        let new_target = if config.find_one && !config.find_bigger { s - 1 } else { s };
+                        target_mus_size.fetch_min(new_target, Relaxed);
                     }
                     (x, ret)
                 })
