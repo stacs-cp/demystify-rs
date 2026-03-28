@@ -47,6 +47,9 @@ struct Opt {
     #[arg(long)]
     searches: Option<i64>,
 
+    #[arg(long, help = "Stop after this many solve steps")]
+    max_steps: Option<usize>,
+
     #[arg(
         long,
         value_enum,
@@ -124,6 +127,7 @@ fn main() -> anyhow::Result<()> {
         merge_small_threshold: opt.merge,
         skip_small_threshold: opt.skip,
         expand_to_all_deductions: true,
+        max_steps: opt.max_steps,
     };
 
     let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);

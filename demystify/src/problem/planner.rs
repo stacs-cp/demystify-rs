@@ -27,6 +27,8 @@ pub struct PlannerConfig {
     pub merge_small_threshold: i64,
     pub skip_small_threshold: i64,
     pub expand_to_all_deductions: bool,
+    /// Stop after this many solve steps. `None` means run to completion.
+    pub max_steps: Option<usize>,
 }
 
 impl Default for PlannerConfig {
@@ -36,6 +38,7 @@ impl Default for PlannerConfig {
             merge_small_threshold: 1,
             skip_small_threshold: 0,
             expand_to_all_deductions: true,
+            max_steps: None,
         }
     }
 }
@@ -319,6 +322,9 @@ impl PuzzlePlanner {
     fn quick_solve_impl(&mut self, progress: bool) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
         let mut solvesteps = vec![];
         'litloop: while !self.psolve.get_provable_varlits().is_empty() {
+            if self.config.max_steps.is_some_and(|n| solvesteps.len() >= n) {
+                break;
+            }
             let _step_timer = crate::stats::PhaseTimer::solve_step();
             let muses = self.smallest_muses_with_config();
 
