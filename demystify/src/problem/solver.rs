@@ -556,7 +556,10 @@ impl PuzzleSolver {
         lits: &[Lit],
         muses: &mut BTreeSet<Vec<Lit>>,
     ) -> SearchResult<()> {
-        if lits.is_empty() || count.is_some_and(|x| muses.len() >= x) {
+        if lits.is_empty()
+            || count.is_some_and(|x| muses.len() >= x)
+            || muses.contains(&vec![]) // size-0 MUS already found; every subset is UNSAT
+        {
             return Ok(());
         }
 
@@ -568,8 +571,25 @@ impl PuzzleSolver {
             .assumption_solve_with_core(self.get_known_lits(), &lit_cpy)?;
 
         if let Some(core) = solvable {
+            // Check for size-0 MUS: core contains only !lit, no constraint needed.
+            if !core.iter().any(|&x| x != !lit) {
+                muses.insert(vec![]);
+                return Ok(());
+            }
+
             if lits.len() == 1 {
-                muses.insert(lits.to_vec());
+                // The solver's core isn't guaranteed minimal: it may include the
+                // constraint even when !lit alone suffices (size-0 MUS). Do one
+                // final cheap check to find out which case we're in.
+                let just_neg_lit = vec![!lit];
+                let size0 = self
+                    .get_satcore()
+                    .assumption_solve(self.get_known_lits(), &just_neg_lit)?;
+                if size0 {
+                    muses.insert(lits.to_vec()); // constraint is needed: size-1 MUS
+                } else {
+                    muses.insert(vec![]); // !lit alone is UNSAT: size-0 MUS
+                }
             } else {
                 // This core can be found early. We might find it again later,
                 // but we add it here as it might make us find enough cores (in particular
@@ -608,19 +628,6 @@ impl PuzzleSolver {
         lit: Lit,
         count: Option<usize>,
     ) -> SearchResult<Vec<Vec<Lit>>> {
-        // First of all, check if there is a MUS of size 0,
-        // mainly because it makes the rest of this algorithm
-        // degenerate.
-        let just_lit = vec![!lit];
-
-        let solvable = self
-            .get_satcore()
-            .assumption_solve(self.get_known_lits(), &just_lit)?;
-
-        if !solvable {
-            return Ok(vec![vec![]]);
-        }
-
         let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
 
         let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
