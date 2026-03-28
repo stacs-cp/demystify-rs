@@ -6,7 +6,7 @@ use demystify::{
         solver::{MusConfig, PuzzleSolver, SolverConfig},
         util::exec::{RunMethod, set_run_method},
     },
-    stats::print_mus_stats,
+    stats::{print_mus_stats, print_sat_stats},
     web::{base_css, base_javascript},
 };
 use std::{fs::File, path::PathBuf, sync::Arc};
@@ -149,6 +149,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     print_mus_stats();
+    print_sat_stats();
 
     Ok(())
 }

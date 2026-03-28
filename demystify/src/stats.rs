@@ -1,7 +1,8 @@
 /// Global MUS statistics collector.
 ///
 /// Tracks per-MUS-search outcomes (time + size or failure) broken down by
-/// which internal function was called, and overall phase timing.
+/// which internal function was called, per-SAT-call time and conflict counts,
+/// and overall phase timing.
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -76,6 +77,169 @@ const BUCKETS: &[(u128, &str)] = &[
 fn bucket_index(d: Duration) -> usize {
     let ms = d.as_millis();
     BUCKETS.iter().position(|&(limit, _)| ms < limit).unwrap_or(BUCKETS.len() - 1)
+}
+
+/// Conflict-count buckets for per-SAT-call distribution table.
+const CONFLICT_BUCKETS: &[(usize, &str)] = &[
+    (1,      "0 conflicts"),
+    (10,     "1–9"),
+    (100,    "10–99"),
+    (1_000,  "100–999"),
+    (10_000, "1k–9k"),
+    (usize::MAX, "≥ 10k"),
+];
+
+fn conflict_bucket_index(n: usize) -> usize {
+    CONFLICT_BUCKETS.iter().position(|&(limit, _)| n < limit).unwrap_or(CONFLICT_BUCKETS.len() - 1)
+}
+
+// ── SAT call stats ────────────────────────────────────────────────────────────
+
+/// Outcome of a single SAT solver call (from the solver's perspective).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SatResult {
+    Sat,
+    Unsat,
+    Interrupted,
+}
+
+impl From<rustsat::solvers::SolverResult> for SatResult {
+    fn from(r: rustsat::solvers::SolverResult) -> Self {
+        match r {
+            rustsat::solvers::SolverResult::Sat         => SatResult::Sat,
+            rustsat::solvers::SolverResult::Unsat       => SatResult::Unsat,
+            rustsat::solvers::SolverResult::Interrupted => SatResult::Interrupted,
+        }
+    }
+}
+
+/// One recorded SAT solver invocation.
+#[derive(Debug, Clone)]
+pub struct SatCallRecord {
+    pub duration:  Duration,
+    pub conflicts: usize,
+    pub result:    SatResult,
+}
+
+#[derive(Debug, Default)]
+struct SatStats {
+    calls: Vec<SatCallRecord>,
+}
+
+impl SatStats {
+    fn record(&mut self, duration: Duration, conflicts: usize, result: SatResult) {
+        self.calls.push(SatCallRecord { duration, conflicts, result });
+    }
+
+    fn print_summary(&self) {
+        let n = self.calls.len();
+        eprintln!("=== SAT Call Statistics ===");
+        eprintln!("Total SAT calls: {n}");
+        if n == 0 {
+            eprintln!("===========================");
+            return;
+        }
+
+        let total_time: Duration = self.calls.iter().map(|r| r.duration).sum();
+        let total_conflicts: usize = self.calls.iter().map(|r| r.conflicts).sum();
+        let n_sat         = self.calls.iter().filter(|r| r.result == SatResult::Sat).count();
+        let n_unsat       = self.calls.iter().filter(|r| r.result == SatResult::Unsat).count();
+        let n_interrupted = self.calls.iter().filter(|r| r.result == SatResult::Interrupted).count();
+        eprintln!(
+            "sat {n_sat}  unsat {n_unsat}  interrupted {n_interrupted}  \
+             total time {:.3}s  total conflicts {total_conflicts}",
+            total_time.as_secs_f64(),
+        );
+
+        // ── Time bucket table ─────────────────────────────────────────────
+        eprintln!();
+        eprintln!("  Time distribution:");
+        let nb = BUCKETS.len();
+        let mut time_sat  = vec![0u32; nb];
+        let mut time_unsat= vec![0u32; nb];
+        let mut time_int  = vec![0u32; nb];
+        let mut bucket_time = vec![Duration::ZERO; nb];
+        for r in &self.calls {
+            let b = bucket_index(r.duration);
+            bucket_time[b] += r.duration;
+            match r.result {
+                SatResult::Sat         => time_sat[b]   += 1,
+                SatResult::Unsat       => time_unsat[b] += 1,
+                SatResult::Interrupted => time_int[b]   += 1,
+            }
+        }
+        eprintln!(
+            "  {:>12}  {:>7}  {:>7}  {:>11}  {:>7}  {:>9}",
+            "bucket", "sat", "unsat", "interrupted", "total", "time (s)"
+        );
+        eprintln!("  {}", "-".repeat(62));
+        for b in 0..nb {
+            let row = time_sat[b] + time_unsat[b] + time_int[b];
+            if row == 0 { continue; }
+            eprintln!(
+                "  {:>12}  {:>7}  {:>7}  {:>11}  {:>7}  {:>9.3}",
+                BUCKETS[b].1, time_sat[b], time_unsat[b], time_int[b], row,
+                bucket_time[b].as_secs_f64(),
+            );
+        }
+
+        // ── Conflict bucket table ─────────────────────────────────────────
+        eprintln!();
+        eprintln!("  Conflict distribution:");
+        let cb = CONFLICT_BUCKETS.len();
+        let mut conf_sat  = vec![0u32; cb];
+        let mut conf_unsat= vec![0u32; cb];
+        let mut conf_int  = vec![0u32; cb];
+        let mut bucket_conf = vec![0usize; cb];
+        for r in &self.calls {
+            let b = conflict_bucket_index(r.conflicts);
+            bucket_conf[b] += r.conflicts;
+            match r.result {
+                SatResult::Sat         => conf_sat[b]   += 1,
+                SatResult::Unsat       => conf_unsat[b] += 1,
+                SatResult::Interrupted => conf_int[b]   += 1,
+            }
+        }
+        eprintln!(
+            "  {:>14}  {:>7}  {:>7}  {:>11}  {:>7}  {:>12}",
+            "bucket", "sat", "unsat", "interrupted", "total", "conflicts"
+        );
+        eprintln!("  {}", "-".repeat(66));
+        for b in 0..cb {
+            let row = conf_sat[b] + conf_unsat[b] + conf_int[b];
+            if row == 0 { continue; }
+            eprintln!(
+                "  {:>14}  {:>7}  {:>7}  {:>11}  {:>7}  {:>12}",
+                CONFLICT_BUCKETS[b].1, conf_sat[b], conf_unsat[b], conf_int[b], row, bucket_conf[b],
+            );
+        }
+
+        eprintln!();
+        eprintln!("===========================");
+    }
+}
+
+static SAT_STATS: Mutex<SatStats> = Mutex::new(SatStats { calls: Vec::new() });
+
+/// Record a single SAT solver call into the global stats.
+pub fn record_sat_call(duration: Duration, conflicts: usize, result: rustsat::solvers::SolverResult) {
+    if let Ok(mut s) = SAT_STATS.lock() {
+        s.record(duration, conflicts, result.into());
+    }
+}
+
+/// Reset SAT call stats to zero.
+pub fn reset_sat_stats() {
+    if let Ok(mut s) = SAT_STATS.lock() {
+        *s = SatStats::default();
+    }
+}
+
+/// Print a summary of per-SAT-call stats to stderr.
+pub fn print_sat_stats() {
+    if let Ok(s) = SAT_STATS.lock() {
+        s.print_summary();
+    }
 }
 
 /// All collected statistics.

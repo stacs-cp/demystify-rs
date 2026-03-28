@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use itertools::Itertools;
 use rustsat::instances::Cnf;
-use rustsat::solvers::{Solve, SolveIncremental, SolverResult};
+use rustsat::solvers::{GetInternalStats, Solve, SolveIncremental, SolverResult};
 use rustsat::types::{Assignment, Lit};
 use tracing::info;
 
@@ -102,6 +102,13 @@ impl Solver {
             Solver::CaDiCaL(s) => s
                 .set_limit(rustsat_cadical::Limit::Conflicts(-1))
                 .expect("CaDiCaL set_limit failed"),
+        }
+    }
+
+    fn conflicts(&self) -> usize {
+        match self {
+            Solver::Glucose(s) => s.conflicts(),
+            Solver::CaDiCaL(s) => s.conflicts(),
         }
     }
 }
@@ -218,11 +225,16 @@ impl SatCore {
         solver: &mut MutexGuard<Solver>,
         lits: &[Lit],
     ) -> SolverResult {
-        //let _timer = QuickTimer::new("sat".to_owned());
         solver.set_conflict_limit(CONFLICT_LIMIT.load(Relaxed));
         SOLVER_CALLS.fetch_add(1, Relaxed);
+        let conflicts_before = solver.conflicts();
+        let call_start = std::time::Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
+        let call_duration = call_start.elapsed();
+        let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
         solver.clear_conflict_limit();
+
+        crate::stats::record_sat_call(call_duration, conflicts_delta, solve);
 
         if matches!(solve, SolverResult::Interrupted) {
             //eprintln!("SAT solver limit tripped");

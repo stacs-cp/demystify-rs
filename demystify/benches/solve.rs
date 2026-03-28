@@ -8,7 +8,7 @@ use demystify::{
         util::test_utils::build_puzzleparse,
     },
     satcore::{get_solver_calls, reset_solver_calls},
-    stats::{print_mus_stats, reset_mus_stats},
+    stats::{print_mus_stats, print_sat_stats, reset_mus_stats, reset_sat_stats},
 };
 
 fn bench_solve(c: &mut Criterion, name: &str, eprime: &str, param: &str, max_steps: Option<usize>) {
@@ -20,6 +20,7 @@ fn bench_solve(c: &mut Criterion, name: &str, eprime: &str, param: &str, max_ste
             || {
                 reset_solver_calls();
                 reset_mus_stats();
+                reset_sat_stats();
                 PuzzleSolver::new(Arc::clone(&puz)).expect("solver init failed")
             },
             |solver| {
@@ -33,9 +34,11 @@ fn bench_solve(c: &mut Criterion, name: &str, eprime: &str, param: &str, max_ste
         );
     });
 
-    // Print MUS stats accumulated from the last benchmark iteration.
+    // Print stats accumulated from the last benchmark iteration.
     eprintln!("\n--- MUS stats for {name} ---");
     print_mus_stats();
+    eprintln!("\n--- SAT call stats for {name} ---");
+    print_sat_stats();
 }
 
 fn binairo(c: &mut Criterion) {
@@ -65,6 +68,7 @@ fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, sample
             || {
                 reset_solver_calls();
                 reset_mus_stats();
+                reset_sat_stats();
                 PuzzleSolver::new(Arc::clone(&puz)).expect("solver init failed")
             },
             |solver| {
@@ -82,6 +86,8 @@ fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, sample
 
     eprintln!("\n--- MUS stats for {name} ---");
     print_mus_stats();
+    eprintln!("\n--- SAT call stats for {name} ---");
+    print_sat_stats();
 }
 
 fn miracle_sudoku_02(c: &mut Criterion) {
