@@ -872,7 +872,15 @@ impl PuzzleSolver {
             .iter()
             .par_bridge()
             .map(|&x| {
+                let t0 = Instant::now();
                 let ret = self.get_var_mus_size_1(x, Some(1));
+                let elapsed = t0.elapsed();
+                let outcome = match &ret {
+                    Ok(v) if !v.is_empty() => crate::stats::MusOutcome::Found(1),
+                    Ok(_) => crate::stats::MusOutcome::NotFound,
+                    Err(_) => crate::stats::MusOutcome::Timeout,
+                };
+                crate::stats::record_mus_search(elapsed, outcome, crate::stats::MusFunction::Size1);
                 (x, ret)
             })
             .filter(|(_, y)| y.is_ok())
@@ -917,15 +925,15 @@ impl PuzzleSolver {
                     };
 
                     let t0 = Instant::now();
-                    let ret = match config.strategy {
-                        Strategy::Slice => self.get_var_mus_slice(x, Some(mus_test_size)),
-                        Strategy::Cake => self.get_var_mus_cake(x, mus_test_size),
-                        Strategy::Quick => self.get_var_mus_quick(x, Some(mus_test_size)),
+                    let (ret, func) = match config.strategy {
+                        Strategy::Slice => (self.get_var_mus_slice(x, Some(mus_test_size)), crate::stats::MusFunction::Slice),
+                        Strategy::Cake  => (self.get_var_mus_cake(x, mus_test_size),        crate::stats::MusFunction::Cake),
+                        Strategy::Quick => (self.get_var_mus_quick(x, Some(mus_test_size)), crate::stats::MusFunction::Quick),
                         Strategy::Dynamic => {
                             if mus_test_size < 5 {
-                                self.get_var_mus_cake(x, mus_test_size)
+                                (self.get_var_mus_cake(x, mus_test_size),        crate::stats::MusFunction::Cake)
                             } else {
-                                self.get_var_mus_slice(x, Some(mus_test_size))
+                                (self.get_var_mus_slice(x, Some(mus_test_size)), crate::stats::MusFunction::Slice)
                             }
                         }
                     };
@@ -935,7 +943,7 @@ impl PuzzleSolver {
                         Ok(None) => crate::stats::MusOutcome::NotFound,
                         Err(_) => crate::stats::MusOutcome::Timeout,
                     };
-                    crate::stats::record_mus_search(elapsed, outcome);
+                    crate::stats::record_mus_search(elapsed, outcome, func);
                     if let Ok(Some(y)) = &ret {
                         best_mus_size.fetch_min(y.len() as i64, Relaxed);
                     }

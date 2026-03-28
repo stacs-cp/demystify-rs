@@ -12,12 +12,6 @@ use demystify::{
 };
 
 fn bench_solve(c: &mut Criterion, name: &str, eprime: &str, param: &str, max_steps: Option<usize>) {
-    // Fix rayon to 1 thread for reproducibility. build_global is idempotent.
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(1)
-        .build_global()
-        .ok();
-
     // Build PuzzleParse once — calling Conjure is expensive, done outside the loop.
     let puz = Arc::new(build_puzzleparse(eprime, param));
 
@@ -60,11 +54,6 @@ const MIRACLE_EPRIME: &str = "../demystify-web/examples/eprime/miracle.eprime";
 const MIRACLE_PARAM: &str = "../demystify-web/examples/eprime/miracle/original.param";
 
 fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, samples: usize, meas: Duration) {
-    rayon::ThreadPoolBuilder::new()
-        .num_threads(1)
-        .build_global()
-        .ok();
-
     let puz = Arc::new(build_puzzleparse(MIRACLE_EPRIME, MIRACLE_PARAM));
 
     let mut group = c.benchmark_group(name);
@@ -95,40 +84,9 @@ fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, sample
     print_mus_stats();
 }
 
-fn miracle_sudoku_01(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_01", Some(1),  50, Duration::from_secs(60));
-}
-
 fn miracle_sudoku_02(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_02", Some(2),  30, Duration::from_secs(120));
+    bench_miracle(c, "miracle_sudoku_02", Some(2), 10, Duration::from_secs(120));
 }
 
-fn miracle_sudoku_05(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_05", Some(5),  20, Duration::from_secs(300));
-}
-
-fn miracle_sudoku_10(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_10", Some(10), 10, Duration::from_secs(600));
-}
-
-fn miracle_sudoku_20(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_20", Some(20), 10, Duration::from_secs(3600));
-}
-
-fn miracle_sudoku_50(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_50", Some(50), 10, Duration::from_secs(7200));
-}
-
-criterion_group!(
-    benches,
-    binairo,
-    minesweeper_wall,
-    little_sudoku,
-    miracle_sudoku_01,
-    miracle_sudoku_02,
-    miracle_sudoku_05,
-    miracle_sudoku_10,
-    miracle_sudoku_20,
-    miracle_sudoku_50,
-);
+criterion_group!(benches, binairo, minesweeper_wall, little_sudoku, miracle_sudoku_02);
 criterion_main!(benches);
