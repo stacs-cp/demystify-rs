@@ -10,7 +10,103 @@ use tracing::info;
 
 use std::sync::atomic::Ordering::Relaxed;
 
-pub type Solver = rustsat_glucose::core::Glucose;
+// ===== Solver backend selection =====
+// All solver-specific code is isolated here; the rest of the file uses `Solver` uniformly.
+
+/// Which SAT solver backend to use.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SolverBackend {
+    Glucose,
+    CaDiCaL,
+}
+
+static SOLVER_BACKEND: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0); // 0=Glucose, 1=CaDiCaL
+
+/// Set the SAT solver backend. Should be called before any [`SatCore`] is created.
+pub fn set_solver_backend(backend: SolverBackend) {
+    SOLVER_BACKEND.store(backend as u8, Relaxed);
+}
+
+fn current_backend() -> SolverBackend {
+    if SOLVER_BACKEND.load(Relaxed) == 0 {
+        SolverBackend::Glucose
+    } else {
+        SolverBackend::CaDiCaL
+    }
+}
+
+pub enum Solver {
+    Glucose(rustsat_glucose::core::Glucose),
+    CaDiCaL(rustsat_cadical::CaDiCaL<'static, 'static>),
+}
+
+impl Default for Solver {
+    fn default() -> Self {
+        match current_backend() {
+            SolverBackend::Glucose => Solver::Glucose(Default::default()),
+            SolverBackend::CaDiCaL => Solver::CaDiCaL(Default::default()),
+        }
+    }
+}
+
+impl Solver {
+    fn add_cnf(&mut self, cnf: Cnf) -> anyhow::Result<()> {
+        match self {
+            Solver::Glucose(s) => s.add_cnf(cnf)?,
+            Solver::CaDiCaL(s) => s.add_cnf(cnf)?,
+        }
+        Ok(())
+    }
+
+    fn add_unit(&mut self, lit: Lit) -> anyhow::Result<()> {
+        match self {
+            Solver::Glucose(s) => s.add_unit(lit)?,
+            Solver::CaDiCaL(s) => s.add_unit(lit)?,
+        }
+        Ok(())
+    }
+
+    fn solve_assumps(&mut self, lits: &[Lit]) -> anyhow::Result<SolverResult> {
+        Ok(match self {
+            Solver::Glucose(s) => s.solve_assumps(lits)?,
+            Solver::CaDiCaL(s) => s.solve_assumps(lits)?,
+        })
+    }
+
+    fn full_solution(&self) -> anyhow::Result<Assignment> {
+        match self {
+            Solver::Glucose(s) => s.full_solution(),
+            Solver::CaDiCaL(s) => s.full_solution(),
+        }
+    }
+
+    fn core(&mut self) -> anyhow::Result<Vec<Lit>> {
+        match self {
+            Solver::Glucose(s) => s.core(),
+            Solver::CaDiCaL(s) => s.core(),
+        }
+    }
+
+    fn set_conflict_limit(&mut self, limit: i64) {
+        match self {
+            Solver::Glucose(s) => s.set_limit(rustsat_glucose::Limit::Conflicts(limit)),
+            Solver::CaDiCaL(s) => s
+                .set_limit(rustsat_cadical::Limit::Conflicts(limit as i32))
+                .expect("CaDiCaL set_limit failed"),
+        }
+    }
+
+    fn clear_conflict_limit(&mut self) {
+        match self {
+            Solver::Glucose(s) => s.set_limit(rustsat_glucose::Limit::Conflicts(-1)),
+            Solver::CaDiCaL(s) => s
+                .set_limit(rustsat_cadical::Limit::Conflicts(-1))
+                .expect("CaDiCaL set_limit failed"),
+        }
+    }
+}
+
+// ===== End solver backend selection =====
 
 /// Represents a SAT solver core.
 /// The public interface to the solver is stateless.
@@ -119,16 +215,14 @@ impl SatCore {
     }
 
     fn do_solve_assumps(
-        solver: &mut MutexGuard<rustsat_glucose::core::Glucose>,
+        solver: &mut MutexGuard<Solver>,
         lits: &[Lit],
     ) -> SolverResult {
         //let _timer = QuickTimer::new("sat".to_owned());
-        solver.set_limit(rustsat_glucose::Limit::Conflicts(
-            CONFLICT_LIMIT.load(Relaxed),
-        ));
+        solver.set_conflict_limit(CONFLICT_LIMIT.load(Relaxed));
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let solve = solver.solve_assumps(lits).unwrap();
-        solver.set_limit(rustsat_glucose::Limit::Conflicts(-1));
+        solver.clear_conflict_limit();
 
         if matches!(solve, SolverResult::Interrupted) {
             //eprintln!("SAT solver limit tripped");
