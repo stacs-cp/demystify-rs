@@ -758,7 +758,7 @@ impl PuzzleSolver {
 
         conset.shuffle(&mut rand::rng());
 
-        let conset_chunks: Vec<Vec<Lit>> = (0..=max_size)
+        let conset_chunks: Vec<Vec<Lit>> = (0..max_size)
             .map(|i| {
                 conset
                     .iter()
