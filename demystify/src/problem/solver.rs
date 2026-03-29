@@ -1132,7 +1132,7 @@ mod tests {
             let mus_limit = puz.get_var_mus_quick(lit, Some(100))?.unwrap();
             let tiny_muses = puz.get_var_mus_size_1(lit, None)?;
             let tiny_muses_1 = puz.get_var_mus_size_1(lit, Some(1))?;
-            let cake_mus = puz.get_var_mus_cake(lit, 3)?.unwrap();
+            let cake_mus = puz.get_var_mus_cake(lit, 4)?.unwrap();
             assert_eq!(mus.len() == 1, !tiny_muses.is_empty());
             assert_eq!(!tiny_muses_1.is_empty(), !tiny_muses.is_empty());
             if mus.len() == 1 {
