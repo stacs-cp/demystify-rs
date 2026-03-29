@@ -197,12 +197,12 @@ impl Puzzle {
         }
 
         if width.is_none() || height.is_none() {
-            if start_grid.is_some() {
-                width = Some(start_grid.as_ref().unwrap()[0].len() as i64);
-                height = Some(start_grid.as_ref().unwrap().len() as i64);
-            } else if cages.is_some() {
-                width = Some(cages.as_ref().unwrap()[0].len() as i64);
-                height = Some(cages.as_ref().unwrap().len() as i64);
+            if let Some(sg) = &start_grid {
+                width = Some(sg[0].len() as i64);
+                height = Some(sg.len() as i64);
+            } else if let Some(cg) = &cages {
+                width = Some(cg[0].len() as i64);
+                height = Some(cg.len() as i64);
             }
         }
 
@@ -225,35 +225,35 @@ impl Puzzle {
             let mut classes: BTreeMap<String, Vec<ConstraintInstance>> = BTreeMap::new();
             for (lit, description) in &problem.conset {
                 // Recover the class name from invlitmap (Lit → PuzLit → PuzVar.name)
-                if let Some(puzlits) = problem.invlitmap.get(lit) {
-                    if let Some(puzlit) = puzlits.iter().find(|p| p.val() == 1) {
-                        let class = puzlit.var().name().clone();
-                        // Skip if this class is already at the cap.
-                        let entries = classes.entry(class.clone()).or_default();
-                        if entries.len() >= MAX_INSTANCES_PER_CLASS {
-                            continue;
-                        }
-                        // Collect the unique grid cells this constraint covers (0-indexed).
-                        let scope = problem.constraint_scope(description);
-                        let cells: Vec<[i64; 2]> = scope
-                            .iter()
-                            .filter(|vvp| vvp.var().indices().len() == 2)
-                            .map(|vvp| {
-                                let idx = vvp.var().indices();
-                                [idx[0] - 1, idx[1] - 1]
-                            })
-                            .collect::<BTreeSet<_>>()
-                            .into_iter()
-                            .collect();
-                        // Skip vacuous instances (guard failed → no SAT connections → no cells).
-                        if cells.is_empty() {
-                            continue;
-                        }
-                        entries.push(ConstraintInstance {
-                            description: description.clone(),
-                            cells,
-                        });
+                if let Some(puzlits) = problem.invlitmap.get(lit)
+                    && let Some(puzlit) = puzlits.iter().find(|p| p.val() == 1)
+                {
+                    let class = puzlit.var().name().clone();
+                    // Skip if this class is already at the cap.
+                    let entries = classes.entry(class.clone()).or_default();
+                    if entries.len() >= MAX_INSTANCES_PER_CLASS {
+                        continue;
                     }
+                    // Collect the unique grid cells this constraint covers (0-indexed).
+                    let scope = problem.constraint_scope(description);
+                    let cells: Vec<[i64; 2]> = scope
+                        .iter()
+                        .filter(|vvp| vvp.var().indices().len() == 2)
+                        .map(|vvp| {
+                            let idx = vvp.var().indices();
+                            [idx[0] - 1, idx[1] - 1]
+                        })
+                        .collect::<BTreeSet<_>>()
+                        .into_iter()
+                        .collect();
+                    // Skip vacuous instances (guard failed → no SAT connections → no cells).
+                    if cells.is_empty() {
+                        continue;
+                    }
+                    entries.push(ConstraintInstance {
+                        description: description.clone(),
+                        cells,
+                    });
                 }
             }
             if classes.is_empty() { None } else { Some(classes) }
@@ -587,10 +587,10 @@ impl Problem {
             .flat_map(|r| (0..width).map(move |c| (r, c)))
             .filter(|&(r, c)| {
                 knowledgegrid[r][c].is_none()
-                    && !puzzle
+                    && puzzle
                         .start_grid
                         .as_ref()
-                        .is_some_and(|sg| sg[r][c].is_some())
+                        .is_none_or(|sg| sg[r][c].is_none())
             })
             .map(|(r, c)| [r as i64, c as i64])
             .collect();
@@ -615,21 +615,51 @@ mod tests {
     use test_log::test;
 
     use crate::json::Puzzle;
+    use crate::problem::util::test_utils::build_puzzleparse;
 
     #[test]
     fn test_parse_essence_binairo() -> anyhow::Result<()> {
-        let eprime_path = "./tst/binairo.eprime";
-        let eprimeparam_path = "./tst/binairo-1.param";
-
-        let puz =
-            crate::problem::util::test_utils::build_puzzleparse(eprime_path, eprimeparam_path);
-
+        let puz = build_puzzleparse("./tst/binairo.eprime", "./tst/binairo-1.param");
         let p = Puzzle::new_from_puzzle(&puz)?;
-
         assert_eq!(p.kind, "Binairo");
         assert_eq!(p.width, 6);
         assert_eq!(p.height, 6);
+        Ok(())
+    }
 
+    #[test]
+    fn test_puzzle_dimensions_match_param() -> anyhow::Result<()> {
+        // binairo with n=6 should produce a 6×6 puzzle.
+        let puz = build_puzzleparse("./tst/binairo.eprime", "./tst/binairo-1.param");
+        let p = Puzzle::new_from_puzzle(&puz)?;
+        assert_eq!(p.width, 6, "binairo n=6 should give width=6");
+        assert_eq!(p.height, 6, "binairo n=6 should give height=6");
+        Ok(())
+    }
+
+    #[test]
+    fn test_puzzle_start_grid_present() -> anyhow::Result<()> {
+        // Binairo has a start_grid with some given values.
+        let puz = build_puzzleparse("./tst/binairo.eprime", "./tst/binairo-1.param");
+        let p = Puzzle::new_from_puzzle(&puz)?;
+        assert!(p.start_grid.is_some());
+        let sg = p.start_grid.unwrap();
+        assert_eq!(sg.len() as i64, p.height);
+        assert_eq!(sg[0].len() as i64, p.width);
+        Ok(())
+    }
+
+    #[test]
+    fn test_puzzle_minesweeper_has_no_start_grid() -> anyhow::Result<()> {
+        // Minesweeper has no pre-filled grid.
+        let puz = build_puzzleparse("./tst/minesweeper.eprime", "./tst/minesweeperPrinted.param");
+        let p = Puzzle::new_from_puzzle(&puz)?;
+        // Minesweeper start_grid is None or all-None cells
+        let all_empty = p
+            .start_grid
+            .as_ref()
+            .map_or(true, |sg| sg.iter().all(|row| row.iter().all(|c| c.is_none())));
+        assert!(all_empty, "minesweeper should have no fixed start cells");
         Ok(())
     }
 }

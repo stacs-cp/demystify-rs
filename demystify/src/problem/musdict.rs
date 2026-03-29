@@ -1,11 +1,11 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use rustsat::types::Lit;
 
 /// A dictionary for storing muses (minimal unsatisfiable subsets) associated with literals.
 #[derive(Clone)]
 pub struct MusDict {
-    muses: HashMap<Lit, BTreeSet<MusContext>>,
+    muses: BTreeMap<Lit, BTreeSet<MusContext>>,
 }
 
 impl Default for MusDict {
@@ -23,7 +23,7 @@ impl MusDict {
     #[must_use]
     pub fn new() -> Self {
         MusDict {
-            muses: HashMap::new(),
+            muses: BTreeMap::new(),
         }
     }
 
@@ -71,7 +71,7 @@ impl MusDict {
 
     /// Returns a reference to the muses in the dictionary.
     #[must_use]
-    pub fn muses(&self) -> &HashMap<Lit, BTreeSet<MusContext>> {
+    pub fn muses(&self) -> &BTreeMap<Lit, BTreeSet<MusContext>> {
         &self.muses
     }
 

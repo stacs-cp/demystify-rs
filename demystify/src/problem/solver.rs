@@ -23,7 +23,7 @@ use crate::{
 use super::{PuzLit, musdict::MusDict, parse::PuzzleParse};
 
 /// The strategy to use when finding a minimal unsatisfiable subset (MUS)
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub enum Strategy {
     /// Uses a quick algorithm that may find larger MUSes
     Quick,
@@ -32,13 +32,8 @@ pub enum Strategy {
     /// Uses a "cake cutting" technique to find small MUSes
     Cake,
     /// Uses 'cake cutting' for smaller MUSes, slice for larger
+    #[default]
     Dynamic,
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Self::Dynamic
-    }
 }
 
 #[derive(Copy, Clone)]
@@ -178,7 +173,7 @@ impl PuzzleSolver {
         self.puzzleparse
             .invlitmap
             .get(lit)
-            .unwrap_or_else(|| panic!("Mizzing lit: {lit}"))
+            .unwrap_or_else(|| panic!("Missing lit: {lit}"))
     }
 
     /// Determines if the current puzzle state is solvable under the current assumptions. This only checks if the puzzle has at least one solution, not that the solution is unique.
@@ -401,7 +396,7 @@ impl PuzzleSolver {
                     solution.push(test_lit);
                     litorig.push(test_lit);
                 } else {
-                    panic!("Trying to find a solution to a problem with no answer??!??")
+                    panic!("No solution exists for the current puzzle state")
                 }
             }
 
@@ -875,7 +870,7 @@ impl PuzzleSolver {
         } else {
             lits.iter()
                 .copied()
-                .filter(|&lit| md.min_lit(lit).map_or(true, |s| s > 1))
+                .filter(|&lit| md.min_lit(lit).is_none_or(|s| s > 1))
                 .collect()
         };
 
@@ -920,7 +915,7 @@ impl PuzzleSolver {
                 lits.iter().collect()
             } else {
                 lits.iter()
-                    .filter(|&&lit| md.min_lit(lit).map_or(true, |s| s as i64 > mus_size))
+                    .filter(|&&lit| md.min_lit(lit).is_none_or(|s| s as i64 > mus_size))
                     .collect()
             };
 
@@ -934,6 +929,8 @@ impl PuzzleSolver {
                         return (x, Ok(None));
                     }
                     let mus_test_size = if config.find_bigger {
+                        // Allow 9 constraints above the current best, giving slack to find
+                        // moderately larger MUSes without searching unboundedly.
                         mus_test_size + 3 * 3
                     } else {
                         mus_test_size

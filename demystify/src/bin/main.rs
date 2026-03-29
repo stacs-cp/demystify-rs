@@ -56,6 +56,15 @@ struct Opt {
     )]
     all_muses: bool,
 
+    #[arg(long, help = "Suppress progress and statistics output on stderr")]
+    quiet: bool,
+
+    #[arg(
+        long,
+        help = "Emit each solve step as a JSON object (instead of the default debug format)"
+    )]
+    json: bool,
+
     #[arg(
         long,
         value_enum,
@@ -154,14 +163,34 @@ fn main() -> anyhow::Result<()> {
         println!("<body> {html}");
         println!("<script> doJavascript(); </script>");
         println!("</body> </html>");
+    } else if opt.json {
+        for step in planner.quick_solve() {
+            let json_step: Vec<serde_json::Value> = step
+                .iter()
+                .map(|(lits, constraints)| {
+                    serde_json::json!({
+                        "lits": lits,
+                        "constraints": constraints,
+                    })
+                })
+                .collect();
+            println!("{}", serde_json::to_string(&json_step).unwrap());
+        }
     } else {
-        for p in planner.quick_solve_with_progress() {
+        let solve_fn: Box<dyn FnOnce() -> Vec<_>> = if opt.quiet {
+            Box::new(|| planner.quick_solve())
+        } else {
+            Box::new(|| planner.quick_solve_with_progress())
+        };
+        for p in solve_fn() {
             println!("{p:?}");
         }
     }
 
-    print_mus_stats();
-    print_sat_stats();
+    if !opt.quiet {
+        print_mus_stats();
+        print_sat_stats();
+    }
 
     Ok(())
 }

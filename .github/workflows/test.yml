@@ -38,6 +38,11 @@ jobs:
 
       - run: cargo build -vv --workspace
 
+      - run: cargo clippy --workspace -- -D warnings
+
+      - run: cargo install cargo-audit --quiet || true
+      - run: cargo audit
+
       - uses: ./.github/actions/install-conjure
         with:
           os_arch: ${{ matrix.release_suffix }}

@@ -130,6 +130,8 @@ pub struct SatCore {
 // We also set a 'counter', which checks if the solver is frequently hitting it's limit, if so
 // we increase the limit
 static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
+/// Upper bound on the auto-ramp conflict limit — prevents overflow on very long runs.
+const MAX_CONFLICT_LIMIT: i64 = 100_000_000;
 static CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 static SOLVER_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
@@ -250,7 +252,7 @@ impl SatCore {
                     limit,
                     limit * 10
                 );
-                CONFLICT_LIMIT.store(CONFLICT_LIMIT.load(Relaxed) * 10, Relaxed);
+                CONFLICT_LIMIT.store((CONFLICT_LIMIT.load(Relaxed) * 10).min(MAX_CONFLICT_LIMIT), Relaxed);
                 CONFLICT_COUNT.store(0, Relaxed);
             } else {
                 let _ = CONFLICT_COUNT.fetch_update(Relaxed, Relaxed, |count| {

@@ -54,10 +54,10 @@ impl Decorations {
                     }
                 } else if dec == "clue_in_corner" {
                     flags.insert(DecorationKind::ClueInCorner);
-                } else if let Some(val_str) = dec.strip_prefix("wall_below=") {
-                    if let Ok(val) = val_str.parse::<i64>() {
-                        flags.insert(DecorationKind::WallBelow(val));
-                    }
+                } else if let Some(val_str) = dec.strip_prefix("wall_below=")
+                    && let Ok(val) = val_str.parse::<i64>()
+                {
+                    flags.insert(DecorationKind::WallBelow(val));
                 }
             }
             return Decorations { flags };
@@ -310,41 +310,41 @@ impl PuzzleDraw {
                 let val = contents[i][j];
 
                 // Wall cell: start_grid value < wall_below threshold → draw thick inward border.
-                if let Some(wb) = wall_below {
-                    if val.is_some_and(|v| v < wb) {
-                        // Dark outer rect fills the entire cell.
-                        let mut outer = element::Rectangle::new();
-                        outer.assign("width", 1);
-                        outer.assign("height", 1);
-                        outer.assign("fill", "#666666");
-                        outer.assign("class", "wall-cell");
-                        cells[i][j].append(outer);
+                if let Some(wb) = wall_below
+                    && val.is_some_and(|v| v < wb)
+                {
+                    // Dark outer rect fills the entire cell.
+                    let mut outer = element::Rectangle::new();
+                    outer.assign("width", 1);
+                    outer.assign("height", 1);
+                    outer.assign("fill", "#666666");
+                    outer.assign("class", "wall-cell");
+                    cells[i][j].append(outer);
 
-                        // White inner rect — leaves a thick dark border around the edge.
-                        let mut inner = element::Rectangle::new();
-                        inner.assign("x", 0.1);
-                        inner.assign("y", 0.1);
-                        inner.assign("width", 0.8);
-                        inner.assign("height", 0.8);
-                        inner.assign("fill", "white");
-                        cells[i][j].append(inner);
+                    // White inner rect — leaves a thick dark border around the edge.
+                    let mut inner = element::Rectangle::new();
+                    inner.assign("x", 0.1);
+                    inner.assign("y", 0.1);
+                    inner.assign("width", 0.8);
+                    inner.assign("height", 0.8);
+                    inner.assign("fill", "white");
+                    cells[i][j].append(inner);
 
-                        // Show clue number only for numbered cells (value >= 0).
-                        // Negative values (e.g. -1) mean "black, no number".
-                        if let Some(v) = val {
-                            if v >= 0 {
-                                let mut node =
-                                    svg::node::element::Text::new(v.to_string());
-                                node.assign("font-size", 0.5);
-                                node.assign("x", 0.5);
-                                node.assign("y", 0.65);
-                                node.assign("dominant-baseline", "middle");
-                                node.assign("text-anchor", "middle");
-                                cells[i][j].append(node);
-                            }
-                        }
-                        continue;
+                    // Show clue number only for numbered cells (value >= 0).
+                    // Negative values (e.g. -1) mean "black, no number".
+                    if let Some(v) = val
+                        && v >= 0
+                    {
+                        let mut node =
+                            svg::node::element::Text::new(v.to_string());
+                        node.assign("font-size", 0.5);
+                        node.assign("x", 0.5);
+                        node.assign("y", 0.65);
+                        node.assign("dominant-baseline", "middle");
+                        node.assign("text-anchor", "middle");
+                        cells[i][j].append(node);
                     }
+                    continue;
                 }
 
                 // Normal fixed cell rendering.
@@ -874,16 +874,54 @@ mod tests {
 
     #[test]
     fn test_svg_sudoku() -> anyhow::Result<()> {
-        let svg_path = "./tst/sudoku.json";
-
-        let file = File::open(svg_path)?;
+        let file = File::open("./tst/sudoku.json")?;
         let problem: Problem = serde_json::from_reader(file)?;
-
         let puz_draw = PuzzleDraw::new(&problem.puzzle.kind);
-
         let svg = puz_draw.draw_puzzle(&problem);
+        let svg_str = svg.to_string();
 
-        let _ = svg.to_string();
+        // Should produce non-empty SVG with grid rectangles.
+        assert!(!svg_str.is_empty(), "SVG output must not be empty");
+        assert!(svg_str.contains("<svg"), "SVG output must contain <svg tag");
+        assert!(svg_str.contains("rect"), "SVG output must contain rect elements");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_svg_sudoku_has_sudoku_grid_lines() -> anyhow::Result<()> {
+        // The sudoku kind triggers SudokuGrid decoration — thick lines every 3 cells.
+        let file = File::open("./tst/sudoku.json")?;
+        let problem: Problem = serde_json::from_reader(file)?;
+        let puz_draw = PuzzleDraw::new(&problem.puzzle.kind);
+        let svg = puz_draw.draw_puzzle(&problem);
+        let svg_str = svg.to_string();
+
+        // Sudoku grids use stroke-width > 0.1 for box boundaries.
+        assert!(
+            svg_str.contains("stroke-width"),
+            "Sudoku SVG must include stroke-width attributes for grid lines"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_svg_minesweeper() -> anyhow::Result<()> {
+        // Build a minesweeper puzzle without a pre-parsed JSON file.
+        let puz =
+            crate::problem::util::test_utils::build_puzzleparse(
+                "./tst/minesweeper.eprime",
+                "./tst/minesweeperPrinted.param",
+            );
+        let puzzle = crate::json::Puzzle::new_from_puzzle(&puz)?;
+        let problem = Problem { puzzle, state: None };
+        let puz_draw = PuzzleDraw::new(&problem.puzzle.kind);
+        let svg = puz_draw.draw_puzzle(&problem);
+        let svg_str = svg.to_string();
+
+        assert!(!svg_str.is_empty());
+        assert!(svg_str.contains("<svg"));
 
         Ok(())
     }

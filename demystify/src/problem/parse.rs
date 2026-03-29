@@ -706,7 +706,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 info!(target: "parser", "{}", line);
                 let captures = conmatch
                     .captures(&line)
-                    .unwrap_or_else(|| panic!("Broken line: {line}"));
+                    .context(format!("Malformed $#CON line: {line}"))?;
 
                 let con_name = captures.get(1).unwrap().as_str().to_string();
                 let con_value = captures.get(2).unwrap().as_str().to_string();
@@ -740,11 +740,11 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 kind = Some(v);
             } else if line.starts_with("$#INFO") {
                 // Collect the rest of the line after $#INFO as an info string
-                let info_string = line["$#INFO ".len()..].trim().to_string();
+                let info_string = line.strip_prefix("$#INFO").unwrap_or("").trim().to_string();
                 info!(target: "parser", "Found INFO: '{}'", info_string);
                 info.push(info_string);
             } else if line.starts_with("$#DEC ") {
-                let dec_string = line["$#DEC ".len()..].trim().to_string();
+                let dec_string = line.strip_prefix("$#DEC ").unwrap_or("").trim().to_string();
                 info!(target: "parser", "Found DEC: '{}'", dec_string);
                 decs.push(dec_string);
             } else if line.starts_with("$#REVEAL ") {
@@ -815,13 +815,13 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
     Ok(puzzleparse)
 }
 
-fn read_dimacs_to_maps(
-    in_path: &PathBuf,
-) -> anyhow::Result<(
+type DimacsMaps = (
     BTreeMap<PuzLit, Lit>,
     BTreeMap<PuzVar, HashSet<Lit>>,
     BTreeMap<Lit, PuzVar>,
-)> {
+);
+
+fn read_dimacs_to_maps(in_path: &PathBuf) -> anyhow::Result<DimacsMaps> {
     let dvarmatch = Regex::new(r"c Var '(.*)' direct represents '(.*)' with '(.*)'").unwrap();
     let ovarmatch = Regex::new(r"c Var '(.*)' order represents '(.*)' with '(.*)'").unwrap();
 

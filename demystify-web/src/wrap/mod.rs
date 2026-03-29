@@ -19,75 +19,90 @@ macro_rules! include_model_file {
     };
 }
 
-static EXAMPLES: Lazy<[(&str, &str, &str); 14]> = Lazy::new(|| {
+/// Each entry: (name, description, model_content, param_content).
+static EXAMPLES: Lazy<[(&str, &str, &str, &str); 14]> = Lazy::new(|| {
     [
         (
             "Sudoku",
+            "Place 1–9 in each row, column and 3×3 box exactly once.",
             include_model_file!("examples/eprime/sudoku.eprime"),
             include_model_file!("examples/eprime/sudoku/puzzlingexample.param"),
         ),
         (
             "MiracleSudoku",
+            "Sudoku with extra constraints: no two equal digits may be a king or knight's move apart.",
             include_model_file!("examples/eprime/miracle.eprime"),
             include_model_file!("examples/eprime/miracle/original.param"),
         ),
         (
             "StarBattle",
+            "Place stars in the grid so each row, column and region has exactly one star; stars may not touch.",
             include_model_file!("examples/eprime/star-battle.eprime"),
             include_model_file!("examples/eprime/star-battle/FATAtalkexample.param"),
         ),
         (
             "Binairo",
+            "Fill the grid with 0s and 1s: equal counts per row/column, no three equal values adjacent.",
             include_model_file!("examples/eprime/binairo.essence"),
             include_model_file!("examples/eprime/binairo/diiscu.param"),
         ),
         (
             "Thermometer",
+            "Fill thermometers so values increase from bulb to tip.",
             include_model_file!("examples/eprime/thermometer.eprime"),
             include_model_file!("examples/eprime/thermometer/thermometer-1.param"),
         ),
         (
             "Futoshiki",
+            "Place digits 1–N in each row and column; respect the inequality signs between cells.",
             include_model_file!("examples/eprime/futoshiki.eprime"),
             include_model_file!("examples/eprime/futoshiki/nfutoshiki-1.param"),
         ),
         (
             "KillerSudoku",
+            "Sudoku where caged groups of cells must sum to a given total; no repeats within a cage.",
             include_model_file!("examples/eprime/killersudoku.eprime"),
             include_model_file!("examples/eprime/killersudoku/killersudoku.param"),
         ),
         (
             "Skyscrapers",
+            "Place 1–N in each row and column; clues on edges indicate how many 'buildings' are visible.",
             include_model_file!("examples/eprime/skyscrapers.eprime"),
             include_model_file!("examples/eprime/skyscrapers/skyscrapers-1.param"),
         ),
         (
             "XSums",
+            "Sudoku variant where edge clues equal the sum of the first X digits in that row/column (X is the first digit).",
             include_model_file!("examples/eprime/x-sums.eprime"),
             include_model_file!("examples/eprime/x-sums/easy-xsums.param"),
         ),
         (
             "Kakurasu",
+            "Place marks in a grid so each row and column's marked-column (or marked-row) indices sum to the clue.",
             include_model_file!("examples/eprime/kakurasu.eprime"),
             include_model_file!("examples/eprime/kakurasu/kakurasu.param"),
         ),
         (
             "Akari",
+            "Place light bulbs so every cell is lit; bulbs may not illuminate each other; numbered cells must have exactly that many adjacent bulbs.",
             include_model_file!("examples/eprime/akari.eprime"),
             include_model_file!("examples/eprime/akari/akari-5x5.param"),
         ),
         (
             "Mosaic",
+            "Fill each cell black or white; a numbered cell indicates how many of its 3×3 neighbourhood (including itself) are black.",
             include_model_file!("examples/eprime/mosaic.eprime"),
             include_model_file!("examples/eprime/mosaic/mosaic-5x5.param"),
         ),
         (
             "Nonogram",
+            "Fill rows and columns according to clue sequences that describe runs of consecutive filled cells.",
             include_model_file!("examples/eprime/nonogram.eprime"),
             include_model_file!("examples/eprime/nonogram/duck-8x9.param"),
         ),
         (
             "Minesweeper",
+            "Identify mine locations; numbered cells show exactly how many of their neighbours are mines.",
             include_model_file!("examples/eprime/minesweeper.eprime"),
             include_model_file!("examples/eprime/minesweeper/minesweeper-5x5.param"),
         ),
@@ -291,15 +306,16 @@ pub async fn load_example(
 ) -> Result<String, util::AppError> {
     let example_name = form.example_name.clone();
 
-    let param_content = EXAMPLES
+    let (_, description, _, param_content) = EXAMPLES
         .iter()
-        .find(|(name, _, _)| *name == example_name)
-        .map(|(_, _, content)| *content)
+        .find(|(name, _, _, _)| *name == example_name)
+        .copied()
         .context(format!("Example '{example_name}' not found"))?;
 
     Ok(format!(
         r###"
         <h5>Edit Parameters for {example_name}</h5>
+        <p class="text-muted small">{description}</p>
         <form id="paramForm" hx-post="/submitExample" hx-target="#mainSpace">
             <input type="hidden" name="example_name" value="{example_name}">
             <textarea name="param_content" class="form-control" rows="15" style="font-family: monospace;">{param_content}</textarea>
@@ -314,7 +330,7 @@ pub async fn load_example(
 pub async fn get_example_names() -> String {
     let options = EXAMPLES
         .iter()
-        .map(|(name, _, _)| format!("<option value=\"{name}\">{name}</option>"))
+        .map(|(name, desc, _, _)| format!("<option value=\"{name}\" title=\"{desc}\">{name}</option>"))
         .collect::<Vec<_>>()
         .join("");
 
@@ -341,8 +357,8 @@ pub async fn submit_example(
 
     let model_content = EXAMPLES
         .iter()
-        .find(|(name, _, _)| *name == example_name)
-        .map(|(_, content, _)| *content)
+        .find(|(name, _, _, _)| *name == example_name)
+        .map(|(_, _, content, _)| *content)
         .context(format!("Example '{example_name}' not found"))?;
 
     let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;

@@ -21,7 +21,12 @@ async fn main() {
 
     match conjure_version {
         Ok(s) => println!("{s}"),
-        Err(s) => panic!("Can't find conjure: {s}"),
+        Err(s) => {
+            eprintln!("ERROR: Could not find 'conjure': {s}");
+            eprintln!("Install conjure from https://github.com/conjure-cp/conjure/releases");
+            eprintln!("or pass --conjure Docker / --conjure Podman to use a container image.");
+            std::process::exit(1);
+        }
     };
 
     let session_config = SessionConfig::default().with_table_name("sessions_table");

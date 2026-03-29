@@ -62,7 +62,7 @@ impl LuaUserData for LuaPlanner {
         // Check if the puzzle is fully solved
         methods.add_method("is_solved", |_, this, ()| {
             let planner = this.inner.lock().unwrap();
-            Ok(planner.get_all_known_lits().len() > 0
+            Ok(!planner.get_all_known_lits().is_empty()
                 && planner.puzzle().varset_lits.iter().all(|lit| {
                     planner.get_all_known_lits().contains(lit)
                         || planner.get_all_known_lits().contains(&(!*lit))
@@ -103,11 +103,11 @@ impl LuaUserData for LuaPlanner {
 
             // First check provable literals
             for lit in &provable {
-                let puzlits = planner.puzzle().lit_to_vars(&lit);
+                let puzlits = planner.puzzle().lit_to_vars(lit);
                 for puzlit in puzlits {
                     if format_puzlit(puzlit) == lit_str {
                         let lit_copy = lit;
-                        planner.mark_lit_as_deduced(&lit_copy);
+                        planner.mark_lit_as_deduced(lit_copy);
                         return Ok(true);
                     }
                 }

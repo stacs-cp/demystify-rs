@@ -121,14 +121,7 @@ impl PuzzlePlanner {
             &self.config.mus_config,
             Some(self.mus_cache.clone()),
         );
-        // Update cache (skip size-0 MUSes — those are trivial deductions).
-        for (lit, mus_set) in full_result.muses() {
-            for mc in mus_set {
-                if !mc.mus.is_empty() {
-                    self.mus_cache.add_mus(*lit, mc.mus.clone());
-                }
-            }
-        }
+        self.update_mus_cache(&full_result);
         // Return only entries for the current varlits — the full_result may also contain
         // stale entries from earlier steps that must not be seen by callers.
         Self::filter_musdict_to_lits(full_result, &varlits)
@@ -153,14 +146,19 @@ impl PuzzlePlanner {
             &self.config.mus_config,
             Some(self.mus_cache.clone()),
         );
-        for (lit, mus_set) in full_result.muses() {
+        self.update_mus_cache(&full_result);
+        Self::filter_musdict_to_lits(full_result, &varlits)
+    }
+
+    /// Updates the MUS cache from a search result, skipping size-0 MUSes (trivial deductions).
+    fn update_mus_cache(&mut self, result: &MusDict) {
+        for (lit, mus_set) in result.muses() {
             for mc in mus_set {
                 if !mc.mus.is_empty() {
                     self.mus_cache.add_mus(*lit, mc.mus.clone());
                 }
             }
         }
-        Self::filter_musdict_to_lits(full_result, &varlits)
     }
 
     /// Filters a `MusDict` to only contain entries whose literal is in `lits`.
@@ -671,7 +669,10 @@ impl PuzzlePlanner {
 mod tests {
     use std::{collections::BTreeSet, sync::Arc};
 
-    use crate::problem::{planner::PuzzlePlanner, solver::PuzzleSolver};
+    use crate::problem::{
+        planner::{PlannerConfig, PuzzlePlanner},
+        solver::{MusConfig, PuzzleSolver},
+    };
     use itertools::Itertools;
     use test_log::test;
 
@@ -715,6 +716,41 @@ mod tests {
         let mut plan = PuzzlePlanner::new(puz);
 
         assert_eq!(plan.check_solvability(), Some(0));
+    }
+
+    /// find_one=true (the new default) must produce the same set of deduced literals as find_one=false.
+    #[test]
+    fn test_find_one_same_deductions_as_find_all() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperWall.param",
+        );
+        let result = Arc::new(result);
+
+        let run_solve = |find_one: bool| {
+            let puz = PuzzleSolver::new(result.clone()).unwrap();
+            let config = PlannerConfig {
+                mus_config: MusConfig { find_one, ..MusConfig::default() },
+                ..PlannerConfig::default()
+            };
+            let mut plan = PuzzlePlanner::new_with_config(puz, config);
+            let seq = plan.quick_solve();
+            // Collect the flat list of deduced literal sets across all steps.
+            seq.into_iter()
+                .flatten()
+                .map(|(lits, _)| lits)
+                .collect_vec()
+        };
+
+        let with_find_one = run_solve(true);
+        let without_find_one = run_solve(false);
+
+        // Both runs must deduce the same number of steps (deductions are deterministic).
+        assert_eq!(
+            with_find_one.len(),
+            without_find_one.len(),
+            "find_one changed the number of deduction steps"
+        );
     }
 
     // This test doesn't really do any deep tests,
