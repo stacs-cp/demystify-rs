@@ -437,10 +437,7 @@ impl PuzzlePlanner {
     pub fn quick_solve_html_step(&mut self) -> (String, Vec<Lit>) {
         let base_muses = self.smallest_muses_with_config();
         if base_muses.is_empty() {
-            return self.quick_display_html_step_impl(
-                None,
-                "There are no more values to deduce",
-            );
+            return self.quick_display_html_step_impl(None, "There are no more values to deduce");
         }
         self.quick_display_html_step(Some(base_muses))
     }
@@ -730,7 +727,10 @@ mod tests {
         let run_solve = |find_one: bool| {
             let puz = PuzzleSolver::new(result.clone()).unwrap();
             let config = PlannerConfig {
-                mus_config: MusConfig { find_one, ..MusConfig::default() },
+                mus_config: MusConfig {
+                    find_one,
+                    ..MusConfig::default()
+                },
                 ..PlannerConfig::default()
             };
             let mut plan = PuzzlePlanner::new_with_config(puz, config);

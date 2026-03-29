@@ -223,10 +223,7 @@ impl SatCore {
         }
     }
 
-    fn do_solve_assumps(
-        solver: &mut MutexGuard<Solver>,
-        lits: &[Lit],
-    ) -> SolverResult {
+    fn do_solve_assumps(solver: &mut MutexGuard<Solver>, lits: &[Lit]) -> SolverResult {
         solver.set_conflict_limit(CONFLICT_LIMIT.load(Relaxed));
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
@@ -252,7 +249,10 @@ impl SatCore {
                     limit,
                     limit * 10
                 );
-                CONFLICT_LIMIT.store((CONFLICT_LIMIT.load(Relaxed) * 10).min(MAX_CONFLICT_LIMIT), Relaxed);
+                CONFLICT_LIMIT.store(
+                    (CONFLICT_LIMIT.load(Relaxed) * 10).min(MAX_CONFLICT_LIMIT),
+                    Relaxed,
+                );
                 CONFLICT_COUNT.store(0, Relaxed);
             } else {
                 let _ = CONFLICT_COUNT.fetch_update(Relaxed, Relaxed, |count| {

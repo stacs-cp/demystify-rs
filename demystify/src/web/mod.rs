@@ -49,7 +49,8 @@ pub fn create_html(puzjson: &Problem) -> String {
     context.insert("statements", &statements);
     context.insert("svg", &svg.to_string());
 
-    let main = tera::Tera::one_off(two_div_template, &context, false).expect("IE: Failed templating");
+    let main =
+        tera::Tera::one_off(two_div_template, &context, false).expect("IE: Failed templating");
     let overview = render_overview(&puzjson.puzzle);
     main + &overview
 }
@@ -58,7 +59,10 @@ pub fn create_html(puzjson: &Problem) -> String {
 /// grouped by their `$#CON` class, with hover-highlighting of the cells they cover.
 fn render_overview(puzzle: &Puzzle) -> String {
     let has_info = puzzle.info.as_ref().is_some_and(|i| !i.is_empty());
-    let has_classes = puzzle.constraint_classes.as_ref().is_some_and(|c| !c.is_empty());
+    let has_classes = puzzle
+        .constraint_classes
+        .as_ref()
+        .is_some_and(|c| !c.is_empty());
 
     if !has_info && !has_classes {
         return String::new();

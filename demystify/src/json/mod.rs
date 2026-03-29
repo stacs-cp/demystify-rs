@@ -256,7 +256,11 @@ impl Puzzle {
                     });
                 }
             }
-            if classes.is_empty() { None } else { Some(classes) }
+            if classes.is_empty() {
+                None
+            } else {
+                Some(classes)
+            }
         };
 
         Ok(Puzzle {
@@ -594,7 +598,11 @@ impl Problem {
             })
             .map(|(r, c)| [r as i64, c as i64])
             .collect();
-        let blocked_cells = if blocked.is_empty() { None } else { Some(blocked) };
+        let blocked_cells = if blocked.is_empty() {
+            None
+        } else {
+            Some(blocked)
+        };
 
         let state = State {
             knowledge_grid: Some(knowledgegrid),
@@ -655,10 +663,9 @@ mod tests {
         let puz = build_puzzleparse("./tst/minesweeper.eprime", "./tst/minesweeperPrinted.param");
         let p = Puzzle::new_from_puzzle(&puz)?;
         // Minesweeper start_grid is None or all-None cells
-        let all_empty = p
-            .start_grid
-            .as_ref()
-            .map_or(true, |sg| sg.iter().all(|row| row.iter().all(|c| c.is_none())));
+        let all_empty = p.start_grid.as_ref().map_or(true, |sg| {
+            sg.iter().all(|row| row.iter().all(|c| c.is_none()))
+        });
         assert!(all_empty, "minesweeper should have no fixed start cells");
         Ok(())
     }

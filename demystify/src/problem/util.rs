@@ -155,7 +155,9 @@ pub mod test_utils {
         let result = parse_essence(&temp_eprime, &temp_param);
         assert!(result.is_ok(), "Bad parse: {result:?}");
 
-        temp_dir.close().expect("Failed to clean up temporary directory");
+        temp_dir
+            .close()
+            .expect("Failed to clean up temporary directory");
         result.unwrap()
     }
 }

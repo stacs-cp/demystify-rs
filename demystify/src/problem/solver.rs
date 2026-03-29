@@ -7,7 +7,7 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
@@ -554,9 +554,8 @@ impl PuzzleSolver {
         lits: &[Lit],
         muses: &mut BTreeSet<Vec<Lit>>,
     ) -> SearchResult<()> {
-        if lits.is_empty()
-            || count.is_some_and(|x| muses.len() >= x)
-            || muses.contains(&vec![]) // size-0 MUS already found; every subset is UNSAT
+        if lits.is_empty() || count.is_some_and(|x| muses.len() >= x) || muses.contains(&vec![])
+        // size-0 MUS already found; every subset is UNSAT
         {
             return Ok(());
         }
@@ -938,14 +937,29 @@ impl PuzzleSolver {
 
                     let t0 = Instant::now();
                     let (ret, func) = match config.strategy {
-                        Strategy::Slice => (self.get_var_mus_slice(x, Some(mus_test_size)), crate::stats::MusFunction::Slice),
-                        Strategy::Cake  => (self.get_var_mus_cake(x, mus_test_size),        crate::stats::MusFunction::Cake),
-                        Strategy::Quick => (self.get_var_mus_quick(x, Some(mus_test_size)), crate::stats::MusFunction::Quick),
+                        Strategy::Slice => (
+                            self.get_var_mus_slice(x, Some(mus_test_size)),
+                            crate::stats::MusFunction::Slice,
+                        ),
+                        Strategy::Cake => (
+                            self.get_var_mus_cake(x, mus_test_size),
+                            crate::stats::MusFunction::Cake,
+                        ),
+                        Strategy::Quick => (
+                            self.get_var_mus_quick(x, Some(mus_test_size)),
+                            crate::stats::MusFunction::Quick,
+                        ),
                         Strategy::Dynamic => {
                             if mus_test_size < 5 {
-                                (self.get_var_mus_cake(x, mus_test_size),        crate::stats::MusFunction::Cake)
+                                (
+                                    self.get_var_mus_cake(x, mus_test_size),
+                                    crate::stats::MusFunction::Cake,
+                                )
                             } else {
-                                (self.get_var_mus_slice(x, Some(mus_test_size)), crate::stats::MusFunction::Slice)
+                                (
+                                    self.get_var_mus_slice(x, Some(mus_test_size)),
+                                    crate::stats::MusFunction::Slice,
+                                )
                             }
                         }
                     };
@@ -959,7 +973,11 @@ impl PuzzleSolver {
                     if let Ok(Some(y)) = &ret {
                         let s = y.len() as i64;
                         best_mus_size.fetch_min(s, Relaxed);
-                        let new_target = if config.find_one && !config.find_bigger { s - 1 } else { s };
+                        let new_target = if config.find_one && !config.find_bigger {
+                            s - 1
+                        } else {
+                            s
+                        };
                         target_mus_size.fetch_min(new_target, Relaxed);
                     }
                     (x, ret)

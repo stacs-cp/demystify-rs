@@ -24,7 +24,10 @@ fn bench_solve(c: &mut Criterion, name: &str, eprime: &str, param: &str, max_ste
                 PuzzleSolver::new(Arc::clone(&puz)).expect("solver init failed")
             },
             |solver| {
-                let config = PlannerConfig { max_steps, ..PlannerConfig::default() };
+                let config = PlannerConfig {
+                    max_steps,
+                    ..PlannerConfig::default()
+                };
                 let mut planner = PuzzlePlanner::new_with_config(solver, config);
                 let result = planner.quick_solve();
                 let calls = get_solver_calls();
@@ -42,21 +45,45 @@ fn bench_solve(c: &mut Criterion, name: &str, eprime: &str, param: &str, max_ste
 }
 
 fn binairo(c: &mut Criterion) {
-    bench_solve(c, "binairo", "./tst/binairo.eprime", "./tst/binairo-1.param", None);
+    bench_solve(
+        c,
+        "binairo",
+        "./tst/binairo.eprime",
+        "./tst/binairo-1.param",
+        None,
+    );
 }
 
 fn minesweeper_wall(c: &mut Criterion) {
-    bench_solve(c, "minesweeper_wall", "./tst/minesweeper.eprime", "./tst/minesweeperWall.param", None);
+    bench_solve(
+        c,
+        "minesweeper_wall",
+        "./tst/minesweeper.eprime",
+        "./tst/minesweeperWall.param",
+        None,
+    );
 }
 
 fn little_sudoku(c: &mut Criterion) {
-    bench_solve(c, "little_sudoku", "./tst/little-sudoku.eprime", "./tst/little-sudoku.param", None);
+    bench_solve(
+        c,
+        "little_sudoku",
+        "./tst/little-sudoku.eprime",
+        "./tst/little-sudoku.param",
+        None,
+    );
 }
 
 const MIRACLE_EPRIME: &str = "../demystify-web/examples/eprime/miracle.eprime";
 const MIRACLE_PARAM: &str = "../demystify-web/examples/eprime/miracle/original.param";
 
-fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, samples: usize, meas: Duration) {
+fn bench_miracle(
+    c: &mut Criterion,
+    name: &str,
+    max_steps: Option<usize>,
+    samples: usize,
+    meas: Duration,
+) {
     let puz = Arc::new(build_puzzleparse(MIRACLE_EPRIME, MIRACLE_PARAM));
 
     let mut group = c.benchmark_group(name);
@@ -72,7 +99,10 @@ fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, sample
                 PuzzleSolver::new(Arc::clone(&puz)).expect("solver init failed")
             },
             |solver| {
-                let config = PlannerConfig { max_steps, ..PlannerConfig::default() };
+                let config = PlannerConfig {
+                    max_steps,
+                    ..PlannerConfig::default()
+                };
                 let mut planner = PuzzlePlanner::new_with_config(solver, config);
                 let result = planner.quick_solve();
                 let calls = get_solver_calls();
@@ -91,8 +121,20 @@ fn bench_miracle(c: &mut Criterion, name: &str, max_steps: Option<usize>, sample
 }
 
 fn miracle_sudoku_02(c: &mut Criterion) {
-    bench_miracle(c, "miracle_sudoku_02", Some(2), 10, Duration::from_secs(120));
+    bench_miracle(
+        c,
+        "miracle_sudoku_02",
+        Some(2),
+        10,
+        Duration::from_secs(120),
+    );
 }
 
-criterion_group!(benches, binairo, minesweeper_wall, little_sudoku, miracle_sudoku_02);
+criterion_group!(
+    benches,
+    binairo,
+    minesweeper_wall,
+    little_sudoku,
+    miracle_sudoku_02
+);
 criterion_main!(benches);

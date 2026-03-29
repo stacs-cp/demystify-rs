@@ -335,8 +335,7 @@ impl PuzzleDraw {
                     if let Some(v) = val
                         && v >= 0
                     {
-                        let mut node =
-                            svg::node::element::Text::new(v.to_string());
+                        let mut node = svg::node::element::Text::new(v.to_string());
                         node.assign("font-size", 0.5);
                         node.assign("x", 0.5);
                         node.assign("y", 0.65);
@@ -883,7 +882,10 @@ mod tests {
         // Should produce non-empty SVG with grid rectangles.
         assert!(!svg_str.is_empty(), "SVG output must not be empty");
         assert!(svg_str.contains("<svg"), "SVG output must contain <svg tag");
-        assert!(svg_str.contains("rect"), "SVG output must contain rect elements");
+        assert!(
+            svg_str.contains("rect"),
+            "SVG output must contain rect elements"
+        );
 
         Ok(())
     }
@@ -909,13 +911,15 @@ mod tests {
     #[test]
     fn test_svg_minesweeper() -> anyhow::Result<()> {
         // Build a minesweeper puzzle without a pre-parsed JSON file.
-        let puz =
-            crate::problem::util::test_utils::build_puzzleparse(
-                "./tst/minesweeper.eprime",
-                "./tst/minesweeperPrinted.param",
-            );
+        let puz = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeperPrinted.param",
+        );
         let puzzle = crate::json::Puzzle::new_from_puzzle(&puz)?;
-        let problem = Problem { puzzle, state: None };
+        let problem = Problem {
+            puzzle,
+            state: None,
+        };
         let puz_draw = PuzzleDraw::new(&problem.puzzle.kind);
         let svg = puz_draw.draw_puzzle(&problem);
         let svg_str = svg.to_string();

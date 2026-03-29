@@ -330,7 +330,9 @@ pub async fn load_example(
 pub async fn get_example_names() -> String {
     let options = EXAMPLES
         .iter()
-        .map(|(name, desc, _, _)| format!("<option value=\"{name}\" title=\"{desc}\">{name}</option>"))
+        .map(|(name, desc, _, _)| {
+            format!("<option value=\"{name}\" title=\"{desc}\">{name}</option>")
+        })
         .collect::<Vec<_>>()
         .join("");
 
