@@ -398,6 +398,29 @@ impl PuzzlePlanner {
         }
     }
 
+    /// Returns the solution variables that could not be uniquely determined after
+    /// exhausting all constraint propagation.
+    ///
+    /// This is meaningful only after `check_solvability()` or `quick_solve()` has been
+    /// called, which exhausts all deductions. Before that call, the result is undefined.
+    ///
+    /// Each returned `PuzVar` is a variable whose value is not pinned to a single value
+    /// by the current set of puzzle clues. Returns an empty set if the puzzle is fully
+    /// solvable (all variables determined) or inconsistent (no solution).
+    pub fn unsolved_vars_after_solve(&mut self) -> BTreeSet<super::PuzVar> {
+        let lits = self.psolve.get_literals_to_try_solving();
+        lits.iter()
+            .flat_map(|lit| {
+                self.psolve
+                    .puzzleparse()
+                    .lit_to_vars(lit)
+                    .iter()
+                    .map(|puzlit| puzlit.var())
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
     pub fn get_provable_varlits(&mut self) -> BTreeSet<Lit> {
         self.psolve.get_provable_varlits().clone()
     }
