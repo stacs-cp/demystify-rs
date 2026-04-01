@@ -318,14 +318,17 @@ impl PuzzleParse {
 mod tests {
     use super::*;
     use crate::problem::util::test_utils::build_puzzleparse;
-    use tempfile::NamedTempFile;
+
 
     #[test]
     fn test_serialize_roundtrip_little() {
         let original = build_puzzleparse("./tst/little1.eprime", "./tst/little1.param");
 
         // Save to temp file
-        let temp_file = NamedTempFile::new().unwrap();
+        let temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
         original.save_to_json(temp_file.path()).unwrap();
 
         // Load back
@@ -349,7 +352,10 @@ mod tests {
     fn test_serialize_roundtrip_binairo() {
         let original = build_puzzleparse("./tst/binairo.eprime", "./tst/binairo-1.param");
 
-        let temp_file = NamedTempFile::new().unwrap();
+        let temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
         original.save_to_json(temp_file.path()).unwrap();
 
         let loaded = PuzzleParse::load_from_json(temp_file.path()).unwrap();
@@ -367,7 +373,10 @@ mod tests {
 
         let original = build_puzzleparse("./tst/little1.eprime", "./tst/little1.param");
 
-        let temp_file = NamedTempFile::new().unwrap();
+        let temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
         original.save_to_json(temp_file.path()).unwrap();
 
         let loaded = PuzzleParse::load_from_json(temp_file.path()).unwrap();

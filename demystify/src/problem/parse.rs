@@ -22,7 +22,7 @@ use std::io::prelude::*;
 use std::mem::forget;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tempfile::TempDir;
+
 use tracing::{debug, info};
 
 use std::fs::File;
@@ -930,7 +930,10 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     //let mut litmap = BTreeMap::new();
     //let mut varlist = Vec::new();
 
-    let tdir = TempDir::new().unwrap();
+    let tdir = tempfile::Builder::new()
+        .prefix(".demystify-")
+        .tempdir_in(".")
+        .unwrap();
 
     let eprime = tdir.path().join(eprimein.file_name().unwrap());
     let eprimeparam = tdir.path().join(eprimeparamin.file_name().unwrap());
@@ -1051,7 +1054,10 @@ fn pretty_print_essence(
     file: &PathBuf,
     format: &str,
 ) -> anyhow::Result<BTreeMap<String, serde_json::value::Value>> {
-    let tdir = TempDir::new().unwrap();
+    let tdir = tempfile::Builder::new()
+        .prefix(".demystify-")
+        .tempdir_in(".")
+        .unwrap();
     let temp_file = tdir.path().join(file.file_name().unwrap());
     fs::copy(file, &temp_file)?;
 
@@ -1275,12 +1281,15 @@ mod tests {
     }
 
     use std::io::Write;
-    use tempfile::NamedTempFile;
+
 
     #[test]
     fn test_parse_info_directives() {
         // Create a temporary eprime file with INFO directives
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
         writeln!(temp_file, "$#VAR x").unwrap();
         writeln!(temp_file, "$#VAR y").unwrap();
         writeln!(temp_file, "$#CON con1 \"x != y\"").unwrap();
@@ -1315,7 +1324,10 @@ mod tests {
     #[test]
     fn test_parse_empty_info() {
         // Create a temporary eprime file without INFO directives
-        let mut temp_file = NamedTempFile::new().unwrap();
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
         writeln!(temp_file, "$#VAR x").unwrap();
         writeln!(temp_file, "$#KIND puzzle").unwrap();
 

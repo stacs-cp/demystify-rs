@@ -141,7 +141,10 @@ pub mod test_utils {
         let eprime_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprime_path;
         let eprimeparam_path = env!("CARGO_MANIFEST_DIR").to_string() + "/" + eprimeparam_path;
 
-        let temp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
+        let temp_dir = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempdir_in(".")
+            .expect("Failed to create temporary directory");
 
         // Preserve original filenames so Conjure output filenames are predictable.
         let eprime_name = Path::new(&eprime_path).file_name().unwrap();

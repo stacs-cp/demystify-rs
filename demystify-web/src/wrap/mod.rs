@@ -186,7 +186,10 @@ pub async fn upload_files(
     session: Session<SessionNullPool>,
     mut multipart: Multipart,
 ) -> Result<String, util::AppError> {
-    let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
+    let temp_dir = tempfile::Builder::new()
+        .prefix(".demystify-")
+        .tempdir_in(".")
+        .context("Failed to create temporary directory")?;
 
     let mut model: Option<PathBuf> = None;
     let mut param: Option<PathBuf> = None;
@@ -363,7 +366,10 @@ pub async fn submit_example(
         .map(|(_, _, content, _)| *content)
         .context(format!("Example '{example_name}' not found"))?;
 
-    let temp_dir = tempfile::tempdir().context("Failed to create temporary directory")?;
+    let temp_dir = tempfile::Builder::new()
+        .prefix(".demystify-")
+        .tempdir_in(".")
+        .context("Failed to create temporary directory")?;
 
     let model_dest = temp_dir.path().join("upload.eprime");
     std::fs::write(&model_dest, model_content).context("Failed to write model file")?;
