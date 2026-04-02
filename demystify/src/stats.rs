@@ -3,6 +3,9 @@
 /// Tracks per-MUS-search outcomes (time + size or failure) broken down by
 /// which internal function was called, per-SAT-call time and conflict counts,
 /// and overall phase timing.
+///
+/// All statistics are stored as pre-aggregated bucket counts so that memory
+/// usage is O(1) regardless of how many solves are performed in a process.
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -28,6 +31,15 @@ impl MusFunction {
             MusFunction::Quick => "quick",
         }
     }
+
+    fn index(self) -> usize {
+        match self {
+            MusFunction::Size1 => 0,
+            MusFunction::Slice => 1,
+            MusFunction::Cake => 2,
+            MusFunction::Quick => 3,
+        }
+    }
 }
 
 /// Outcome of a single MUS search attempt.
@@ -41,7 +53,7 @@ pub enum MusOutcome {
     Timeout,
 }
 
-/// A single recorded MUS search.
+/// A single recorded MUS search (kept as a public type for callers that build records externally).
 #[derive(Debug, Clone)]
 pub struct MusRecord {
     pub duration: Duration,
@@ -74,6 +86,8 @@ const BUCKETS: &[(u128, &str)] = &[
     (u128::MAX, "> 2s"),
 ];
 
+const NUM_TIME_BUCKETS: usize = 7;
+
 fn bucket_index(d: Duration) -> usize {
     let ms = d.as_millis();
     BUCKETS
@@ -91,6 +105,8 @@ const CONFLICT_BUCKETS: &[(usize, &str)] = &[
     (10_000, "1k–9k"),
     (usize::MAX, "≥ 10k"),
 ];
+
+const NUM_CONF_BUCKETS: usize = 6;
 
 fn conflict_bucket_index(n: usize) -> usize {
     CONFLICT_BUCKETS
@@ -119,7 +135,7 @@ impl From<rustsat::solvers::SolverResult> for SatResult {
     }
 }
 
-/// One recorded SAT solver invocation.
+/// One recorded SAT solver invocation (kept as a public type for external callers).
 #[derive(Debug, Clone)]
 pub struct SatCallRecord {
     pub duration: Duration,
@@ -127,120 +143,129 @@ pub struct SatCallRecord {
     pub result: SatResult,
 }
 
-#[derive(Debug, Default)]
+/// Pre-aggregated SAT call statistics. Stores O(1) bucket data rather than
+/// O(N) individual records, so memory does not grow with the number of solves.
+#[derive(Debug, Clone, Copy)]
 struct SatStats {
-    calls: Vec<SatCallRecord>,
+    total: usize,
+    n_sat: usize,
+    n_unsat: usize,
+    n_interrupted: usize,
+    total_time: Duration,
+    total_conflicts: usize,
+    /// Per time bucket: [sat_count, unsat_count, interrupted_count]
+    time_by_result: [[u32; 3]; NUM_TIME_BUCKETS],
+    time_bucket_dur: [Duration; NUM_TIME_BUCKETS],
+    /// Per conflict bucket: [sat_count, unsat_count, interrupted_count]
+    conf_by_result: [[u32; 3]; NUM_CONF_BUCKETS],
+    conf_bucket_total: [usize; NUM_CONF_BUCKETS],
 }
+
+const SAT_STATS_ZERO: SatStats = SatStats {
+    total: 0,
+    n_sat: 0,
+    n_unsat: 0,
+    n_interrupted: 0,
+    total_time: Duration::ZERO,
+    total_conflicts: 0,
+    time_by_result: [[0; 3]; NUM_TIME_BUCKETS],
+    time_bucket_dur: [Duration::ZERO; NUM_TIME_BUCKETS],
+    conf_by_result: [[0; 3]; NUM_CONF_BUCKETS],
+    conf_bucket_total: [0; NUM_CONF_BUCKETS],
+};
 
 impl SatStats {
     fn record(&mut self, duration: Duration, conflicts: usize, result: SatResult) {
-        self.calls.push(SatCallRecord {
-            duration,
-            conflicts,
-            result,
-        });
+        self.total += 1;
+        self.total_time += duration;
+        self.total_conflicts += conflicts;
+        let ri = match result {
+            SatResult::Sat => {
+                self.n_sat += 1;
+                0
+            }
+            SatResult::Unsat => {
+                self.n_unsat += 1;
+                1
+            }
+            SatResult::Interrupted => {
+                self.n_interrupted += 1;
+                2
+            }
+        };
+        let tb = bucket_index(duration);
+        self.time_by_result[tb][ri] += 1;
+        self.time_bucket_dur[tb] += duration;
+        let cb = conflict_bucket_index(conflicts);
+        self.conf_by_result[cb][ri] += 1;
+        self.conf_bucket_total[cb] += conflicts;
     }
 
     fn print_summary(&self) {
-        let n = self.calls.len();
         eprintln!("=== SAT Call Statistics ===");
-        eprintln!("Total SAT calls: {n}");
-        if n == 0 {
+        eprintln!("Total SAT calls: {}", self.total);
+        if self.total == 0 {
             eprintln!("===========================");
             return;
         }
 
-        let total_time: Duration = self.calls.iter().map(|r| r.duration).sum();
-        let total_conflicts: usize = self.calls.iter().map(|r| r.conflicts).sum();
-        let n_sat = self
-            .calls
-            .iter()
-            .filter(|r| r.result == SatResult::Sat)
-            .count();
-        let n_unsat = self
-            .calls
-            .iter()
-            .filter(|r| r.result == SatResult::Unsat)
-            .count();
-        let n_interrupted = self
-            .calls
-            .iter()
-            .filter(|r| r.result == SatResult::Interrupted)
-            .count();
         eprintln!(
-            "sat {n_sat}  unsat {n_unsat}  interrupted {n_interrupted}  \
-             total time {:.3}s  total conflicts {total_conflicts}",
-            total_time.as_secs_f64(),
+            "sat {}  unsat {}  interrupted {}  \
+             total time {:.3}s  total conflicts {}",
+            self.n_sat,
+            self.n_unsat,
+            self.n_interrupted,
+            self.total_time.as_secs_f64(),
+            self.total_conflicts,
         );
 
         // ── Time bucket table ─────────────────────────────────────────────
         eprintln!();
         eprintln!("  Time distribution:");
-        let nb = BUCKETS.len();
-        let mut time_sat = vec![0u32; nb];
-        let mut time_unsat = vec![0u32; nb];
-        let mut time_int = vec![0u32; nb];
-        let mut bucket_time = vec![Duration::ZERO; nb];
-        for r in &self.calls {
-            let b = bucket_index(r.duration);
-            bucket_time[b] += r.duration;
-            match r.result {
-                SatResult::Sat => time_sat[b] += 1,
-                SatResult::Unsat => time_unsat[b] += 1,
-                SatResult::Interrupted => time_int[b] += 1,
-            }
-        }
         eprintln!(
             "  {:>12}  {:>7}  {:>7}  {:>11}  {:>7}  {:>9}",
             "bucket", "sat", "unsat", "interrupted", "total", "time (s)"
         );
         eprintln!("  {}", "-".repeat(62));
-        for b in 0..nb {
-            let row = time_sat[b] + time_unsat[b] + time_int[b];
+        for b in 0..NUM_TIME_BUCKETS {
+            let [sat, unsat, int] = self.time_by_result[b];
+            let row = sat + unsat + int;
             if row == 0 {
                 continue;
             }
             eprintln!(
                 "  {:>12}  {:>7}  {:>7}  {:>11}  {:>7}  {:>9.3}",
                 BUCKETS[b].1,
-                time_sat[b],
-                time_unsat[b],
-                time_int[b],
+                sat,
+                unsat,
+                int,
                 row,
-                bucket_time[b].as_secs_f64(),
+                self.time_bucket_dur[b].as_secs_f64(),
             );
         }
 
         // ── Conflict bucket table ─────────────────────────────────────────
         eprintln!();
         eprintln!("  Conflict distribution:");
-        let cb = CONFLICT_BUCKETS.len();
-        let mut conf_sat = vec![0u32; cb];
-        let mut conf_unsat = vec![0u32; cb];
-        let mut conf_int = vec![0u32; cb];
-        let mut bucket_conf = vec![0usize; cb];
-        for r in &self.calls {
-            let b = conflict_bucket_index(r.conflicts);
-            bucket_conf[b] += r.conflicts;
-            match r.result {
-                SatResult::Sat => conf_sat[b] += 1,
-                SatResult::Unsat => conf_unsat[b] += 1,
-                SatResult::Interrupted => conf_int[b] += 1,
-            }
-        }
         eprintln!(
             "  {:>14}  {:>7}  {:>7}  {:>11}  {:>7}  {:>12}",
             "bucket", "sat", "unsat", "interrupted", "total", "conflicts"
         );
         eprintln!("  {}", "-".repeat(66));
-        for b in 0..cb {
-            let row = conf_sat[b] + conf_unsat[b] + conf_int[b];
+        for b in 0..NUM_CONF_BUCKETS {
+            let [sat, unsat, int] = self.conf_by_result[b];
+            let row = sat + unsat + int;
             if row == 0 {
                 continue;
             }
             eprintln!(
                 "  {:>14}  {:>7}  {:>7}  {:>11}  {:>7}  {:>12}",
-                CONFLICT_BUCKETS[b].1, conf_sat[b], conf_unsat[b], conf_int[b], row, bucket_conf[b],
+                CONFLICT_BUCKETS[b].1,
+                sat,
+                unsat,
+                int,
+                row,
+                self.conf_bucket_total[b],
             );
         }
 
@@ -249,7 +274,7 @@ impl SatStats {
     }
 }
 
-static SAT_STATS: Mutex<SatStats> = Mutex::new(SatStats { calls: Vec::new() });
+static SAT_STATS: Mutex<SatStats> = Mutex::new(SAT_STATS_ZERO);
 
 /// Record a single SAT solver call into the global stats.
 pub fn record_sat_call(
@@ -265,7 +290,7 @@ pub fn record_sat_call(
 /// Reset SAT call stats to zero.
 pub fn reset_sat_stats() {
     if let Ok(mut s) = SAT_STATS.lock() {
-        *s = SatStats::default();
+        *s = SAT_STATS_ZERO;
     }
 }
 
@@ -276,29 +301,157 @@ pub fn print_sat_stats() {
     }
 }
 
-/// All collected statistics.
-#[derive(Debug, Default)]
+// ── MUS search stats ──────────────────────────────────────────────────────────
+
+const NUM_MUS_FUNCTIONS: usize = 4;
+
+/// Pre-aggregated stats for a single MUS-finding function. O(1) memory.
+#[derive(Debug, Clone, Copy)]
+struct MusFuncStats {
+    total: usize,
+    n_found: usize,
+    n_notfound: usize,
+    n_timeout: usize,
+    total_time: Duration,
+    /// For computing min/max/avg of Found MUS sizes.
+    size_min: usize, // usize::MAX when n_found == 0
+    size_max: usize,
+    size_sum: usize,
+    /// Per time bucket: [found_count, notfound_count, timeout_count]
+    time_by_outcome: [[u32; 3]; NUM_TIME_BUCKETS],
+    time_bucket_dur: [Duration; NUM_TIME_BUCKETS],
+}
+
+const MUS_FUNC_ZERO: MusFuncStats = MusFuncStats {
+    total: 0,
+    n_found: 0,
+    n_notfound: 0,
+    n_timeout: 0,
+    total_time: Duration::ZERO,
+    size_min: usize::MAX,
+    size_max: 0,
+    size_sum: 0,
+    time_by_outcome: [[0; 3]; NUM_TIME_BUCKETS],
+    time_bucket_dur: [Duration::ZERO; NUM_TIME_BUCKETS],
+};
+
+impl MusFuncStats {
+    fn record(&mut self, duration: Duration, outcome: &MusOutcome) {
+        self.total += 1;
+        self.total_time += duration;
+        let oi = match outcome {
+            MusOutcome::Found(n) => {
+                self.n_found += 1;
+                if *n < self.size_min {
+                    self.size_min = *n;
+                }
+                if *n > self.size_max {
+                    self.size_max = *n;
+                }
+                self.size_sum += n;
+                0
+            }
+            MusOutcome::NotFound => {
+                self.n_notfound += 1;
+                1
+            }
+            MusOutcome::Timeout => {
+                self.n_timeout += 1;
+                2
+            }
+        };
+        let tb = bucket_index(duration);
+        self.time_by_outcome[tb][oi] += 1;
+        self.time_bucket_dur[tb] += duration;
+    }
+
+    fn print_summary(&self, label: &str) {
+        if self.total == 0 {
+            return;
+        }
+        eprintln!();
+        eprintln!(
+            "── {} ─── {} calls, {:.3}s total (found {}, not-found {}, timeout {})",
+            label,
+            self.total,
+            self.total_time.as_secs_f64(),
+            self.n_found,
+            self.n_notfound,
+            self.n_timeout,
+        );
+        if self.n_found > 0 {
+            let avg = self.size_sum as f64 / self.n_found as f64;
+            eprintln!(
+                "   MUS sizes: min={} max={} avg={:.1}",
+                self.size_min, self.size_max, avg
+            );
+        }
+        eprintln!(
+            "   {:>12}  {:>7}  {:>10}  {:>8}  {:>7}  {:>9}",
+            "bucket", "found", "not-found", "timeout", "total", "time (s)"
+        );
+        eprintln!("   {}", "-".repeat(62));
+        for b in 0..NUM_TIME_BUCKETS {
+            let [found, notfound, timeout] = self.time_by_outcome[b];
+            let row_total = found + notfound + timeout;
+            if row_total == 0 {
+                continue;
+            }
+            eprintln!(
+                "   {:>12}  {:>7}  {:>10}  {:>8}  {:>7}  {:>9.3}",
+                BUCKETS[b].1,
+                found,
+                notfound,
+                timeout,
+                row_total,
+                self.time_bucket_dur[b].as_secs_f64(),
+            );
+        }
+    }
+}
+
+/// All collected MUS statistics. Pre-aggregated — O(1) memory regardless of
+/// how many MUS searches are performed.
+#[derive(Debug, Clone)]
 pub struct MusStats {
-    /// One record per individual MUS search call.
-    pub searches: Vec<MusRecord>,
+    /// Per-function aggregated stats. Index via `MusFunction::index()`.
+    per_func: [MusFuncStats; NUM_MUS_FUNCTIONS],
     /// Time spent inside `get_many_vars_small_mus_quick` (the parallel batch loop).
     pub phase_batch_mus: PhaseStats,
     /// Time spent inside `quick_solve_impl` (the outer planning loop iterations).
     pub phase_solve_step: PhaseStats,
 }
 
+const MUS_STATS_ZERO: MusStats = MusStats {
+    per_func: [MUS_FUNC_ZERO; NUM_MUS_FUNCTIONS],
+    phase_batch_mus: PhaseStats {
+        calls: 0,
+        total_time: Duration::ZERO,
+    },
+    phase_solve_step: PhaseStats {
+        calls: 0,
+        total_time: Duration::ZERO,
+    },
+};
+
+impl Default for MusStats {
+    fn default() -> Self {
+        MUS_STATS_ZERO.clone()
+    }
+}
+
 impl MusStats {
     fn record_search(&mut self, duration: Duration, outcome: MusOutcome, function: MusFunction) {
-        self.searches.push(MusRecord {
-            duration,
-            outcome,
-            function,
-        });
+        self.per_func[function.index()].record(duration, &outcome);
+    }
+
+    fn total_searches(&self) -> usize {
+        self.per_func.iter().map(|f| f.total).sum()
     }
 
     /// Print a human-readable summary to stderr, including per-function timing tables.
     pub fn print_summary(&self) {
-        let total = self.searches.len();
+        let total = self.total_searches();
 
         eprintln!("=== MUS Statistics ===");
         eprintln!(
@@ -316,106 +469,14 @@ impl MusStats {
             return;
         }
 
-        // Collect per-function records
         let functions = [
             MusFunction::Size1,
             MusFunction::Slice,
             MusFunction::Cake,
             MusFunction::Quick,
         ];
-
         for func in functions {
-            let records: Vec<&MusRecord> = self
-                .searches
-                .iter()
-                .filter(|r| r.function == func)
-                .collect();
-
-            if records.is_empty() {
-                continue;
-            }
-
-            let total_time: Duration = records.iter().map(|r| r.duration).sum();
-            let n_found = records
-                .iter()
-                .filter(|r| matches!(r.outcome, MusOutcome::Found(_)))
-                .count();
-            let n_notfound = records
-                .iter()
-                .filter(|r| matches!(r.outcome, MusOutcome::NotFound))
-                .count();
-            let n_timeout = records
-                .iter()
-                .filter(|r| matches!(r.outcome, MusOutcome::Timeout))
-                .count();
-
-            eprintln!();
-            eprintln!(
-                "── {} ─── {} calls, {:.3}s total (found {}, not-found {}, timeout {})",
-                func.label(),
-                records.len(),
-                total_time.as_secs_f64(),
-                n_found,
-                n_notfound,
-                n_timeout,
-            );
-
-            // MUS size distribution for Found
-            let mut sizes: Vec<usize> = records
-                .iter()
-                .filter_map(|r| {
-                    if let MusOutcome::Found(n) = r.outcome {
-                        Some(n)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            if !sizes.is_empty() {
-                sizes.sort_unstable();
-                let min = sizes[0];
-                let max = *sizes.last().unwrap();
-                let avg = sizes.iter().sum::<usize>() as f64 / sizes.len() as f64;
-                eprintln!("   MUS sizes: min={min} max={max} avg={avg:.1}");
-            }
-
-            // Timing bucket table
-            let nb = BUCKETS.len();
-            let mut found_counts = vec![0u32; nb];
-            let mut notfound_counts = vec![0u32; nb];
-            let mut timeout_counts = vec![0u32; nb];
-            let mut bucket_time = vec![Duration::ZERO; nb];
-
-            for r in &records {
-                let b = bucket_index(r.duration);
-                bucket_time[b] += r.duration;
-                match r.outcome {
-                    MusOutcome::Found(_) => found_counts[b] += 1,
-                    MusOutcome::NotFound => notfound_counts[b] += 1,
-                    MusOutcome::Timeout => timeout_counts[b] += 1,
-                }
-            }
-
-            eprintln!(
-                "   {:>12}  {:>7}  {:>10}  {:>8}  {:>7}  {:>9}",
-                "bucket", "found", "not-found", "timeout", "total", "time (s)"
-            );
-            eprintln!("   {}", "-".repeat(62));
-            for b in 0..nb {
-                let row_total = found_counts[b] + notfound_counts[b] + timeout_counts[b];
-                if row_total == 0 {
-                    continue;
-                }
-                eprintln!(
-                    "   {:>12}  {:>7}  {:>10}  {:>8}  {:>7}  {:>9.3}",
-                    BUCKETS[b].1,
-                    found_counts[b],
-                    notfound_counts[b],
-                    timeout_counts[b],
-                    row_total,
-                    bucket_time[b].as_secs_f64(),
-                );
-            }
+            self.per_func[func.index()].print_summary(func.label());
         }
 
         eprintln!();
@@ -423,17 +484,7 @@ impl MusStats {
     }
 }
 
-static MUS_STATS: Mutex<MusStats> = Mutex::new(MusStats {
-    searches: Vec::new(),
-    phase_batch_mus: PhaseStats {
-        calls: 0,
-        total_time: Duration::ZERO,
-    },
-    phase_solve_step: PhaseStats {
-        calls: 0,
-        total_time: Duration::ZERO,
-    },
-});
+static MUS_STATS: Mutex<MusStats> = Mutex::new(MUS_STATS_ZERO);
 
 /// Record a single MUS search result into the global stats.
 pub fn record_mus_search(duration: Duration, outcome: MusOutcome, function: MusFunction) {
@@ -456,24 +507,14 @@ pub fn record_solve_step(duration: Duration) {
     }
 }
 
-/// Get a snapshot of the current stats.
-pub fn get_mus_stats() -> MusStats {
-    let stats = MUS_STATS.lock().unwrap();
-    MusStats {
-        searches: stats.searches.clone(),
-        phase_batch_mus: stats.phase_batch_mus.clone(),
-        phase_solve_step: stats.phase_solve_step.clone(),
-    }
-}
-
-/// Reset all stats to zero.
+/// Reset all MUS stats to zero.
 pub fn reset_mus_stats() {
     if let Ok(mut stats) = MUS_STATS.lock() {
-        *stats = MusStats::default();
+        *stats = MUS_STATS_ZERO.clone();
     }
 }
 
-/// Print a summary of the current stats to stderr.
+/// Print a summary of the current MUS stats to stderr.
 pub fn print_mus_stats() {
     if let Ok(stats) = MUS_STATS.lock() {
         stats.print_summary();
