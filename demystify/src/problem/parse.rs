@@ -19,7 +19,6 @@ use std::fs;
 use std::io::BufReader;
 use std::io::prelude::*;
 
-use std::mem::forget;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -1031,8 +1030,6 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     read_dimacs(&in_dimacs_path, &mut eprimeparse).context("reading variable info from dimacs")?;
 
     eprimeparse.finalise().context("finalisation of parsing failed. The most likely reason for this is you gave a puzzle which has no solutions!")?;
-
-    forget(tdir);
 
     Ok(eprimeparse)
 }
