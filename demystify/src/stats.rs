@@ -260,12 +260,7 @@ impl SatStats {
             }
             eprintln!(
                 "  {:>14}  {:>7}  {:>7}  {:>11}  {:>7}  {:>12}",
-                label,
-                sat,
-                unsat,
-                int,
-                row,
-                self.conf_bucket_total[b],
+                label, sat, unsat, int, row, self.conf_bucket_total[b],
             );
         }
 

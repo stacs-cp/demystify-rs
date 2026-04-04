@@ -319,7 +319,6 @@ mod tests {
     use super::*;
     use crate::problem::util::test_utils::build_puzzleparse;
 
-
     #[test]
     fn test_serialize_roundtrip_little() {
         let original = build_puzzleparse("./tst/little1.eprime", "./tst/little1.param");

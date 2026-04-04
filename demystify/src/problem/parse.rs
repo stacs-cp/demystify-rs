@@ -1279,7 +1279,6 @@ mod tests {
 
     use std::io::Write;
 
-
     #[test]
     fn test_parse_info_directives() {
         // Create a temporary eprime file with INFO directives
