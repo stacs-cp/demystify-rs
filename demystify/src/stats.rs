@@ -86,7 +86,7 @@ const BUCKETS: &[(u128, &str)] = &[
     (u128::MAX, "> 2s"),
 ];
 
-const NUM_TIME_BUCKETS: usize = 7;
+const NUM_TIME_BUCKETS: usize = BUCKETS.len();
 
 fn bucket_index(d: Duration) -> usize {
     let ms = d.as_millis();
@@ -106,7 +106,7 @@ const CONFLICT_BUCKETS: &[(usize, &str)] = &[
     (usize::MAX, "≥ 10k"),
 ];
 
-const NUM_CONF_BUCKETS: usize = 6;
+const NUM_CONF_BUCKETS: usize = CONFLICT_BUCKETS.len();
 
 fn conflict_bucket_index(n: usize) -> usize {
     CONFLICT_BUCKETS
@@ -227,7 +227,7 @@ impl SatStats {
             "bucket", "sat", "unsat", "interrupted", "total", "time (s)"
         );
         eprintln!("  {}", "-".repeat(62));
-        for b in 0..NUM_TIME_BUCKETS {
+        for (b, &(_, label)) in BUCKETS.iter().enumerate() {
             let [sat, unsat, int] = self.time_by_result[b];
             let row = sat + unsat + int;
             if row == 0 {
@@ -235,7 +235,7 @@ impl SatStats {
             }
             eprintln!(
                 "  {:>12}  {:>7}  {:>7}  {:>11}  {:>7}  {:>9.3}",
-                BUCKETS[b].1,
+                label,
                 sat,
                 unsat,
                 int,
@@ -252,7 +252,7 @@ impl SatStats {
             "bucket", "sat", "unsat", "interrupted", "total", "conflicts"
         );
         eprintln!("  {}", "-".repeat(66));
-        for b in 0..NUM_CONF_BUCKETS {
+        for (b, &(_, label)) in CONFLICT_BUCKETS.iter().enumerate() {
             let [sat, unsat, int] = self.conf_by_result[b];
             let row = sat + unsat + int;
             if row == 0 {
@@ -260,7 +260,7 @@ impl SatStats {
             }
             eprintln!(
                 "  {:>14}  {:>7}  {:>7}  {:>11}  {:>7}  {:>12}",
-                CONFLICT_BUCKETS[b].1,
+                label,
                 sat,
                 unsat,
                 int,
@@ -391,7 +391,7 @@ impl MusFuncStats {
             "bucket", "found", "not-found", "timeout", "total", "time (s)"
         );
         eprintln!("   {}", "-".repeat(62));
-        for b in 0..NUM_TIME_BUCKETS {
+        for (b, &(_, label)) in BUCKETS.iter().enumerate() {
             let [found, notfound, timeout] = self.time_by_outcome[b];
             let row_total = found + notfound + timeout;
             if row_total == 0 {
@@ -399,7 +399,7 @@ impl MusFuncStats {
             }
             eprintln!(
                 "   {:>12}  {:>7}  {:>10}  {:>8}  {:>7}  {:>9.3}",
-                BUCKETS[b].1,
+                label,
                 found,
                 notfound,
                 timeout,
