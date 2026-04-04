@@ -1,6 +1,3 @@
-[workspace]
-members_order = ["demystify", "demystify-web"]
-
 [[package]]
 name = "demystify-lua"
 release = false
