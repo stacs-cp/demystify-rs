@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - run: rustup update ${{ matrix.rust_release }} && rustup default ${{ matrix.rust_release }}
+      - run: rustup update ${{ matrix.rust_release }} && rustup default ${{ matrix.rust_release }} && rustup component add clippy
 
       - run: cargo build -vv --workspace
 
