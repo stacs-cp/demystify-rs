@@ -26,8 +26,10 @@ jobs:
         include:
           - os: ubuntu-latest
             release_suffix: linux
+            cargo_flags: "--workspace"
           - os: macos-latest
             release_suffix: macos-intel
+            cargo_flags: "--workspace --exclude demystify-lua"
 
     runs-on: ${{ matrix.os }}
 
@@ -36,9 +38,9 @@ jobs:
 
       - run: rustup update ${{ matrix.rust_release }} && rustup default ${{ matrix.rust_release }} && rustup component add clippy
 
-      - run: cargo build -vv --workspace
+      - run: cargo build -vv ${{ matrix.cargo_flags }}
 
-      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo clippy ${{ matrix.cargo_flags }} -- -D warnings
 
       - run: cargo install cargo-audit --quiet || true
       - run: cargo audit
@@ -48,6 +50,6 @@ jobs:
           os_arch: ${{ matrix.release_suffix }}
           version: ${{ matrix.conjure_version }}
 
-      - run: cargo test --workspace
+      - run: cargo test ${{ matrix.cargo_flags }}
 
       - run: bash scripts/test-some.sh
