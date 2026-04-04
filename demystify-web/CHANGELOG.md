@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/stacs-cp/demystify-rs/compare/demystify-web-v0.1.3...demystify-web-v0.1.4) - 2026-04-04
+
+### Added
+
+- *(web)* add Minesweeper example with hidden-information reveal
+- *(akari)* add wall_below decoration for thick-border black cell rendering
+- *(nonogram)* add Duck and Heart test puzzles, register web demo
+- *(mosaic)* add Mosaic (Minesweeper) puzzle model and web demo
+- *(akari)* add Akari (Light Up) puzzle model and examples
+- *(web)* add puzzle overview panel with $#INFO and constraint classes
+- *(puzzles)* add Kakurasu/Skyscrapers/XSums web examples, fix Kakurasu labels
+- *(svg)* add thermometer, futoshiki, and killer sudoku rendering
+
+### Fixed
+
+- *(planner)* refresh shows current state; deduction renders post-deduction grid
+- *(akari)* replace under-constrained 5x5 instance with uniquely solvable one
+- *(svg)* add clue_in_corner decoration for Mosaic-style puzzles
+- *(x-sums)* remove $#DESC from ctc param (causes parse error)
+- *(x-sums)* remove dead commented directives, fix template syntax, add easy demo param
+- *(thermometer)* correct grid variable to row-major indexing
+
+### Other
+
+- replace NamedTempFile/tempdir with prefixed tempdir_in(".") to avoid sandbox write restrictions
+- fmt, update package dependancies
+- broad codebase cleanup and improvements
+
 ## [0.1.3](https://github.com/stacs-cp/demystify-rs/compare/demystify-web-v0.1.2...demystify-web-v0.1.3) - 2025-08-10
 
 ### Other
