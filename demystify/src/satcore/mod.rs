@@ -98,7 +98,7 @@ impl Solver {
 
     fn clear_conflict_limit(&mut self) {
         match self {
-            Solver::Glucose(s) => s.set_limit(rustsat_glucose::Limit::Conflicts(-1)),
+            Solver::Glucose(s) => s.set_limit(rustsat_glucose::Limit::None),
             Solver::CaDiCaL(s) => s
                 .set_limit(rustsat_cadical::Limit::Conflicts(-1))
                 .expect("CaDiCaL set_limit failed"),
@@ -224,7 +224,14 @@ impl SatCore {
     }
 
     fn do_solve_assumps(solver: &mut MutexGuard<Solver>, lits: &[Lit]) -> SolverResult {
-        solver.set_conflict_limit(CONFLICT_LIMIT.load(Relaxed));
+        // A non-positive CONFLICT_LIMIT means "no limit": go straight to
+        // clear_conflict_limit so the caller does not receive Interrupted.
+        let limit = CONFLICT_LIMIT.load(Relaxed);
+        if limit > 0 {
+            solver.set_conflict_limit(limit);
+        } else {
+            solver.clear_conflict_limit();
+        }
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
         let call_start = std::time::Instant::now();
