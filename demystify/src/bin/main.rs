@@ -83,6 +83,13 @@ struct Opt {
         help = "Load a pre-parsed puzzle from JSON instead of parsing .eprime/.param files"
     )]
     load_parsed: Option<PathBuf>,
+
+    #[arg(
+        long,
+        default_value_t = 1_000_000,
+        help = "Per-SAT-call conflict limit (0 = no limit). Default 1,000,000."
+    )]
+    conflict_limit: i64,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -94,6 +101,10 @@ fn main() -> anyhow::Result<()> {
     if let Some(method) = opt.conjure {
         set_run_method(method);
     }
+
+    // Apply user-requested conflict limit (0 means "no limit"; the satcore
+    // module honours non-positive values via clear_conflict_limit).
+    demystify::satcore::set_global_conflict_limit(opt.conflict_limit);
 
     if opt.trace {
         tracing_subscriber::fmt()
@@ -190,6 +201,7 @@ fn main() -> anyhow::Result<()> {
     if !opt.quiet {
         print_mus_stats();
         print_sat_stats();
+        demystify::satcore::print_phase_breakdown();
     }
 
     Ok(())

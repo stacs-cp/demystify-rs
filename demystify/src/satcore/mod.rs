@@ -135,6 +135,53 @@ const MAX_CONFLICT_LIMIT: i64 = 100_000_000;
 static CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 static SOLVER_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
+// --- Diagnostic timers for `_no_limit` path.
+//
+// Accumulated in nanoseconds across all threads.  `print_phase_breakdown` emits
+// totals at shutdown.  The solve itself is `PHASE_SOLVE_NS`; the rest is
+// everything around the solver call (mutex, fix_values, stats bookkeeping).
+static PHASE_FIX_VALUES_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static PHASE_MUTEX_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static PHASE_SOLVE_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static PHASE_POST_NS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static PHASE_CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+pub fn print_phase_breakdown() {
+    let calls = PHASE_CALLS.load(Relaxed);
+    if calls == 0 {
+        return;
+    }
+    let fv = PHASE_FIX_VALUES_NS.load(Relaxed);
+    let mu = PHASE_MUTEX_NS.load(Relaxed);
+    let sv = PHASE_SOLVE_NS.load(Relaxed);
+    let po = PHASE_POST_NS.load(Relaxed);
+    let tot = fv + mu + sv + po;
+    let pct = |x: u64| if tot == 0 { 0.0 } else { 100.0 * x as f64 / tot as f64 };
+    eprintln!("=== SAT-call phase breakdown (_no_limit path, summed across threads) ===");
+    eprintln!("  Calls timed: {calls}");
+    eprintln!(
+        "  fix_values       {:>10.3} s  ({:5.1}%)",
+        fv as f64 / 1e9,
+        pct(fv)
+    );
+    eprintln!(
+        "  mutex acquire    {:>10.3} s  ({:5.1}%)",
+        mu as f64 / 1e9,
+        pct(mu)
+    );
+    eprintln!(
+        "  solve_assumps    {:>10.3} s  ({:5.1}%)",
+        sv as f64 / 1e9,
+        pct(sv)
+    );
+    eprintln!(
+        "  post (stats etc) {:>10.3} s  ({:5.1}%)",
+        po as f64 / 1e9,
+        pct(po)
+    );
+    eprintln!("========================================================================");
+}
+
 /// Set the global conflict limit used for the SAT
 /// solver (0 = no limit)
 pub fn set_global_conflict_limit(val: i64) {
@@ -223,6 +270,25 @@ impl SatCore {
         }
     }
 
+    /// Variant of [`do_solve_assumps`] that clears any conflict limit before
+    /// invoking the solver.  Because no limit is in place, the solver will
+    /// never return `Interrupted`.  Used by the `*_no_limit` public methods.
+    fn do_solve_assumps_no_limit(
+        solver: &mut MutexGuard<Solver>,
+        lits: &[Lit],
+    ) -> SolverResult {
+        solver.clear_conflict_limit();
+        SOLVER_CALLS.fetch_add(1, Relaxed);
+        let conflicts_before = solver.conflicts();
+        let call_start = std::time::Instant::now();
+        let solve = solver.solve_assumps(lits).unwrap();
+        let call_duration = call_start.elapsed();
+        let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
+        solver.clear_conflict_limit();
+        crate::stats::record_sat_call(call_duration, conflicts_delta, solve);
+        solve
+    }
+
     fn do_solve_assumps(solver: &mut MutexGuard<Solver>, lits: &[Lit]) -> SolverResult {
         // A non-positive CONFLICT_LIMIT means "no limit": go straight to
         // clear_conflict_limit so the caller does not receive Interrupted.
@@ -283,14 +349,24 @@ impl SatCore {
     ///
     /// `true` if the formula is satisfiable, `false` if it is unsatisfiable.
     pub fn assumption_solve(&self, known: &[Lit], lits: &[Lit]) -> SearchResult<bool> {
+        let t0 = std::time::Instant::now();
         self.fix_values(known);
+        let t1 = std::time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
+        let t2 = std::time::Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
+        let t3 = std::time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(true),
             rustsat::solvers::SolverResult::Unsat => Ok(false),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
+        let t4 = std::time::Instant::now();
+        PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
+        PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
+        PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
+        PHASE_POST_NS.fetch_add((t4 - t3).as_nanos() as u64, Relaxed);
+        PHASE_CALLS.fetch_add(1, Relaxed);
         info!(target: "solver", "Solution to {:?} is {:?}", lits, result);
         result
     }
@@ -310,16 +386,80 @@ impl SatCore {
         known: &[Lit],
         lits: &[Lit],
     ) -> SearchResult<Option<Assignment>> {
+        let t0 = std::time::Instant::now();
         self.fix_values(known);
+        let t1 = std::time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
+        let t2 = std::time::Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
+        let t3 = std::time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(Some(solver.full_solution().unwrap())),
             rustsat::solvers::SolverResult::Unsat => Ok(None),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
+        let t4 = std::time::Instant::now();
+        PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
+        PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
+        PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
+        PHASE_POST_NS.fetch_add((t4 - t3).as_nanos() as u64, Relaxed);
+        PHASE_CALLS.fetch_add(1, Relaxed);
         info!(target: "solver", "Solution to {:?} is {:?}", lits, result);
         result
+    }
+
+    /// Solve as an assumption problem with **no conflict limit applied**.
+    ///
+    /// Returns `true` for SAT, `false` for UNSAT.  There is no `Interrupted`
+    /// branch: without a limit, the solver will run until it produces an
+    /// answer.  Use this variant in code that has no useful fallback when a
+    /// conflict-limit trips: the caller should simply wait.
+    ///
+    /// MUS-finding algorithms that *do* have a sensible fallback (try another
+    /// dive, skip this literal, etc.) should continue to use the limited
+    /// [`assumption_solve`] and handle the `Err(SearchError::Limit)` case
+    /// explicitly.
+    pub fn assumption_solve_no_limit(&self, known: &[Lit], lits: &[Lit]) -> bool {
+        let t0 = std::time::Instant::now();
+        self.fix_values(known);
+        let t1 = std::time::Instant::now();
+        let mut solver = self.solver.lock().unwrap();
+        let t2 = std::time::Instant::now();
+        let solve = SatCore::do_solve_assumps_no_limit(&mut solver, lits);
+        let t3 = std::time::Instant::now();
+        let result = match solve {
+            rustsat::solvers::SolverResult::Sat => true,
+            rustsat::solvers::SolverResult::Unsat => false,
+            rustsat::solvers::SolverResult::Interrupted => {
+                unreachable!("assumption_solve_no_limit must not hit a limit")
+            }
+        };
+        let t4 = std::time::Instant::now();
+        PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
+        PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
+        PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
+        PHASE_POST_NS.fetch_add((t4 - t3).as_nanos() as u64, Relaxed);
+        PHASE_CALLS.fetch_add(1, Relaxed);
+        result
+    }
+
+    /// Solve as an assumption problem with **no conflict limit applied**, and
+    /// return the full model when SAT.  See [`assumption_solve_no_limit`].
+    pub fn assumption_solve_solution_no_limit(
+        &self,
+        known: &[Lit],
+        lits: &[Lit],
+    ) -> Option<Assignment> {
+        self.fix_values(known);
+        let mut solver = self.solver.lock().unwrap();
+        let solve = SatCore::do_solve_assumps_no_limit(&mut solver, lits);
+        match solve {
+            rustsat::solvers::SolverResult::Sat => Some(solver.full_solution().unwrap()),
+            rustsat::solvers::SolverResult::Unsat => None,
+            rustsat::solvers::SolverResult::Interrupted => {
+                unreachable!("assumption_solve_solution_no_limit must not hit a limit")
+            }
+        }
     }
 
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
@@ -337,30 +477,47 @@ impl SatCore {
         known: &[Lit],
         lits: &[Lit],
     ) -> SearchResult<Option<Vec<Lit>>> {
+        let t0 = std::time::Instant::now();
         self.fix_values(known);
-        self.raw_assumption_solve_with_core(lits)
+        let t1 = std::time::Instant::now();
+        PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
+        self.raw_assumption_solve_with_core_timed(lits, t1)
     }
 
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
     /// *Not memoryless*: Uses whatever set of values are already fixed in the solver.
-    ///
-    /// # Arguments
-    ///
-    /// * `lits` - The assumptions to use during solving.
-    ///
-    /// # Returns
-    ///
-    /// The unsatisfiable core if the formula is unsatisfiable, `None` if it is satisfiable.
     fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
+        self.raw_assumption_solve_with_core_timed(lits, std::time::Instant::now())
+    }
+
+    /// Shared body of the core-returning solve.  Accepts an anchor `Instant`
+    /// so the phase breakdown can split time between fix_values (before the
+    /// anchor) and the rest of the call.
+    fn raw_assumption_solve_with_core_timed(
+        &self,
+        lits: &[Lit],
+        t_after_fix: std::time::Instant,
+    ) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
+        let t2 = std::time::Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
-        match solve {
+        let t3 = std::time::Instant::now();
+        let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(None),
             rustsat::solvers::SolverResult::Unsat => Ok(Some(
                 solver.core().unwrap().into_iter().map(|l| !l).collect(),
             )),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
-        }
+        };
+        let t4 = std::time::Instant::now();
+        // The caller recorded fix_values's start; we recover its duration here.
+        // When the raw entry point is used without a fix_values step, we still
+        // record mutex/solve/post honestly.
+        PHASE_MUTEX_NS.fetch_add((t2 - t_after_fix).as_nanos() as u64, Relaxed);
+        PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
+        PHASE_POST_NS.fetch_add((t4 - t3).as_nanos() as u64, Relaxed);
+        PHASE_CALLS.fetch_add(1, Relaxed);
+        result
     }
 
     /// Finds a minimal unsatisfiable subset (MUS) of literals given a set of known literals.

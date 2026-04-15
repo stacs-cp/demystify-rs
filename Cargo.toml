@@ -5,3 +5,8 @@ members = [
     "demystify-lua",
 ]
 resolver = "2"
+
+# Keep optimisation at O3 but retain debug symbols so samply/perf can
+# symbolise stack frames.  Costs some binary size; run-time is unaffected.
+[profile.release]
+debug = true
