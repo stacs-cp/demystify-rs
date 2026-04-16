@@ -95,6 +95,9 @@ pub struct SerializablePuzzleParse {
     pub varset_lits_neg: BTreeSet<i32>,
     /// conset_lits with Lit converted to i32
     pub conset_lits: BTreeSet<i32>,
+    /// special_lits (framework-special `demystify_*` AUX vars) with Lit converted to i32
+    #[serde(default)]
+    pub special_lits: BTreeSet<i32>,
     /// order_encoding_map
     pub order_encoding_map: Vec<(PuzVar, HashSet<i32>)>,
     /// inv_order_encoding_map with Lit converted to i32 (as string key for JSON)
@@ -171,6 +174,7 @@ impl TryFrom<&PuzzleParse> for SerializablePuzzleParse {
             varset_lits: p.varset_lits.iter().map(|&l| lit_to_i32(l)).collect(),
             varset_lits_neg: p.varset_lits_neg.iter().map(|&l| lit_to_i32(l)).collect(),
             conset_lits: p.conset_lits.iter().map(|&l| lit_to_i32(l)).collect(),
+            special_lits: p.special_lits.iter().map(|&l| lit_to_i32(l)).collect(),
             order_encoding_map: p
                 .order_encoding_map
                 .iter()
@@ -259,6 +263,11 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
                 .collect::<Result<_>>()?,
             conset_lits: s
                 .conset_lits
+                .into_iter()
+                .map(i32_to_lit)
+                .collect::<Result<_>>()?,
+            special_lits: s
+                .special_lits
                 .into_iter()
                 .map(i32_to_lit)
                 .collect::<Result<_>>()?,

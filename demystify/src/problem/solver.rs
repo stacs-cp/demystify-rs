@@ -385,9 +385,19 @@ impl PuzzleSolver {
         let reveal_lits: Vec<_> = self.puzzleparse.reveal_map.values().copied().collect();
         litorig.extend_from_slice(&reveal_lits);
 
+        // Random sampling and the read-out treat two sets differently:
+        // - `lits_to_check` is shuffled and visited for random polarity
+        //   choices on the first `steps` iterations.  Only $#VAR lits go
+        //   here; framework-special `demystify_*` AUX vars are derived from
+        //   the puzzle's design and should not be randomly fixed first.
+        // - `lits_to_read` is the union: it is what we read out of the
+        //   final solution to populate the returned BTreeSet.  Special
+        //   AUX values are captured here so callers (e.g. Mystify) can
+        //   use them for design control or fitness signalling.
         let mut lits_to_check = self.puzzleparse.varset_lits.iter().copied().collect_vec();
-
         lits_to_check.shuffle(rng);
+        let mut lits_to_read = lits_to_check.clone();
+        lits_to_read.extend(self.puzzleparse.special_lits.iter().copied());
 
         for &l in &lits_to_check {
             let mut lits = litorig.clone();
@@ -431,7 +441,7 @@ impl PuzzleSolver {
                     .assumption_solve_solution_no_limit(self.get_known_lits(), &litorig)
                     .expect("Must be a solution, from previous call");
 
-                for &l in &lits_to_check {
+                for &l in &lits_to_read {
                     match sol.lit_value(l) {
                         rustsat::types::TernaryVal::True => {
                             solution.push(l);
