@@ -14,6 +14,11 @@ dist
 tarpaulin-report.html
 .aider*
 
+# Solver / experiment scratch output
+out.html
+out*.sat
+etc/example-outputs/
+
 # IDE and editor files
 *.swp
 *.swo
