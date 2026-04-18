@@ -435,7 +435,7 @@ impl PuzzlePlanner {
                 self.mark_lit_as_deduced(v);
             }
 
-            all_lits.extend(varlits.into_iter());
+            all_lits.extend(varlits);
         }
 
         all_lits
