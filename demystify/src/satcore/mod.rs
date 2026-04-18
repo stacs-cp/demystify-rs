@@ -156,7 +156,13 @@ pub fn print_phase_breakdown() {
     let sv = PHASE_SOLVE_NS.load(Relaxed);
     let po = PHASE_POST_NS.load(Relaxed);
     let tot = fv + mu + sv + po;
-    let pct = |x: u64| if tot == 0 { 0.0 } else { 100.0 * x as f64 / tot as f64 };
+    let pct = |x: u64| {
+        if tot == 0 {
+            0.0
+        } else {
+            100.0 * x as f64 / tot as f64
+        }
+    };
     eprintln!("=== SAT-call phase breakdown (_no_limit path, summed across threads) ===");
     eprintln!("  Calls timed: {calls}");
     eprintln!(
@@ -273,10 +279,7 @@ impl SatCore {
     /// Variant of [`do_solve_assumps`] that clears any conflict limit before
     /// invoking the solver.  Because no limit is in place, the solver will
     /// never return `Interrupted`.  Used by the `*_no_limit` public methods.
-    fn do_solve_assumps_no_limit(
-        solver: &mut MutexGuard<Solver>,
-        lits: &[Lit],
-    ) -> SolverResult {
+    fn do_solve_assumps_no_limit(solver: &mut MutexGuard<Solver>, lits: &[Lit]) -> SolverResult {
         solver.clear_conflict_limit();
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
