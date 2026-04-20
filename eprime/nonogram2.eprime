@@ -1,0 +1,83 @@
+language ESSENCE' 1.0
+
+$ Nonogram (Picross) — ordering-CON model
+$ Identical to nonogram.eprime except the inter-run ordering constraints are
+$ CON-gated rather than unconditional, so they can appear as named constraints
+$ in MUSes and separate the "run length" reason from the "packing order" reason.
+
+$#INFO Nonogram: fill cells black/white so each row and column has the given runs of consecutive black cells in order
+
+given height, width, maxruns : int(1..)
+
+given row_clues : matrix indexed by [int(1..height), int(1..maxruns)] of int(0..width)
+given col_clues : matrix indexed by [int(1..width), int(1..maxruns)] of int(0..height)
+
+$#VAR grid
+find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
+
+$#AUX row_start
+find row_start : matrix indexed by [int(1..height), int(1..maxruns)] of int(1..width)
+$#AUX row_end
+find row_end   : matrix indexed by [int(1..height), int(1..maxruns)] of int(1..width)
+
+$#AUX col_start
+find col_start : matrix indexed by [int(1..width), int(1..maxruns)] of int(1..height)
+$#AUX col_end
+find col_end   : matrix indexed by [int(1..width), int(1..maxruns)] of int(1..height)
+
+$#CON row_run "row {{index[0]}} run {{index[1]}}: {{params['row_clues'][index[0]][index[1]]}} consecutive black cells"
+find row_run : matrix indexed by [int(1..height), int(1..maxruns)] of bool
+
+$#CON col_run "column {{index[0]}} run {{index[1]}}: {{params['col_clues'][index[0]][index[1]]}} consecutive black cells"
+find col_run : matrix indexed by [int(1..width), int(1..maxruns)] of bool
+
+$#CON row_order "row {{index[0]}}: gap after run {{index[1]}}"
+find row_order : matrix indexed by [int(1..height), int(1..maxruns-1)] of bool
+
+$#CON col_order "column {{index[0]}}: gap after run {{index[1]}}"
+find col_order : matrix indexed by [int(1..width), int(1..maxruns-1)] of bool
+
+such that
+
+$ ── Row constraints ──────────────────────────────────────────────────────────
+
+$ Run length: active runs satisfy end = start + length - 1, within the grid.
+forAll r : int(1..height) . forAll k : int(1..maxruns) .
+    row_run[r,k] ->
+    (row_clues[r,k] = 0 \/
+     (row_end[r,k] = row_start[r,k] + row_clues[r,k] - 1 /\
+      row_end[r,k] <= width)),
+
+$ Ordering: consecutive active runs are left-to-right with at least one gap.
+$ CON-gated so the packing argument appears as a named constraint in MUSes.
+forAll r : int(1..height) . forAll k : int(1..maxruns-1) .
+    row_order[r,k] ->
+    ((row_clues[r,k] > 0 /\ row_clues[r,k+1] > 0) ->
+     row_start[r,k+1] >= row_end[r,k] + 2),
+
+$ Coverage: cell (r,c) is black iff covered by an active run in its row.
+forAll r : int(1..height) . forAll c : int(1..width) .
+    grid[r,c] = sum([ toInt(row_start[r,k] <= c /\ c <= row_end[r,k]) |
+                      k : int(1..maxruns), row_clues[r,k] > 0 ]),
+
+$ ── Column constraints ───────────────────────────────────────────────────────
+
+$ Run length: active runs satisfy end = start + length - 1, within the grid.
+forAll c : int(1..width) . forAll k : int(1..maxruns) .
+    col_run[c,k] ->
+    (col_clues[c,k] = 0 \/
+     (col_end[c,k] = col_start[c,k] + col_clues[c,k] - 1 /\
+      col_end[c,k] <= height)),
+
+$ Ordering: consecutive active runs are top-to-bottom with at least one gap.
+forAll c : int(1..width) . forAll k : int(1..maxruns-1) .
+    col_order[c,k] ->
+    ((col_clues[c,k] > 0 /\ col_clues[c,k+1] > 0) ->
+     col_start[c,k+1] >= col_end[c,k] + 2),
+
+$ Coverage: cell (r,c) is black iff covered by an active run in its column.
+forAll c : int(1..width) . forAll r : int(1..height) .
+    grid[r,c] = sum([ toInt(col_start[c,k] <= r /\ r <= col_end[c,k]) |
+                      k : int(1..maxruns), col_clues[c,k] > 0 ]),
+
+true
