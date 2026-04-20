@@ -1,9 +1,7 @@
+use std::collections::BTreeSet;
 use std::ops::Neg;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use std::{collections::BTreeSet, sync::atomic::AtomicI64};
-
-use std::sync::atomic::Ordering::Relaxed;
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -893,87 +891,102 @@ impl PuzzleSolver {
         config: &MusConfig,
         musdict: Option<MusDict>,
     ) -> MusDict {
-        let mut md = musdict.unwrap_or_else(|| MusDict::with_keep_all(config.keep_all_muses));
-
-        let mut mus_size = config.base_size_mus;
-        let best_mus_size = AtomicI64::new(config.base_size_mus);
-        let target_mus_size = AtomicI64::new(config.base_size_mus);
+        let md =
+            Mutex::new(musdict.unwrap_or_else(|| MusDict::with_keep_all(config.keep_all_muses)));
 
         let _batch_timer = crate::stats::PhaseTimer::batch_mus();
 
         info!(target: "solve", "scanning for tiny muses");
 
-        // Skip lits already cached at size ≤ 1 (only when not hunting for bigger MUSes).
+        // Tiny scan: search every lit for a size-1 MUS unless one is already cached.
         let tiny_scan_lits: BTreeSet<Lit> = if config.find_bigger {
             lits.clone()
         } else {
+            let g = md.lock().unwrap();
             lits.iter()
                 .copied()
-                .filter(|&lit| md.min_lit(lit).is_none_or(|s| s > 1))
+                .filter(|&lit| g.min_lit(lit).is_none_or(|s| s > 1))
                 .collect()
         };
 
-        let muses: Vec<_> = tiny_scan_lits
-            .iter()
-            .par_bridge()
-            .map(|&x| {
-                let t0 = Instant::now();
-                let ret = self.get_var_mus_size_1(x, Some(1));
-                let elapsed = t0.elapsed();
-                let outcome = match &ret {
-                    Ok(v) if !v.is_empty() => crate::stats::MusOutcome::Found(1),
-                    Ok(_) => crate::stats::MusOutcome::NotFound,
-                    Err(_) => crate::stats::MusOutcome::Timeout,
-                };
-                crate::stats::record_mus_search(elapsed, outcome, crate::stats::MusFunction::Size1);
-                (x, ret)
-            })
-            .filter(|(_, y)| y.is_ok())
-            .map(|(x, y)| (x, y.unwrap()))
-            .filter(|(_, mus)| !mus.is_empty())
-            .map(|(lit, mus)| (lit, mus[0].clone()))
-            .collect();
-
-        if !muses.is_empty() && !config.find_bigger {
-            info!(target: "solve", "found tiny muses");
-            for (k, v) in muses {
-                let bts = v.iter().copied().collect();
-                md.add_mus(k, bts);
+        tiny_scan_lits.iter().par_bridge().for_each(|&x| {
+            let t0 = Instant::now();
+            let ret = self.get_var_mus_size_1(x, Some(1));
+            let elapsed = t0.elapsed();
+            let outcome = match &ret {
+                Ok(v) if !v.is_empty() => crate::stats::MusOutcome::Found(1),
+                Ok(_) => crate::stats::MusOutcome::NotFound,
+                Err(_) => crate::stats::MusOutcome::Timeout,
+            };
+            crate::stats::record_mus_search(elapsed, outcome, crate::stats::MusFunction::Size1);
+            if let Ok(v) = ret
+                && !v.is_empty()
+            {
+                let bts: BTreeSet<Lit> = v[0].iter().copied().collect();
+                md.lock().unwrap().add_mus(x, bts);
             }
-            return md;
+        });
+
+        // If the tiny scan landed any new size-1 MUS, that's enough to make progress;
+        // skip the larger search entirely. find_bigger wants the larger MUSes too,
+        // so it always falls through.
+        if !config.find_bigger && md.lock().unwrap().min_filtered(&tiny_scan_lits) == Some(1) {
+            info!(target: "solve", "found tiny muses");
+            return md.into_inner().unwrap();
         }
 
         info!(target: "solver", "scanning for {} muses", lits.len());
+        let mut mus_size = config.base_size_mus;
         loop {
             info!(target: "solver", "scanning for muses size {}", mus_size);
-            best_mus_size.store(mus_size, Relaxed);
-            target_mus_size.store(best_mus_size.load(Relaxed), Relaxed);
 
-            // Skip lits already cached at a size that meets the current target.
-            let search_lits: Vec<&Lit> = if config.find_bigger {
-                lits.iter().collect()
+            // Pick the lits worth searching this iteration. Without find_bigger, skip
+            // those whose cached minimum already meets mus_size.
+            let search_lits: BTreeSet<Lit> = if config.find_bigger {
+                lits.clone()
             } else {
+                let g = md.lock().unwrap();
                 lits.iter()
-                    .filter(|&&lit| md.min_lit(lit).is_none_or(|s| s as i64 > mus_size))
+                    .copied()
+                    .filter(|&lit| g.min_lit(lit).is_none_or(|s| s as i64 > mus_size))
                     .collect()
             };
 
-            let muses: Vec<_> = search_lits
+            search_lits
                 .iter()
-                .flat_map(|&&x| std::iter::repeat_n(x, config.repeats as usize))
+                .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
                 .par_bridge()
-                .map(|x| {
-                    let mus_test_size = target_mus_size.load(Relaxed);
-                    if mus_test_size <= 1 {
-                        return (x, Ok(None));
-                    }
+                .for_each(|x| {
+                    // Compute the per-search size bound from the dict's current state.
+                    //
+                    // !find_bigger: target starts at mus_size and shrinks only once a
+                    //   worker has actually written a MUS for one of search_lits. With
+                    //   find_one we then tighten one further (s-1) to make subsequent
+                    //   workers reject any MUS not strictly smaller than what's
+                    //   already known. Without an in-iteration find we leave the
+                    //   bound at mus_size — otherwise find_one would refuse the very
+                    //   first MUS of size mus_size and skip the iteration entirely.
+                    //
+                    // find_bigger: target = mus_size, fixed. We add the documented
+                    //   +9 slack so each round explores up to mus_size + 9. The
+                    //   global minimum is irrelevant here — the whole point is to
+                    //   keep finding alternative explanations above it.
                     let mus_test_size = if config.find_bigger {
-                        // Allow 9 constraints above the current best, giving slack to find
-                        // moderately larger MUSes without searching unboundedly.
-                        mus_test_size + 3 * 3
+                        mus_size + 9
                     } else {
-                        mus_test_size
+                        let g = md.lock().unwrap();
+                        match g.min_filtered(&search_lits) {
+                            Some(found) => {
+                                let bound = (found as i64).min(mus_size);
+                                if config.find_one { bound - 1 } else { bound }
+                            }
+                            None => mus_size,
+                        }
                     };
+
+                    if mus_test_size <= 1 {
+                        return;
+                    }
 
                     let t0 = Instant::now();
                     let (ret, func) = match config.strategy {
@@ -1010,32 +1023,17 @@ impl PuzzleSolver {
                         Err(_) => crate::stats::MusOutcome::Timeout,
                     };
                     crate::stats::record_mus_search(elapsed, outcome, func);
-                    if let Ok(Some(y)) = &ret {
-                        let s = y.len() as i64;
-                        best_mus_size.fetch_min(s, Relaxed);
-                        let new_target = if config.find_one && !config.find_bigger {
-                            s - 1
-                        } else {
-                            s
-                        };
-                        target_mus_size.fetch_min(new_target, Relaxed);
+
+                    if let Ok(Some(y)) = ret {
+                        let bts: BTreeSet<Lit> = y.iter().copied().collect();
+                        md.lock().unwrap().add_mus(x, bts);
                     }
-                    (x, ret)
-                })
-                .filter(|(_, y)| y.is_ok())
-                .map(|(x, y)| (x, y.unwrap()))
-                .filter(|(_, mus)| mus.is_some())
-                .map(|(lit, mus)| (lit, mus.unwrap()))
-                .collect();
+                });
 
-            for (k, v) in muses {
-                let bts = v.iter().copied().collect();
-                md.add_mus(k, bts);
-            }
-
-            // Use min_filtered so stale cache entries from previous steps don't
-            // cause premature termination.
-            if let Some(mus_min) = md.min_filtered(lits) {
+            // Termination. Use min_filtered over the original `lits` so stale entries
+            // for lits no longer in scope don't pull the answer down.
+            let mus_min = md.lock().unwrap().min_filtered(lits);
+            if let Some(mus_min) = mus_min {
                 let met_target = if config.find_bigger {
                     (mus_min as i64) * 3 + 3 <= mus_size
                 } else {
@@ -1043,13 +1041,13 @@ impl PuzzleSolver {
                 };
                 if met_target {
                     info!(target: "solver", "muses found!");
-                    return md;
+                    return md.into_inner().unwrap();
                 }
             }
-            // Make sure we stop, if something stupid has happened
+            // Bail out if the size has runaway-grown.
             if mus_size > i64::from(i32::MAX) {
                 info!(target: "solver", "no muses found!");
-                return md;
+                return md.into_inner().unwrap();
             }
             mus_size = mus_size * config.mus_mult_step + config.mus_add_step;
         }
