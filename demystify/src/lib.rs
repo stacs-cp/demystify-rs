@@ -99,8 +99,8 @@
 //! // Get difficulty ratings for all deductions
 //! let muses = planner.all_muses_with_larger();
 //! for (lit, mus_set) in muses.muses() {
-//!     if let Some(mus) = mus_set.iter().next() {
-//!         println!("Deduction requires {} constraints", mus.mus_len());
+//!     if let Some(min_len) = mus_set.iter().map(|mc| mc.mus_len()).min() {
+//!         println!("Deduction requires {} constraints", min_len);
 //!     }
 //! }
 //! ```

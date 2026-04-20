@@ -302,7 +302,7 @@ impl LuaUserData for LuaPlanner {
 
             let result = lua.create_table()?;
             for (lit, mus_set) in muses.muses() {
-                if let Some(mus) = mus_set.iter().next() {
+                if let Some(min_len) = mus_set.iter().map(|mc| mc.mus_len()).min() {
                     let lit_str = {
                         let puzlits = planner.puzzle().lit_to_vars(lit);
                         if let Some(first) = puzlits.iter().next() {
@@ -311,7 +311,7 @@ impl LuaUserData for LuaPlanner {
                             continue;
                         }
                     };
-                    result.set(lit_str, mus.mus_len())?;
+                    result.set(lit_str, min_len)?;
                 }
             }
 

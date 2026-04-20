@@ -128,11 +128,17 @@ impl PuzzlePlanner {
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle.
+    ///
+    /// The returned dict keeps every MUS the search finds per literal, including strictly
+    /// larger ones. Use this when analysing whether a literal has alternative explanations
+    /// of different sizes (e.g. whether a deduction that needs a size-2 MUS in one model
+    /// still has a size-1 MUS via another path).
     pub fn all_muses_with_larger(&mut self) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
         let mut conf_clone = self.config.mus_config;
         conf_clone.find_bigger = true;
         conf_clone.find_one = false;
+        conf_clone.keep_all_muses = true;
         self.psolve
             .get_many_vars_small_mus_quick(&varlits, &conf_clone, None)
     }
@@ -471,8 +477,7 @@ impl PuzzlePlanner {
         let base_difficulties: BTreeMap<Lit, usize> = base_muses
             .muses()
             .iter()
-            .filter(|(_, v)| !v.is_empty())
-            .map(|(k, v)| (*k, v.iter().next().unwrap().mus_len()))
+            .filter_map(|(k, v)| v.iter().map(MusContext::mus_len).min().map(|m| (*k, m)))
             .collect();
 
         self.quick_display_difficulty_step(base_difficulties)
@@ -736,6 +741,34 @@ mod tests {
         let mut plan = PuzzlePlanner::new(puz);
 
         assert_eq!(plan.check_solvability(), Some(0));
+    }
+
+    /// all_muses_with_larger must retain strictly larger MUSes per literal, not just the
+    /// minimum. Regression test for the keep_all_muses flag.
+    #[test]
+    fn test_all_muses_with_larger_retains_alternatives() {
+        let result = crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/binairo.eprime",
+            "./tst/binairo-1.param",
+        );
+        let result = Arc::new(result);
+        let puz = PuzzleSolver::new(result).unwrap();
+        let mut plan = PuzzlePlanner::new(puz);
+
+        let muses = plan.all_muses_with_larger();
+        // On a non-trivial puzzle, at least one literal should have multiple MUSes of
+        // different sizes once we stop discarding larger ones.
+        let has_multi_size = muses.muses().values().any(|set| {
+            set.iter()
+                .map(|mc| mc.mus_len())
+                .collect::<BTreeSet<_>>()
+                .len()
+                > 1
+        });
+        assert!(
+            has_multi_size,
+            "expected at least one literal with MUSes of distinct sizes when keep_all_muses is on"
+        );
     }
 
     /// find_one=true (the new default) must produce the same set of deduced literals as find_one=false.

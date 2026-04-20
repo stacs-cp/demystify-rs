@@ -44,6 +44,10 @@ pub struct MusConfig {
     pub repeats: i64,
     pub find_bigger: bool,
     pub find_one: bool,
+    /// When true, the returned `MusDict` retains every MUS the search produces,
+    /// including strictly larger ones. Intended for analysing whether a literal has
+    /// alternative explanations of different sizes. Has no effect on search order.
+    pub keep_all_muses: bool,
     pub strategy: Strategy,
 }
 
@@ -56,6 +60,7 @@ impl Default for MusConfig {
             repeats: 2,
             find_bigger: false,
             find_one: true,
+            keep_all_muses: false,
             strategy: Strategy::default(),
         }
     }
@@ -71,6 +76,7 @@ impl MusConfig {
             repeats,
             find_bigger: false,
             find_one: true,
+            keep_all_muses: false,
             strategy: Strategy::default(),
         }
     }
@@ -888,6 +894,7 @@ impl PuzzleSolver {
         musdict: Option<MusDict>,
     ) -> MusDict {
         let mut md = musdict.unwrap_or_default();
+        md.set_keep_all(config.keep_all_muses);
 
         let mut mus_size = config.base_size_mus;
         let best_mus_size = AtomicI64::new(config.base_size_mus);

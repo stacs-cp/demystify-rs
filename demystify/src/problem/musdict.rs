@@ -6,6 +6,7 @@ use rustsat::types::Lit;
 #[derive(Clone)]
 pub struct MusDict {
     muses: BTreeMap<Lit, BTreeSet<MusContext>>,
+    keep_all: bool,
 }
 
 impl Default for MusDict {
@@ -24,14 +25,39 @@ impl MusDict {
     pub fn new() -> Self {
         MusDict {
             muses: BTreeMap::new(),
+            keep_all: false,
         }
+    }
+
+    /// Creates a new `MusDict` configured to keep every MUS added, including those
+    /// strictly larger than the current minimum for their literal.
+    #[must_use]
+    pub fn with_keep_all(keep_all: bool) -> Self {
+        MusDict {
+            muses: BTreeMap::new(),
+            keep_all,
+        }
+    }
+
+    /// Sets whether subsequent `add_mus` calls keep every MUS (true) or only the
+    /// smallest observed per literal (false, the default).
+    pub fn set_keep_all(&mut self, keep_all: bool) {
+        self.keep_all = keep_all;
+    }
+
+    /// Returns whether this dict keeps all MUSes per literal.
+    #[must_use]
+    pub fn keep_all(&self) -> bool {
+        self.keep_all
     }
 
     /// Adds a new mus to the dictionary.
     ///
-    /// If the mus associated with the given literal already exists in the dictionary, the new mus
-    /// will be added only if its length is smaller than the existing mus. If the lengths are equal,
-    /// the new mus will be appended to the existing mus list.
+    /// In the default mode, if the mus associated with the given literal already exists in the
+    /// dictionary, the new mus will be added only if its length is smaller than the existing mus.
+    /// If the lengths are equal, the new mus will be appended to the existing mus list.
+    ///
+    /// In `keep_all` mode, every MUS is retained regardless of size.
     ///
     /// If the mus associated with the given literal does not exist in the dictionary, a new entry
     /// will be created with the given mus.
@@ -41,12 +67,20 @@ impl MusDict {
     /// * `lit` - The literal associated with the mus.
     /// * `new_mus` - The new mus to be added.
     pub fn add_mus(&mut self, lit: Lit, new_mus: BTreeSet<Lit>) {
+        if self.keep_all {
+            self.muses
+                .entry(lit)
+                .or_default()
+                .insert(MusContext::new(lit, new_mus));
+            return;
+        }
+
         if let Some(mus_list) = self.muses.get_mut(&lit) {
-            let len = if let Some(element) = mus_list.iter().next() {
-                element.mus_len()
-            } else {
-                usize::MAX
-            };
+            let len = mus_list
+                .iter()
+                .map(MusContext::mus_len)
+                .min()
+                .unwrap_or(usize::MAX);
 
             if new_mus.len() < len {
                 mus_list.clear();
@@ -62,11 +96,9 @@ impl MusDict {
 
     #[must_use]
     pub fn min_lit(&self, lit: Lit) -> Option<usize> {
-        if let Some(mus_list) = self.muses.get(&lit) {
-            mus_list.iter().next().map(MusContext::mus_len)
-        } else {
-            None
-        }
+        self.muses
+            .get(&lit)
+            .and_then(|mus_list| mus_list.iter().map(MusContext::mus_len).min())
     }
 
     /// Returns a reference to the muses in the dictionary.
@@ -258,6 +290,41 @@ mod tests {
         assert_eq!(mus_dict.muses().get(&lit), Some(&bts));
         assert_eq!(mus_dict.min(), Some(1));
         assert!(!mus_dict.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_keep_all_retains_larger_muses() -> anyhow::Result<()> {
+        let mut mus_dict = MusDict::with_keep_all(true);
+        let lit = Lit::from_ipasir(1)?;
+        let mus_small = BTreeSet::from([Lit::from_ipasir(2)?]);
+        let mus_medium = BTreeSet::from([Lit::from_ipasir(3)?, Lit::from_ipasir(4)?]);
+        let mus_large = BTreeSet::from([
+            Lit::from_ipasir(5)?,
+            Lit::from_ipasir(6)?,
+            Lit::from_ipasir(7)?,
+        ]);
+
+        mus_dict.add_mus(lit, mus_medium.clone());
+        mus_dict.add_mus(lit, mus_small.clone());
+        mus_dict.add_mus(lit, mus_large.clone());
+
+        let stored = mus_dict.muses().get(&lit).expect("lit should be present");
+        assert_eq!(stored.len(), 3);
+        assert_eq!(mus_dict.min_lit(lit), Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn test_keep_all_ignores_duplicate_muses() -> anyhow::Result<()> {
+        let mut mus_dict = MusDict::with_keep_all(true);
+        let lit = Lit::from_ipasir(1)?;
+        let mus = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+
+        mus_dict.add_mus(lit, mus.clone());
+        mus_dict.add_mus(lit, mus.clone());
+
+        assert_eq!(mus_dict.muses().get(&lit).map(BTreeSet::len), Some(1));
         Ok(())
     }
 
