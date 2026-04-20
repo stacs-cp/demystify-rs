@@ -3,10 +3,23 @@ use std::collections::{BTreeMap, BTreeSet};
 use rustsat::types::Lit;
 
 /// A dictionary for storing muses (minimal unsatisfiable subsets) associated with literals.
+///
+/// Maintains two auxiliary indices so that size queries are O(1) amortised, not a scan
+/// over all stored MUSes:
+/// * `min_sizes[lit]` is the smallest MUS size recorded for `lit`.
+/// * `size_index[size]` is the set of lits whose minimum MUS has that size. `size_index`
+///   is a `BTreeMap`, so the global minimum is `.first_key_value()`.
+///
+/// Both indices are updated on every `add_mus` call; no other mutator touches the
+/// stored MUSes, so the invariant `min_sizes[lit] == muses[lit].map(mus_len).min()`
+/// and `size_index[size] == {lit | min_sizes[lit] == size}` holds at every entry and
+/// exit from a `&mut self` method.
 #[derive(Clone)]
 pub struct MusDict {
     muses: BTreeMap<Lit, BTreeSet<MusContext>>,
     keep_all: bool,
+    min_sizes: BTreeMap<Lit, usize>,
+    size_index: BTreeMap<usize, BTreeSet<Lit>>,
 }
 
 impl Default for MusDict {
@@ -26,29 +39,48 @@ impl MusDict {
         MusDict {
             muses: BTreeMap::new(),
             keep_all: false,
+            min_sizes: BTreeMap::new(),
+            size_index: BTreeMap::new(),
         }
     }
 
     /// Creates a new `MusDict` configured to keep every MUS added, including those
-    /// strictly larger than the current minimum for their literal.
+    /// strictly larger than the current minimum for their literal. The flag can only
+    /// be chosen at construction: flipping it mid-life would leave a dict that
+    /// claims "smallest only" but still holds the larger MUSes accumulated before
+    /// the flip.
     #[must_use]
     pub fn with_keep_all(keep_all: bool) -> Self {
-        MusDict {
-            muses: BTreeMap::new(),
-            keep_all,
-        }
-    }
-
-    /// Sets whether subsequent `add_mus` calls keep every MUS (true) or only the
-    /// smallest observed per literal (false, the default).
-    pub fn set_keep_all(&mut self, keep_all: bool) {
-        self.keep_all = keep_all;
+        let mut d = Self::new();
+        d.keep_all = keep_all;
+        d
     }
 
     /// Returns whether this dict keeps all MUSes per literal.
     #[must_use]
     pub fn keep_all(&self) -> bool {
         self.keep_all
+    }
+
+    /// Records `candidate` as the minimum MUS size for `lit` if it is strictly smaller
+    /// than the current minimum (or no minimum is recorded yet). Calling this with a
+    /// value at least as large as the current minimum is a no-op, so it is always safe
+    /// to invoke after a successful insert.
+    fn update_min(&mut self, lit: Lit, candidate: usize) {
+        let old = self.min_sizes.get(&lit).copied();
+        if old.is_some_and(|m| m <= candidate) {
+            return;
+        }
+        self.min_sizes.insert(lit, candidate);
+        if let Some(old_size) = old
+            && let Some(set) = self.size_index.get_mut(&old_size)
+        {
+            set.remove(&lit);
+            if set.is_empty() {
+                self.size_index.remove(&old_size);
+            }
+        }
+        self.size_index.entry(candidate).or_default().insert(lit);
     }
 
     /// Adds a new mus to the dictionary.
@@ -67,38 +99,49 @@ impl MusDict {
     /// * `lit` - The literal associated with the mus.
     /// * `new_mus` - The new mus to be added.
     pub fn add_mus(&mut self, lit: Lit, new_mus: BTreeSet<Lit>) {
+        let new_size = new_mus.len();
+
         if self.keep_all {
-            self.muses
+            let inserted = self
+                .muses
                 .entry(lit)
                 .or_default()
                 .insert(MusContext::new(lit, new_mus));
+            if inserted {
+                self.update_min(lit, new_size);
+            }
             return;
         }
 
-        if let Some(mus_list) = self.muses.get_mut(&lit) {
-            let len = mus_list
-                .iter()
-                .map(MusContext::mus_len)
-                .min()
-                .unwrap_or(usize::MAX);
-
-            if new_mus.len() < len {
-                mus_list.clear();
-                mus_list.insert(MusContext::new(lit, new_mus));
-            } else if new_mus.len() == len {
-                mus_list.insert(MusContext::new(lit, new_mus));
+        match self.muses.get_mut(&lit) {
+            Some(mus_list) => {
+                let current_min = *self
+                    .min_sizes
+                    .get(&lit)
+                    .expect("min_sizes invariant: lit present in muses => lit in min_sizes");
+                match new_size.cmp(&current_min) {
+                    std::cmp::Ordering::Less => {
+                        mus_list.clear();
+                        mus_list.insert(MusContext::new(lit, new_mus));
+                        self.update_min(lit, new_size);
+                    }
+                    std::cmp::Ordering::Equal => {
+                        mus_list.insert(MusContext::new(lit, new_mus));
+                    }
+                    std::cmp::Ordering::Greater => {}
+                }
             }
-        } else {
-            let hs: BTreeSet<_> = std::iter::once(MusContext::new(lit, new_mus)).collect();
-            self.muses.insert(lit, hs);
+            None => {
+                let hs: BTreeSet<_> = std::iter::once(MusContext::new(lit, new_mus)).collect();
+                self.muses.insert(lit, hs);
+                self.update_min(lit, new_size);
+            }
         }
     }
 
     #[must_use]
     pub fn min_lit(&self, lit: Lit) -> Option<usize> {
-        self.muses
-            .get(&lit)
-            .and_then(|mus_list| mus_list.iter().map(MusContext::mus_len).min())
+        self.min_sizes.get(&lit).copied()
     }
 
     /// Returns a reference to the muses in the dictionary.
@@ -117,21 +160,17 @@ impl MusDict {
 
     #[must_use]
     pub fn min(&self) -> Option<usize> {
-        self.muses
-            .values()
-            .flat_map(|sets| sets.iter().map(MusContext::mus_len))
-            .min()
+        self.size_index.keys().next().copied()
     }
 
     /// Like `min`, but only considers entries whose literal is still in `valid_lits`.
     /// Use this when the dict may contain stale entries from previous solving steps.
     #[must_use]
     pub fn min_filtered(&self, valid_lits: &BTreeSet<Lit>) -> Option<usize> {
-        self.muses
+        self.size_index
             .iter()
-            .filter(|(lit, _)| valid_lits.contains(lit))
-            .flat_map(|(_, sets)| sets.iter().map(MusContext::mus_len))
-            .min()
+            .find(|(_, lits)| !lits.is_disjoint(valid_lits))
+            .map(|(size, _)| *size)
     }
 
     /// Merges all entries from `other` into this dict (keeping smallest MUSes).
@@ -290,6 +329,81 @@ mod tests {
         assert_eq!(mus_dict.muses().get(&lit), Some(&bts));
         assert_eq!(mus_dict.min(), Some(1));
         assert!(!mus_dict.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn test_min_and_min_filtered_track_index() -> anyhow::Result<()> {
+        let mut mus_dict = MusDict::new();
+        let lit_a = Lit::from_ipasir(1)?;
+        let lit_b = Lit::from_ipasir(2)?;
+        let lit_c = Lit::from_ipasir(3)?;
+        let size1 = BTreeSet::from([Lit::from_ipasir(10)?]);
+        let size2 = BTreeSet::from([Lit::from_ipasir(11)?, Lit::from_ipasir(12)?]);
+        let size3 = BTreeSet::from([
+            Lit::from_ipasir(13)?,
+            Lit::from_ipasir(14)?,
+            Lit::from_ipasir(15)?,
+        ]);
+
+        mus_dict.add_mus(lit_a, size3.clone());
+        mus_dict.add_mus(lit_b, size2.clone());
+        mus_dict.add_mus(lit_c, size1.clone());
+
+        assert_eq!(mus_dict.min(), Some(1));
+        assert_eq!(mus_dict.min_lit(lit_a), Some(3));
+        assert_eq!(mus_dict.min_lit(lit_b), Some(2));
+        assert_eq!(mus_dict.min_lit(lit_c), Some(1));
+
+        // Filtering that excludes the cheapest lit should bump the answer up.
+        let only_ab = BTreeSet::from([lit_a, lit_b]);
+        assert_eq!(mus_dict.min_filtered(&only_ab), Some(2));
+        let only_a = BTreeSet::from([lit_a]);
+        assert_eq!(mus_dict.min_filtered(&only_a), Some(3));
+        let empty = BTreeSet::new();
+        assert_eq!(mus_dict.min_filtered(&empty), None);
+
+        // Shrinking lit_a to size 1 should update both per-lit and global mins.
+        mus_dict.add_mus(lit_a, size1.clone());
+        assert_eq!(mus_dict.min_lit(lit_a), Some(1));
+        assert_eq!(mus_dict.min_filtered(&only_a), Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn test_duplicate_mus_does_not_perturb_index() -> anyhow::Result<()> {
+        let mut mus_dict = MusDict::new();
+        let lit = Lit::from_ipasir(1)?;
+        let mus = BTreeSet::from([Lit::from_ipasir(2)?, Lit::from_ipasir(3)?]);
+
+        mus_dict.add_mus(lit, mus.clone());
+        mus_dict.add_mus(lit, mus.clone());
+        mus_dict.add_mus(lit, mus);
+
+        assert_eq!(mus_dict.muses().get(&lit).map(BTreeSet::len), Some(1));
+        assert_eq!(mus_dict.min_lit(lit), Some(2));
+        assert_eq!(mus_dict.min(), Some(2));
+        Ok(())
+    }
+
+    #[test]
+    fn test_merge_updates_index() -> anyhow::Result<()> {
+        let lit_a = Lit::from_ipasir(1)?;
+        let lit_b = Lit::from_ipasir(2)?;
+        let size1 = BTreeSet::from([Lit::from_ipasir(10)?]);
+        let size2 = BTreeSet::from([Lit::from_ipasir(11)?, Lit::from_ipasir(12)?]);
+
+        let mut dst = MusDict::new();
+        dst.add_mus(lit_a, size2.clone());
+
+        let mut src = MusDict::new();
+        src.add_mus(lit_a, size1.clone());
+        src.add_mus(lit_b, size2.clone());
+
+        dst.merge(&src);
+        assert_eq!(dst.min_lit(lit_a), Some(1));
+        assert_eq!(dst.min_lit(lit_b), Some(2));
+        assert_eq!(dst.min(), Some(1));
         Ok(())
     }
 

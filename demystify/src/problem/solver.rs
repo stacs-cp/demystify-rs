@@ -893,8 +893,7 @@ impl PuzzleSolver {
         config: &MusConfig,
         musdict: Option<MusDict>,
     ) -> MusDict {
-        let mut md = musdict.unwrap_or_default();
-        md.set_keep_all(config.keep_all_muses);
+        let mut md = musdict.unwrap_or_else(|| MusDict::with_keep_all(config.keep_all_muses));
 
         let mut mus_size = config.base_size_mus;
         let best_mus_size = AtomicI64::new(config.base_size_mus);
