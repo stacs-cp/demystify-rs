@@ -7,6 +7,30 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::{PuzLit, VarValPair, parse::PuzzleParse, solver::PuzzleSolver};
 
+/// Convert a 2D clue matrix (outer = side entry, inner = padded-with-trailing-zeros clue slots)
+/// into layered border labels. Non-zero values in each row are right-aligned across layers so
+/// the last clue ends up on the layer nearest the grid. Empty leading layers are trimmed.
+/// Returns an empty Vec if every row is all zeros.
+fn clue_matrix_to_layers(clues: &[Vec<i64>]) -> Vec<Vec<String>> {
+    let max_clues = clues
+        .iter()
+        .map(|row| row.iter().filter(|&&v| v > 0).count())
+        .max()
+        .unwrap_or(0);
+    if max_clues == 0 {
+        return Vec::new();
+    }
+    let mut layers: Vec<Vec<String>> = vec![vec![String::new(); clues.len()]; max_clues];
+    for (r, row) in clues.iter().enumerate() {
+        let non_zero: Vec<i64> = row.iter().copied().filter(|&v| v > 0).collect();
+        let offset = max_clues - non_zero.len();
+        for (k, v) in non_zero.into_iter().enumerate() {
+            layers[offset + k][r] = v.to_string();
+        }
+    }
+    layers
+}
+
 /// One instantiated constraint from a `$#CON` class, with the grid cells it covers.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConstraintInstance {
@@ -24,10 +48,15 @@ pub struct Puzzle {
     pub start_grid: Option<Vec<Vec<Option<i64>>>>,
     pub solution_grid: Option<Vec<Vec<Option<i64>>>>,
     pub cages: Option<Vec<Vec<Option<i64>>>>,
-    pub top_labels: Option<Vec<String>>,
-    pub bottom_labels: Option<Vec<String>>,
-    pub left_labels: Option<Vec<String>>,
-    pub right_labels: Option<Vec<String>>,
+    /// Border labels on each side. Outer vec is layer depth (0 = furthest from grid for
+    /// top/left, 0 = nearest grid for bottom/right). Inner vec runs along the side
+    /// (row index for top/bottom_labels, col index for left/right_labels). Depth-1 layer
+    /// vectors cover the single-number case (Kakurasu, Skyscrapers). Multi-layer is used
+    /// for Nonogram clue lists.
+    pub top_labels: Option<Vec<Vec<String>>>,
+    pub bottom_labels: Option<Vec<Vec<String>>>,
+    pub left_labels: Option<Vec<Vec<String>>>,
+    pub right_labels: Option<Vec<Vec<String>>>,
     /// Thermometer paths: each thermometer is an ordered list of [row, col] (0-indexed), bulb first.
     pub thermometers: Option<Vec<Vec<[i64; 2]>>>,
     /// Less-than constraints: each entry is [r1, c1, r2, c2] (0-indexed), meaning cell (r1,c1) < cell (r2,c2).
@@ -96,34 +125,52 @@ impl Puzzle {
 
         for label in ["row_labels", "top_labels", "row_sums"] {
             if problem.eprime.has_param(label) {
-                top_labels = Some(problem.eprime.param_vec_string(label)?);
+                top_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
             }
         }
 
         for label in ["col_labels", "left_labels", "col_sums"] {
             if problem.eprime.has_param(label) {
-                left_labels = Some(problem.eprime.param_vec_string(label)?);
+                left_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
             }
         }
 
         for label in ["bottom_labels"] {
             if problem.eprime.has_param(label) {
-                bottom_labels = Some(problem.eprime.param_vec_string(label)?);
+                bottom_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
             }
         }
 
         for label in ["right_labels"] {
             if problem.eprime.has_param(label) {
-                right_labels = Some(problem.eprime.param_vec_string(label)?);
+                right_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
             }
         }
 
         if problem.eprime.has_param("side_labels") {
             let side_labels = problem.eprime.param_vec_vec_string("side_labels")?;
-            left_labels = Some(side_labels[0].clone());
-            top_labels = Some(side_labels[1].clone());
-            right_labels = Some(side_labels[2].clone());
-            bottom_labels = Some(side_labels[3].clone());
+            left_labels = Some(vec![side_labels[0].clone()]);
+            top_labels = Some(vec![side_labels[1].clone()]);
+            right_labels = Some(vec![side_labels[2].clone()]);
+            bottom_labels = Some(vec![side_labels[3].clone()]);
+        }
+
+        // Nonogram clues: matrix indexed by [side_count, maxruns] of ints with trailing-zero
+        // padding. Convert to layered labels, right-aligned so the last clue sits nearest
+        // the grid and empty trailing layers are trimmed.
+        if problem.eprime.has_param("row_clues") {
+            let m = problem.eprime.param_vec_vec_i64("row_clues")?;
+            let layers = clue_matrix_to_layers(&m);
+            if !layers.is_empty() {
+                top_labels = Some(layers);
+            }
+        }
+        if problem.eprime.has_param("col_clues") {
+            let m = problem.eprime.param_vec_vec_i64("col_clues")?;
+            let layers = clue_matrix_to_layers(&m);
+            if !layers.is_empty() {
+                left_labels = Some(layers);
+            }
         }
 
         if problem.eprime.has_param("start_grid") {
@@ -655,6 +702,41 @@ mod tests {
         assert_eq!(sg.len() as i64, p.height);
         assert_eq!(sg[0].len() as i64, p.width);
         Ok(())
+    }
+
+    #[test]
+    fn test_clue_matrix_to_layers_nonogram_5x5() {
+        use crate::json::clue_matrix_to_layers;
+        let row_clues = vec![
+            vec![5, 0, 0],
+            vec![1, 3, 0],
+            vec![3, 1, 0],
+            vec![2, 2, 0],
+            vec![1, 1, 1],
+        ];
+        let layers = clue_matrix_to_layers(&row_clues);
+        assert_eq!(layers.len(), 3);
+        assert_eq!(layers[0], vec!["", "", "", "", "1"]);
+        assert_eq!(layers[1], vec!["", "1", "3", "2", "1"]);
+        assert_eq!(layers[2], vec!["5", "3", "1", "2", "1"]);
+    }
+
+    #[test]
+    fn test_clue_matrix_to_layers_trims_empty_depth() {
+        use crate::json::clue_matrix_to_layers;
+        // maxruns=4 but no row uses more than 2 clues: depth should be 2, not 4.
+        let clues = vec![vec![3, 0, 0, 0], vec![1, 2, 0, 0]];
+        let layers = clue_matrix_to_layers(&clues);
+        assert_eq!(layers.len(), 2);
+        assert_eq!(layers[0], vec!["", "1"]);
+        assert_eq!(layers[1], vec!["3", "2"]);
+    }
+
+    #[test]
+    fn test_clue_matrix_to_layers_all_zeros() {
+        use crate::json::clue_matrix_to_layers;
+        let clues = vec![vec![0, 0], vec![0, 0]];
+        assert!(clue_matrix_to_layers(&clues).is_empty());
     }
 
     #[test]

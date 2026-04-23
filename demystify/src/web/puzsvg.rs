@@ -223,7 +223,9 @@ impl PuzzleDraw {
 
         let mut puz_bounds = (0.0, step * (p.width as f64), 0.0, step * (p.height as f64));
 
-        // Add top labels
+        // Each side's labels are a Vec of layers. Closures map (total_layers L, layer index,
+        // along-side index i) → (row, col) for make_cell, plus a per-layer bounds bump.
+        // For top/left, layer 0 is furthest from the grid; for bottom/right, layer 0 is nearest.
         let label_groups = [
             &p.top_labels,
             &p.bottom_labels,
@@ -233,43 +235,53 @@ impl PuzzleDraw {
 
         #[allow(clippy::type_complexity)]
         let label_positions: Vec<(
-            Box<dyn Fn(usize) -> i64>,
-            Box<dyn Fn(usize) -> i64>,
+            Box<dyn Fn(i64, i64, usize) -> i64>,
+            Box<dyn Fn(i64, i64, usize) -> i64>,
             Box<dyn Fn(&mut (f64, f64, f64, f64))>,
         )> = vec![
             (
-                Box::new(|i| i as i64),
-                Box::new(|_| -1),
+                Box::new(|_l, _layer, i| i as i64),
+                Box::new(|l, layer, _i| -(l - layer)),
                 Box::new(|bounds| bounds.0 -= step),
             ),
             (
-                Box::new(|i| i as i64),
-                Box::new(|_| p.height),
+                Box::new(|_l, _layer, i| i as i64),
+                Box::new(|_l, layer, _i| p.height + layer),
                 Box::new(|bounds| bounds.1 += step),
             ),
             (
-                Box::new(|_| -1),
-                Box::new(|i| i as i64),
+                Box::new(|l, layer, _i| -(l - layer)),
+                Box::new(|_l, _layer, i| i as i64),
                 Box::new(|bounds| bounds.2 -= step),
             ),
             (
-                Box::new(|_| p.width),
-                Box::new(|i| i as i64),
+                Box::new(|_l, layer, _i| p.width + layer),
+                Box::new(|_l, _layer, i| i as i64),
                 Box::new(|bounds| bounds.3 += step),
             ),
         ];
 
-        for (labels, position) in label_groups.iter().zip(label_positions.iter()) {
-            if let Some(labels) = labels {
-                // Update grid bounds
-                position.2(&mut puz_bounds);
-                for (i, label) in labels.iter().enumerate() {
-                    let mut node = svg::node::element::Text::new(label);
-                    node.assign("font-size", 1);
-                    node.assign("transform", "translate(0.2, 0.9)");
-                    let mut g = make_cell(position.0(i), position.1(i), step);
-                    g.append(node);
-                    label_group.append(g);
+        for (layers_opt, position) in label_groups.iter().zip(label_positions.iter()) {
+            if let Some(layers) = layers_opt {
+                let total_layers = layers.len() as i64;
+                for (layer_idx, labels) in layers.iter().enumerate() {
+                    position.2(&mut puz_bounds);
+                    let layer = layer_idx as i64;
+                    for (i, label) in labels.iter().enumerate() {
+                        if label.is_empty() {
+                            continue;
+                        }
+                        let mut node = svg::node::element::Text::new(label);
+                        node.assign("font-size", 1);
+                        node.assign("transform", "translate(0.2, 0.9)");
+                        let mut g = make_cell(
+                            position.0(total_layers, layer, i),
+                            position.1(total_layers, layer, i),
+                            step,
+                        );
+                        g.append(node);
+                        label_group.append(g);
+                    }
                 }
             }
         }
@@ -905,6 +917,60 @@ mod tests {
             "Sudoku SVG must include stroke-width attributes for grid lines"
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_svg_multilayer_labels_nonogram_5x5() -> anyhow::Result<()> {
+        // 5x5 nonogram layered labels: row clues on top_labels, col clues on left_labels.
+        // Each has depth 3. Verify the renderer emits every non-empty label string.
+        let puzzle = crate::json::Puzzle {
+            kind: "Nonogram".to_string(),
+            width: 5,
+            height: 5,
+            start_grid: None,
+            solution_grid: None,
+            cages: None,
+            top_labels: Some(vec![
+                vec!["".into(), "".into(), "".into(), "".into(), "1".into()],
+                vec!["".into(), "1".into(), "3".into(), "2".into(), "1".into()],
+                vec!["5".into(), "3".into(), "1".into(), "2".into(), "1".into()],
+            ]),
+            bottom_labels: None,
+            left_labels: Some(vec![
+                vec!["".into(), "".into(), "".into(), "".into(), "".into()],
+                vec!["".into(), "".into(), "".into(), "".into(), "".into()],
+                vec!["5".into(), "1".into(), "3".into(), "2".into(), "5".into()],
+            ]),
+            right_labels: None,
+            thermometers: None,
+            less_than: None,
+            cage_sums: None,
+            info: None,
+            constraint_classes: None,
+            decorations: vec![],
+        };
+        let problem = Problem {
+            puzzle,
+            state: None,
+        };
+        let svg = PuzzleDraw::new("Nonogram").draw_puzzle(&problem);
+        let svg_str = svg.to_string();
+
+        // The labels group should carry one <text> element per non-empty clue.
+        // top_labels: 1 + 4 + 5 = 10 non-empty; left_labels: 0 + 0 + 5 = 5 → 15 total.
+        let text_count = svg_str.matches("<text").count();
+        assert_eq!(
+            text_count, 15,
+            "expected 15 label <text> elements for 15 non-empty clues, got {text_count}"
+        );
+        // Sanity: the clue values actually appear in the output.
+        for expected in ["5", "1", "3", "2"] {
+            assert!(
+                svg_str.contains(expected),
+                "expected clue {expected} in SVG output"
+            );
+        }
         Ok(())
     }
 
