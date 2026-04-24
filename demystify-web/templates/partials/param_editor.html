@@ -1,0 +1,11 @@
+<div class="he-paper" style="padding:1rem;">
+  <h4 style="margin:0 0 0.25rem;">{{ example_name }}</h4>
+  <p class="desc" style="margin:0 0 0.75rem;">{{ description }}</p>
+  <form method="post" action="/submitExample">
+    <input type="hidden" name="example_name" value="{{ example_name }}">
+    <textarea name="param_content" class="he-param-editor" rows="15">{{ param_content }}</textarea>
+    <button type="submit" class="he-btn primary" style="margin-top:0.5rem;">
+      Submit &rarr;
+    </button>
+  </form>
+</div>

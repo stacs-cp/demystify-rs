@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+{% block title %}Demystify — puzzle picker{% endblock title %}
+{% block content %}
+<div class="he-landing">
+  <section class="he-hero">
+    <h1>A solver that <em>shows its working</em>.</h1>
+    <p>Demystify compiles your constraint model, propagates one round at a time, and writes a short explanation for every cell it places. {{ puzzle_count }} puzzle families supported.</p>
+    <div class="chips">
+      <span class="he-chip"><span class="dot"></span>{{ puzzle_count }} puzzle types</span>
+      <span class="he-chip">Essence &middot; eprime &middot; Minion</span>
+      <span class="he-chip">Narrative explanations</span>
+    </div>
+  </section>
+
+  <section class="he-start">
+    {% include "partials/uploader.html" %}
+
+    <div class="he-paper">
+      <h3>Or pick a built-in puzzle</h3>
+      <p class="desc">Choose a puzzle type, then optionally edit the parameters before solving.</p>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <select id="exampleSelect" name="example_name" class="he-btn" style="min-width:180px;" required>
+          {% for ex in examples %}
+          <option value="{{ ex.name }}" title="{{ ex.description }}">{{ ex.name }}</option>
+          {% endfor %}
+        </select>
+        <button class="he-btn"
+                hx-post="/previewExample" hx-target="#paramPreview" hx-swap="innerHTML"
+                hx-include="#exampleSelect">
+          Edit params
+        </button>
+        <form method="post" action="/loadExample" style="margin:0; display:inline;">
+          <select name="example_name" style="display:none;" id="quickLoadSelect"></select>
+          <button type="submit" class="he-btn primary"
+                  onclick="document.getElementById('quickLoadSelect').innerHTML=document.getElementById('exampleSelect').innerHTML;document.getElementById('quickLoadSelect').value=document.getElementById('exampleSelect').value;">
+            Load &rarr;
+          </button>
+        </form>
+      </div>
+      <div id="paramPreview" style="margin-top:1rem;"></div>
+    </div>
+  </section>
+</div>
+{% endblock content %}

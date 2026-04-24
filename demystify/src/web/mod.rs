@@ -57,7 +57,7 @@ pub fn create_html(puzjson: &Problem) -> String {
 
 /// Renders a collapsible overview panel showing `$#INFO` text and all constraint instances
 /// grouped by their `$#CON` class, with hover-highlighting of the cells they cover.
-fn render_overview(puzzle: &Puzzle) -> String {
+pub fn render_overview(puzzle: &Puzzle) -> String {
     let has_info = puzzle.info.as_ref().is_some_and(|i| !i.is_empty());
     let has_classes = puzzle
         .constraint_classes

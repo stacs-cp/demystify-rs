@@ -1,17 +1,19 @@
 use anyhow::Context;
-use axum::{Json, extract::Multipart};
+use axum::extract::{Multipart, State};
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum_session::{Session, SessionNullPool};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use serde_json::Value;
 
 use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 
-use crate::util::{self, get_solver_global, set_solver_global};
+use crate::util::{self, AppState, get_solver_global, set_solver_global};
 
+use demystify::json::{Problem, Statement};
 use demystify::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+use demystify::web::puzsvg::PuzzleDraw;
 
 macro_rules! include_model_file {
     ($path:expr) => {
@@ -19,173 +21,504 @@ macro_rules! include_model_file {
     };
 }
 
-/// Each entry: (name, description, model_content, param_content).
-static EXAMPLES: Lazy<[(&str, &str, &str, &str); 14]> = Lazy::new(|| {
+pub struct ExampleInfo {
+    pub name: &'static str,
+    pub description: &'static str,
+    model: &'static str,
+    param: &'static str,
+}
+
+static EXAMPLES: Lazy<[ExampleInfo; 14]> = Lazy::new(|| {
     [
-        (
-            "Sudoku",
-            "Place 1–9 in each row, column and 3×3 box exactly once.",
-            include_model_file!("examples/eprime/sudoku.eprime"),
-            include_model_file!("examples/eprime/sudoku/puzzlingexample.param"),
-        ),
-        (
-            "MiracleSudoku",
-            "Sudoku with extra constraints: no two equal digits may be a king or knight's move apart.",
-            include_model_file!("examples/eprime/miracle.eprime"),
-            include_model_file!("examples/eprime/miracle/original.param"),
-        ),
-        (
-            "StarBattle",
-            "Place stars in the grid so each row, column and region has exactly one star; stars may not touch.",
-            include_model_file!("examples/eprime/star-battle.eprime"),
-            include_model_file!("examples/eprime/star-battle/FATAtalkexample.param"),
-        ),
-        (
-            "Binairo",
-            "Fill the grid with 0s and 1s: equal counts per row/column, no three equal values adjacent.",
-            include_model_file!("examples/eprime/binairo.essence"),
-            include_model_file!("examples/eprime/binairo/diiscu.param"),
-        ),
-        (
-            "Thermometer",
-            "Fill thermometers so values increase from bulb to tip.",
-            include_model_file!("examples/eprime/thermometer.eprime"),
-            include_model_file!("examples/eprime/thermometer/thermometer-1.param"),
-        ),
-        (
-            "Futoshiki",
-            "Place digits 1–N in each row and column; respect the inequality signs between cells.",
-            include_model_file!("examples/eprime/futoshiki.eprime"),
-            include_model_file!("examples/eprime/futoshiki/nfutoshiki-1.param"),
-        ),
-        (
-            "KillerSudoku",
-            "Sudoku where caged groups of cells must sum to a given total; no repeats within a cage.",
-            include_model_file!("examples/eprime/killersudoku.eprime"),
-            include_model_file!("examples/eprime/killersudoku/killersudoku.param"),
-        ),
-        (
-            "Skyscrapers",
-            "Place 1–N in each row and column; clues on edges indicate how many 'buildings' are visible.",
-            include_model_file!("examples/eprime/skyscrapers.eprime"),
-            include_model_file!("examples/eprime/skyscrapers/skyscrapers-1.param"),
-        ),
-        (
-            "XSums",
-            "Sudoku variant where edge clues equal the sum of the first X digits in that row/column (X is the first digit).",
-            include_model_file!("examples/eprime/x-sums.eprime"),
-            include_model_file!("examples/eprime/x-sums/easy-xsums.param"),
-        ),
-        (
-            "Kakurasu",
-            "Place marks in a grid so each row and column's marked-column (or marked-row) indices sum to the clue.",
-            include_model_file!("examples/eprime/kakurasu.eprime"),
-            include_model_file!("examples/eprime/kakurasu/kakurasu.param"),
-        ),
-        (
-            "Akari",
-            "Place light bulbs so every cell is lit; bulbs may not illuminate each other; numbered cells must have exactly that many adjacent bulbs.",
-            include_model_file!("examples/eprime/akari.eprime"),
-            include_model_file!("examples/eprime/akari/akari-5x5.param"),
-        ),
-        (
-            "Mosaic",
-            "Fill each cell black or white; a numbered cell indicates how many of its 3×3 neighbourhood (including itself) are black.",
-            include_model_file!("examples/eprime/mosaic.eprime"),
-            include_model_file!("examples/eprime/mosaic/mosaic-5x5.param"),
-        ),
-        (
-            "Nonogram",
-            "Fill rows and columns according to clue sequences that describe runs of consecutive filled cells.",
-            include_model_file!("examples/eprime/nonogram.eprime"),
-            include_model_file!("examples/eprime/nonogram/duck-8x9.param"),
-        ),
-        (
-            "Minesweeper",
-            "Identify mine locations; numbered cells show exactly how many of their neighbours are mines.",
-            include_model_file!("examples/eprime/minesweeper.eprime"),
-            include_model_file!("examples/eprime/minesweeper/minesweeper-5x5.param"),
-        ),
+        ExampleInfo {
+            name: "Sudoku",
+            description: "Place 1-9 in each row, column and 3x3 box exactly once.",
+            model: include_model_file!("examples/eprime/sudoku.eprime"),
+            param: include_model_file!("examples/eprime/sudoku/puzzlingexample.param"),
+        },
+        ExampleInfo {
+            name: "MiracleSudoku",
+            description: "Sudoku with extra constraints: no two equal digits may be a king or knight's move apart.",
+            model: include_model_file!("examples/eprime/miracle.eprime"),
+            param: include_model_file!("examples/eprime/miracle/original.param"),
+        },
+        ExampleInfo {
+            name: "StarBattle",
+            description: "Place stars in the grid so each row, column and region has exactly one star; stars may not touch.",
+            model: include_model_file!("examples/eprime/star-battle.eprime"),
+            param: include_model_file!("examples/eprime/star-battle/FATAtalkexample.param"),
+        },
+        ExampleInfo {
+            name: "Binairo",
+            description: "Fill the grid with 0s and 1s: equal counts per row/column, no three equal values adjacent.",
+            model: include_model_file!("examples/eprime/binairo.essence"),
+            param: include_model_file!("examples/eprime/binairo/diiscu.param"),
+        },
+        ExampleInfo {
+            name: "Thermometer",
+            description: "Fill thermometers so values increase from bulb to tip.",
+            model: include_model_file!("examples/eprime/thermometer.eprime"),
+            param: include_model_file!("examples/eprime/thermometer/thermometer-1.param"),
+        },
+        ExampleInfo {
+            name: "Futoshiki",
+            description: "Place digits 1-N in each row and column; respect the inequality signs between cells.",
+            model: include_model_file!("examples/eprime/futoshiki.eprime"),
+            param: include_model_file!("examples/eprime/futoshiki/nfutoshiki-1.param"),
+        },
+        ExampleInfo {
+            name: "KillerSudoku",
+            description: "Sudoku where caged groups of cells must sum to a given total; no repeats within a cage.",
+            model: include_model_file!("examples/eprime/killersudoku.eprime"),
+            param: include_model_file!("examples/eprime/killersudoku/killersudoku.param"),
+        },
+        ExampleInfo {
+            name: "Skyscrapers",
+            description: "Place 1-N in each row and column; clues on edges indicate how many buildings are visible.",
+            model: include_model_file!("examples/eprime/skyscrapers.eprime"),
+            param: include_model_file!("examples/eprime/skyscrapers/skyscrapers-1.param"),
+        },
+        ExampleInfo {
+            name: "XSums",
+            description: "Sudoku variant where edge clues equal the sum of the first X digits in that row/column.",
+            model: include_model_file!("examples/eprime/x-sums.eprime"),
+            param: include_model_file!("examples/eprime/x-sums/easy-xsums.param"),
+        },
+        ExampleInfo {
+            name: "Kakurasu",
+            description: "Place marks in a grid so each row and column's marked indices sum to the clue.",
+            model: include_model_file!("examples/eprime/kakurasu.eprime"),
+            param: include_model_file!("examples/eprime/kakurasu/kakurasu.param"),
+        },
+        ExampleInfo {
+            name: "Akari",
+            description: "Place light bulbs so every cell is lit; bulbs may not illuminate each other.",
+            model: include_model_file!("examples/eprime/akari.eprime"),
+            param: include_model_file!("examples/eprime/akari/akari-5x5.param"),
+        },
+        ExampleInfo {
+            name: "Mosaic",
+            description: "Fill each cell black or white; a numbered cell indicates how many of its neighbourhood are black.",
+            model: include_model_file!("examples/eprime/mosaic.eprime"),
+            param: include_model_file!("examples/eprime/mosaic/mosaic-5x5.param"),
+        },
+        ExampleInfo {
+            name: "Nonogram",
+            description: "Fill rows and columns according to clue sequences that describe runs of consecutive filled cells.",
+            model: include_model_file!("examples/eprime/nonogram.eprime"),
+            param: include_model_file!("examples/eprime/nonogram/duck-8x9.param"),
+        },
+        ExampleInfo {
+            name: "Minesweeper",
+            description: "Identify mine locations; numbered cells show exactly how many of their neighbours are mines.",
+            model: include_model_file!("examples/eprime/minesweeper.eprime"),
+            param: include_model_file!("examples/eprime/minesweeper/minesweeper-5x5.param"),
+        },
     ]
 });
 
-pub async fn dump_full_solve(
-    session: Session<SessionNullPool>,
-) -> Result<Json<Value>, util::AppError> {
-    let solver = get_solver_global(&session)?;
+// ─── Template rendering helpers ───
 
-    let mut solver = solver.lock().unwrap();
-
-    let solve = solver.quick_solve();
-
-    Ok(Json(serde_json::value::to_value(solve).unwrap()))
+fn render_svg(problem: &Problem) -> String {
+    let pd = PuzzleDraw::new_with_decs(&problem.puzzle.kind, &problem.puzzle.decorations);
+    pd.draw_puzzle(problem).to_string()
 }
 
-pub async fn best_next_step(session: Session<SessionNullPool>) -> Result<String, util::AppError> {
-    let solver = get_solver_global(&session)?;
+fn count_givens(problem: &Problem) -> u32 {
+    problem.puzzle.start_grid.as_ref().map_or(0, |sg| {
+        sg.iter()
+            .flat_map(|row| row.iter())
+            .filter(|c| c.is_some())
+            .count() as u32
+    })
+}
 
-    let mut solver = solver.lock().unwrap();
+fn count_placed(problem: &Problem) -> u32 {
+    problem
+        .state
+        .as_ref()
+        .and_then(|s| s.knowledge_grid.as_ref())
+        .map_or(0, |kg| {
+            kg.iter()
+                .flat_map(|row| row.iter())
+                .filter(|cell| {
+                    cell.as_ref().is_some_and(|vals| {
+                        vals.len() == 1
+                            && vals[0]
+                                .classes
+                                .as_ref()
+                                .is_some_and(|c| c.contains("litknown") || c.contains("litpos"))
+                    })
+                })
+                .count() as u32
+        })
+}
 
-    let (solve, lits) = solver.quick_solve_html_step();
+fn count_candidates(problem: &Problem) -> u32 {
+    problem
+        .state
+        .as_ref()
+        .and_then(|s| s.knowledge_grid.as_ref())
+        .map_or(0, |kg| {
+            kg.iter()
+                .flat_map(|row| row.iter())
+                .filter_map(|cell| cell.as_ref())
+                .map(|vals| vals.len() as u32)
+                .sum()
+        })
+}
 
-    solver.mark_lits_as_deduced(&lits);
+fn count_constraints(problem: &Problem) -> u32 {
+    problem
+        .puzzle
+        .constraint_classes
+        .as_ref()
+        .map_or(0, |cc| cc.values().map(|v| v.len() as u32).sum())
+}
 
-    if solve.is_empty() {
-        Ok("Please upload a puzzle or select an example to begin.".to_string())
-    } else {
-        Ok(solve)
+/// Extract deduction data from statements for template rendering.
+fn extract_deductions(statements: &[Statement]) -> Vec<tera::Value> {
+    let mut deductions = Vec::new();
+    let mut current_result: Option<String> = None;
+    let mut current_constraints: Vec<String> = Vec::new();
+    let mut current_constraint_classes: Vec<Vec<String>> = Vec::new();
+
+    for stmt in statements {
+        let is_result = stmt.classes.is_empty()
+            || (!stmt.classes.iter().any(|c| c.starts_with("highlight_con")));
+        if is_result {
+            if let Some(result) = current_result.take() {
+                let mut obj = serde_json::Map::new();
+                obj.insert("result".into(), tera::Value::String(result));
+                obj.insert(
+                    "constraints".into(),
+                    tera::Value::Array(
+                        current_constraints
+                            .drain(..)
+                            .map(tera::Value::String)
+                            .collect(),
+                    ),
+                );
+                obj.insert(
+                    "constraint_classes".into(),
+                    tera::Value::Array(
+                        current_constraint_classes
+                            .drain(..)
+                            .map(|cc| {
+                                tera::Value::Array(
+                                    cc.into_iter().map(tera::Value::String).collect(),
+                                )
+                            })
+                            .collect(),
+                    ),
+                );
+                obj.insert("classes".into(), tera::Value::Array(vec![]));
+                deductions.push(tera::Value::Object(obj));
+            }
+            current_result = Some(stmt.content.clone());
+        } else {
+            current_constraints.push(stmt.content.clone());
+            current_constraint_classes.push(stmt.classes.clone());
+        }
     }
+
+    if let Some(result) = current_result {
+        let mut obj = serde_json::Map::new();
+        obj.insert("result".into(), tera::Value::String(result));
+        obj.insert(
+            "constraints".into(),
+            tera::Value::Array(
+                current_constraints
+                    .into_iter()
+                    .map(tera::Value::String)
+                    .collect(),
+            ),
+        );
+        obj.insert(
+            "constraint_classes".into(),
+            tera::Value::Array(
+                current_constraint_classes
+                    .into_iter()
+                    .map(|cc| tera::Value::Array(cc.into_iter().map(tera::Value::String).collect()))
+                    .collect(),
+            ),
+        );
+        obj.insert("classes".into(), tera::Value::Array(vec![]));
+        deductions.push(tera::Value::Object(obj));
+    }
+
+    deductions
 }
 
-pub async fn get_difficulties(session: Session<SessionNullPool>) -> Result<String, util::AppError> {
-    let solver = get_solver_global(&session)?;
+fn build_solver_stage_context(problem: &Problem, round: u32) -> tera::Context {
+    let mut ctx = tera::Context::new();
+    let svg = render_svg(problem);
+    let puzzle_name = &problem.puzzle.kind;
+    let dim = format!("{}x{}", problem.puzzle.width, problem.puzzle.height);
+    let givens = count_givens(problem);
+    let description = problem
+        .state
+        .as_ref()
+        .and_then(|s| s.description.clone())
+        .unwrap_or_default();
 
-    let mut solver = solver.lock().unwrap();
+    let statements = problem.state.as_ref().and_then(|s| s.statements.as_ref());
 
-    let solve = solver.quick_generate_html_difficulties();
+    let all_are_legend = statements.is_some_and(|stmts| {
+        !stmts.is_empty()
+            && stmts
+                .iter()
+                .all(|s| s.classes.iter().any(|c| c.starts_with("highlight_con")))
+    });
 
-    Ok(solve)
+    let deductions = if all_are_legend {
+        Vec::new()
+    } else {
+        statements.map_or_else(Vec::new, |stmts| extract_deductions(stmts))
+    };
+
+    let legend_items: Vec<tera::Value> = if all_are_legend {
+        statements
+            .unwrap()
+            .iter()
+            .map(|s| {
+                let mut obj = serde_json::Map::new();
+                obj.insert("content".into(), tera::Value::String(s.content.clone()));
+                obj.insert(
+                    "classes".into(),
+                    tera::Value::Array(
+                        s.classes
+                            .iter()
+                            .map(|c| tera::Value::String(c.clone()))
+                            .collect(),
+                    ),
+                );
+                tera::Value::Object(obj)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    let placed = count_placed(problem);
+    let total_cells = (problem.puzzle.width * problem.puzzle.height) as u32;
+    let candidates = count_candidates(problem);
+    let constraint_count = count_constraints(problem);
+    let this_round = problem
+        .state
+        .as_ref()
+        .and_then(|s| s.knowledge_grid.as_ref())
+        .map_or(0u32, |kg| {
+            kg.iter()
+                .flat_map(|row| row.iter())
+                .filter(|cell| {
+                    cell.as_ref().is_some_and(|vals| {
+                        vals.iter()
+                            .any(|v| v.classes.as_ref().is_some_and(|c| c.contains("litpos")))
+                    })
+                })
+                .count() as u32
+        });
+
+    let techniques: Vec<tera::Value> =
+        problem
+            .puzzle
+            .constraint_classes
+            .as_ref()
+            .map_or_else(Vec::new, |cc| {
+                cc.iter()
+                    .map(|(name, instances)| {
+                        let mut obj = serde_json::Map::new();
+                        obj.insert("name".into(), tera::Value::String(name.clone()));
+                        obj.insert(
+                            "count".into(),
+                            tera::Value::Number(serde_json::Number::from(instances.len())),
+                        );
+                        let inst_vals: Vec<tera::Value> = instances
+                            .iter()
+                            .map(|inst| {
+                                let cell_ids = inst
+                                    .cells
+                                    .iter()
+                                    .map(|[r, c]| format!("C_{}_{}", r + 1, c + 1))
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
+                                let mut iobj = serde_json::Map::new();
+                                iobj.insert(
+                                    "description".into(),
+                                    tera::Value::String(inst.description.clone()),
+                                );
+                                iobj.insert("cell_ids".into(), tera::Value::String(cell_ids));
+                                tera::Value::Object(iobj)
+                            })
+                            .collect();
+                        obj.insert("instances".into(), tera::Value::Array(inst_vals));
+                        tera::Value::Object(obj)
+                    })
+                    .collect()
+            });
+
+    ctx.insert("board_svg", &svg);
+    ctx.insert("puzzle_name", puzzle_name);
+    ctx.insert("puzzle_dim", &dim);
+    ctx.insert("givens_count", &givens);
+    ctx.insert("round", &round);
+    ctx.insert("description", &description);
+    ctx.insert("deductions", &deductions);
+    ctx.insert("legend_items", &legend_items);
+    ctx.insert("placed", &placed);
+    ctx.insert("total_cells", &total_cells);
+    ctx.insert("this_round", &this_round);
+    ctx.insert("candidates_left", &candidates);
+    ctx.insert("constraint_count", &constraint_count);
+    ctx.insert("techniques", &techniques);
+
+    let puzzle_info: Vec<String> = problem.puzzle.info.as_ref().cloned().unwrap_or_default();
+    ctx.insert("puzzle_info", &puzzle_info);
+
+    ctx
 }
 
-pub async fn refresh(session: Session<SessionNullPool>) -> Result<String, util::AppError> {
-    let solver = get_solver_global(&session)?;
-
-    let mut solver = solver.lock().unwrap();
-
-    let (solve, _) = solver.refresh_html_step();
-
-    Ok(solve)
+fn build_solver_page_context(problem: &Problem, round: u32) -> tera::Context {
+    let mut ctx = build_solver_stage_context(problem, round);
+    ctx.insert("view", "solver");
+    ctx.insert("headline", &problem.puzzle.kind);
+    ctx
 }
 
-pub async fn click_literal(
-    headers: axum::http::header::HeaderMap,
+// ─── Route handlers ───
+
+pub async fn landing(State(state): State<AppState>) -> Result<Html<String>, util::AppError> {
+    let mut ctx = tera::Context::new();
+    ctx.insert("view", "landing");
+    ctx.insert("puzzle_count", &EXAMPLES.len());
+    ctx.insert("model_loaded", &false);
+
+    let examples: Vec<tera::Value> = EXAMPLES
+        .iter()
+        .map(|ex| {
+            let mut obj = serde_json::Map::new();
+            obj.insert("name".into(), tera::Value::String(ex.name.to_string()));
+            obj.insert(
+                "description".into(),
+                tera::Value::String(ex.description.to_string()),
+            );
+            tera::Value::Object(obj)
+        })
+        .collect();
+    ctx.insert("examples", &examples);
+
+    let html = state.tera.render("landing.html", &ctx)?;
+    Ok(Html(html))
+}
+
+pub async fn solver_page(
+    State(state): State<AppState>,
     session: Session<SessionNullPool>,
-) -> Result<String, util::AppError> {
-    let solver = get_solver_global(&session)?;
+) -> Result<Response, util::AppError> {
+    let solver = match get_solver_global(&session) {
+        Ok(s) => s,
+        Err(_) => {
+            let mut ctx = tera::Context::new();
+            ctx.insert("view", "solver");
+            let html = state.tera.render("no_puzzle.html", &ctx)?;
+            return Ok(Html(html).into_response());
+        }
+    };
 
     let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
+    let (problem, _lits) = solver.refresh_problem();
+
+    let ctx = build_solver_page_context(&problem, round);
+    let html = state.tera.render("solver.html", &ctx)?;
+    Ok(Html(html).into_response())
+}
+
+pub async fn solver_advance(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+
+    let mut round: u32 = session.get("round").unwrap_or(0);
+    round += 1;
+    session.set("round", round);
+
+    let (problem, _lits) = solver.solve_step();
+    let ctx = build_solver_stage_context(&problem, round);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+pub async fn solver_reset(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
+
+    let (problem, _lits) = solver.refresh_problem();
+    let ctx = build_solver_stage_context(&problem, round);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+pub async fn solver_difficulties(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
+
+    let problem = solver.difficulty_problem();
+    let ctx = build_solver_stage_context(&problem, round);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+pub async fn solver_explain(
+    headers: axum::http::header::HeaderMap,
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
 
     let cell = headers
-        .get("hx-trigger")
-        .context("Missing header: 'hx-trigger'")?;
+        .get("x-cell-literal")
+        .context("Missing header: 'X-Cell-Literal'")?;
     let cell = cell.to_str()?;
     let cell: Result<Vec<_>, _> = cell.split('_').skip(1).map(str::parse).collect();
     let cell = cell?;
 
-    session.set("click_cell", &cell);
+    let (problem, _lits) = solver.solve_step_for_literal(cell);
+    let ctx = build_solver_stage_context(&problem, round);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
 
-    let (html, lits) = solver.quick_solve_html_step_for_literal(cell);
+// ─── Upload / example loading ───
 
-    let lidx_lits: Vec<_> = lits.iter().map(|x| x.lidx()).collect();
-    session.set("lidx_lits", &lidx_lits);
+#[derive(Deserialize)]
+pub struct ExampleParams {
+    example_name: String,
+}
 
-    Ok(html)
+#[derive(Deserialize)]
+pub struct SubmitExampleParams {
+    example_name: String,
+    param_content: String,
 }
 
 pub async fn upload_files(
     session: Session<SessionNullPool>,
     mut multipart: Multipart,
-) -> Result<String, util::AppError> {
+) -> Result<Response, util::AppError> {
     let temp_dir = tempfile::Builder::new()
         .prefix(".demystify-")
         .tempdir_in(".")
@@ -199,24 +532,16 @@ pub async fn upload_files(
         .await
         .context("Failed to parse multipart upload")?
     {
-        if field.name().unwrap() != "model" && field.name().unwrap() != "parameter" {
-            return Err(anyhow!(
-                "Form malformed -- should contain 'model' and 'parameter', but it contains '{}'",
-                field.name().unwrap()
-            )
-            .into());
+        let field_name = field.name().unwrap_or("");
+        if field_name != "model" && field_name != "params" {
+            continue;
         }
-
-        // Grab the name
-        let form_file_name = field.file_name().context("No filename")?;
-
-        eprintln!("Got file '{form_file_name}'!");
+        let form_file_name = field.file_name().context("No filename")?.to_owned();
 
         let file_name = if form_file_name.ends_with(".param") || form_file_name.ends_with(".json") {
             if param.is_some() {
                 return Err(anyhow!("Cannot upload two param files (.param or .json)").into());
             }
-
             if form_file_name.ends_with(".param") {
                 param = Some("upload.param".into());
                 "upload.param"
@@ -237,133 +562,40 @@ pub async fn upload_files(
             }
         } else {
             return Err(anyhow!(
-                "Only expecting .param, .json, .eprime or .essence uploads, not '{}'",
-                form_file_name
+                "Only expecting .param, .json, .eprime or .essence uploads, not '{form_file_name}'"
             )
             .into());
         };
 
-        // Create a path for the soon-to-be file
         let file_path = temp_dir.path().join(file_name);
-
-        // Unwrap the incoming bytes
         let data = field.bytes().await.context("Failed to read file bytes")?;
-
-        // Open a handle to the file
         let mut file_handle = File::create(file_path).context("Failed to open file for writing")?;
-
-        // Write the incoming data to the handle
         file_handle
             .write_all(&data)
-            .context("Failed to write data!")?;
+            .context("Failed to write data")?;
     }
 
     if model.is_none() {
-        return Ok(r###"
-            <div class="alert alert-danger">
-                <h4>Upload Error</h4>
-                <p>Please upload a model file (.eprime or .essence)</p>
-            </div>
-        "###
-        .to_string());
+        return Err(anyhow!("Please upload a model file (.eprime or .essence)").into());
     }
-
     if param.is_none() {
-        return Ok(r###"
-            <div class="alert alert-danger">
-                <h4>Upload Error</h4>
-                <p>Please upload a parameter file (.param or .json)</p>
-            </div>
-        "###
-        .to_string());
+        return Err(anyhow!("Please upload a parameter file (.param or .json)").into());
     }
 
-    match load_model(&session, temp_dir, model, param) {
-        Ok(_) => refresh(session).await,
-        Err(e) => Ok(format!(
-            r###"
-            <div class="alert alert-danger">
-                <h4>Failed to upload puzzle</h4>
-                <pre class="text-danger">{e:#}</pre>
-                <p>Please check your files and try again.</p>
-            </div>
-            "###
-        )),
-    }
+    load_model(&session, temp_dir, model, param)?;
+    session.set("round", 0u32);
+    Ok(Redirect::to("/solver").into_response())
 }
 
-#[derive(Deserialize)]
-pub struct ExampleParams {
-    example_name: String,
-}
-
-#[derive(Deserialize)]
-pub struct SubmitExampleParams {
-    param_content: String,
-    example_name: String,
-}
-
-pub async fn load_example(
-    _session: Session<SessionNullPool>,
-    form: axum::extract::Form<ExampleParams>,
-) -> Result<String, util::AppError> {
-    let example_name = form.example_name.clone();
-
-    let (_, description, _, param_content) = EXAMPLES
-        .iter()
-        .find(|(name, _, _, _)| *name == example_name)
-        .copied()
-        .context(format!("Example '{example_name}' not found"))?;
-
-    Ok(format!(
-        r###"
-        <h5>Edit Parameters for {example_name}</h5>
-        <p class="text-muted small">{description}</p>
-        <form id="paramForm" hx-post="/submitExample" hx-target="#mainSpace">
-            <input type="hidden" name="example_name" value="{example_name}">
-            <textarea name="param_content" class="form-control" rows="15" style="font-family: monospace;">{param_content}</textarea>
-            <button type="submit" class="btn btn-primary mt-2" hx-indicator="#indicator">
-                Submit Parameters
-            </button>
-        </form>
-    "###
-    ))
-}
-
-pub async fn get_example_names() -> String {
-    let options = EXAMPLES
-        .iter()
-        .map(|(name, desc, _, _)| {
-            format!("<option value=\"{name}\" title=\"{desc}\">{name}</option>")
-        })
-        .collect::<Vec<_>>()
-        .join("");
-
-    r###"<form id="exampleForm" hx-post="/loadExample" hx-target="#exampleParams">
-                        <select name="example_name" class="form-select" required>
-    "###
-    .to_owned()
-        + &options
-        + r###" 
-                        </select>
-                        <button type="submit" class="btn btn-primary mt-3" hx-indicator="#indicator">
-                            Load Example
-                        </button>
-                    </form>
-    "###
-}
-
-pub async fn submit_example(
+pub async fn load_example_and_redirect(
     session: Session<SessionNullPool>,
-    form: axum::extract::Form<SubmitExampleParams>,
-) -> Result<String, util::AppError> {
-    let example_name = form.example_name.clone();
-    let param_content = form.param_content.clone();
+    form: axum::extract::Form<ExampleParams>,
+) -> Result<Response, util::AppError> {
+    let example_name = &form.example_name;
 
-    let model_content = EXAMPLES
+    let example = EXAMPLES
         .iter()
-        .find(|(name, _, _, _)| *name == example_name)
-        .map(|(_, _, content, _)| *content)
+        .find(|e| e.name == *example_name)
         .context(format!("Example '{example_name}' not found"))?;
 
     let temp_dir = tempfile::Builder::new()
@@ -372,28 +604,71 @@ pub async fn submit_example(
         .context("Failed to create temporary directory")?;
 
     let model_dest = temp_dir.path().join("upload.eprime");
-    std::fs::write(&model_dest, model_content).context("Failed to write model file")?;
+    std::fs::write(&model_dest, example.model).context("Failed to write model file")?;
 
     let param_dest = temp_dir.path().join("upload.param");
-    std::fs::write(&param_dest, param_content).context("Failed to write param file")?;
+    std::fs::write(&param_dest, example.param).context("Failed to write param file")?;
 
-    match load_model(
+    load_model(
         &session,
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
-    ) {
-        Ok(_) => refresh(session).await,
-        Err(e) => Ok(format!(
-            r###"
-            <div class="alert alert-danger">
-                <h4>Failed to load puzzle</h4>
-                <pre class="text-danger">{e:#}</pre>
-                <p>Please check your parameter file and try again.</p>
-            </div>
-            "###
-        )),
-    }
+    )?;
+    session.set("round", 0u32);
+    Ok(Redirect::to("/solver").into_response())
+}
+
+pub async fn preview_example(
+    State(state): State<AppState>,
+    form: axum::extract::Form<ExampleParams>,
+) -> Result<Html<String>, util::AppError> {
+    let example_name = &form.example_name;
+
+    let example = EXAMPLES
+        .iter()
+        .find(|e| e.name == *example_name)
+        .context(format!("Example '{example_name}' not found"))?;
+
+    let mut ctx = tera::Context::new();
+    ctx.insert("example_name", example_name);
+    ctx.insert("description", example.description);
+    ctx.insert("param_content", example.param);
+
+    let html = state.tera.render("partials/param_editor.html", &ctx)?;
+    Ok(Html(html))
+}
+
+pub async fn submit_example(
+    session: Session<SessionNullPool>,
+    form: axum::extract::Form<SubmitExampleParams>,
+) -> Result<Response, util::AppError> {
+    let example_name = &form.example_name;
+
+    let example = EXAMPLES
+        .iter()
+        .find(|e| e.name == *example_name)
+        .context(format!("Example '{example_name}' not found"))?;
+
+    let temp_dir = tempfile::Builder::new()
+        .prefix(".demystify-")
+        .tempdir_in(".")
+        .context("Failed to create temporary directory")?;
+
+    let model_dest = temp_dir.path().join("upload.eprime");
+    std::fs::write(&model_dest, example.model).context("Failed to write model file")?;
+
+    let param_dest = temp_dir.path().join("upload.param");
+    std::fs::write(&param_dest, &form.param_content).context("Failed to write param file")?;
+
+    load_model(
+        &session,
+        temp_dir,
+        Some("upload.eprime".into()),
+        Some("upload.param".into()),
+    )?;
+    session.set("round", 0u32);
+    Ok(Redirect::to("/solver").into_response())
 }
 
 fn load_model(
@@ -411,4 +686,15 @@ fn load_model(
     let plan = PuzzlePlanner::new(puz);
     set_solver_global(session, plan);
     Ok(())
+}
+
+// ─── Legacy compatibility: old JSON full-solve endpoint ───
+
+pub async fn dump_full_solve(
+    session: Session<SessionNullPool>,
+) -> Result<axum::Json<serde_json::Value>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let solve = solver.quick_solve();
+    Ok(axum::Json(serde_json::value::to_value(solve).unwrap()))
 }

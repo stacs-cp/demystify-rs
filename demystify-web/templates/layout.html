@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{% block title %}Demystify{% endblock title %}</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..600;1,9..144,400..500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/demystify.css">
+  <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
+  <script src="/static/demystify.js" defer></script>
+</head>
+<body class="he-root">
+  <header class="he-topbar">
+    <a class="he-brand" href="/">demystify<span class="dot">.</span></a>
+    <nav class="he-nav">
+      <a href="/"          class="{% if view == 'landing' %}active{% endif %}">Puzzles</a>
+      <a href="/solver"    class="{% if view == 'solver' %}active{% endif %}">Solver</a>
+    </nav>
+  </header>
+
+  <main>{% block content %}{% endblock content %}</main>
+</body>
+</html>

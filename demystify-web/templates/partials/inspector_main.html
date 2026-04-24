@@ -1,0 +1,16 @@
+<section id="inspector-main" class="he-paper he-insp-main">
+  {% if active_cls %}
+  <h3>{{ active_cls.name }}</h3>
+  <p class="lede">{{ active_cls.count }} rules in this class.</p>
+  <ul class="he-rules">
+    {% for inst in active_cls.instances %}
+    <li class="js_con_preview" data-cells="{{ inst.cell_ids }}">{{ inst.description }}</li>
+    {% endfor %}
+    {% if active_cls.count > active_cls.instances | length %}
+    <li class="more">&hellip; {{ active_cls.count - active_cls.instances | length }} more</li>
+    {% endif %}
+  </ul>
+  {% else %}
+  <p style="color:var(--ink-mid);">Select a constraint class from the sidebar.</p>
+  {% endif %}
+</section>

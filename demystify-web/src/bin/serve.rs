@@ -1,18 +1,77 @@
+use axum::Router;
 use axum::body::Body;
 use axum::http::Request;
 use axum::response::Response;
-use axum::routing::post;
-use axum::{Json, Router, routing::get};
-use axum_session::{Session, SessionConfig, SessionLayer, SessionNullPool, SessionStore};
+use axum::routing::{get, post};
+use axum_session::{SessionConfig, SessionLayer, SessionNullPool, SessionStore};
+use demystify_web::util::AppState;
 use demystify_web::wrap;
-use serde::{Deserialize, Serialize};
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::net::TcpListener;
-
 use tower_http::cors::{Any, CorsLayer};
 
 use demystify::problem::util::exec::ProgramRunner;
+
+fn build_templates() -> tera::Tera {
+    let mut tera = tera::Tera::default();
+    tera.add_raw_templates(vec![
+        (
+            "layout.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/layout.html"
+            )),
+        ),
+        (
+            "landing.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/landing.html"
+            )),
+        ),
+        (
+            "solver.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/solver.html"
+            )),
+        ),
+        (
+            "no_puzzle.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/no_puzzle.html"
+            )),
+        ),
+        (
+            "partials/solver_stage.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/partials/solver_stage.html"
+            )),
+        ),
+        (
+            "partials/uploader.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/partials/uploader.html"
+            )),
+        ),
+        (
+            "partials/param_editor.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/partials/param_editor.html"
+            )),
+        ),
+    ])
+    .expect("Failed to load templates");
+
+    tera.autoescape_on(vec![]);
+    tera
+}
 
 #[tokio::main]
 async fn main() {
@@ -30,101 +89,89 @@ async fn main() {
     };
 
     let session_config = SessionConfig::default().with_table_name("sessions_table");
-
-    // create SessionStore and initiate the database tables
     let session_store = SessionStore::<SessionNullPool>::new(None, session_config)
         .await
         .unwrap();
 
     let cors = CorsLayer::new().allow_origin(Any);
 
-    macro_rules! serve_static_file {
-        ($path:expr) => {
+    let tera = build_templates();
+    let app_state = AppState {
+        tera: Arc::new(tera),
+    };
+
+    macro_rules! serve_static {
+        ($path:expr, $content_type:expr) => {
             get(move |_: Request<Body>| async {
-                let file_content: &'static str =
+                let content: &'static str =
                     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), $path));
-                Ok::<_, Infallible>(Response::new(Body::from(file_content)))
+                Ok::<_, Infallible>(
+                    Response::builder()
+                        .header("Content-Type", $content_type)
+                        .body(Body::from(content))
+                        .unwrap(),
+                )
             })
         };
     }
 
-    // build our application with some routes
     let app = Router::new()
-        .route("/greet", get(greet))
-        .route("/greetX", get(greet_x))
-        .route("/getExampleNames", get(wrap::get_example_names))
-        .route("/uploadPuzzle", post(wrap::upload_files))
-        .route("/loadExample", post(wrap::load_example))
+        // Page routes
+        .route("/", get(wrap::landing))
+        .route("/solver", get(wrap::solver_page))
+        // htmx partial routes
+        .route("/solver/advance", post(wrap::solver_advance))
+        .route("/solver/reset", post(wrap::solver_reset))
+        .route("/solver/difficulties", post(wrap::solver_difficulties))
+        .route("/solver/explain", post(wrap::solver_explain))
+        // Upload / example loading
+        .route("/upload", post(wrap::upload_files))
+        .route("/previewExample", post(wrap::preview_example))
         .route("/submitExample", post(wrap::submit_example))
-        .route("/refresh", post(wrap::refresh))
+        .route("/loadExample", post(wrap::load_example_and_redirect))
+        // Legacy JSON endpoint
         .route("/quickFullSolve", post(wrap::dump_full_solve))
-        .route("/bestNextStep", post(wrap::best_next_step))
-        .route("/getDifficulties", post(wrap::get_difficulties))
-        .route("/clickLiteral", post(wrap::click_literal))
+        // Static assets
         .route(
-            "/ext/htmx.js",
-            serve_static_file!("/html/website/ext/htmx.js"),
+            "/static/demystify.css",
+            serve_static!("/static/demystify.css", "text/css; charset=utf-8"),
         )
         .route(
-            "/ext/bootstrap.min.css",
-            serve_static_file!("/html/website/ext/bootstrap.min.css"),
+            "/static/demystify.js",
+            serve_static!(
+                "/static/demystify.js",
+                "application/javascript; charset=utf-8"
+            ),
         )
-        .route(
-            "/ext/bootstrap.bundle.min.js",
-            serve_static_file!("/html/website/ext/bootstrap.bundle.min.js"),
-        )
-        .route(
-            "/ext/response-targets.js",
-            serve_static_file!("/html/website/ext/response-targets.js"),
-        )
-        .route("/", serve_static_file!("/html/website/index.html"))
+        // Legacy static assets (base.css/base.js from demystify core, for CLI compatibility)
         .route(
             "/base/base.css",
             get(move |_: Request<Body>| async {
-                Ok::<_, Infallible>(Response::new(Body::from(demystify::web::base_css())))
+                Ok::<_, Infallible>(
+                    Response::builder()
+                        .header("Content-Type", "text/css")
+                        .body(Body::from(demystify::web::base_css()))
+                        .unwrap(),
+                )
             }),
         )
         .route(
             "/base/base.js",
             get(move |_: Request<Body>| async {
-                Ok::<_, Infallible>(Response::new(Body::from(demystify::web::base_javascript())))
+                Ok::<_, Infallible>(
+                    Response::builder()
+                        .header("Content-Type", "application/javascript")
+                        .body(Body::from(demystify::web::base_javascript()))
+                        .unwrap(),
+                )
             }),
         )
+        .with_state(app_state)
         .layer(cors)
         .layer(SessionLayer::new(session_store));
 
-    // run it
     let addr = SocketAddr::from(([0, 0, 0, 0], 8008));
-
     eprintln!("listening on {addr}");
     let listener = TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn greet(session: Session<SessionNullPool>) -> String {
-    let mut count: usize = session.get("count").unwrap_or(0);
-
-    count += 1;
-    session.set("count", count);
-
-    count.to_string()
-}
-
-#[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
-
-struct Obj {
-    val: i32,
-}
-
-async fn greet_x(session: Session<SessionNullPool>, Json(obj): Json<Obj>) -> Result<Json<Obj>, ()> {
-    let mut count: i32 = session.get("count").unwrap_or(0);
-
-    count += 1;
-    session.set("count", count);
-
-    let o: Obj = Obj {
-        val: obj.val * 100 + count,
-    };
-
-    Ok(Json(o))
 }

@@ -1,0 +1,115 @@
+<div id="solver-stage" class="he-solver-grid">
+  <section class="he-stage">
+
+  <figure class="he-board">
+    <figcaption class="he-board-cap">
+      <span>{{ puzzle_name }} &middot; {{ puzzle_dim }}</span>
+      <span class="muted">{{ givens_count }} given &middot; round {{ round }}</span>
+    </figcaption>
+
+    {{ board_svg | safe }}
+
+    <div class="he-board-foot">
+      <div class="legend">
+        <span><i class="sw given"></i>given</span>
+        <span><i class="sw placed"></i>placed this round</span>
+        <span><i class="sw support"></i>supporting cell</span>
+      </div>
+    </div>
+  </figure>
+
+  <aside class="he-deductions" aria-live="polite">
+    {% if legend_items | length > 0 %}
+    <h3>Difficulty legend</h3>
+    <div class="he-difficulty-legend">
+      {% for item in legend_items %}
+      <div class="he-legend-item {% for cls in item.classes %}{{ cls }} {% endfor %}js_highlighter">
+        <span class="he-legend-swatch {% for cls in item.classes %}{{ cls }} {% endfor %}"></span>
+        {{ item.content }}
+      </div>
+      {% endfor %}
+    </div>
+    {% elif deductions | length > 0 %}
+    <h3>{{ deductions | length }} deduction{{ deductions | length | pluralize }}</h3>
+    <div class="he-steplist-scroll">
+    <ol class="he-steplist">
+      {% for d in deductions %}
+      <li class="he-step {% for cls in d.classes %}{{ cls }} {% endfor %}"
+          tabindex="0">
+        <div class="he-step-num"></div>
+        <div class="he-step-body">
+          <div class="code">{{ d.result | safe }}</div>
+          {% if d.constraints | length > 0 %}
+          <span class="because">because&hellip;</span>
+          {% for con in d.constraints %}
+          <div class="prose {% for cls in d.constraint_classes[loop.index0] %}{{ cls }} {% endfor %}js_highlighter">{{ con }}</div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    </div>
+    {% else %}
+    <h3>Current state</h3>
+    {% endif %}
+  </aside>
+
+  </section>
+
+  <aside class="he-rail">
+    <div class="he-paper he-mini">
+      <h4>Progress</h4>
+      <div class="row"><span>Cells placed</span><span class="b">{{ placed }} / {{ total_cells }}</span></div>
+      <div class="row"><span>This round</span><span class="b">+{{ this_round }}</span></div>
+      <div class="row"><span>Candidates left</span><span class="n">{{ candidates_left }}</span></div>
+      {% if constraint_count > 0 %}
+      <div class="row"><span>Constraints</span><span class="n">{{ constraint_count }}</span></div>
+      {% endif %}
+    </div>
+
+    <div class="he-paper he-mini">
+      <h4>Actions</h4>
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        <button class="he-btn"
+                hx-post="/solver/reset"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML">
+          &#8634; Refresh
+        </button>
+        <button class="he-btn primary"
+                hx-post="/solver/advance"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML"
+                hx-indicator="#solver-stage">
+          Next step &rarr;
+        </button>
+        <button class="he-btn"
+                hx-post="/solver/difficulties"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML">
+          Show difficulty heatmap
+        </button>
+      </div>
+    </div>
+
+    {% if techniques | length > 0 %}
+    <div class="he-paper he-mini">
+      <h4>Constraint types</h4>
+      {% for t in techniques %}
+      <details class="he-con-class">
+        <summary>
+          <span>{{ t.name }}</span>
+          <span class="b">{{ t.count }}</span>
+        </summary>
+        <div class="he-con-instances">
+          {% for inst in t.instances %}
+          <div class="he-con-inst js_con_preview" data-cells="{{ inst.cell_ids }}">{{ inst.description }}</div>
+          {% endfor %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </aside>
+</div>

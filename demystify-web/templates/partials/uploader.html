@@ -1,0 +1,25 @@
+<div id="uploader" class="he-paper">
+  {% if model_loaded %}
+    <h3>Model loaded</h3>
+    <p class="desc">
+      <code>{{ model_filename }}</code>
+    </p>
+    <a class="he-btn" href="/">Replace model</a>
+  {% else %}
+    <h3>Bring your own puzzle</h3>
+    <p class="desc">Drop an Essence or eprime model plus a parameter file.</p>
+    <form class="he-drop"
+          method="post"
+          action="/upload"
+          enctype="multipart/form-data">
+      <input type="file" name="model"  accept=".eprime,.essence" required>
+      <input type="file" name="params" accept=".param,.json" required>
+      <b>Drop files or click to browse</b>
+      <div class="he-fileset">
+        <span><code>.eprime</code> or <code>.essence</code></span>
+        <span><code>.param</code> or <code>.json</code></span>
+      </div>
+      <button type="submit" class="he-btn primary" style="margin-top:0.75rem;">Upload &amp; solve &rarr;</button>
+    </form>
+  {% endif %}
+</div>

@@ -532,13 +532,12 @@ impl PuzzlePlanner {
         self.quick_display_html_step_impl(None, "Current puzzle state")
     }
 
-    fn quick_display_html_step_impl(
+    fn build_step_problem(
         &mut self,
         base_muses: Option<Vec<MusContext>>,
         fallback_description: &str,
-    ) -> (String, Vec<Lit>) {
+    ) -> (Problem, Vec<Lit>) {
         if let Some(base_muses) = base_muses {
-            // Build description from the MUS *before* marking deductions (context is the same).
             let muses = base_muses
                 .iter()
                 .map(|mus| self.mus_to_user_mus(mus))
@@ -564,24 +563,24 @@ impl PuzzlePlanner {
                 });
             }
 
-            // Mark deductions *before* building the grid so the rendered state reflects
-            // any newly provable cells (including those unlocked by $#REVEAL cascades).
             let v = base_muses
                 .iter()
                 .flat_map(|mc| &mc.lits)
                 .copied()
                 .collect_vec();
-            for m in &v {
-                self.mark_lit_as_deduced(m);
-            }
 
-            // Recompute grid state post-deduction.
+            // Snapshot tosolve BEFORE marking deduced, so eliminated
+            // candidates remain visible (rendered with litneg).
             let varlits = self.psolve.get_provable_varlits().clone();
             let tosolve_varvals: BTreeSet<_> = varlits
                 .iter()
                 .flat_map(|x| self.psolve.lit_to_puzlit(x))
                 .map(super::PuzLit::varval)
                 .collect();
+
+            for m in &v {
+                self.mark_lit_as_deduced(m);
+            }
 
             let known_lits = self.get_all_known_lits().clone();
             let known_puzlits: BTreeSet<PuzLit> = known_lits
@@ -600,7 +599,7 @@ impl PuzzlePlanner {
             )
             .expect("Cannot make puzzle json");
 
-            (create_html(&problem), v)
+            (problem, v)
         } else {
             let varlits = self.psolve.get_provable_varlits().clone();
 
@@ -628,8 +627,101 @@ impl PuzzlePlanner {
             )
             .expect("Cannot make puzzle json");
 
-            (create_html(&problem), vec![])
+            (problem, vec![])
         }
+    }
+
+    fn quick_display_html_step_impl(
+        &mut self,
+        base_muses: Option<Vec<MusContext>>,
+        fallback_description: &str,
+    ) -> (String, Vec<Lit>) {
+        let (problem, lits) = self.build_step_problem(base_muses, fallback_description);
+        (create_html(&problem), lits)
+    }
+
+    pub fn solve_step(&mut self) -> (Problem, Vec<Lit>) {
+        let base_muses = self.smallest_muses_with_config();
+        if base_muses.is_empty() {
+            return self.build_step_problem(None, "There are no more values to deduce");
+        }
+        self.build_step_problem(Some(base_muses), "Made the following deductions")
+    }
+
+    pub fn refresh_problem(&mut self) -> (Problem, Vec<Lit>) {
+        self.build_step_problem(None, "Current puzzle state")
+    }
+
+    pub fn solve_step_for_literal(&mut self, lit_def: Vec<i64>) -> (Problem, Vec<Lit>) {
+        let muses = self.filtered_muses(Box::new(move |lit, planner| {
+            let puzlit_list = planner.solver().lit_to_puzlit(lit);
+            for puzlit in puzlit_list {
+                let mut indices = puzlit.var().indices().clone();
+                indices.push(puzlit.val());
+                if indices == lit_def {
+                    return true;
+                }
+            }
+            false
+        }));
+
+        let min = muses.min();
+        if min.is_none() {
+            return self.build_step_problem(None, "There are no more values to deduce");
+        }
+        let min = min.unwrap();
+
+        let mut vec = vec![];
+        for v in muses.muses().values() {
+            if let Some(m) = v.iter().next()
+                && m.mus_len() == min
+            {
+                vec.push(m.clone());
+            }
+        }
+
+        self.build_step_problem(Some(vec), "Made the following deductions")
+    }
+
+    pub fn difficulty_problem(&mut self) -> Problem {
+        let base_muses = self.all_muses_with_larger();
+
+        let base_difficulties: BTreeMap<Lit, usize> = base_muses
+            .muses()
+            .iter()
+            .filter_map(|(k, v)| v.iter().map(MusContext::mus_len).min().map(|m| (*k, m)))
+            .collect();
+
+        let mut vvpmap: BTreeMap<VarValPair, usize> = BTreeMap::new();
+        for (lit, &val) in &base_difficulties {
+            for puzlit in self.psolve.puzzleparse().lit_to_vars(lit) {
+                let vvp = puzlit.varval();
+                vvpmap.insert(vvp, val);
+            }
+        }
+
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let tosolve_varvals: BTreeSet<_> = varlits
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .map(super::PuzLit::varval)
+            .collect();
+
+        let known_puzlits: BTreeSet<PuzLit> = self
+            .get_all_known_lits()
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .cloned()
+            .collect();
+
+        Problem::new_from_puzzle_and_difficulty(
+            &self.psolve,
+            &tosolve_varvals,
+            &known_puzlits,
+            &vvpmap,
+            "The difficulty of the problem",
+        )
+        .expect("Cannot make puzzle json")
     }
 
     pub fn quick_display_difficulty_step(

@@ -184,6 +184,8 @@ impl PuzzleDraw {
             }
         */
 
+        self.set_cell_data_states(&mut cells, puzjson);
+
         // Thermometer overlays drawn before cells so grid lines appear on top.
         out.append(self.draw_thermometers(puzzle));
 
@@ -211,6 +213,7 @@ impl PuzzleDraw {
             .set("viewBox", (0, 0, 500, 500))
             .set("width", 500)
             .set("height", 500)
+            .set("id", "board")
             .set("class", "puzzle");
         doc.add(final_grp)
     }
@@ -443,8 +446,7 @@ impl PuzzleDraw {
                                 );
                                 group.assign("id", id.clone());
                                 group.assign("name", id);
-                                group.assign("hx-post", "/clickLiteral");
-                                group.assign("hx-target", "#mainSpace");
+                                group.assign("data-cand", state.val.to_string());
                                 group.assign("class", "literal");
                                 let mut classes = vec!["literal".to_owned()];
 
@@ -496,6 +498,40 @@ impl PuzzleDraw {
             text.assign("fill", "#888888");
             text.assign("class", "litundeducable");
             cells[i][j].append(text);
+        }
+    }
+
+    fn set_cell_data_states(&self, cells: &mut [Vec<element::Group>], problem: &Problem) {
+        let puzzle = &problem.puzzle;
+        for i in 0..cells.len() {
+            for j in 0..cells[i].len() {
+                let has_fixed = puzzle.start_grid.as_ref().is_some_and(|sg| {
+                    i < sg.len() && j < sg[i].len() && self.fixed_cell_is_used(sg[i][j])
+                });
+
+                let knowledge = problem
+                    .state
+                    .as_ref()
+                    .and_then(|s| s.knowledge_grid.as_ref())
+                    .and_then(|kg| kg.get(i))
+                    .and_then(|row| row.get(j))
+                    .and_then(|cell| cell.as_ref());
+
+                if let Some(cell_vals) = knowledge {
+                    let is_single_known = cell_vals.len() == 1
+                        && cell_vals[0]
+                            .classes
+                            .as_ref()
+                            .is_some_and(|c| c.contains("litknown") || c.contains("litpos"));
+                    if is_single_known {
+                        cells[i][j].assign("data-state", "solved");
+                    } else {
+                        cells[i][j].assign("data-state", "candidates");
+                    }
+                } else if has_fixed && !self.decorations.clue_in_corner() {
+                    cells[i][j].assign("data-state", "given");
+                }
+            }
         }
     }
 
@@ -854,6 +890,7 @@ fn make_cell(i: i64, j: i64, step: f64) -> element::Group {
 
     let mut g = element::Group::new();
     g.assign("id", format!("C_{}_{}", i + 1, j + 1));
+    g.assign("data-cell", format!("{},{}", i + 1, j + 1));
     g.assign(
         "transform",
         format!(

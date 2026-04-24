@@ -13,10 +13,13 @@ use axum_session::{Session, SessionNullPool};
 use demystify::problem::planner::PuzzlePlanner;
 use uuid::Uuid;
 
-// Make our own error that wraps `anyhow::Error`.
+#[derive(Clone)]
+pub struct AppState {
+    pub tera: Arc<tera::Tera>,
+}
+
 pub struct AppError(anyhow::Error);
 
-// Tell axum how to convert `AppError` into a response.
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         (
@@ -27,8 +30,6 @@ impl IntoResponse for AppError {
     }
 }
 
-// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
-// `Result<_, AppError>`. That way you don't need to do that manually.
 impl<E> From<E> for AppError
 where
     E: Into<anyhow::Error>,
@@ -54,7 +55,6 @@ fn solver_global(
     }
 }
 
-/// Get global solver from uuid
 pub fn get_solver_global(
     session: &Session<SessionNullPool>,
 ) -> anyhow::Result<Arc<Mutex<PuzzlePlanner>>> {
