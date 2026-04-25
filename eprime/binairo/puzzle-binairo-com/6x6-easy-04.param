@@ -1,0 +1,12 @@
+$ Source: https://www.puzzle-binairo.com/binairo-6x6-easy/
+$ Puzzle ID: 9,402,919
+letting n be 6
+letting initial be
+    [
+        [2,1,2,2,0,2],
+        [2,2,0,0,2,2],
+        [1,2,2,2,2,1],
+        [2,2,2,0,2,2],
+        [1,2,0,2,2,2],
+        [2,2,2,2,2,2]
+    ]

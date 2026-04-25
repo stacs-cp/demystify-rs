@@ -1,0 +1,12 @@
+$ Source: https://www.puzzle-binairo.com/binairo-6x6-hard/
+$ Puzzle ID: 130,278
+letting n be 6
+letting initial be
+    [
+        [2,1,0,2,2,2],
+        [2,2,2,1,2,2],
+        [0,2,2,2,0,2],
+        [2,2,2,2,2,2],
+        [0,2,2,1,2,0],
+        [2,2,2,2,1,0]
+    ]
