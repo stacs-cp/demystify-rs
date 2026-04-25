@@ -1,0 +1,37 @@
+language ESSENCE' 1.0
+
+$ Pen-and-paper minesweeper solver
+$
+$ Given a grid of number clues (-1 = unknown, 0-8 = clue),
+$ determine which unknown cells contain mines.
+$ Each numbered cell must have exactly that many mines among
+$ its (up to 8) orthogonal and diagonal neighbours.
+$ Numbered cells are never mines.
+
+given height, width : int(1..)
+
+$ -1 = unknown cell, 0-8 = clue (number of adjacent mines)
+given grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..8)
+
+$ 1 = mine, 0 = no mine
+$#VAR mines
+find mines : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
+
+$#CON clue "cell ({{index[0]}},{{index[1]}}) sees {{params['grid'][index[0]][index[1]]}} mine(s) among its neighbours"
+find clue : matrix indexed by [int(1..height), int(1..width)] of bool
+
+such that
+
+$ Numbered cells cannot be mines
+forAll r : int(1..height) . forAll c : int(1..width) .
+    grid[r,c] >= 0 -> mines[r,c] = 0,
+
+$ Each numbered cell's clue equals the count of adjacent mines
+forAll r : int(1..height) . forAll c : int(1..width) .
+    grid[r,c] >= 0 ->
+    (clue[r,c] ->
+     sum([ mines[r2,c2] | r2 : int(1..height), c2 : int(1..width),
+           r2 >= r-1 /\ r2 <= r+1 /\ c2 >= c-1 /\ c2 <= c+1
+           /\ !(r2 = r /\ c2 = c) ]) = grid[r,c]),
+
+true

@@ -1,0 +1,12 @@
+$ Source: https://www.puzzle-minesweeper.com/minesweeper-5x5-easy/
+$ Puzzle ID: 4,786,949
+language ESSENCE' 1.0
+letting height be 5
+letting width be 5
+letting grid be [
+    [-1,-1,-1, 1,-1],
+    [ 1,-1,-1,-1, 1],
+    [ 2,-1,-1,-1, 1],
+    [-1,-1, 1, 2,-1],
+    [ 1,-1,-1, 1, 1]
+]
