@@ -1,0 +1,19 @@
+$ Source: https://www.puzzle-futoshiki.com/futoshiki-4x4-easy/
+$ Puzzle ID: 2,087,043
+language ESSENCE' 1.0
+letting grid_size be 4
+letting values be
+[
+ [0, 0, 0, 0],
+ [0, 0, 0, 0],
+ [0, 0, 0, 0],
+ [0, 0, 0, 1]
+]
+letting lastdx be 3
+letting lt be
+[
+[1,2,2,2],
+[2,2,2,3],
+[1,4,2,4],
+[2,4,3,4]
+]

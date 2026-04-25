@@ -1,0 +1,25 @@
+$ Source: https://www.puzzle-futoshiki.com/futoshiki-5x5-hard/
+$ Puzzle ID: 3,445,374
+language ESSENCE' 1.0
+letting grid_size be 5
+letting values be
+[
+ [0, 3, 0, 0, 0],
+ [0, 0, 0, 0, 0],
+ [0, 0, 0, 0, 0],
+ [0, 0, 0, 0, 0],
+ [0, 0, 0, 0, 0]
+]
+letting lastdx be 8
+letting lt be
+[
+[1,2,1,1],
+[2,4,1,4],
+[1,3,2,3],
+[2,2,3,2],
+[2,3,3,3],
+[4,3,3,3],
+[4,2,4,1],
+[4,1,5,1],
+[4,5,5,5]
+]
