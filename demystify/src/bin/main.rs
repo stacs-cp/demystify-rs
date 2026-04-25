@@ -2,7 +2,7 @@ use clap::Parser;
 use demystify::{
     problem::{
         self,
-        planner::{PlannerConfig, PuzzlePlanner},
+        planner::{MusMethod, PlannerConfig, PuzzlePlanner},
         solver::{MusConfig, PuzzleSolver, SolverConfig},
         util::exec::{RunMethod, set_run_method},
     },
@@ -10,8 +10,8 @@ use demystify::{
     web::{base_css, base_javascript},
 };
 use std::{fs::File, path::PathBuf, sync::Arc};
-use tracing::Level;
 use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::prelude::*;
 
 #[derive(clap::Parser, Debug)]
 struct Opt {
@@ -90,6 +90,21 @@ struct Opt {
         help = "Per-SAT-call conflict limit (0 = no limit). Default 1,000,000."
     )]
     conflict_limit: i64,
+
+    #[arg(
+        long,
+        value_enum,
+        default_value_t = MusMethod::default(),
+        help = "MUS generation algorithm: core (raw cores only), mus (standard MUS search), core+mus (hybrid: size-1 pass, cores, then full MUS if needed)"
+    )]
+    mus_method: MusMethod,
+
+    #[arg(
+        long,
+        value_delimiter = ',',
+        help = "Enable logging targets on stderr (comma-separated). Available: progress, cores, solver, planner, solve, parser"
+    )]
+    log: Vec<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -106,15 +121,49 @@ fn main() -> anyhow::Result<()> {
     // module honours non-positive values via clear_conflict_limit).
     demystify::satcore::set_global_conflict_limit(opt.conflict_limit);
 
-    if opt.trace {
-        tracing_subscriber::fmt()
-            .with_span_events(FmtSpan::ACTIVE)
-            .with_max_level(Level::TRACE)
-            //.with_env_filter("trace,tracer=off")
-            .with_ansi(false)
-            .without_time()
-            //.pretty()
-            .with_writer(non_block)
+    // Set up tracing: --trace writes everything to file, --log writes
+    // selected targets to stderr.  Without --quiet, "progress" is
+    // implicitly enabled on stderr.
+    {
+        let trace_layer = if opt.trace {
+            Some(
+                tracing_subscriber::fmt::layer()
+                    .with_span_events(FmtSpan::ACTIVE)
+                    .with_ansi(false)
+                    .without_time()
+                    .with_writer(non_block)
+                    .with_filter(tracing_subscriber::filter::LevelFilter::TRACE),
+            )
+        } else {
+            None
+        };
+
+        let mut log_targets = opt.log.clone();
+        if !opt.quiet && !log_targets.contains(&"progress".to_string()) {
+            log_targets.push("progress".to_string());
+        }
+
+        let log_layer = if !log_targets.is_empty() {
+            let filter_str = log_targets
+                .iter()
+                .map(|t| format!("{}=info", t.trim()))
+                .collect::<Vec<_>>()
+                .join(",");
+            Some(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_target(false)
+                    .with_level(false)
+                    .without_time()
+                    .with_filter(tracing_subscriber::filter::EnvFilter::new(filter_str)),
+            )
+        } else {
+            None
+        };
+
+        tracing_subscriber::registry()
+            .with(trace_layer)
+            .with(log_layer)
             .init();
     }
 
@@ -160,6 +209,7 @@ fn main() -> anyhow::Result<()> {
         skip_small_threshold: opt.skip,
         expand_to_all_deductions: true,
         max_steps: opt.max_steps,
+        mus_method: opt.mus_method,
     };
 
     let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);
@@ -188,12 +238,7 @@ fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string(&json_step).unwrap());
         }
     } else {
-        let solve_fn: Box<dyn FnOnce() -> Vec<_>> = if opt.quiet {
-            Box::new(|| planner.quick_solve())
-        } else {
-            Box::new(|| planner.quick_solve_with_progress())
-        };
-        for p in solve_fn() {
+        for p in planner.quick_solve() {
             println!("{p:?}");
         }
     }

@@ -826,16 +826,66 @@ impl PuzzleSolver {
         Ok(None)
     }
 
-    /// Retrieves the literals which can be solved with a size 0 MUS.
-    ///
-    /// # Arguments
-    ///
-    /// * `lits` - The literals to check MUSes for.
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS of variables.
-    /// Literals where no MUS was found are omitted from the output.
+    pub fn core_size_summary(&self, lits: &BTreeSet<Lit>) -> (Option<usize>, usize) {
+        let cores = self.get_all_cores(lits);
+        let min = cores.iter().map(|(_, core)| core.len()).min();
+        let count_1 = cores.iter().filter(|(_, core)| core.len() <= 1).count();
+        (min, count_1)
+    }
+
+    /// For each provable literal, extract a raw SAT core (constraint-only).
+    /// Returns `(lit, core)` pairs; lits where the SAT call fails are omitted.
+    pub fn get_all_cores(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
+        lits.par_iter()
+            .filter_map(|&lit| {
+                let mut assumptions: Vec<Lit> =
+                    self.puzzleparse.conset_lits.iter().copied().collect();
+                assumptions.push(!lit);
+                match self
+                    .get_satcore()
+                    .assumption_solve_with_core(&self.knownlits, &assumptions)
+                {
+                    Ok(Some(core)) => {
+                        let con_core: Vec<Lit> = core
+                            .into_iter()
+                            .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                            .collect();
+                        Some((lit, con_core))
+                    }
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// Minimise a raw core for a single literal into a true MUS.
+    /// The `core` should contain only constraint lits (not `!lit`).
+    pub fn minimise_core_for_lit(&self, lit: Lit, core: &[Lit]) -> SearchResult<Vec<Lit>> {
+        let mut known = self.knownlits.clone();
+        known.push(!lit);
+        let minimised = self.get_satcore().minimise_us(&known, core, None)?;
+        Ok(minimised
+            .into_iter()
+            .filter(|x| self.puzzleparse.conset_lits.contains(x))
+            .collect())
+    }
+
+    /// Minimise a batch of `(lit, core)` pairs in parallel, returning a [`MusDict`].
+    pub fn minimise_cores(&self, cores: &[(Lit, Vec<Lit>)]) -> MusDict {
+        let results: Vec<_> = cores
+            .par_iter()
+            .filter_map(|(lit, core)| match self.minimise_core_for_lit(*lit, core) {
+                Ok(mus) => Some((*lit, mus.into_iter().collect::<BTreeSet<Lit>>())),
+                Err(_) => None,
+            })
+            .collect();
+        let mut dict = MusDict::new();
+        for (lit, mus) in results {
+            dict.add_mus(lit, mus);
+        }
+        dict
+    }
+
     pub fn get_many_vars_mus_size_0(&self, lits: &BTreeSet<Lit>) -> BTreeSet<Lit> {
         lits.par_iter()
             .filter(|&x| self.check_var_mus_size_0(*x))
@@ -940,15 +990,16 @@ impl PuzzleSolver {
         loop {
             info!(target: "solver", "scanning for muses size {}", mus_size);
 
-            // Pick the lits worth searching this iteration. Without find_bigger, skip
-            // those whose cached minimum already meets mus_size.
+            // Pick the lits worth searching this iteration. Skip only those
+            // with a known size-1 MUS (can't improve, and the tiny scan
+            // already handles them).
             let search_lits: BTreeSet<Lit> = if config.find_bigger {
                 lits.clone()
             } else {
                 let g = md.lock().unwrap();
                 lits.iter()
                     .copied()
-                    .filter(|&lit| g.min_lit(lit).is_none_or(|s| s as i64 > mus_size))
+                    .filter(|&lit| g.min_lit(lit).is_none_or(|s| s > 1))
                     .collect()
             };
 

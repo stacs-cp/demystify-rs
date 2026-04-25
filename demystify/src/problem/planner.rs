@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use itertools::Itertools;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
 use tracing::info;
 
@@ -21,6 +22,18 @@ use super::{
     solver::{MusConfig, PuzzleSolver},
 };
 
+#[derive(Copy, Clone, Debug, Default, PartialEq, clap::ValueEnum)]
+pub enum MusMethod {
+    /// Raw SAT cores only: get cores for all lits, minimise the smallest.
+    Core,
+    /// Standard MUS search (no core pre-pass).
+    Mus,
+    /// Hybrid: size-1 pass, then cores, then full MUS if needed.
+    #[default]
+    #[value(name = "core+mus")]
+    CorePlusMus,
+}
+
 #[derive(Copy, Clone)]
 pub struct PlannerConfig {
     pub mus_config: MusConfig,
@@ -29,6 +42,8 @@ pub struct PlannerConfig {
     pub expand_to_all_deductions: bool,
     /// Stop after this many solve steps. `None` means run to completion.
     pub max_steps: Option<usize>,
+    /// Which MUS generation algorithm to use.
+    pub mus_method: MusMethod,
 }
 
 impl Default for PlannerConfig {
@@ -39,6 +54,7 @@ impl Default for PlannerConfig {
             skip_small_threshold: 0,
             expand_to_all_deductions: true,
             max_steps: None,
+            mus_method: MusMethod::default(),
         }
     }
 }
@@ -143,6 +159,87 @@ impl PuzzlePlanner {
             .get_many_vars_small_mus_quick(&varlits, &conf_clone, None)
     }
 
+    /// Core-guided MUS search: get raw SAT cores for all provable lits,
+    /// then minimise only the cores of smallest size into true MUSes.
+    fn core_guided_muses(&mut self) -> MusDict {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let cores = self.psolve.get_all_cores(&varlits);
+
+        if cores.is_empty() {
+            return MusDict::new();
+        }
+
+        let min_size = cores.iter().map(|(_, core)| core.len()).min().unwrap();
+
+        let smallest: Vec<_> = cores
+            .into_iter()
+            .filter(|(_, core)| core.len() == min_size)
+            .collect();
+
+        self.psolve.minimise_cores(&smallest)
+    }
+
+    /// Hybrid MUS search: size-1 pass, then cores, then full MUS if needed.
+    fn core_plus_mus_muses(&mut self) -> MusDict {
+        let varlits = self.psolve.get_provable_varlits().clone();
+
+        // Phase 1: size-1 scan
+        let size1_results: Vec<_> = varlits
+            .iter()
+            .par_bridge()
+            .filter_map(|&lit| {
+                let t0 = std::time::Instant::now();
+                let ret = self.psolve.get_var_mus_size_1(lit, Some(1));
+                let elapsed = t0.elapsed();
+                let outcome = match &ret {
+                    Ok(v) if !v.is_empty() => crate::stats::MusOutcome::Found(1),
+                    Ok(_) => crate::stats::MusOutcome::NotFound,
+                    Err(_) => crate::stats::MusOutcome::Timeout,
+                };
+                crate::stats::record_mus_search(elapsed, outcome, crate::stats::MusFunction::Size1);
+                match ret {
+                    Ok(v) if !v.is_empty() => {
+                        let bts: BTreeSet<Lit> = v[0].iter().copied().collect();
+                        Some((lit, bts))
+                    }
+                    _ => None,
+                }
+            })
+            .collect();
+
+        if !size1_results.is_empty() {
+            let mut dict = MusDict::new();
+            for (lit, mus) in size1_results {
+                dict.add_mus(lit, mus);
+            }
+            self.update_mus_cache(&dict);
+            return dict;
+        }
+
+        // Phase 2: get raw cores
+        let cores = self.psolve.get_all_cores(&varlits);
+        if cores.is_empty() {
+            return MusDict::new();
+        }
+
+        let min_core_size = cores.iter().map(|(_, core)| core.len()).min().unwrap();
+        info!(target: "cores", "core+mus: min core size = {min_core_size}");
+
+        // Phase 3: if smallest core <= 2, minimise those and done
+        if min_core_size <= 2 {
+            let smallest: Vec<_> = cores
+                .into_iter()
+                .filter(|(_, core)| core.len() == min_core_size)
+                .collect();
+            let dict = self.psolve.minimise_cores(&smallest);
+            self.update_mus_cache(&dict);
+            return dict;
+        }
+
+        // Phase 4: full MUS search
+        self.all_smallish_muses()
+    }
+
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle which satisfy a filter.
     pub fn filtered_muses(&mut self, filter: FilterType) -> MusDict {
         let varlits = self.psolve.get_provable_varlits().clone();
@@ -180,61 +277,48 @@ impl PuzzlePlanner {
         result
     }
 
-    /// Returns a vector of the smallest MUSes of the puzzle.
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
-    pub fn smallest_muses(&mut self) -> Vec<MusContext> {
-        //let mut t = QuickTimer::new("smallest_muses");
-        let muses = self.all_smallish_muses();
-
-        let min = muses.min();
-
+    fn smallest_muses_from_dict(dict: &MusDict) -> Vec<MusContext> {
+        let min = dict.min();
         if min.is_none() {
             return vec![];
         }
-
         let min = min.unwrap();
         let mut vec = vec![];
-
-        for v in muses.muses().values() {
+        for v in dict.muses().values() {
             if let Some(m) = v.iter().next()
                 && m.mus_len() <= min
             {
                 vec.push(m.clone());
             }
         }
-
         vec
     }
 
-    /// Returns a vector of the smallest MUSes of the puzzle based on the planner's configuration.
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples, where each tuple contains a literal and its corresponding MUS.
-    pub fn smallest_muses_with_config(&mut self) -> Vec<MusContext> {
-        let muses = self.smallest_muses();
+    fn apply_config_to_muses(&mut self, muses: Vec<MusContext>) -> Vec<MusContext> {
         if muses.is_empty() {
             return muses;
         }
-
-        // Merge identical MUSes
         let muses = merge_muscontexts(&muses);
-
-        // Return all MUSes if they are small enough
         if muses[0].mus_len() as i64 <= self.config.merge_small_threshold {
             return muses;
         }
-
-        // Todo: Try to pick a 'good' MUS, instead of the first one?
-
         if self.config.expand_to_all_deductions {
             vec![self.psolve.get_all_lits_solved_by_mus(&muses[0])]
         } else {
             vec![muses[0].clone()]
         }
+    }
+
+    /// Returns a vector of the smallest MUSes of the puzzle.
+    pub fn smallest_muses(&mut self) -> Vec<MusContext> {
+        let dict = self.all_smallish_muses();
+        Self::smallest_muses_from_dict(&dict)
+    }
+
+    /// Returns a vector of the smallest MUSes of the puzzle based on the planner's configuration.
+    pub fn smallest_muses_with_config(&mut self) -> Vec<MusContext> {
+        let muses = self.smallest_muses();
+        self.apply_config_to_muses(muses)
     }
 
     /// Converts a MUS to a user-friendly MUS representation.
@@ -307,31 +391,48 @@ impl PuzzlePlanner {
     }
 
     /// Solves the puzzle quickly and returns a sequence of steps.
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples, where each tuple contains a set of user-friendly literals and a vector of user-friendly constraints.
     pub fn quick_solve(&mut self) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
-        self.quick_solve_impl(false)
-    }
-
-    /// Solves the puzzle quickly and returns a sequence of steps, printing info on progress as solving runs
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples, where each tuple contains a set of user-friendly literals and a vector of user-friendly constraints.
-    pub fn quick_solve_with_progress(&mut self) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
-        self.quick_solve_impl(true)
-    }
-
-    fn quick_solve_impl(&mut self, progress: bool) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
         let mut solvesteps = vec![];
         'litloop: while !self.psolve.get_provable_varlits().is_empty() {
             if self.config.max_steps.is_some_and(|n| solvesteps.len() >= n) {
                 break;
             }
             let _step_timer = crate::stats::PhaseTimer::solve_step();
-            let muses = self.smallest_muses_with_config();
+
+            let cores_enabled = tracing::enabled!(target: "cores", tracing::Level::INFO);
+
+            let (core_min, core_count_1) =
+                if cores_enabled && self.config.mus_method == MusMethod::Mus {
+                    let varlits = self.psolve.get_provable_varlits().clone();
+                    self.psolve.core_size_summary(&varlits)
+                } else {
+                    (None, 0)
+                };
+
+            let (muses, mus_count_1) = match self.config.mus_method {
+                MusMethod::Core => {
+                    let dict = self.core_guided_muses();
+                    let raw = Self::smallest_muses_from_dict(&dict);
+                    (self.apply_config_to_muses(raw), 0)
+                }
+                MusMethod::CorePlusMus => {
+                    let dict = self.core_plus_mus_muses();
+                    let count_1 = if cores_enabled {
+                        dict.count_at_size(1)
+                    } else {
+                        0
+                    };
+                    let raw = Self::smallest_muses_from_dict(&dict);
+                    (self.apply_config_to_muses(raw), count_1)
+                }
+                MusMethod::Mus if cores_enabled => {
+                    let dict = self.all_smallish_muses();
+                    let count_1 = dict.count_at_size(1);
+                    let raw = Self::smallest_muses_from_dict(&dict);
+                    (self.apply_config_to_muses(raw), count_1)
+                }
+                MusMethod::Mus => (self.smallest_muses_with_config(), 0),
+            };
 
             for mus in &muses {
                 for lit in &mus.lits {
@@ -340,34 +441,39 @@ impl PuzzlePlanner {
             }
 
             if !muses.is_empty() && muses[0].mus_len() as i64 <= self.config.skip_small_threshold {
+                info!(target: "cores",
+                    "Step {} (skipped): core min={} #1={}, true MUS min={} #1={}",
+                    solvesteps.len(),
+                    core_min.map_or("none".to_string(), |v| v.to_string()),
+                    core_count_1,
+                    muses[0].mus_len(),
+                    mus_count_1,
+                );
                 continue 'litloop;
             }
-            // Map the 'muses' to a user-friendly representation
             let muses = muses
                 .into_iter()
                 .map(|mus| self.mus_to_user_mus(&mus))
                 .collect_vec();
 
-            if progress {
-                eprintln!(
-                    "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
-                    solvesteps.len(),
-                    muses.len(),
-                    muses[0].1.len(),
-                    self.psolve.get_provable_varlits().len(),
-                    get_solver_calls(),
-                );
-            } else {
-                info!(target: "planner",
-                    "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
-                    solvesteps.len(),
-                    muses.len(),
-                    muses[0].1.len(),
-                    self.psolve.get_provable_varlits().len(),
-                    get_solver_calls(),
-                );
-            }
-            // Add these muses to the solving steps
+            info!(target: "cores",
+                "Step {}: core min={} #1={}, true MUS min={} #1={}",
+                solvesteps.len(),
+                core_min.map_or("none".to_string(), |v| v.to_string()),
+                core_count_1,
+                muses[0].1.len(),
+                mus_count_1,
+            );
+
+            info!(target: "progress",
+                "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
+                solvesteps.len(),
+                muses.len(),
+                muses[0].1.len(),
+                self.psolve.get_provable_varlits().len(),
+                get_solver_calls(),
+            );
+
             solvesteps.push(muses);
         }
         info!(target: "planner", "solved!");

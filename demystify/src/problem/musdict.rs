@@ -163,6 +163,11 @@ impl MusDict {
         self.size_index.keys().next().copied()
     }
 
+    #[must_use]
+    pub fn count_at_size(&self, size: usize) -> usize {
+        self.size_index.get(&size).map_or(0, BTreeSet::len)
+    }
+
     /// Like `min`, but only considers entries whose literal is still in `valid_lits`.
     /// Use this when the dict may contain stale entries from previous solving steps.
     #[must_use]

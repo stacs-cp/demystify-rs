@@ -523,6 +523,65 @@ impl SatCore {
         result
     }
 
+    /// Greedy minimisation loop: given an initial UNSAT core and the universe of
+    /// lits it was drawn from, try removing each element.  Assumes `fix_values`
+    /// has already been called.
+    fn greedy_minimise(
+        &self,
+        initial_core: Vec<Lit>,
+        universe: &[Lit],
+        max_size: Option<i64>,
+    ) -> SearchResult<Vec<Lit>> {
+        let mut core = initial_core;
+        let mut known_core = Vec::new();
+        let mut known_size: i64 = 0;
+        for &lit in universe {
+            let location = core.iter().position(|&x| x == lit);
+            if let Some(location) = location {
+                let mut check_core = core.clone();
+                check_core.remove(location);
+                let candidate = self.raw_assumption_solve_with_core(&check_core)?;
+                if let Some(found) = candidate {
+                    core = found;
+                } else {
+                    known_size += 1;
+                    known_core.push(lit);
+                    if let Some(max_size) = max_size
+                        && known_size == max_size
+                    {
+                        assert!(known_core.len() as i64 == max_size);
+                        let core = self.raw_assumption_solve_with_core(&known_core)?;
+                        if let Some(found) = &core {
+                            assert!(found.len() as i64 == known_size);
+                        }
+                        return Ok(core.unwrap_or(known_core));
+                    }
+                }
+            }
+        }
+        Ok(core
+            .into_iter()
+            .filter(|x| universe.contains(x))
+            .collect_vec())
+    }
+
+    /// Takes a known-unsatisfiable subset and greedily minimises it by trying
+    /// to remove each element.  Returns a MUS (or a smaller US if `max_size`
+    /// terminates the search early).
+    ///
+    /// Panics if `us` is satisfiable under `known`.
+    pub fn minimise_us(
+        &self,
+        known: &[Lit],
+        us: &[Lit],
+        max_size: Option<i64>,
+    ) -> SearchResult<Vec<Lit>> {
+        self.fix_values(known);
+        let initial = self.raw_assumption_solve_with_core(us)?;
+        let core = initial.expect("minimise_us: input must be an unsatisfiable subset");
+        self.greedy_minimise(core, us, max_size)
+    }
+
     /// Finds a minimal unsatisfiable subset (MUS) of literals given a set of known literals.
     ///
     /// # Arguments
@@ -540,43 +599,11 @@ impl SatCore {
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(known);
-        let mut known_size = 0;
         let core = self.raw_assumption_solve_with_core(lits)?;
-        if core.is_none() {
-            return Ok(core);
+        match core {
+            None => Ok(None),
+            Some(core) => Ok(Some(self.greedy_minimise(core, lits, max_size)?)),
         }
-        let mut core = core.unwrap();
-
-        let mut known_core = Vec::new();
-        // Need to make a copy for actually searching over
-        for &lit in lits {
-            let location = core.iter().position(|&x| x == lit);
-            if let Some(location) = location {
-                let mut check_core = core.clone();
-                check_core.remove(location);
-                let candidate = self.raw_assumption_solve_with_core(&check_core)?;
-                if let Some(found) = candidate {
-                    core = found;
-                } else {
-                    known_size += 1;
-                    known_core.push(lit);
-                    if let Some(max_size) = max_size
-                        && known_size == max_size
-                    {
-                        // If there is a MUS, this has to be it!
-                        assert!(known_core.len() as i64 == max_size);
-                        let core = self.raw_assumption_solve_with_core(&known_core)?;
-                        if let Some(found) = &core {
-                            assert!(found.len() as i64 == known_size);
-                        }
-                        return Ok(core);
-                    }
-                }
-            }
-        }
-        Ok(Some(
-            core.into_iter().filter(|x| lits.contains(x)).collect_vec(),
-        ))
     }
 }
 
