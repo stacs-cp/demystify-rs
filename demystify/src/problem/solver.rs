@@ -861,9 +861,9 @@ impl PuzzleSolver {
     /// Minimise a raw core for a single literal into a true MUS.
     /// The `core` should contain only constraint lits (not `!lit`).
     pub fn minimise_core_for_lit(&self, lit: Lit, core: &[Lit]) -> SearchResult<Vec<Lit>> {
-        let mut known = self.knownlits.clone();
-        known.push(!lit);
-        let minimised = self.get_satcore().minimise_us(&known, core, None)?;
+        let mut us = core.to_vec();
+        us.push(!lit);
+        let minimised = self.get_satcore().minimise_us(&self.knownlits, &us, None)?;
         Ok(minimised
             .into_iter()
             .filter(|x| self.puzzleparse.conset_lits.contains(x))
