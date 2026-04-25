@@ -1,0 +1,19 @@
+$ Source: https://www.puzzle-tents.com/?size=1
+$ Category: 6x6-hard
+$ Puzzle ID: 10,009,154
+letting x be 6
+letting y be 6
+letting treecount be 7
+
+letting col_sums be [2,1,1,1,1,1]
+letting row_sums be [1,1,2,1,1,1]
+
+letting trees be
+[
+    [ 0, 1, 0, 0, 2, 0],
+    [ 0, 0, 0, 0, 0, 0],
+    [ 0, 0, 0, 0, 0, 3],
+    [ 4, 0, 5, 0, 0, 0],
+    [ 0, 6, 0, 0, 7, 0],
+    [ 0, 0, 0, 0, 0, 0]
+]

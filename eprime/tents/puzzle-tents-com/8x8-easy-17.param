@@ -1,0 +1,21 @@
+$ Source: https://www.puzzle-tents.com/?size=2
+$ Category: 8x8-easy
+$ Puzzle ID: 10,592,669
+letting x be 8
+letting y be 8
+letting treecount be 12
+
+letting col_sums be [2,2,1,2,1,1,2,1]
+letting row_sums be [2,1,1,1,3,0,3,1]
+
+letting trees be
+[
+    [ 1, 0, 2, 0, 0, 0, 0, 0],
+    [ 0, 0, 0, 0, 0, 0, 0, 3],
+    [ 0, 0, 0, 0, 0, 0, 0, 0],
+    [ 4, 5, 0, 0, 0, 6, 0, 0],
+    [ 0, 0, 0, 7, 0, 0, 0, 0],
+    [ 0, 0, 0, 8, 0, 0, 9, 0],
+    [ 0, 0, 0, 0, 0,10,11, 0],
+    [12, 0, 0, 0, 0, 0, 0, 0]
+]
