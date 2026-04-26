@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use itertools::Itertools;
 use rustsat::instances::Cnf;
 use rustsat::solvers::{GetInternalStats, Solve, SolveIncremental, SolverResult};
 use rustsat::types::{Assignment, Lit};
@@ -533,13 +532,49 @@ impl SatCore {
     fn greedy_minimise(
         &self,
         initial_core: Vec<Lit>,
-        universe: &[Lit],
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut core = initial_core;
+
+        // Bulk shrinking: partition the core into max_size+1 groups and
+        // greedily drop the first group whose removal keeps UNSAT.
+        // By pigeonhole, if a MUS of size ≤ max_size exists, at least one
+        // group contains no MUS elements.
+        if let Some(max_size) = max_size {
+            let num_groups = max_size as usize + 1;
+            while core.len() > num_groups * 2 {
+                let mut shrank = false;
+                for i in 0..num_groups {
+                    let remaining: Vec<Lit> = core
+                        .iter()
+                        .enumerate()
+                        .filter_map(
+                            |(j, &lit)| {
+                                if j % num_groups == i { None } else { Some(lit) }
+                            },
+                        )
+                        .collect();
+                    let candidate = self.raw_assumption_solve_with_core(&remaining)?;
+                    if let Some(found) = candidate {
+                        tracing::info!(target: "musdetail",
+                            "bulk shrink: {} -> {} (group {}/{})",
+                            core.len(), found.len(), i, num_groups);
+                        core = found;
+                        shrank = true;
+                        break;
+                    }
+                }
+                if !shrank {
+                    return Ok(None);
+                }
+            }
+        }
+
+        // Element-by-element minimisation over the (now small) core.
+        let candidates = core.clone();
         let mut known_core = Vec::new();
         let mut known_size: i64 = 0;
-        for &lit in universe {
+        for &lit in &candidates {
             let location = core.iter().position(|&x| x == lit);
             if let Some(location) = location {
                 let mut check_core = core.clone();
@@ -559,20 +594,12 @@ impl SatCore {
                             assert!(found.len() as i64 == known_size);
                             return Ok(Some(found));
                         }
-                        // known_core is SAT: the individually-necessary elements
-                        // came from different core snapshots and don't form a
-                        // valid UNSAT subset together. The real MUS is larger
-                        // than max_size.
                         return Ok(None);
                     }
                 }
             }
         }
-        Ok(Some(
-            core.into_iter()
-                .filter(|x| universe.contains(x))
-                .collect_vec(),
-        ))
+        Ok(Some(core))
     }
 
     /// Takes a known-unsatisfiable subset and greedily minimises it by trying
@@ -590,7 +617,7 @@ impl SatCore {
         let initial = self.raw_assumption_solve_with_core(us)?;
         let core = initial.expect("minimise_us: input must be an unsatisfiable subset");
         Ok(self
-            .greedy_minimise(core, us, max_size)?
+            .greedy_minimise(core, max_size)?
             .expect("minimise_us: greedy_minimise must succeed (input is UNSAT)"))
     }
 
@@ -614,7 +641,11 @@ impl SatCore {
         let core = self.raw_assumption_solve_with_core(lits)?;
         match core {
             None => Ok(None),
-            Some(core) => Ok(self.greedy_minimise(core, lits, max_size)?),
+            Some(core) => {
+                tracing::info!(target: "musdetail", "quick_mus: initial_core={} max_size={:?}",
+                    core.len(), max_size);
+                Ok(self.greedy_minimise(core, max_size)?)
+            }
         }
     }
 }

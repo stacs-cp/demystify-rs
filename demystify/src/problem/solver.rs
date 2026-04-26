@@ -904,8 +904,42 @@ impl PuzzleSolver {
         }))
     }
 
+    fn search_one_mus(
+        &self,
+        lit: Lit,
+        mus_test_size: i64,
+        strategy: Strategy,
+    ) -> (SearchResult<Option<Vec<Lit>>>, crate::stats::MusFunction) {
+        match strategy {
+            Strategy::Slice => (
+                self.get_var_mus_slice(lit, Some(mus_test_size)),
+                crate::stats::MusFunction::Slice,
+            ),
+            Strategy::Cake => (
+                self.get_var_mus_cake(lit, mus_test_size),
+                crate::stats::MusFunction::Cake,
+            ),
+            Strategy::Quick => (
+                self.get_var_mus_quick(lit, Some(mus_test_size)),
+                crate::stats::MusFunction::Quick,
+            ),
+            Strategy::Dynamic => {
+                if mus_test_size < 5 {
+                    (
+                        self.get_var_mus_cake(lit, mus_test_size),
+                        crate::stats::MusFunction::Cake,
+                    )
+                } else {
+                    (
+                        self.get_var_mus_slice(lit, Some(mus_test_size)),
+                        crate::stats::MusFunction::Slice,
+                    )
+                }
+            }
+        }
+    }
+
     pub fn get_var_mus_cake(&self, lit: Lit, max_size: i64) -> SearchResult<Option<Vec<Lit>>> {
-        // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
         assert!(self.puzzleparse.var_lits.positive().contains(&lit));
 
         let mut conset = self
@@ -918,29 +952,33 @@ impl PuzzleSolver {
 
         conset.shuffle(&mut rand::rng());
 
-        let conset_chunks: Vec<Vec<Lit>> = (0..max_size)
+        let num_groups = max_size as usize + 1;
+        let conset_chunks: Vec<Vec<Lit>> = (0..num_groups)
             .map(|i| {
                 conset
                     .iter()
                     .enumerate()
-                    .filter_map(|(j, &lit)| {
-                        if j % (max_size as usize + 1) == i as usize {
-                            None
-                        } else {
-                            Some(lit)
-                        }
-                    })
+                    .filter_map(
+                        |(j, &lit)| {
+                            if j % num_groups == i { None } else { Some(lit) }
+                        },
+                    )
                     .collect()
             })
             .collect();
 
-        for chunk in conset_chunks {
-            let mut lits: Vec<Lit> = vec![];
-            lits.extend(chunk);
+        for (i, chunk) in conset_chunks.iter().enumerate() {
+            let mut lits: Vec<Lit> = chunk.clone();
             lits.push(!lit);
+            let t0 = Instant::now();
             let mus = self
                 .get_satcore()
                 .quick_mus(&self.knownlits, &lits, Some(max_size + 1))?;
+            info!(target: "musdetail", "cake chunk {}/{} lit={:?} bound={} chunk_size={} result={} {:.1?}",
+                  i, num_groups, lit, max_size,
+                  chunk.len(),
+                  if mus.is_some() { format!("found({})", mus.as_ref().unwrap().len()) } else { "none".to_string() },
+                  t0.elapsed());
             if let Some(m) = mus {
                 return Ok(Some(
                     m.into_iter()
@@ -948,7 +986,6 @@ impl PuzzleSolver {
                         .collect(),
                 ));
             }
-            lits.clear();
         }
 
         Ok(None)
@@ -1101,6 +1138,7 @@ impl PuzzleSolver {
                 Ok(_) => crate::stats::MusOutcome::NotFound,
                 Err(_) => crate::stats::MusOutcome::Timeout,
             };
+            info!(target: "musdetail", "tiny  lit={:?} size=1 {:?} {:.1?}", x, outcome, elapsed);
             crate::stats::record_mus_search(elapsed, outcome, crate::stats::MusFunction::Size1);
             if let Ok(v) = ret
                 && !v.is_empty()
@@ -1118,123 +1156,125 @@ impl PuzzleSolver {
             return md.into_inner().unwrap();
         }
 
-        info!(target: "solver", "scanning for {} muses", lits.len());
-        let mut mus_size = config.base_size_mus;
-        loop {
-            info!(target: "solver", "scanning for muses size {}", mus_size);
+        // Core scan: get raw SAT cores for all lits. The minimum core size
+        // is an upper bound on the minimum MUS size.
+        let core_t0 = Instant::now();
+        let cores = self.get_all_cores(lits);
+        let core_elapsed = core_t0.elapsed();
+        let min_core = cores.iter().map(|(_, core)| core.len()).min();
+        let max_core = cores.iter().map(|(_, core)| core.len()).max();
+        let mus_size =
+            (min_core.unwrap_or(config.base_size_mus as usize) as i64).max(config.base_size_mus);
+        info!(target: "solver", "scanning for {} muses, core bound = {:?}, mus_size = {}",
+              lits.len(), min_core, mus_size);
+        info!(target: "musdetail", "cores: {} lits, min={:?} max={:?} {:.1?}",
+              cores.len(), min_core, max_core, core_elapsed);
 
-            // Pick the lits worth searching this iteration. Skip only those
-            // with a known size-1 MUS (can't improve, and the tiny scan
-            // already handles them).
-            let search_lits: BTreeSet<Lit> = if config.find_bigger {
-                lits.clone()
-            } else {
-                let g = md.lock().unwrap();
-                lits.iter()
-                    .copied()
-                    .filter(|&lit| g.min_lit(lit).is_none_or(|s| s > 1))
-                    .collect()
-            };
-
-            search_lits
-                .iter()
-                .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
-                .par_bridge()
-                .for_each(|x| {
-                    // Compute the per-search size bound from the dict's current state.
-                    //
-                    // !find_bigger: target starts at mus_size and shrinks only once a
-                    //   worker has actually written a MUS for one of search_lits. With
-                    //   find_one we then tighten one further (s-1) to make subsequent
-                    //   workers reject any MUS not strictly smaller than what's
-                    //   already known. Without an in-iteration find we leave the
-                    //   bound at mus_size — otherwise find_one would refuse the very
-                    //   first MUS of size mus_size and skip the iteration entirely.
-                    //
-                    // find_bigger: target = mus_size, fixed. We add the documented
-                    //   +9 slack so each round explores up to mus_size + 9. The
-                    //   global minimum is irrelevant here — the whole point is to
-                    //   keep finding alternative explanations above it.
-                    let mus_test_size = if config.find_bigger {
-                        mus_size + 9
-                    } else {
-                        let g = md.lock().unwrap();
-                        match g.min_filtered(&search_lits) {
-                            Some(found) => {
-                                let bound = (found as i64).min(mus_size);
-                                if config.find_one { bound - 1 } else { bound }
-                            }
-                            None => mus_size,
-                        }
-                    };
-
-                    if mus_test_size <= 1 {
-                        return;
-                    }
-
-                    let t0 = Instant::now();
-                    let (ret, func) = match config.strategy {
-                        Strategy::Slice => (
-                            self.get_var_mus_slice(x, Some(mus_test_size)),
-                            crate::stats::MusFunction::Slice,
-                        ),
-                        Strategy::Cake => (
-                            self.get_var_mus_cake(x, mus_test_size),
-                            crate::stats::MusFunction::Cake,
-                        ),
-                        Strategy::Quick => (
-                            self.get_var_mus_quick(x, Some(mus_test_size)),
-                            crate::stats::MusFunction::Quick,
-                        ),
-                        Strategy::Dynamic => {
-                            if mus_test_size < 5 {
-                                (
-                                    self.get_var_mus_cake(x, mus_test_size),
-                                    crate::stats::MusFunction::Cake,
-                                )
-                            } else {
-                                (
-                                    self.get_var_mus_slice(x, Some(mus_test_size)),
-                                    crate::stats::MusFunction::Slice,
-                                )
-                            }
-                        }
-                    };
-                    let elapsed = t0.elapsed();
-                    let outcome = match &ret {
-                        Ok(Some(mus)) => crate::stats::MusOutcome::Found(mus.len()),
-                        Ok(None) => crate::stats::MusOutcome::NotFound,
-                        Err(_) => crate::stats::MusOutcome::Timeout,
-                    };
-                    crate::stats::record_mus_search(elapsed, outcome, func);
-
-                    if let Ok(Some(y)) = ret {
-                        let bts: BTreeSet<Lit> = y.iter().copied().collect();
-                        md.lock().unwrap().add_mus(x, bts);
-                    }
-                });
-
-            // Termination. Use min_filtered over the original `lits` so stale entries
-            // for lits no longer in scope don't pull the answer down.
-            let mus_min = md.lock().unwrap().min_filtered(lits);
-            if let Some(mus_min) = mus_min {
-                let met_target = if config.find_bigger {
-                    (mus_min as i64) * 3 + 3 <= mus_size
-                } else {
-                    mus_min as i64 <= mus_size
-                };
-                if met_target {
-                    info!(target: "solver", "muses found!");
-                    return md.into_inner().unwrap();
+        // Minimise the smallest cores into actual MUSes. These seed the
+        // MusDict so the main search can tighten its bound immediately.
+        if let Some(min) = min_core {
+            let smallest: Vec<_> = cores
+                .into_iter()
+                .filter(|(_, core)| core.len() == min)
+                .collect();
+            info!(target: "musdetail", "minimising {} cores of size {}", smallest.len(), min);
+            let min_t0 = Instant::now();
+            let minimised = self.minimise_cores(&smallest);
+            let min_elapsed = min_t0.elapsed();
+            let n_muses: usize = minimised.muses().values().map(|s| s.len()).sum();
+            let min_mus_size = minimised.min();
+            info!(target: "musdetail", "minimised: {} muses, min_size={:?} {:.1?}",
+                  n_muses, min_mus_size, min_elapsed);
+            let mut g = md.lock().unwrap();
+            for (lit, mus_set) in minimised.muses() {
+                for mc in mus_set {
+                    g.add_mus(*lit, mc.mus.clone());
                 }
             }
-            // Bail out if the size has runaway-grown.
-            if mus_size > i64::from(i32::MAX) {
-                info!(target: "solver", "no muses found!");
-                return md.into_inner().unwrap();
-            }
-            mus_size = mus_size * config.mus_mult_step + config.mus_add_step;
         }
+
+        let search_t0 = Instant::now();
+        lits.iter()
+            .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
+            .par_bridge()
+            .for_each(|x| {
+                let mus_test_size = if config.find_bigger {
+                    mus_size + 9
+                } else {
+                    let g = md.lock().unwrap();
+                    match g.min_filtered(lits) {
+                        Some(found) => {
+                            let bound = (found as i64).min(mus_size);
+                            if config.find_one { bound - 1 } else { bound }
+                        }
+                        None => mus_size,
+                    }
+                };
+
+                if mus_test_size <= 1 {
+                    info!(target: "musdetail", "skip  lit={:?} bound={} (<=1)", x, mus_test_size);
+                    return;
+                }
+
+                let t0 = Instant::now();
+                let (ret, func) = self.search_one_mus(x, mus_test_size, config.strategy);
+                let elapsed = t0.elapsed();
+                let outcome = match &ret {
+                    Ok(Some(mus)) => crate::stats::MusOutcome::Found(mus.len()),
+                    Ok(None) => crate::stats::MusOutcome::NotFound,
+                    Err(_) => crate::stats::MusOutcome::Timeout,
+                };
+                info!(target: "musdetail", "search lit={:?} algo={:?} bound={} {:?} {:.1?}",
+                      x, func, mus_test_size, outcome, elapsed);
+                crate::stats::record_mus_search(elapsed, outcome, func);
+
+                if let Ok(Some(y)) = ret {
+                    let bts: BTreeSet<Lit> = y.iter().copied().collect();
+                    md.lock().unwrap().add_mus(x, bts);
+                }
+            });
+        info!(target: "musdetail", "main search done {:.1?}", search_t0.elapsed());
+
+        if config.find_bigger {
+            // find_bigger needs to keep growing beyond the initial core bound.
+            let mus_min = md.lock().unwrap().min_filtered(lits);
+            let met_target = mus_min.is_some_and(|m| (m as i64) * 3 + 3 <= mus_size);
+            if !met_target {
+                let mut grow_size = mus_size * config.mus_mult_step + config.mus_add_step;
+                while grow_size <= i64::from(i32::MAX) {
+                    info!(target: "solver", "find_bigger: scanning at size {}", grow_size);
+                    lits.iter()
+                        .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
+                        .par_bridge()
+                        .for_each(|x| {
+                            let mus_test_size = grow_size + 9;
+                            let t0 = Instant::now();
+                            let (ret, func) =
+                                self.search_one_mus(x, mus_test_size, config.strategy);
+                            let elapsed = t0.elapsed();
+                            let outcome = match &ret {
+                                Ok(Some(mus)) => crate::stats::MusOutcome::Found(mus.len()),
+                                Ok(None) => crate::stats::MusOutcome::NotFound,
+                                Err(_) => crate::stats::MusOutcome::Timeout,
+                            };
+                            crate::stats::record_mus_search(elapsed, outcome, func);
+
+                            if let Ok(Some(y)) = ret {
+                                let bts: BTreeSet<Lit> = y.iter().copied().collect();
+                                md.lock().unwrap().add_mus(x, bts);
+                            }
+                        });
+                    let mus_min = md.lock().unwrap().min_filtered(lits);
+                    if mus_min.is_some_and(|m| (m as i64) * 3 + 3 <= grow_size) {
+                        break;
+                    }
+                    grow_size = grow_size * config.mus_mult_step + config.mus_add_step;
+                }
+            }
+        }
+
+        info!(target: "solver", "muses found!");
+        md.into_inner().unwrap()
     }
 
     /// Retrieves a reference to the `PuzzleParse` instance associated with the `PuzzleSolver`.
