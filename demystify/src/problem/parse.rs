@@ -248,85 +248,264 @@ impl EPrimeAnnotations {
 ///
 /// ```text
 /// PuzLit (var[i,j]=v, eq/neq)  ←→  Lit (raw SAT integer)
-///     litmap:     PuzLit → Lit
-///     invlitmap:  Lit → BTreeSet<PuzLit>   (set because order-encoding Lits map to many PuzLits)
+///     direct.litmap:     PuzLit → Lit
+///     direct.invlitmap:  Lit → BTreeSet<PuzLit>
 ///
 /// PuzVar (var[i,j])  →  domain values
-///     domainmap:  PuzVar → BTreeSet<i64>
+///     direct.domainmap:  PuzVar → BTreeSet<i64>
 ///
 /// Constraint instances ($#CON class[i,j,...] = true):
-///     conset:         Lit(CON=true) → rendered English description
-///     invconset:      description   → Lit(CON=true)     (inverse of conset)
-///     varlits_in_con: Lit(CON=true) → Vec<Lit>          (the VAR-encoding lits reachable from
-///                                                         this constraint in the SAT formula;
-///                                                         use direct_or_ordered_lit_to_varvalpair
-///                                                         to convert these back to PuzLits)
+///     constraints  (ConstraintStore — four maps kept in sync atomically)
 ///
 /// Convenience sets:
-///     varset_lits:     all positive direct-encoding Lits for $#VAR variables
-///     varset_lits_neg: all negative direct-encoding Lits for $#VAR variables
-///     conset_lits:     all positive direct-encoding Lits for $#CON variables
+///     var_lits  (VarLitSets — positive, negative, and special lit sets)
+///
+/// Order encoding:
+///     order  (OrderEncoding — forward/inverse/all-lits maps)
 /// ```
 ///
 /// ## Reveal map
 ///
 /// `$#AUX` variables expose "extra" assignments when their trigger literal is proved.
 /// `reveal_map[x] = y` means: when `x` is deduced true, also treat `y` as known.
+
+// ── ConstraintStore ──────────────────────────────────────────────────────────
+// Four maps that must always agree on which constraint lits exist.
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ConstraintStore {
+    conset: BTreeMap<Lit, String>,
+    invconset: BTreeMap<String, Lit>,
+    varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
+    lits: BTreeSet<Lit>,
+}
+
+impl ConstraintStore {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            conset: BTreeMap::new(),
+            invconset: BTreeMap::new(),
+            varlits_in_con: BTreeMap::new(),
+            lits: BTreeSet::new(),
+        }
+    }
+
+    pub fn insert(
+        &mut self,
+        lit: Lit,
+        description: String,
+        var_lits: Vec<Lit>,
+    ) -> anyhow::Result<()> {
+        safe_insert(&mut self.conset, lit, description.clone())?;
+        safe_insert(&mut self.invconset, description, lit)?;
+        self.lits.insert(lit);
+        safe_insert(&mut self.varlits_in_con, lit, var_lits)?;
+        Ok(())
+    }
+
+    pub fn remove(&mut self, lit: &Lit) {
+        self.lits.remove(lit);
+        if let Some(name) = self.conset.remove(lit) {
+            self.invconset.remove(&name);
+        }
+        self.varlits_in_con.remove(lit);
+    }
+
+    pub fn retain(&mut self, mut f: impl FnMut(&Lit) -> bool) {
+        let to_remove: Vec<Lit> = self.lits.iter().filter(|l| !f(l)).copied().collect();
+        for lit in &to_remove {
+            self.remove(lit);
+        }
+    }
+
+    #[must_use]
+    pub fn contains(&self, lit: &Lit) -> bool {
+        self.lits.contains(lit)
+    }
+
+    #[must_use]
+    pub fn description(&self, lit: &Lit) -> &String {
+        assert!(self.contains(lit));
+        self.conset.get(lit).unwrap()
+    }
+
+    #[must_use]
+    pub fn try_description(&self, lit: &Lit) -> Option<&String> {
+        self.conset.get(lit)
+    }
+
+    #[must_use]
+    pub fn lit_for(&self, description: &String) -> &Lit {
+        self.invconset
+            .get(description)
+            .expect("IE: Bad constraint name")
+    }
+
+    #[must_use]
+    pub fn var_lits(&self, lit: &Lit) -> &Vec<Lit> {
+        self.varlits_in_con.get(lit).expect("IE: Bad constraint")
+    }
+
+    #[must_use]
+    pub fn lits(&self) -> &BTreeSet<Lit> {
+        &self.lits
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Lit, &String)> {
+        self.conset.iter()
+    }
+
+    pub fn descriptions(&self) -> impl Iterator<Item = &String> {
+        self.invconset.keys()
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.lits.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.lits.is_empty()
+    }
+
+    #[must_use]
+    pub fn from_raw(
+        conset: BTreeMap<Lit, String>,
+        invconset: BTreeMap<String, Lit>,
+        varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
+        lits: BTreeSet<Lit>,
+    ) -> Self {
+        Self {
+            conset,
+            invconset,
+            varlits_in_con,
+            lits,
+        }
+    }
+}
+
+// ── DirectEncoding ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DirectEncoding {
+    pub litmap: BTreeMap<PuzLit, Lit>,
+    pub invlitmap: BTreeMap<Lit, BTreeSet<PuzLit>>,
+    pub domainmap: BTreeMap<PuzVar, BTreeSet<i64>>,
+}
+
+impl DirectEncoding {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            litmap: BTreeMap::new(),
+            invlitmap: BTreeMap::new(),
+            domainmap: BTreeMap::new(),
+        }
+    }
+}
+
+// ── OrderEncoding ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct OrderEncoding {
+    pub map: BTreeMap<PuzVar, HashSet<Lit>>,
+    pub inv_map: BTreeMap<Lit, PuzVar>,
+    pub all_lits: BTreeSet<Lit>,
+}
+
+impl OrderEncoding {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            map: BTreeMap::new(),
+            inv_map: BTreeMap::new(),
+            all_lits: BTreeSet::new(),
+        }
+    }
+
+    pub fn rebuild_all_lits(&mut self) {
+        self.all_lits = self.map.values().flatten().copied().collect();
+    }
+}
+
+// ── VarLitSets ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct VarLitSets {
+    positive: BTreeSet<Lit>,
+    negative: BTreeSet<Lit>,
+    special: BTreeSet<Lit>,
+}
+
+impl VarLitSets {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            positive: BTreeSet::new(),
+            negative: BTreeSet::new(),
+            special: BTreeSet::new(),
+        }
+    }
+
+    pub fn insert_positive(&mut self, lit: Lit) {
+        self.positive.insert(lit);
+    }
+
+    pub fn insert_negative(&mut self, lit: Lit) {
+        self.negative.insert(lit);
+    }
+
+    pub fn insert_special(&mut self, lit: Lit) {
+        self.special.insert(lit);
+    }
+
+    #[must_use]
+    pub fn positive(&self) -> &BTreeSet<Lit> {
+        &self.positive
+    }
+
+    #[must_use]
+    pub fn negative(&self) -> &BTreeSet<Lit> {
+        &self.negative
+    }
+
+    #[must_use]
+    pub fn special(&self) -> &BTreeSet<Lit> {
+        &self.special
+    }
+
+    #[must_use]
+    pub fn contains(&self, lit: &Lit) -> bool {
+        self.positive.contains(lit)
+    }
+
+    #[must_use]
+    pub fn from_raw(
+        positive: BTreeSet<Lit>,
+        negative: BTreeSet<Lit>,
+        special: BTreeSet<Lit>,
+    ) -> Self {
+        Self {
+            positive,
+            negative,
+            special,
+        }
+    }
+}
+
+// ── PuzzleParse ──────────────────────────────────────────────────────────────
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct PuzzleParse {
-    /// Annotations extracted from the `.eprime` file (VAR/CON/AUX names, param values, etc.).
     pub eprime: EPrimeAnnotations,
-    /// The full SAT instance (all clauses added by Conjure).
     pub satinstance: SatInstance,
-    /// Cached CNF form of `satinstance` (computed once, reused frequently).
     pub cnf: Option<Arc<Cnf>>,
-
-    // ── Direct encoding ──────────────────────────────────────────────────────
-    /// `PuzLit(var[i,j]=v, eq)` → raw SAT `Lit`.  Covers both $#VAR and $#CON variables.
-    pub litmap: BTreeMap<PuzLit, Lit>,
-    /// Raw SAT `Lit` → set of `PuzLit`s it encodes.
-    /// A set because the same Lit can appear in multiple order-encoding threshold assignments.
-    pub invlitmap: BTreeMap<Lit, BTreeSet<PuzLit>>,
-    /// `PuzVar` → the set of integer values in its domain.
-    pub domainmap: BTreeMap<PuzVar, BTreeSet<i64>>,
-
-    // ── Constraint maps ($#CON) ───────────────────────────────────────────────
-    /// `Lit(CON_instance=true)` → rendered English description of that constraint instance.
-    /// Keys are identical to `conset_lits`.
-    pub conset: BTreeMap<Lit, String>,
-    /// Rendered description → `Lit(CON_instance=true)`.  Inverse of `conset`.
-    pub invconset: BTreeMap<String, Lit>,
-    /// For each CON instance Lit, the list of VAR-encoding Lits reachable from it in the SAT
-    /// formula (via `FindVarConnections`).  Use `direct_or_ordered_lit_to_varvalpair` to convert
-    /// these back to `VarValPair`s.
-    pub varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
-
-    // ── Convenience literal sets ──────────────────────────────────────────────
-    /// All positive direct-encoding Lits for $#VAR variables (`var[i,j]=v` true).
-    pub varset_lits: BTreeSet<Lit>,
-    /// All negative direct-encoding Lits for $#VAR variables (`var[i,j]=v` false).
-    pub varset_lits_neg: BTreeSet<Lit>,
-    /// All positive Lits for $#CON instances (`CON[...]=true`).  Same keys as `conset`.
-    pub conset_lits: BTreeSet<Lit>,
-    /// All positive direct-encoding Lits for variables in the reserved
-    /// `demystify_*` namespace.  These are framework-special variables
-    /// (e.g. `demystify_enforce_design`, `demystify_quality_measure`) that
-    /// callers like Mystify capture for design-control or fitness purposes.
-    /// They are NOT in `varset_lits`, so demystify's MUS finder does not try
-    /// to deduce them.
-    pub special_lits: BTreeSet<Lit>,
-
-    // ── Order encoding (rarely needed directly) ───────────────────────────────
-    /// `PuzVar` → set of SAT Lits used to order-encode it (`var >= v` thresholds).
-    pub order_encoding_map: BTreeMap<PuzVar, HashSet<Lit>>,
-    /// SAT `Lit` → the `PuzVar` whose order encoding it belongs to.
-    pub inv_order_encoding_map: BTreeMap<Lit, PuzVar>,
-    /// Union of all Lits across all order encodings.
-    pub order_encoding_all_lits: BTreeSet<Lit>,
-
-    // ── Reveal map ($#AUX) ────────────────────────────────────────────────────
-    /// When `x` is deduced true, `reveal_map[x]` should also be added to the known-lit set.
-    /// Populated from `$#AUX` directives.
+    pub direct: DirectEncoding,
+    pub constraints: ConstraintStore,
+    pub var_lits: VarLitSets,
+    pub order: OrderEncoding,
     pub reveal_map: BTreeMap<Lit, Lit>,
 }
 
@@ -355,19 +534,10 @@ impl PuzzleParse {
             },
             satinstance: SatInstance::new(),
             cnf: None,
-            litmap: BTreeMap::new(),
-            invlitmap: BTreeMap::new(),
-            domainmap: BTreeMap::new(),
-            order_encoding_map: BTreeMap::new(),
-            inv_order_encoding_map: BTreeMap::new(),
-            order_encoding_all_lits: BTreeSet::new(),
-            conset: BTreeMap::new(),
-            invconset: BTreeMap::new(),
-            varlits_in_con: BTreeMap::new(),
-            varset_lits: BTreeSet::new(),
-            varset_lits_neg: BTreeSet::new(),
-            conset_lits: BTreeSet::new(),
-            special_lits: BTreeSet::new(),
+            direct: DirectEncoding::new(),
+            constraints: ConstraintStore::new(),
+            var_lits: VarLitSets::new(),
+            order: OrderEncoding::new(),
             reveal_map: BTreeMap::new(),
         }
     }
@@ -375,9 +545,8 @@ impl PuzzleParse {
     fn finalise(&mut self) -> anyhow::Result<()> {
         {
             let mut newlitmap = BTreeMap::new();
-            // Make sure 'litmap' contains both positive and negative version of every problem literal
-            for (key, &value) in &self.litmap {
-                if let Some(&val) = self.litmap.get(&key.neg()) {
+            for (key, &value) in &self.direct.litmap {
+                if let Some(&val) = self.direct.litmap.get(&key.neg()) {
                     if val != -value {
                         bail!(
                             "Malformed Savilerow DIMACS output: Issue with {:?}",
@@ -388,55 +557,50 @@ impl PuzzleParse {
                     safe_insert(&mut newlitmap, key.neg(), -value)?;
                 }
             }
-            self.litmap.extend(newlitmap);
+            self.direct.litmap.extend(newlitmap);
         }
 
-        // Set up inverse of 'litmap', mapping from integers to PuzLit objects
-        for (key, value) in &self.litmap {
-            self.invlitmap
+        for (key, value) in &self.direct.litmap {
+            self.direct
+                .invlitmap
                 .entry(*value)
                 .or_default()
                 .insert(key.clone());
         }
 
-        // Get the domain of each variable quickly
-        for lit in self.litmap.keys() {
+        for lit in self.direct.litmap.keys() {
             let var_id = lit.var();
             if lit.sign() {
-                self.domainmap.entry(var_id).or_default().insert(lit.val());
+                self.direct
+                    .domainmap
+                    .entry(var_id)
+                    .or_default()
+                    .insert(lit.val());
             }
         }
 
-        for (puzlit, &lit) in &self.litmap {
+        for (puzlit, &lit) in &self.direct.litmap {
             let var = puzlit.var();
 
             let name = var.name();
             if self.eprime.vars.contains(name) {
-                self.varset_lits.insert(lit);
+                self.var_lits.insert_positive(lit);
                 if !puzlit.sign() {
-                    self.varset_lits_neg.insert(lit);
+                    self.var_lits.insert_negative(lit);
                 }
             } else if self.eprime.auxvars.contains(name) || name.starts_with("conjure_aux") {
-                // AUX variables aren't deduced via MUS, but framework-special
-                // ones in the reserved `demystify_*` namespace get captured
-                // into special_lits so callers (e.g. Mystify) can read their
-                // values from a SAT solution without making them deduction
-                // targets.
                 if name.starts_with("demystify_") && puzlit.sign() {
-                    self.special_lits.insert(lit);
+                    self.var_lits.insert_special(lit);
                 }
-            } else if self.eprime.cons.contains_key(name) {
-                // constraints are specially dealt with above
-            } else if self.eprime.reveal_values.contains(name) {
-                // reveal_values are dealt with below,
-                // as we need all of 'varset' to be complete first
-                // So here we just allow the name
+            } else if self.eprime.cons.contains_key(name)
+                || self.eprime.reveal_values.contains(name)
+            {
             } else {
                 bail!("Cannot identify {:?}, should it be marked as AUX?", puzlit);
             }
         }
 
-        for (puzlit, &lit) in &self.litmap {
+        for (puzlit, &lit) in &self.direct.litmap {
             let var = puzlit.var();
             let name = var.name();
             if self.eprime.reveal.contains_key(name) && puzlit.sign() {
@@ -449,7 +613,7 @@ impl PuzzleParse {
                 let target_varvalpair = VarValPair::new(&target_puzvar, 1);
                 let target_puzlit = PuzLit::new_eq(target_varvalpair);
 
-                if let Some(&target_lit) = self.litmap.get(&target_puzlit) {
+                if let Some(&target_lit) = self.direct.litmap.get(&target_puzlit) {
                     safe_insert(&mut self.reveal_map, lit, target_lit)
                         .context("Some variable used in two 'REVEAL'")?;
                 } else {
@@ -462,8 +626,7 @@ impl PuzzleParse {
 
         let fvc = FindVarConnections::new(&self.satinstance, &self.all_var_related_lits());
 
-        // Tidy up and check constraints
-        for (varid, vals) in &self.domainmap {
+        for (varid, vals) in &self.direct.domainmap {
             if let Some(template_string) = self.eprime.cons.get(varid.name()) {
                 debug!(target: "parser", "Found {:?} in constraint {:?}", varid, varid.name());
 
@@ -488,7 +651,6 @@ impl PuzzleParse {
                     &varid.indices,
                 )?;
 
-                // Check is we have used this name before
                 if usedconstraintnames.contains(&constraintname) {
                     bail!(format!(
                         "CON name {:?} used twice. This should already have substitutions done, so if you see '{{' or '}}' check your formatting string.",
@@ -497,27 +659,18 @@ impl PuzzleParse {
                 }
                 usedconstraintnames.insert(constraintname.clone());
 
-                // TODO: Skip constraints which are already parsed,
-                // or trivial (parse.py 270 -- 291)
-
                 let puzlit = PuzLit::new_eq(VarValPair::new(varid, 1));
-                let lit = *self.litmap.get(&puzlit).unwrap();
-                safe_insert(&mut self.conset, lit, constraintname.clone())?;
-                safe_insert(&mut self.invconset, constraintname.clone(), lit)?;
-                self.conset_lits.insert(lit);
-                safe_insert(&mut self.varlits_in_con, lit, fvc.get_connections(lit))?;
-                info!(
-                    "MAP {} {:?}",
-                    &constraintname,
-                    self.varlits_in_con.get(&lit).unwrap()
-                );
+                let lit = *self.direct.litmap.get(&puzlit).unwrap();
+                let connections = fvc.get_connections(lit);
+                info!("MAP {} {:?}", &constraintname, &connections);
+                self.constraints.insert(lit, constraintname, connections)?;
             }
         }
 
         // Remove constraints whose clause sets are identical to an earlier constraint.
         {
             let (cnf, _) = self.satinstance.clone().into_cnf();
-            let con_neg_lits: HashSet<Lit> = self.conset_lits.iter().map(|l| -*l).collect();
+            let con_neg_lits: HashSet<Lit> = self.constraints.lits().iter().map(|l| -*l).collect();
 
             let mut con_to_clauses: BTreeMap<Lit, BTreeSet<Vec<Lit>>> = BTreeMap::new();
             for clause in &cnf {
@@ -535,7 +688,7 @@ impl PuzzleParse {
 
             let mut seen_clause_sets: HashSet<BTreeSet<Vec<Lit>>> = HashSet::new();
             let mut to_remove: Vec<Lit> = Vec::new();
-            for con_lit in &self.conset_lits {
+            for con_lit in self.constraints.lits() {
                 if let Some(clause_set) = con_to_clauses.get(con_lit)
                     && !seen_clause_sets.insert(clause_set.clone())
                 {
@@ -547,14 +700,10 @@ impl PuzzleParse {
                 eprintln!(
                     "Removing {} duplicate constraints (of {} total)",
                     to_remove.len(),
-                    self.conset_lits.len()
+                    self.constraints.len()
                 );
                 for lit in &to_remove {
-                    self.conset_lits.remove(lit);
-                    if let Some(name) = self.conset.remove(lit) {
-                        self.invconset.remove(&name);
-                    }
-                    self.varlits_in_con.remove(lit);
+                    self.constraints.remove(lit);
                 }
             }
         }
@@ -564,58 +713,59 @@ impl PuzzleParse {
 
     #[must_use]
     pub fn lit_is_con(&self, lit: &Lit) -> bool {
-        self.conset_lits.contains(lit)
+        self.constraints.contains(lit)
     }
 
     #[must_use]
     pub fn lit_to_con(&self, lit: &Lit) -> &String {
-        assert!(self.lit_is_con(lit));
-        self.conset.get(lit).unwrap()
+        self.constraints.description(lit)
     }
 
     #[must_use]
     pub fn lit_is_var(&self, lit: &Lit) -> bool {
-        self.varset_lits.contains(lit)
+        self.var_lits.contains(lit)
     }
 
     #[must_use]
     pub fn lit_to_vars(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
-        self.invlitmap.get(lit).expect("IE: Bad lit")
+        self.direct.invlitmap.get(lit).expect("IE: Bad lit")
     }
 
-    // All lits included in both the direct and ordered encoding
-    // of VARs
     #[must_use]
     pub fn all_var_related_lits(&self) -> HashSet<Lit> {
         let ordered_var: BTreeSet<Lit> = self
-            .order_encoding_map
+            .order
+            .map
             .iter()
             .filter(|(k, _)| self.eprime.vars.contains(k.name()))
             .flat_map(|(_, v)| v)
             .copied()
             .collect();
 
-        self.varset_lits.union(&ordered_var).copied().collect()
+        self.var_lits
+            .positive()
+            .union(&ordered_var)
+            .copied()
+            .collect()
     }
 
-    // All VarValPairs included in VARs
     #[must_use]
     pub fn all_var_varvals(&self) -> BTreeSet<VarValPair> {
-        self.varset_lits
+        self.var_lits
+            .positive()
             .iter()
             .flat_map(|x| self.lit_to_vars(x))
             .map(super::PuzLit::varval)
             .collect()
     }
 
-    /// Given a collection of Lits representing both direct and ordered
-    /// representations, collect them into a collection of `VarValPair`s
     #[must_use]
     pub fn direct_or_ordered_lit_to_varvalpair(&self, lit: &Lit) -> BTreeSet<VarValPair> {
-        let direct_lits = self.invlitmap.get(lit).cloned().unwrap_or_default();
+        let direct_lits = self.direct.invlitmap.get(lit).cloned().unwrap_or_default();
 
-        let order_lits = if let Some(var) = self.inv_order_encoding_map.get(lit) {
-            self.domainmap
+        let order_lits = if let Some(var) = self.order.inv_map.get(lit) {
+            self.direct
+                .domainmap
                 .get(var)
                 .unwrap()
                 .iter()
@@ -638,8 +788,8 @@ impl PuzzleParse {
     }
 
     #[must_use]
-    pub fn constraints(&self) -> BTreeSet<String> {
-        self.invconset.keys().cloned().collect()
+    pub fn constraint_names(&self) -> BTreeSet<String> {
+        self.constraints.descriptions().cloned().collect()
     }
 
     pub fn constraint_roots(&self) -> BTreeSet<String> {
@@ -648,9 +798,8 @@ impl PuzzleParse {
 
     #[must_use]
     pub fn constraint_scope(&self, con: &String) -> BTreeSet<VarValPair> {
-        let lit = self.invconset.get(con).expect("IE: Bad constraint name");
-
-        let lits = self.varlits_in_con.get(lit).expect("IE: Bad constraint");
+        let lit = self.constraints.lit_for(con);
+        let lits = self.constraints.var_lits(lit);
         let puzlits = lits
             .iter()
             .flat_map(|l| self.direct_or_ordered_lit_to_varvalpair(l))
@@ -664,26 +813,24 @@ impl PuzzleParse {
             self.eprime.cons.contains_key(con),
             "Filtered constraint is not present: {con}"
         );
-        let mut new_conset_lits = BTreeSet::new();
-        for l in &self.conset_lits {
-            let puzvars = self.invlitmap.get(l).unwrap();
-            if !puzvars.iter().all(|p| p.var().name() == con) {
-                new_conset_lits.insert(*l);
-            }
-        }
+        let invlitmap = &self.direct.invlitmap;
+        let old_len = self.constraints.len();
+        self.constraints.retain(|l| {
+            let puzvars = invlitmap.get(l).unwrap();
+            !puzvars.iter().all(|p| p.var().name() == con)
+        });
         eprintln!(
             "Removing {}: {} -> {}",
             con,
-            self.conset_lits.len(),
-            new_conset_lits.len()
+            old_len,
+            self.constraints.len()
         );
-        self.conset_lits = new_conset_lits;
     }
 
     #[must_use]
     pub fn get_matrix_indices(&self, var: &str) -> Option<Vec<i64>> {
         let mut domain: Option<Vec<i64>> = None;
-        for key in self.domainmap.keys() {
+        for key in self.direct.domainmap.keys() {
             if key.name() == var {
                 let indices = key.indices();
                 if let Some(mut current_domain) = domain {
@@ -962,21 +1109,10 @@ fn update_puzzle_parse_with_maps(
     order_encoding_map: BTreeMap<PuzVar, HashSet<Lit>>,
     inv_order_encoding_map: BTreeMap<Lit, PuzVar>,
 ) -> anyhow::Result<()> {
-    // Update litmap
-    dimacs.litmap = litmap;
-
-    // Update order encoding maps
-    dimacs.order_encoding_map = order_encoding_map;
-    dimacs.inv_order_encoding_map = inv_order_encoding_map;
-
-    // Rebuild order_encoding_all_lits from order_encoding_map
-    dimacs.order_encoding_all_lits = BTreeSet::new();
-    for lits in dimacs.order_encoding_map.values() {
-        for &lit in lits {
-            dimacs.order_encoding_all_lits.insert(lit);
-        }
-    }
-
+    dimacs.direct.litmap = litmap;
+    dimacs.order.map = order_encoding_map;
+    dimacs.order.inv_map = inv_order_encoding_map;
+    dimacs.order.rebuild_all_lits();
     Ok(())
 }
 
@@ -1202,7 +1338,7 @@ mod tests {
 
         filter1_puz.filter_out_constraint("rowwhite");
 
-        assert_eq!(puz.conset_lits.len() - filter1_puz.conset_lits.len(), 6);
+        assert_eq!(puz.constraints.len() - filter1_puz.constraints.len(), 6);
     }
 
     #[test]
@@ -1263,17 +1399,15 @@ mod tests {
             vec![vec!["false", "true"], vec!["true", "false"]]
         );
 
-        // These next two may become '3' at some point, when we do better
-        // at rejecting useless constraints
-        assert_eq!(puz.conset.len(), 4);
-        assert_eq!(puz.conset_lits.len(), 4);
-        assert_eq!(puz.varset_lits.len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
-        let cons = puz.constraints();
+        assert_eq!(puz.constraints.len(), 4);
+        assert_eq!(puz.constraints.len(), 4);
+        assert_eq!(puz.var_lits.positive().len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
+        let cons = puz.constraint_names();
 
-        assert!(puz.conset_lits.iter().all(|l| puz.lit_is_con(l)));
-        assert!(puz.varset_lits.iter().all(|l| !puz.lit_is_con(l)));
-        assert!(puz.conset_lits.iter().all(|l| !puz.lit_is_var(l)));
-        assert!(puz.varset_lits.iter().all(|l| puz.lit_is_var(l)));
+        assert!(puz.constraints.lits().iter().all(|l| puz.lit_is_con(l)));
+        assert!(puz.var_lits.positive().iter().all(|l| !puz.lit_is_con(l)));
+        assert!(puz.constraints.lits().iter().all(|l| !puz.lit_is_var(l)));
+        assert!(puz.var_lits.positive().iter().all(|l| puz.lit_is_var(l)));
 
         let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
 
@@ -1297,7 +1431,7 @@ mod tests {
 
         assert_eq!(puz.eprime.param_i64("n").unwrap(), 3);
 
-        let cons = puz.constraints();
+        let cons = puz.constraint_names();
 
         let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
 
@@ -1321,7 +1455,7 @@ mod tests {
 
         assert_eq!(puz.eprime.param_i64("n").unwrap(), 3);
 
-        let cons = puz.constraints();
+        let cons = puz.constraint_names();
 
         let scopes: Vec<_> = cons.iter().map(|c| (c, puz.constraint_scope(c))).collect();
 

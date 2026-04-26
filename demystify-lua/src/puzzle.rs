@@ -167,12 +167,12 @@ impl LuaUserData for LuaPuzzle {
 
         // Get the number of variables in the direct encoding
         methods.add_method("num_var_lits", |_, this, ()| {
-            Ok(this.inner.varset_lits.len())
+            Ok(this.inner.var_lits.positive().len())
         });
 
         // Get the number of constraint literals
         methods.add_method("num_con_lits", |_, this, ()| {
-            Ok(this.inner.conset_lits.len())
+            Ok(this.inner.constraints.len())
         });
 
         // Check if a parameter exists
@@ -211,7 +211,7 @@ impl LuaUserData for LuaPuzzle {
             };
 
             // Look up in domainmap
-            if let Some(domain) = this.inner.domainmap.get(&puzvar) {
+            if let Some(domain) = this.inner.direct.domainmap.get(&puzvar) {
                 let table = lua.create_table()?;
                 for (i, &val) in domain.iter().enumerate() {
                     table.set(i + 1, val)?;
@@ -227,7 +227,7 @@ impl LuaUserData for LuaPuzzle {
         methods.add_method("all_domains", |lua, this, ()| {
             let table = lua.create_table()?;
 
-            for (puzvar, domain) in &this.inner.domainmap {
+            for (puzvar, domain) in &this.inner.direct.domainmap {
                 let var_str = format_puzvar(puzvar);
                 let domain_table = lua.create_table()?;
                 for (i, &val) in domain.iter().enumerate() {
@@ -244,21 +244,23 @@ impl LuaUserData for LuaPuzzle {
         // Returns: table of variable strings, or nil if constraint not found
         methods.add_method("constraint_variables", |lua, this, con_name: String| {
             // Look up constraint literal
-            let con_lit = match this.inner.invconset.get(&con_name) {
-                Some(lit) => *lit,
-                None => return Ok(LuaValue::Nil),
+            let con_lit = if this
+                .inner
+                .constraints
+                .descriptions()
+                .any(|n| *n == con_name)
+            {
+                *this.inner.constraints.lit_for(&con_name)
+            } else {
+                return Ok(LuaValue::Nil);
             };
 
-            // Get variable literals involved in this constraint
-            let var_lits = match this.inner.varlits_in_con.get(&con_lit) {
-                Some(lits) => lits,
-                None => return Ok(LuaValue::Nil),
-            };
+            let var_lits = this.inner.constraints.var_lits(&con_lit);
 
             // Collect unique variable names
             let mut var_names: BTreeSet<String> = BTreeSet::new();
             for lit in var_lits {
-                if let Some(puzlits) = this.inner.invlitmap.get(lit) {
+                if let Some(puzlits) = this.inner.direct.invlitmap.get(lit) {
                     for puzlit in puzlits {
                         var_names.insert(format_puzvar(&puzlit.var()));
                     }

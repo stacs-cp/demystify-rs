@@ -63,7 +63,7 @@ impl LuaUserData for LuaPlanner {
         methods.add_method("is_solved", |_, this, ()| {
             let planner = this.inner.lock().unwrap();
             Ok(!planner.get_all_known_lits().is_empty()
-                && planner.puzzle().varset_lits.iter().all(|lit| {
+                && planner.puzzle().var_lits.positive().iter().all(|lit| {
                     planner.get_all_known_lits().contains(lit)
                         || planner.get_all_known_lits().contains(&(!*lit))
                 }))
@@ -117,7 +117,7 @@ impl LuaUserData for LuaPlanner {
             // We need to collect the matching literal first to avoid borrow issues
             let matching_lit = {
                 let mut found = None;
-                for (puzlit, sat_lit) in planner.puzzle().litmap.iter() {
+                for (puzlit, sat_lit) in planner.puzzle().direct.litmap.iter() {
                     if format_puzlit(puzlit) == lit_str {
                         found = Some(*sat_lit);
                         break;
@@ -155,7 +155,7 @@ impl LuaUserData for LuaPlanner {
                 let puzlit = PuzLit::new_eq(varval);
 
                 // Look up in litmap
-                if let Some(&sat_lit) = planner.puzzle().litmap.get(&puzlit) {
+                if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
                     planner.mark_lit_as_deduced(&sat_lit);
                     return Ok(true);
                 }
@@ -204,7 +204,7 @@ impl LuaUserData for LuaPlanner {
             };
 
             // Look up in litmap
-            if let Some(&sat_lit) = planner.puzzle().litmap.get(&puzlit) {
+            if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
                 planner.mark_lit_as_deduced(&sat_lit);
                 return Ok(true);
             }

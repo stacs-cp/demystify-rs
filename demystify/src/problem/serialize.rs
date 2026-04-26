@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::{PuzLit, PuzVar};
 
-use super::parse::{EPrimeAnnotations, PuzzleParse};
+use super::parse::{self, EPrimeAnnotations, PuzzleParse};
 
 /// Serializable version of EPrimeAnnotations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,59 +137,85 @@ impl TryFrom<&PuzzleParse> for SerializablePuzzleParse {
             eprime: SerializableEPrimeAnnotations::from(&p.eprime),
             cnf_clauses,
             litmap: p
+                .direct
                 .litmap
                 .iter()
                 .map(|(k, &v)| (k.clone(), lit_to_i32(v)))
                 .collect(),
             invlitmap: p
+                .direct
                 .invlitmap
                 .iter()
                 .map(|(&k, v)| (lit_to_i32(k).to_string(), v.clone()))
                 .collect(),
             domainmap: p
+                .direct
                 .domainmap
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             conset: p
-                .conset
+                .constraints
                 .iter()
                 .map(|(&k, v)| (lit_to_i32(k).to_string(), v.clone()))
                 .collect(),
             invconset: p
-                .invconset
-                .iter()
-                .map(|(k, &v)| (k.clone(), lit_to_i32(v)))
+                .constraints
+                .descriptions()
+                .map(|name| (name.clone(), lit_to_i32(*p.constraints.lit_for(name))))
                 .collect(),
             varlits_in_con: p
-                .varlits_in_con
+                .constraints
+                .lits()
                 .iter()
-                .map(|(&k, v)| {
+                .map(|k| {
                     (
-                        lit_to_i32(k).to_string(),
-                        v.iter().map(|&l| lit_to_i32(l)).collect(),
+                        lit_to_i32(*k).to_string(),
+                        p.constraints
+                            .var_lits(k)
+                            .iter()
+                            .map(|&l| lit_to_i32(l))
+                            .collect(),
                     )
                 })
                 .collect(),
-            varset_lits: p.varset_lits.iter().map(|&l| lit_to_i32(l)).collect(),
-            varset_lits_neg: p.varset_lits_neg.iter().map(|&l| lit_to_i32(l)).collect(),
-            conset_lits: p.conset_lits.iter().map(|&l| lit_to_i32(l)).collect(),
-            special_lits: p.special_lits.iter().map(|&l| lit_to_i32(l)).collect(),
+            varset_lits: p
+                .var_lits
+                .positive()
+                .iter()
+                .map(|&l| lit_to_i32(l))
+                .collect(),
+            varset_lits_neg: p
+                .var_lits
+                .negative()
+                .iter()
+                .map(|&l| lit_to_i32(l))
+                .collect(),
+            conset_lits: p
+                .constraints
+                .lits()
+                .iter()
+                .map(|&l| lit_to_i32(l))
+                .collect(),
+            special_lits: p
+                .var_lits
+                .special()
+                .iter()
+                .map(|&l| lit_to_i32(l))
+                .collect(),
             order_encoding_map: p
-                .order_encoding_map
+                .order
+                .map
                 .iter()
                 .map(|(k, v)| (k.clone(), v.iter().map(|&l| lit_to_i32(l)).collect()))
                 .collect(),
             inv_order_encoding_map: p
-                .inv_order_encoding_map
+                .order
+                .inv_map
                 .iter()
                 .map(|(&k, v)| (lit_to_i32(k).to_string(), v.clone()))
                 .collect(),
-            order_encoding_all_lits: p
-                .order_encoding_all_lits
-                .iter()
-                .map(|&l| lit_to_i32(l))
-                .collect(),
+            order_encoding_all_lits: p.order.all_lits.iter().map(|&l| lit_to_i32(l)).collect(),
             reveal_map: p
                 .reveal_map
                 .iter()
@@ -218,77 +244,87 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
         // Create a SatInstance from the CNF
         let satinstance: SatInstance<BasicVarManager> = cnf.clone().into();
 
+        let conset: BTreeMap<Lit, String> = s
+            .conset
+            .into_iter()
+            .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+            .collect::<Result<_>>()?;
+        let invconset: BTreeMap<String, Lit> = s
+            .invconset
+            .into_iter()
+            .map(|(k, v)| Ok((k, i32_to_lit(v)?)))
+            .collect::<Result<_>>()?;
+        let varlits_in_con: BTreeMap<Lit, Vec<Lit>> = s
+            .varlits_in_con
+            .into_iter()
+            .map(|(k, v)| {
+                let lits: Result<Vec<Lit>> = v.into_iter().map(i32_to_lit).collect();
+                Ok((i32_to_lit(str_to_i32(&k)?)?, lits?))
+            })
+            .collect::<Result<_>>()?;
+        let conset_lits: BTreeSet<Lit> = s
+            .conset_lits
+            .into_iter()
+            .map(i32_to_lit)
+            .collect::<Result<_>>()?;
+
         Ok(Self {
             eprime: s.eprime.into(),
             satinstance,
             cnf: Some(Arc::new(cnf)),
-            litmap: s
-                .litmap
-                .into_iter()
-                .map(|(k, v)| Ok((k, i32_to_lit(v)?)))
-                .collect::<Result<_>>()?,
-            invlitmap: s
-                .invlitmap
-                .into_iter()
-                .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
-                .collect::<Result<_>>()?,
-            domainmap: s.domainmap.into_iter().collect(),
-            conset: s
-                .conset
-                .into_iter()
-                .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
-                .collect::<Result<_>>()?,
-            invconset: s
-                .invconset
-                .into_iter()
-                .map(|(k, v)| Ok((k, i32_to_lit(v)?)))
-                .collect::<Result<_>>()?,
-            varlits_in_con: s
-                .varlits_in_con
-                .into_iter()
-                .map(|(k, v)| {
-                    let lits: Result<Vec<Lit>> = v.into_iter().map(i32_to_lit).collect();
-                    Ok((i32_to_lit(str_to_i32(&k)?)?, lits?))
-                })
-                .collect::<Result<_>>()?,
-            varset_lits: s
-                .varset_lits
-                .into_iter()
-                .map(i32_to_lit)
-                .collect::<Result<_>>()?,
-            varset_lits_neg: s
-                .varset_lits_neg
-                .into_iter()
-                .map(i32_to_lit)
-                .collect::<Result<_>>()?,
-            conset_lits: s
-                .conset_lits
-                .into_iter()
-                .map(i32_to_lit)
-                .collect::<Result<_>>()?,
-            special_lits: s
-                .special_lits
-                .into_iter()
-                .map(i32_to_lit)
-                .collect::<Result<_>>()?,
-            order_encoding_map: s
-                .order_encoding_map
-                .into_iter()
-                .map(|(k, v)| {
-                    let lits: Result<HashSet<Lit>> = v.into_iter().map(i32_to_lit).collect();
-                    Ok((k, lits?))
-                })
-                .collect::<Result<_>>()?,
-            inv_order_encoding_map: s
-                .inv_order_encoding_map
-                .into_iter()
-                .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
-                .collect::<Result<_>>()?,
-            order_encoding_all_lits: s
-                .order_encoding_all_lits
-                .into_iter()
-                .map(i32_to_lit)
-                .collect::<Result<_>>()?,
+            direct: parse::DirectEncoding {
+                litmap: s
+                    .litmap
+                    .into_iter()
+                    .map(|(k, v)| Ok((k, i32_to_lit(v)?)))
+                    .collect::<Result<_>>()?,
+                invlitmap: s
+                    .invlitmap
+                    .into_iter()
+                    .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+                    .collect::<Result<_>>()?,
+                domainmap: s.domainmap.into_iter().collect(),
+            },
+            constraints: parse::ConstraintStore::from_raw(
+                conset,
+                invconset,
+                varlits_in_con,
+                conset_lits,
+            ),
+            var_lits: parse::VarLitSets::from_raw(
+                s.varset_lits
+                    .into_iter()
+                    .map(i32_to_lit)
+                    .collect::<Result<_>>()?,
+                s.varset_lits_neg
+                    .into_iter()
+                    .map(i32_to_lit)
+                    .collect::<Result<_>>()?,
+                s.special_lits
+                    .into_iter()
+                    .map(i32_to_lit)
+                    .collect::<Result<_>>()?,
+            ),
+            order: parse::OrderEncoding {
+                map: s
+                    .order_encoding_map
+                    .into_iter()
+                    .map(|(k, v)| {
+                        let lits: Result<HashSet<Lit>> = v.into_iter().map(i32_to_lit).collect();
+                        Ok((k, lits?))
+                    })
+                    .collect::<Result<_>>()?,
+                inv_map: s
+                    .inv_order_encoding_map
+                    .into_iter()
+                    .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+                    .collect::<Result<_>>()?,
+                all_lits: s
+                    .order_encoding_all_lits
+                    .into_iter()
+                    .map(i32_to_lit)
+                    .collect::<Result<_>>()?,
+            },
             reveal_map: s
                 .reveal_map
                 .into_iter()
@@ -347,13 +383,9 @@ mod tests {
         assert_eq!(original.eprime.auxvars, loaded.eprime.auxvars);
         assert_eq!(original.eprime.cons, loaded.eprime.cons);
         assert_eq!(original.eprime.kind, loaded.eprime.kind);
-        assert_eq!(original.litmap, loaded.litmap);
-        assert_eq!(original.invlitmap, loaded.invlitmap);
-        assert_eq!(original.domainmap, loaded.domainmap);
-        assert_eq!(original.conset, loaded.conset);
-        assert_eq!(original.invconset, loaded.invconset);
-        assert_eq!(original.varset_lits, loaded.varset_lits);
-        assert_eq!(original.conset_lits, loaded.conset_lits);
+        assert_eq!(original.direct, loaded.direct);
+        assert_eq!(original.constraints, loaded.constraints);
+        assert_eq!(original.var_lits, loaded.var_lits);
     }
 
     #[test]
@@ -369,8 +401,8 @@ mod tests {
         let loaded = PuzzleParse::load_from_json(temp_file.path()).unwrap();
 
         assert_eq!(original.eprime.vars, loaded.eprime.vars);
-        assert_eq!(original.litmap, loaded.litmap);
-        assert_eq!(original.conset_lits.len(), loaded.conset_lits.len());
+        assert_eq!(original.direct, loaded.direct);
+        assert_eq!(original.constraints.len(), loaded.constraints.len());
     }
 
     #[test]

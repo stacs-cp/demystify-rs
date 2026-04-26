@@ -108,7 +108,7 @@ mod tests {
 
         let fvc = FindVarConnections::new(&puz.satinstance, &puz.all_var_related_lits());
 
-        for c in &puz.conset_lits {
+        for c in puz.constraints.lits() {
             let lits = fvc.get_connections(*c);
             let puzlits = lits
                 .iter()
@@ -117,8 +117,8 @@ mod tests {
             println!("{c} {puzlits:?}");
             for l in &lits {
                 println!("{l:?}");
-                println!("{:?}", puz.invlitmap.get(l));
-                println!("{:?}", puz.inv_order_encoding_map.get(l));
+                println!("{:?}", puz.direct.invlitmap.get(l));
+                println!("{:?}", puz.order.inv_map.get(l));
             }
         }
     }

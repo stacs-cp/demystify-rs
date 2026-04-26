@@ -266,13 +266,12 @@ impl Puzzle {
         // — where Essence' guard failed — have no SAT connections and are not useful to show).
         // Cap each class at MAX_INSTANCES_PER_CLASS to keep the HTML payload manageable.
         const MAX_INSTANCES_PER_CLASS: usize = 50;
-        let constraint_classes = if problem.conset.is_empty() {
+        let constraint_classes = if problem.constraints.is_empty() {
             None
         } else {
             let mut classes: BTreeMap<String, Vec<ConstraintInstance>> = BTreeMap::new();
-            for (lit, description) in &problem.conset {
-                // Recover the class name from invlitmap (Lit → PuzLit → PuzVar.name)
-                if let Some(puzlits) = problem.invlitmap.get(lit)
+            for (lit, description) in problem.constraints.iter() {
+                if let Some(puzlits) = problem.direct.invlitmap.get(lit)
                     && let Some(puzlit) = puzlits.iter().find(|p| p.val() == 1)
                 {
                     let class = puzlit.var().name().clone();

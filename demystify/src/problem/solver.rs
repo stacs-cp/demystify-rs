@@ -159,9 +159,14 @@ impl PuzzleSolver {
     ///
     /// The corresponding `Lit` instance.
     pub fn puzlit_to_lit(&self, puzlit: &PuzLit) -> Lit {
-        *self.puzzleparse.litmap.get(puzlit).unwrap_or_else(|| {
-            panic!("Expected to find the following variable, but could not find it: {puzlit}");
-        })
+        *self
+            .puzzleparse
+            .direct
+            .litmap
+            .get(puzlit)
+            .unwrap_or_else(|| {
+                panic!("Expected to find the following variable, but could not find it: {puzlit}");
+            })
     }
 
     /// Converts a `Lit` instance to a reference to the set of `PuzLit` instances it represents.
@@ -175,6 +180,7 @@ impl PuzzleSolver {
     /// A reference to the set of `PuzLit` instances.
     pub fn lit_to_puzlit(&self, lit: &Lit) -> &BTreeSet<PuzLit> {
         self.puzzleparse
+            .direct
             .invlitmap
             .get(lit)
             .unwrap_or_else(|| panic!("Missing lit: {lit}"))
@@ -194,7 +200,13 @@ impl PuzzleSolver {
     ///
     /// Returns `true` if the puzzle is solvable under the current assumptions, otherwise `false`.
     pub fn is_currently_solvable(&mut self) -> bool {
-        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
+        let mut litorig: Vec<Lit> = self
+            .puzzleparse
+            .constraints
+            .lits()
+            .iter()
+            .copied()
+            .collect();
         litorig.extend_from_slice(&self.knownlits);
         // Feasibility check with no conflict limit: a Limit interrupt would be
         // meaningless here — the caller has no alternative behaviour and must
@@ -211,7 +223,13 @@ impl PuzzleSolver {
     #[must_use]
     pub fn get_provable_varlits(&mut self) -> &BTreeSet<Lit> {
         if self.tosolvelits.is_none() {
-            let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
+            let mut litorig: Vec<Lit> = self
+                .puzzleparse
+                .constraints
+                .lits()
+                .iter()
+                .copied()
+                .collect();
             litorig.extend_from_slice(&self.knownlits);
             let lits = self.get_literals_to_try_solving();
             let provable: BTreeSet<_> = lits
@@ -253,7 +271,10 @@ impl PuzzleSolver {
         mc: &MusContext,
     ) -> BTreeSet<Lit> {
         let mus = &mc.mus;
-        assert!(mus.iter().all(|c| self.puzzleparse.conset_lits.contains(c)));
+        assert!(
+            mus.iter()
+                .all(|c| self.puzzleparse.constraints.lits().contains(c))
+        );
 
         let mut litorig = mus.clone();
         for &lit in &self.knownlits {
@@ -298,7 +319,7 @@ impl PuzzleSolver {
         let mut lits = BTreeSet::new();
 
         for m in &mc.mus {
-            for l in self.puzzleparse().varlits_in_con.get(m).unwrap() {
+            for l in self.puzzleparse().constraints.var_lits(m) {
                 lits.insert(*l);
             }
         }
@@ -391,7 +412,13 @@ impl PuzzleSolver {
     ) -> Option<BTreeSet<Lit>> {
         let mut solution = vec![];
 
-        let mut litorig: Vec<Lit> = self.puzzleparse.conset_lits.iter().copied().collect();
+        let mut litorig: Vec<Lit> = self
+            .puzzleparse
+            .constraints
+            .lits()
+            .iter()
+            .copied()
+            .collect();
         litorig.extend_from_slice(&self.knownlits);
 
         let reveal_lits: Vec<_> = self.puzzleparse.reveal_map.values().copied().collect();
@@ -406,10 +433,16 @@ impl PuzzleSolver {
         //   final solution to populate the returned BTreeSet.  Special
         //   AUX values are captured here so callers (e.g. Mystify) can
         //   use them for design control or fitness signalling.
-        let mut lits_to_check = self.puzzleparse.varset_lits.iter().copied().collect_vec();
+        let mut lits_to_check = self
+            .puzzleparse
+            .var_lits
+            .positive()
+            .iter()
+            .copied()
+            .collect_vec();
         lits_to_check.shuffle(rng);
         let mut lits_to_read = lits_to_check.clone();
-        lits_to_read.extend(self.puzzleparse.special_lits.iter().copied());
+        lits_to_read.extend(self.puzzleparse.var_lits.special().iter().copied());
 
         for &l in &lits_to_check {
             let mut lits = litorig.clone();
@@ -473,9 +506,9 @@ impl PuzzleSolver {
     /// Returns the set of literals which we should still try solving (may be true, or false)
     pub fn get_literals_to_try_solving(&mut self) -> BTreeSet<Lit> {
         let lits = if self.solver_config.only_assignments {
-            &self.puzzleparse.varset_lits_neg
+            &self.puzzleparse.var_lits.negative()
         } else {
-            &self.puzzleparse.varset_lits
+            &self.puzzleparse.var_lits.positive()
         };
         lits.iter()
             .copied()
@@ -531,6 +564,7 @@ impl PuzzleSolver {
                 let val = puzlit.val();
                 let domain = self
                     .puzzleparse()
+                    .direct
                     .domainmap
                     .get(&var)
                     .expect("Fatal error getting var")
@@ -579,6 +613,7 @@ impl PuzzleSolver {
 
                 let puzlit = self
                     .puzzleparse()
+                    .direct
                     .litmap
                     .get(&imply_lit)
                     .expect("REVEAL variable missing: {imply_lit}");
@@ -671,7 +706,13 @@ impl PuzzleSolver {
         lit: Lit,
         count: Option<usize>,
     ) -> SearchResult<Vec<Vec<Lit>>> {
-        let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+        let mut conset = self
+            .puzzleparse
+            .constraints
+            .lits()
+            .iter()
+            .copied()
+            .collect_vec();
 
         let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
         conset.shuffle(&mut rng);
@@ -731,8 +772,8 @@ impl PuzzleSolver {
                 .iter()
                 .map(|c| {
                     self.puzzleparse()
-                        .conset
-                        .get(c)
+                        .constraints
+                        .try_description(c)
                         .cloned()
                         .unwrap_or_else(|| format!("unknown({})", c))
                 })
@@ -756,8 +797,8 @@ impl PuzzleSolver {
             .iter()
             .map(|c| {
                 self.puzzleparse()
-                    .conset
-                    .get(c)
+                    .constraints
+                    .try_description(c)
                     .cloned()
                     .unwrap_or_else(|| format!("unknown({})", c))
             })
@@ -794,17 +835,17 @@ impl PuzzleSolver {
         lit: Lit,
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
-        assert!(self.puzzleparse.varset_lits.contains(&lit));
+        assert!(self.puzzleparse.var_lits.positive().contains(&lit));
 
         let mut lits: Vec<Lit> = vec![];
-        lits.extend(self.puzzleparse.conset_lits.iter());
+        lits.extend(self.puzzleparse.constraints.lits().iter());
         lits.push(!lit);
         let mus = self
             .get_satcore()
             .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1))?;
         Ok(mus.map(|m| {
             m.into_iter()
-                .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                .filter(|x| self.puzzleparse.constraints.lits().contains(x))
                 .collect()
         }))
     }
@@ -815,11 +856,17 @@ impl PuzzleSolver {
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
         // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
-        assert!(self.puzzleparse.varset_lits.contains(&lit));
+        assert!(self.puzzleparse.var_lits.positive().contains(&lit));
 
         let mut lits: Vec<Lit> = vec![];
 
-        let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+        let mut conset = self
+            .puzzleparse
+            .constraints
+            .lits()
+            .iter()
+            .copied()
+            .collect_vec();
 
         conset.shuffle(&mut rand::rng());
 
@@ -852,16 +899,22 @@ impl PuzzleSolver {
             .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1))?;
         Ok(mus.map(|m| {
             m.into_iter()
-                .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                .filter(|x| self.puzzleparse.constraints.lits().contains(x))
                 .collect()
         }))
     }
 
     pub fn get_var_mus_cake(&self, lit: Lit, max_size: i64) -> SearchResult<Option<Vec<Lit>>> {
         // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
-        assert!(self.puzzleparse.varset_lits.contains(&lit));
+        assert!(self.puzzleparse.var_lits.positive().contains(&lit));
 
-        let mut conset = self.puzzleparse.conset_lits.iter().copied().collect_vec();
+        let mut conset = self
+            .puzzleparse
+            .constraints
+            .lits()
+            .iter()
+            .copied()
+            .collect_vec();
 
         conset.shuffle(&mut rand::rng());
 
@@ -891,7 +944,7 @@ impl PuzzleSolver {
             if let Some(m) = mus {
                 return Ok(Some(
                     m.into_iter()
-                        .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                        .filter(|x| self.puzzleparse.constraints.lits().contains(x))
                         .collect(),
                 ));
             }
@@ -913,8 +966,13 @@ impl PuzzleSolver {
     pub fn get_all_cores(&self, lits: &BTreeSet<Lit>) -> Vec<(Lit, Vec<Lit>)> {
         lits.par_iter()
             .filter_map(|&lit| {
-                let mut assumptions: Vec<Lit> =
-                    self.puzzleparse.conset_lits.iter().copied().collect();
+                let mut assumptions: Vec<Lit> = self
+                    .puzzleparse
+                    .constraints
+                    .lits()
+                    .iter()
+                    .copied()
+                    .collect();
                 assumptions.push(!lit);
                 match self
                     .get_satcore()
@@ -923,7 +981,7 @@ impl PuzzleSolver {
                     Ok(Some(core)) => {
                         let con_core: Vec<Lit> = core
                             .into_iter()
-                            .filter(|x| self.puzzleparse.conset_lits.contains(x))
+                            .filter(|x| self.puzzleparse.constraints.lits().contains(x))
                             .collect();
                         Some((lit, con_core))
                     }
@@ -941,7 +999,7 @@ impl PuzzleSolver {
         let minimised = self.get_satcore().minimise_us(&self.knownlits, &us, None)?;
         Ok(minimised
             .into_iter()
-            .filter(|x| self.puzzleparse.conset_lits.contains(x))
+            .filter(|x| self.puzzleparse.constraints.lits().contains(x))
             .collect())
     }
 
