@@ -517,7 +517,7 @@ impl Problem {
             for constraint in &deduction.constraints {
                 let num = constraint_num.get(constraint).unwrap();
                 statements.push(Statement {
-                    content: constraint.clone(),
+                    content: tera::escape_html(constraint),
                     classes: vec![
                         format!("highlight_con{}", num),
                         "js_highlighter".to_string(),

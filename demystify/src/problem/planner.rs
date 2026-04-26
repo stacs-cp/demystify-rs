@@ -680,7 +680,7 @@ impl PuzzlePlanner {
                 let deduced = PuzLit::nice_puzlit_list_html(&mus.0);
                 description_list.push(DescriptionStatement {
                     result: deduced,
-                    constraints: mus.1.iter().map(|s| tera::escape_html(s)).collect(),
+                    constraints: mus.1.clone(),
                 });
             }
 
@@ -787,7 +787,7 @@ impl PuzzlePlanner {
 
         let description_list = vec![DescriptionStatement {
             result: PuzLit::nice_puzlit_list_html(&user_mus.0),
-            constraints: user_mus.1.iter().map(|s| tera::escape_html(s)).collect(),
+            constraints: user_mus.1.clone(),
         }];
 
         let varlits = self.psolve.get_provable_varlits().clone();
