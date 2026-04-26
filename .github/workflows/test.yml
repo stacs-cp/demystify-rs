@@ -29,7 +29,7 @@ jobs:
             cargo_flags: "--workspace"
           - os: macos-latest
             release_suffix: macos-intel
-            cargo_flags: "--workspace --exclude demystify-lua"
+            cargo_flags: "--workspace"
 
     runs-on: ${{ matrix.os }}
 
