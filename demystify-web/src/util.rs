@@ -10,12 +10,33 @@ use axum::{
 };
 
 use axum_session::{Session, SessionNullPool};
-use demystify::problem::planner::PuzzlePlanner;
+use demystify::problem::{musdict::MusContext, planner::PuzzlePlanner};
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
     pub tera: Arc<tera::Tera>,
+}
+
+pub struct ExploreState {
+    pub all_muses: Vec<MusContext>,
+    pub current_index: usize,
+}
+
+pub struct SolverSession {
+    pub planner: PuzzlePlanner,
+    pub explore: Option<ExploreState>,
+    pub explore_enabled: bool,
+}
+
+impl SolverSession {
+    pub fn new(planner: PuzzlePlanner) -> Self {
+        Self {
+            planner,
+            explore: None,
+            explore_enabled: false,
+        }
+    }
 }
 
 pub struct AppError(anyhow::Error);
@@ -41,9 +62,9 @@ where
 
 fn solver_global(
     uuid: Uuid,
-    set_solver: Option<Arc<Mutex<PuzzlePlanner>>>,
-) -> Option<Arc<Mutex<PuzzlePlanner>>> {
-    type GlobalPuzzleStorage = Mutex<HashMap<Uuid, Arc<Mutex<PuzzlePlanner>>>>;
+    set_solver: Option<Arc<Mutex<SolverSession>>>,
+) -> Option<Arc<Mutex<SolverSession>>> {
+    type GlobalPuzzleStorage = Mutex<HashMap<Uuid, Arc<Mutex<SolverSession>>>>;
     static SOLVER: OnceLock<GlobalPuzzleStorage> = OnceLock::new();
     let m = SOLVER.get_or_init(|| Mutex::new(HashMap::new()));
 
@@ -57,7 +78,7 @@ fn solver_global(
 
 pub fn get_solver_global(
     session: &Session<SessionNullPool>,
-) -> anyhow::Result<Arc<Mutex<PuzzlePlanner>>> {
+) -> anyhow::Result<Arc<Mutex<SolverSession>>> {
     let uuid = session.get_session_id().uuid();
     let solver = solver_global(uuid, None);
     if let Some(solver) = solver {
@@ -69,5 +90,8 @@ pub fn get_solver_global(
 
 pub fn set_solver_global(session: &Session<SessionNullPool>, set_solver: PuzzlePlanner) {
     let uuid = session.get_session_id().uuid();
-    solver_global(uuid, Some(Arc::new(Mutex::new(set_solver))));
+    solver_global(
+        uuid,
+        Some(Arc::new(Mutex::new(SolverSession::new(set_solver)))),
+    );
 }

@@ -1,4 +1,4 @@
-<div id="solver-stage" class="he-solver-grid">
+<div id="solver-stage" class="he-solver-grid" data-explore-mode="{{ explore_mode }}">
   <section class="he-stage">
 
   <figure class="he-board">
@@ -19,6 +19,27 @@
   </figure>
 
   <aside class="he-deductions" aria-live="polite">
+    {% if explore_active %}
+    <div class="he-explore-nav">
+      <span>Explanation {{ explore_index }} of {{ explore_total }} (size {{ explore_mus_size }})</span>
+      <div class="he-explore-btns">
+        <button class="he-btn" {% if explore_index <= 1 %}disabled{% endif %}
+                hx-post="/solver/explore/navigate"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML"
+                hx-headers='{"X-Explore-Direction": "prev"}'>
+          &larr; Prev
+        </button>
+        <button class="he-btn" {% if explore_index >= explore_total %}disabled{% endif %}
+                hx-post="/solver/explore/navigate"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML"
+                hx-headers='{"X-Explore-Direction": "next"}'>
+          Next &rarr;
+        </button>
+      </div>
+    </div>
+    {% endif %}
     {% if legend_items | length > 0 %}
     <h3>Difficulty legend</h3>
     <div class="he-difficulty-legend">
@@ -81,8 +102,15 @@
                 hx-post="/solver/advance"
                 hx-target="#solver-stage"
                 hx-swap="outerHTML"
-                hx-indicator="#solver-stage">
+                hx-indicator="#solver-stage"
+                {% if explore_mode %}disabled title="Disable explore mode first"{% endif %}>
           Next step &rarr;
+        </button>
+        <button class="he-btn {% if explore_mode %}he-btn-active{% endif %}"
+                hx-post="/solver/explore/toggle"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML">
+          {% if explore_mode %}Explore: ON{% else %}Explore mode{% endif %}
         </button>
         <button class="he-btn"
                 hx-post="/solver/difficulties"

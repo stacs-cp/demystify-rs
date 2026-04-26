@@ -9,7 +9,9 @@ use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 
-use crate::util::{self, AppState, get_solver_global, set_solver_global};
+use crate::util::{
+    self, AppState, ExploreState, SolverSession, get_solver_global, set_solver_global,
+};
 
 use demystify::json::{Problem, Statement};
 use demystify::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
@@ -250,7 +252,11 @@ fn extract_deductions(statements: &[Statement]) -> Vec<tera::Value> {
     deductions
 }
 
-fn build_solver_stage_context(problem: &Problem, round: u32) -> tera::Context {
+fn build_solver_stage_context(
+    problem: &Problem,
+    round: u32,
+    session: &SolverSession,
+) -> tera::Context {
     let mut ctx = tera::Context::new();
     let svg = render_svg(problem);
     let puzzle_name = &problem.puzzle.kind;
@@ -376,11 +382,31 @@ fn build_solver_stage_context(problem: &Problem, round: u32) -> tera::Context {
     let puzzle_info: Vec<String> = problem.puzzle.info.as_ref().cloned().unwrap_or_default();
     ctx.insert("puzzle_info", &puzzle_info);
 
+    ctx.insert("explore_mode", &session.explore_enabled);
+    if let Some(ref explore) = session.explore {
+        ctx.insert("explore_active", &true);
+        ctx.insert("explore_index", &(explore.current_index + 1));
+        ctx.insert("explore_total", &explore.all_muses.len());
+        ctx.insert(
+            "explore_mus_size",
+            &explore.all_muses[explore.current_index].mus_len(),
+        );
+    } else {
+        ctx.insert("explore_active", &false);
+        ctx.insert("explore_index", &0u32);
+        ctx.insert("explore_total", &0u32);
+        ctx.insert("explore_mus_size", &0u32);
+    }
+
     ctx
 }
 
-fn build_solver_page_context(problem: &Problem, round: u32) -> tera::Context {
-    let mut ctx = build_solver_stage_context(problem, round);
+fn build_solver_page_context(
+    problem: &Problem,
+    round: u32,
+    session: &SolverSession,
+) -> tera::Context {
+    let mut ctx = build_solver_stage_context(problem, round, session);
     ctx.insert("view", "solver");
     ctx.insert("headline", &problem.puzzle.kind);
     ctx
@@ -428,9 +454,9 @@ pub async fn solver_page(
 
     let mut solver = solver.lock().unwrap();
     let round: u32 = session.get("round").unwrap_or(0);
-    let (problem, _lits) = solver.refresh_problem();
+    let (problem, _lits) = solver.planner.refresh_problem();
 
-    let ctx = build_solver_page_context(&problem, round);
+    let ctx = build_solver_page_context(&problem, round, &solver);
     let html = state.tera.render("solver.html", &ctx)?;
     Ok(Html(html).into_response())
 }
@@ -442,12 +468,16 @@ pub async fn solver_advance(
     let solver = get_solver_global(&session)?;
     let mut solver = solver.lock().unwrap();
 
+    if solver.explore_enabled {
+        return Err(anyhow!("Disable explore mode before advancing").into());
+    }
+
     let mut round: u32 = session.get("round").unwrap_or(0);
     round += 1;
     session.set("round", round);
 
-    let (problem, _lits) = solver.solve_step();
-    let ctx = build_solver_stage_context(&problem, round);
+    let (problem, _lits) = solver.planner.solve_step();
+    let ctx = build_solver_stage_context(&problem, round, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
     Ok(Html(html))
 }
@@ -460,8 +490,8 @@ pub async fn solver_reset(
     let mut solver = solver.lock().unwrap();
     let round: u32 = session.get("round").unwrap_or(0);
 
-    let (problem, _lits) = solver.refresh_problem();
-    let ctx = build_solver_stage_context(&problem, round);
+    let (problem, _lits) = solver.planner.refresh_problem();
+    let ctx = build_solver_stage_context(&problem, round, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
     Ok(Html(html))
 }
@@ -474,8 +504,8 @@ pub async fn solver_difficulties(
     let mut solver = solver.lock().unwrap();
     let round: u32 = session.get("round").unwrap_or(0);
 
-    let problem = solver.difficulty_problem();
-    let ctx = build_solver_stage_context(&problem, round);
+    let problem = solver.planner.difficulty_problem();
+    let ctx = build_solver_stage_context(&problem, round, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
     Ok(Html(html))
 }
@@ -489,15 +519,106 @@ pub async fn solver_explain(
     let mut solver = solver.lock().unwrap();
     let round: u32 = session.get("round").unwrap_or(0);
 
+    let cell = parse_cell_literal(&headers)?;
+
+    if solver.explore_enabled {
+        return render_explore_explain(&state, &mut solver, round, cell);
+    }
+
+    let (problem, _lits) = solver.planner.solve_step_for_literal(cell);
+    let ctx = build_solver_stage_context(&problem, round, &solver);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+// ─── Explore mode ───
+
+fn parse_cell_literal(headers: &axum::http::header::HeaderMap) -> anyhow::Result<Vec<i64>> {
     let cell = headers
         .get("x-cell-literal")
         .context("Missing header: 'X-Cell-Literal'")?;
     let cell = cell.to_str()?;
     let cell: Result<Vec<_>, _> = cell.split('_').skip(1).map(str::parse).collect();
-    let cell = cell?;
+    Ok(cell?)
+}
 
-    let (problem, _lits) = solver.solve_step_for_literal(cell);
-    let ctx = build_solver_stage_context(&problem, round);
+fn render_explore_explain(
+    state: &AppState,
+    solver: &mut SolverSession,
+    round: u32,
+    cell: Vec<i64>,
+) -> Result<Html<String>, util::AppError> {
+    let all_muses = solver.planner.all_muses_for_literal(cell);
+    if all_muses.is_empty() {
+        let (problem, _) = solver.planner.refresh_problem();
+        let ctx = build_solver_stage_context(&problem, round, solver);
+        return Ok(Html(state.tera.render("partials/solver_stage.html", &ctx)?));
+    }
+    let problem = solver.planner.preview_mus(&all_muses[0]);
+    solver.explore = Some(ExploreState {
+        all_muses,
+        current_index: 0,
+    });
+    let ctx = build_solver_stage_context(&problem, round, solver);
+    Ok(Html(state.tera.render("partials/solver_stage.html", &ctx)?))
+}
+
+pub async fn solver_explore_toggle(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
+
+    solver.explore_enabled = !solver.explore_enabled;
+    if !solver.explore_enabled {
+        solver.explore = None;
+    }
+
+    let (problem, _lits) = solver.planner.refresh_problem();
+    let ctx = build_solver_stage_context(&problem, round, &solver);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+pub async fn solver_explore_navigate(
+    headers: axum::http::header::HeaderMap,
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
+
+    let direction = headers
+        .get("x-explore-direction")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("next");
+
+    let explore = solver
+        .explore
+        .as_mut()
+        .context("No explore state — click a cell first")?;
+
+    match direction {
+        "prev" => {
+            if explore.current_index > 0 {
+                explore.current_index -= 1;
+            }
+        }
+        _ => {
+            if explore.current_index + 1 < explore.all_muses.len() {
+                explore.current_index += 1;
+            }
+        }
+    }
+
+    let idx = explore.current_index;
+    let mus = solver.explore.as_ref().unwrap().all_muses[idx].clone();
+    let problem = solver.planner.preview_mus(&mus);
+
+    let ctx = build_solver_stage_context(&problem, round, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
     Ok(Html(html))
 }
@@ -695,6 +816,6 @@ pub async fn dump_full_solve(
 ) -> Result<axum::Json<serde_json::Value>, util::AppError> {
     let solver = get_solver_global(&session)?;
     let mut solver = solver.lock().unwrap();
-    let solve = solver.quick_solve();
+    let solve = solver.planner.quick_solve();
     Ok(axum::Json(serde_json::value::to_value(solve).unwrap()))
 }

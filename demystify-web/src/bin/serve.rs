@@ -124,6 +124,12 @@ async fn main() {
         .route("/solver/reset", post(wrap::solver_reset))
         .route("/solver/difficulties", post(wrap::solver_difficulties))
         .route("/solver/explain", post(wrap::solver_explain))
+        // Explore mode
+        .route("/solver/explore/toggle", post(wrap::solver_explore_toggle))
+        .route(
+            "/solver/explore/navigate",
+            post(wrap::solver_explore_navigate),
+        )
         // Upload / example loading
         .route("/upload", post(wrap::upload_files))
         .route("/previewExample", post(wrap::preview_example))

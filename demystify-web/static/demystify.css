@@ -132,6 +132,36 @@ body.he-root {
   border-color: var(--heather-deep);
 }
 
+.he-btn-active {
+  background: var(--warm-soft);
+  border-color: var(--warm);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.he-btn-active:hover {
+  background: var(--warm);
+  color: white;
+}
+
+.he-explore-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--warm-soft);
+  border: 1px solid var(--warm);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.he-explore-btns {
+  display: flex;
+  gap: 0.4rem;
+}
+
 /* ─── Chips ─── */
 
 .chips {

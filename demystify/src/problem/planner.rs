@@ -758,6 +758,86 @@ impl PuzzlePlanner {
         self.build_step_problem(None, "Current puzzle state")
     }
 
+    /// Render a single MUS as a `Problem` for display without advancing solver state.
+    pub fn preview_mus(&mut self, mus: &MusContext) -> Problem {
+        let user_mus = self.mus_to_user_mus(mus);
+        let all_deduced: BTreeSet<_> = user_mus.0.clone();
+
+        let description_list = vec![DescriptionStatement {
+            result: PuzLit::nice_puzlit_list_html(&user_mus.0),
+            constraints: user_mus.1.iter().map(|s| tera::escape_html(s)).collect(),
+        }];
+
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let tosolve_varvals: BTreeSet<_> = varlits
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .map(super::PuzLit::varval)
+            .collect();
+
+        let known_puzlits: BTreeSet<PuzLit> = self
+            .get_all_known_lits()
+            .iter()
+            .flat_map(|x| self.psolve.lit_to_puzlit(x))
+            .cloned()
+            .collect();
+
+        let pre_string = format!(
+            "Explanation using {} constraint{}:<br/>",
+            mus.mus_len(),
+            if mus.mus_len() == 1 { "" } else { "s" }
+        );
+
+        Problem::new_from_puzzle_and_mus(
+            &self.psolve,
+            &tosolve_varvals,
+            &known_puzlits,
+            &all_deduced,
+            &description_list,
+            &pre_string,
+        )
+        .expect("Cannot make puzzle json")
+    }
+
+    /// Compute all MUSes for a single literal, sorted smallest to largest.
+    pub fn all_muses_for_literal(&mut self, lit_def: Vec<i64>) -> Vec<MusContext> {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let lit_def_clone = lit_def.clone();
+        let varlits: BTreeSet<_> = varlits
+            .into_iter()
+            .filter(|lit| {
+                let puzlit_list = self.psolve.lit_to_puzlit(lit);
+                for puzlit in puzlit_list {
+                    let mut indices = puzlit.var().indices().clone();
+                    indices.push(puzlit.val());
+                    if indices == lit_def_clone {
+                        return true;
+                    }
+                }
+                false
+            })
+            .collect();
+
+        let mut conf = self.config.mus_config;
+        conf.find_bigger = true;
+        conf.find_one = false;
+        conf.keep_all_muses = true;
+
+        let result = self
+            .psolve
+            .get_many_vars_small_mus_quick(&varlits, &conf, None);
+
+        let mut seen = BTreeSet::new();
+        let mut all: Vec<MusContext> = result
+            .muses()
+            .values()
+            .flat_map(|set| set.iter().cloned())
+            .filter(|mc| seen.insert(mc.mus.clone()))
+            .collect();
+        all.sort_by_key(|mc| mc.mus_len());
+        all
+    }
+
     pub fn solve_step_for_literal(&mut self, lit_def: Vec<i64>) -> (Problem, Vec<Lit>) {
         let muses = self.filtered_muses(Box::new(move |lit, planner| {
             let puzlit_list = planner.solver().lit_to_puzlit(lit);
