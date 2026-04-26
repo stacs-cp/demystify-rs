@@ -15,7 +15,7 @@ find grid : matrix indexed by [D,D] of D
 $#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"
 find row_alldiff: matrix indexed by [D,D,D,D] of bool
 
-$#CON con_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same column"
+$#CON con_alldiff "cells ({{index[1]}},{{index[0]}}) and ({{index[2]}},{{index[0]}}) cannot both be {{index[3]}} as they are in the same column"
 find con_alldiff: matrix indexed by [D,D,D,D] of bool
 
 $#CON box_alldiff "cells ({{1+3*index[0]+index[2]}},{{1+3*index[1]+index[3]}}) and ({{1+3*index[0]+index[4]}},{{1+3*index[1]+index[5]}}) cannot both be {{index[6]}} as they are in the same box"

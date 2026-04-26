@@ -514,6 +514,51 @@ impl PuzzleParse {
             }
         }
 
+        // Remove constraints whose clause sets are identical to an earlier constraint.
+        {
+            let (cnf, _) = self.satinstance.clone().into_cnf();
+            let con_neg_lits: HashSet<Lit> = self.conset_lits.iter().map(|l| -*l).collect();
+
+            let mut con_to_clauses: BTreeMap<Lit, BTreeSet<Vec<Lit>>> = BTreeMap::new();
+            for clause in &cnf {
+                let clause_lits: Vec<Lit> = clause.iter().copied().collect();
+                for &lit in &clause_lits {
+                    if con_neg_lits.contains(&lit) {
+                        let con_lit = -lit;
+                        let mut filtered: Vec<Lit> =
+                            clause_lits.iter().filter(|&&l| l != lit).copied().collect();
+                        filtered.sort();
+                        con_to_clauses.entry(con_lit).or_default().insert(filtered);
+                    }
+                }
+            }
+
+            let mut seen_clause_sets: HashSet<BTreeSet<Vec<Lit>>> = HashSet::new();
+            let mut to_remove: Vec<Lit> = Vec::new();
+            for con_lit in &self.conset_lits {
+                if let Some(clause_set) = con_to_clauses.get(con_lit)
+                    && !seen_clause_sets.insert(clause_set.clone())
+                {
+                    to_remove.push(*con_lit);
+                }
+            }
+
+            if !to_remove.is_empty() {
+                eprintln!(
+                    "Removing {} duplicate constraints (of {} total)",
+                    to_remove.len(),
+                    self.conset_lits.len()
+                );
+                for lit in &to_remove {
+                    self.conset_lits.remove(lit);
+                    if let Some(name) = self.conset.remove(lit) {
+                        self.invconset.remove(&name);
+                    }
+                    self.varlits_in_con.remove(lit);
+                }
+            }
+        }
+
         Ok(())
     }
 

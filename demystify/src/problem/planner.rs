@@ -298,12 +298,20 @@ impl PuzzlePlanner {
         if muses.is_empty() {
             return muses;
         }
+
+        for mus in &muses {
+            let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
+            for lit in &mus.lits {
+                self.psolve.verify_mus(*lit, &mus_cons);
+            }
+        }
         let muses = merge_muscontexts(&muses);
         if muses[0].mus_len() as i64 <= self.config.merge_small_threshold {
             return muses;
         }
         if self.config.expand_to_all_deductions {
-            vec![self.psolve.get_all_lits_solved_by_mus(&muses[0])]
+            let expanded = self.psolve.get_all_lits_solved_by_mus(&muses[0]);
+            vec![expanded]
         } else {
             vec![muses[0].clone()]
         }
@@ -433,6 +441,13 @@ impl PuzzlePlanner {
                 }
                 MusMethod::Mus => (self.smallest_muses_with_config(), 0),
             };
+
+            for mus in &muses {
+                let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
+                for lit in &mus.lits {
+                    self.psolve.verify_mus_provability(*lit, &mus_cons);
+                }
+            }
 
             for mus in &muses {
                 for lit in &mus.lits {
@@ -674,6 +689,13 @@ impl PuzzlePlanner {
                 .flat_map(|mc| &mc.lits)
                 .copied()
                 .collect_vec();
+
+            for mc in &base_muses {
+                let mus_cons: Vec<Lit> = mc.mus.iter().copied().collect();
+                for lit in &mc.lits {
+                    self.psolve.verify_mus_provability(*lit, &mus_cons);
+                }
+            }
 
             // Snapshot tosolve BEFORE marking deduced, so eliminated
             // candidates remain visible (rendered with litneg).

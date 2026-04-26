@@ -260,17 +260,13 @@ impl PuzzleSolver {
             litorig.insert(lit);
         }
 
-        let provable: BTreeSet<_> = candidates
+        candidates
             .iter()
             .filter_map(|&lit| {
-                // This literal should be provable, so we invert it for testing
                 let lit = !lit;
                 if !(self.knownlits.contains(&lit) || self.knownlits.contains(&!lit)) {
                     let mut lits = litorig.iter().copied().collect_vec();
                     lits.push(lit);
-                    // No limit: a MUS is an unsat core, so determining which
-                    // literals it proves is always a well-defined question
-                    // with a definite answer.
                     if !self
                         .get_satcore()
                         .assumption_solve_no_limit(self.get_known_lits(), &lits)
@@ -280,9 +276,7 @@ impl PuzzleSolver {
                 }
                 None
             })
-            .collect();
-
-        provable
+            .collect()
     }
 
     /// Returns all literals in the scope of a MUS.
@@ -353,7 +347,21 @@ impl PuzzleSolver {
     pub fn get_all_lits_solved_by_mus(&mut self, mc: &MusContext) -> MusContext {
         let candidates = self.get_all_lits_in_scope_for_mus(mc);
         let filtered = self.get_varlits_provable_by_mus(&candidates, mc);
-        MusContext::new_with_more_lits(filtered, mc)
+        let result = MusContext::new_with_more_lits(filtered.clone(), mc);
+
+        if cfg!(debug_assertions) {
+            let mus_cons: Vec<Lit> = result.mus.iter().copied().collect();
+            for &lit in &mc.lits {
+                self.verify_mus(lit, &mus_cons);
+            }
+            for &lit in &filtered {
+                if !mc.lits.contains(&lit) {
+                    self.verify_mus_provability(lit, &mus_cons);
+                }
+            }
+        }
+
+        result
     }
 
     /// Generate a random solution.  Does not enforce uniqueness, only existence:
@@ -701,6 +709,73 @@ impl PuzzleSolver {
         } else {
             // Treat a solver timeout as 'no MUS'
             false
+        }
+    }
+
+    pub fn verify_mus_provability(&self, target_lit: Lit, mus_cons: &[Lit]) {
+        let fresh_core =
+            SatCore::new(self.puzzleparse.cnf.clone().unwrap()).expect("failed to create SatCore");
+
+        let mut assumps: Vec<Lit> = mus_cons.to_vec();
+        assumps.extend_from_slice(self.get_known_lits());
+        assumps.push(!target_lit);
+
+        let sat = fresh_core.assumption_solve_no_limit(self.get_known_lits(), &assumps);
+        if sat {
+            let target_name: Vec<_> = self
+                .lit_to_puzlit(&target_lit)
+                .iter()
+                .map(|p| format!("{:?}", p))
+                .collect();
+            let con_names: Vec<_> = mus_cons
+                .iter()
+                .map(|c| {
+                    self.puzzleparse()
+                        .conset
+                        .get(c)
+                        .cloned()
+                        .unwrap_or_else(|| format!("unknown({})", c))
+                })
+                .collect();
+            panic!(
+                "MUS verification failed: MUS does not prove {}.\n  Target: {:?}\n  Constraints: {:?}",
+                target_lit, target_name, con_names
+            );
+        }
+    }
+
+    pub fn verify_mus(&self, target_lit: Lit, mus_cons: &[Lit]) {
+        self.verify_mus_provability(target_lit, mus_cons);
+
+        let target_name: Vec<_> = self
+            .lit_to_puzlit(&target_lit)
+            .iter()
+            .map(|p| format!("{:?}", p))
+            .collect();
+        let con_names: Vec<_> = mus_cons
+            .iter()
+            .map(|c| {
+                self.puzzleparse()
+                    .conset
+                    .get(c)
+                    .cloned()
+                    .unwrap_or_else(|| format!("unknown({})", c))
+            })
+            .collect();
+
+        for i in 0..mus_cons.len() {
+            let mut reduced: Vec<Lit> = mus_cons.to_vec();
+            reduced.remove(i);
+            reduced.push(!target_lit);
+
+            let sat = self
+                .get_satcore()
+                .assumption_solve_no_limit(self.get_known_lits(), &reduced);
+            assert!(
+                sat,
+                "MUS is not minimal: removing '{}' still UNSAT for {}.\n  Target: {:?}\n  Constraints: {:?}",
+                con_names[i], target_lit, target_name, con_names
+            );
         }
     }
 

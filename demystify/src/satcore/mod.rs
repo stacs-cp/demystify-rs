@@ -256,10 +256,14 @@ impl SatCore {
             }
         }
 
-        // As we added all 'lits' to 'fixed', if there are more things in 'fixed'
-        // something we don't want is in fixed.
+        // After adding all of `lits`, `fixed` should be exactly `lits`.
+        // If fixed has extra entries, a previous call added lits that are no
+        // longer in the current known set — the solver must be rebooted.
+        assert!(
+            lits.iter().all(|l| fixed.contains(l)),
+            "fix_values: lits contains entries not in fixed (should be impossible after the loop above)"
+        );
         if fixed.len() > lits.len() {
-            eprintln!("Rebooting solver");
             let mut solver = Solver::default();
             solver
                 .add_cnf(self.cnf.as_ref().clone())
@@ -531,7 +535,7 @@ impl SatCore {
         initial_core: Vec<Lit>,
         universe: &[Lit],
         max_size: Option<i64>,
-    ) -> SearchResult<Vec<Lit>> {
+    ) -> SearchResult<Option<Vec<Lit>>> {
         let mut core = initial_core;
         let mut known_core = Vec::new();
         let mut known_size: i64 = 0;
@@ -551,18 +555,24 @@ impl SatCore {
                     {
                         assert!(known_core.len() as i64 == max_size);
                         let core = self.raw_assumption_solve_with_core(&known_core)?;
-                        if let Some(found) = &core {
+                        if let Some(found) = core {
                             assert!(found.len() as i64 == known_size);
+                            return Ok(Some(found));
                         }
-                        return Ok(core.unwrap_or(known_core));
+                        // known_core is SAT: the individually-necessary elements
+                        // came from different core snapshots and don't form a
+                        // valid UNSAT subset together. The real MUS is larger
+                        // than max_size.
+                        return Ok(None);
                     }
                 }
             }
         }
-        Ok(core
-            .into_iter()
-            .filter(|x| universe.contains(x))
-            .collect_vec())
+        Ok(Some(
+            core.into_iter()
+                .filter(|x| universe.contains(x))
+                .collect_vec(),
+        ))
     }
 
     /// Takes a known-unsatisfiable subset and greedily minimises it by trying
@@ -579,7 +589,9 @@ impl SatCore {
         self.fix_values(known);
         let initial = self.raw_assumption_solve_with_core(us)?;
         let core = initial.expect("minimise_us: input must be an unsatisfiable subset");
-        self.greedy_minimise(core, us, max_size)
+        Ok(self
+            .greedy_minimise(core, us, max_size)?
+            .expect("minimise_us: greedy_minimise must succeed (input is UNSAT)"))
     }
 
     /// Finds a minimal unsatisfiable subset (MUS) of literals given a set of known literals.
@@ -602,7 +614,7 @@ impl SatCore {
         let core = self.raw_assumption_solve_with_core(lits)?;
         match core {
             None => Ok(None),
-            Some(core) => Ok(Some(self.greedy_minimise(core, lits, max_size)?)),
+            Some(core) => Ok(self.greedy_minimise(core, lits, max_size)?),
         }
     }
 }
