@@ -808,6 +808,33 @@ impl PuzzleParse {
         BTreeSet::from_iter(puzlits)
     }
 
+    /// Returns the constraint Lits whose scope mentions the variable of the given literal.
+    /// Falls back to all constraints if the variable isn't found.
+    #[must_use]
+    pub fn cons_for_var_lit(&self, lit: &Lit) -> BTreeSet<Lit> {
+        if let Some(puzlits) = self.direct.invlitmap.get(lit) {
+            let target_vars: BTreeSet<PuzVar> = puzlits.iter().map(|pl| pl.var()).collect();
+
+            let mut cons = BTreeSet::new();
+            for &con_lit in self.constraints.lits() {
+                for vl in self.constraints.var_lits(&con_lit) {
+                    if self
+                        .direct_or_ordered_lit_to_varvalpair(vl)
+                        .iter()
+                        .any(|vvp| target_vars.contains(vvp.var()))
+                    {
+                        cons.insert(con_lit);
+                        break;
+                    }
+                }
+            }
+            if !cons.is_empty() {
+                return cons;
+            }
+        }
+        self.constraints.lits().clone()
+    }
+
     pub fn filter_out_constraint(&mut self, con: &str) {
         assert!(
             self.eprime.cons.contains_key(con),

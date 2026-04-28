@@ -716,10 +716,8 @@ impl PuzzleSolver {
     ) -> SearchResult<Vec<Vec<Lit>>> {
         let mut conset = self
             .puzzleparse
-            .constraints
-            .lits()
-            .iter()
-            .copied()
+            .cons_for_var_lit(&lit)
+            .into_iter()
             .collect_vec();
 
         let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(2);
@@ -1237,6 +1235,12 @@ impl PuzzleSolver {
                 crate::stats::record_mus_search(elapsed, outcome, func);
 
                 if let Ok(Some(y)) = ret {
+                    if y.len() <= 1 {
+                        eprintln!(
+                            "WARNING: General MUS search found size-{} MUS for lit {} — should have been caught by size-1 scan (possible scoping bug)",
+                            y.len(), x
+                        );
+                    }
                     let bts: BTreeSet<Lit> = y.iter().copied().collect();
                     md.lock().unwrap().add_mus(x, bts);
                 }
