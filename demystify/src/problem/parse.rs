@@ -662,6 +662,10 @@ impl PuzzleParse {
                 let puzlit = PuzLit::new_eq(VarValPair::new(varid, 1));
                 let lit = *self.direct.litmap.get(&puzlit).unwrap();
                 let connections = fvc.get_connections(lit);
+                if connections.is_empty() {
+                    debug!(target: "parser", "Skipping trivial constraint (no variable connections): {}", constraintname);
+                    continue;
+                }
                 info!("MAP {} {:?}", &constraintname, &connections);
                 self.constraints.insert(lit, constraintname, connections)?;
             }
@@ -1372,7 +1376,7 @@ mod tests {
 
         filter1_puz.filter_out_constraint("rowwhite");
 
-        assert_eq!(puz.constraints.len() - filter1_puz.constraints.len(), 6);
+        assert_eq!(puz.constraints.len() - filter1_puz.constraints.len(), 5);
     }
 
     #[test]
@@ -1433,8 +1437,7 @@ mod tests {
             vec![vec!["false", "true"], vec!["true", "false"]]
         );
 
-        assert_eq!(puz.constraints.len(), 4);
-        assert_eq!(puz.constraints.len(), 4);
+        assert_eq!(puz.constraints.len(), 3);
         assert_eq!(puz.var_lits.positive().len(), 4 * 4 * 2); // 4 variables, 4 domain values, 2 pos+neg lits
         let cons = puz.constraint_names();
 

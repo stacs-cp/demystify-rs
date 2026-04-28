@@ -1,7 +1,6 @@
 ---
 source: demystify/src/problem/parse.rs
 expression: scopes
-snapshot_kind: text
 ---
 [
     (
@@ -234,9 +233,5 @@ snapshot_kind: text
                 val: 4,
             },
         },
-    ),
-    (
-        "4<5",
-        {},
     ),
 ]
