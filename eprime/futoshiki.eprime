@@ -33,6 +33,12 @@ find col_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
 $#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"
 find row_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
 
+$#CON row_contains "Row {{index[0]}} must contain a {{index[1]}}"
+find row_contains: matrix indexed by [RANGE,RANGE] of bool
+
+$#CON col_contains "Column {{index[0]}} must contain a {{index[1]}}"
+find col_contains: matrix indexed by [RANGE,RANGE] of bool
+
 $#CON less_than "{% set i = index[0] + 1 %}cell ({{params['lt'][i][1]}},{{params['lt'][i][2]}}), must be less than cell ({{params['lt'][i][3]}},{{params['lt'][i][4]}})"
 find less_than : matrix indexed by [NUMQD] of bool
 
@@ -51,6 +57,14 @@ forAll j:RANGE.
 $ all < constraints are satisfied
     forAll i : NUMQD .
 	less_than[i] -> ( field[ lt[i,0], lt[i,1] ] < field[ lt[i,2], lt[i,3] ] ),
+
+$ each row must contain each value
+forAll i,d : RANGE .
+    row_contains[i,d] -> or([field[i,j]=d | j:RANGE]),
+
+$ each column must contain each value
+forAll j,d : RANGE .
+    col_contains[j,d] -> or([field[i,j]=d | i:RANGE]),
 
 $ set initial values
     forAll row,col : RANGE .

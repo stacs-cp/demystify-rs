@@ -1,0 +1,66 @@
+language ESSENCE' 1.0
+
+$#KIND Jigsaw Sudoku
+
+letting D be domain int(1..9)
+letting Ds be {1,2,3,4,5,6,7,8,9}
+
+$ allowed[i,j,d] = 1 means value d is a candidate for cell (i,j)
+given allowed : matrix indexed by [D,D,D] of int(0..1)
+
+$ regions[i,j] gives the region number (1-9) for cell (i,j)
+given regions : matrix indexed by [D,D] of D
+
+$#VAR grid
+find grid : matrix indexed by [D,D] of D
+
+$#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"
+find row_alldiff: matrix indexed by [D,D,D,D] of bool
+
+$#CON con_alldiff "cells ({{index[1]}},{{index[0]}}) and ({{index[2]}},{{index[0]}}) cannot both be {{index[3]}} as they are in the same column"
+find con_alldiff: matrix indexed by [D,D,D,D] of bool
+
+$#CON region_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[2]}},{{index[3]}}) cannot both be {{index[4]}} as they are in the same region"
+find region_alldiff: matrix indexed by [D,D,D,D,D] of bool
+
+$#CON row_contains "Row {{index[0]}} must contain a {{index[1]}}"
+find row_contains: matrix indexed by [D,D] of bool
+
+$#CON con_contains "Column {{index[0]}} must contain a {{index[1]}}"
+find con_contains: matrix indexed by [D,D] of bool
+
+$#CON region_contains "Region {{index[0]}} must contain a {{index[1]}}"
+find region_contains: matrix indexed by [D,D] of bool
+
+such that
+
+$ eliminate disallowed values
+forAll i,j,d : D.
+    allowed[i,j,d] = 0 -> grid[i,j] != d,
+
+forAll i:D.
+    forAll j1,j2:D. j1 < j2 ->
+        forAll d:D. row_alldiff[i,j1,j2,d] -> !(grid[i,j1] = d /\ grid[i,j2]=d),
+
+forAll i,d:D.
+     row_contains[i,d] -> or([grid[i,j]=d | j:D]),
+
+forAll j:D.
+    forAll i1,i2:D. i1 < i2 ->
+        forAll d:D. con_alldiff[j,i1,i2,d] -> !(grid[i1,j] = d /\ grid[i2,j]=d),
+
+forAll i,d:D.
+     con_contains[i,d] -> or([grid[j,i]=d | j:D]),
+
+$ region all-different: for each pair of cells in the same region
+forAll i1,j1,i2,j2 : D. ((i1-1)*9+(j1-1)) < ((i2-1)*9+(j2-1)) /\ regions[i1,j1] = regions[i2,j2] ->
+    (
+        forAll d : D. region_alldiff[i1,j1,i2,j2,d] ->
+            !(grid[i1,j1] = d /\ grid[i2,j2] = d)
+    ),
+
+$ each region must contain each value
+forAll r,d : D.
+    region_contains[r,d] -> or([grid[i,j] = d | i : D, j : D, regions[i,j] = r]),
+
+1=1
