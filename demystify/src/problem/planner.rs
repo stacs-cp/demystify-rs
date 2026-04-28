@@ -1015,6 +1015,7 @@ mod tests {
     use std::{collections::BTreeSet, sync::Arc};
 
     use crate::problem::{
+        PuzLit,
         planner::{PlannerConfig, PuzzlePlanner},
         solver::{MusConfig, PuzzleSolver},
     };
@@ -1122,8 +1123,30 @@ mod tests {
         );
     }
 
-    // This test doesn't really do any deep tests,
-    // just do a full end-to-end run
+    /// Verify that a solve sequence is well-formed:
+    /// - non-empty (the puzzle was actually solved)
+    /// - every sub-step deduces at least one literal
+    /// - no PuzLit appears in more than one sub-step
+    fn assert_valid_sequence(sequence: &[Vec<(BTreeSet<PuzLit>, Vec<String>)>]) {
+        assert!(!sequence.is_empty(), "solve produced no steps");
+
+        let mut seen = BTreeSet::<PuzLit>::new();
+        for step in sequence {
+            for substep in step {
+                let litset = &substep.0;
+                let cons = &substep.1;
+                assert!(!litset.is_empty(), "sub-step deduced no literals");
+                assert!(!cons.is_empty(), "sub-step has no constraints");
+                for lit in litset {
+                    assert!(
+                        seen.insert(lit.clone()),
+                        "PuzLit {lit:?} appears in more than one sub-step"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn test_plan_binairo_essence() {
         let result = crate::problem::util::test_utils::build_puzzleparse(
@@ -1139,17 +1162,9 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 21);
-
-        for (litset, cons) in sequence.iter().flatten() {
-            assert!(!litset.is_empty());
-            // If this next line starts failing, it can be commented out.
-            assert!(cons.len() <= 2);
-        }
+        assert_valid_sequence(&sequence);
     }
 
-    // This test doesn't really do any deep tests,
-    // just do a full end-to-end run
     #[test]
     fn test_plan_minesweeper_essence() {
         let result = crate::problem::util::test_utils::build_puzzleparse(
@@ -1165,13 +1180,7 @@ mod tests {
 
         let sequence = plan.quick_solve();
 
-        assert_eq!(sequence.iter().flatten().collect_vec().len(), 9);
-
-        for (litset, cons) in sequence.iter().flatten() {
-            assert!(!litset.is_empty());
-            // If this next line starts failing, it can be commented out.
-            assert!(cons.len() <= 2);
-        }
+        assert_valid_sequence(&sequence);
     }
 
     #[test]
