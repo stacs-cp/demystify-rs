@@ -1,4 +1,5 @@
 use anyhow::Context;
+use axum::body::Body;
 use axum::extract::{Multipart, State};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum_session::{Session, SessionNullPool};
@@ -11,6 +12,7 @@ use anyhow::anyhow;
 
 use crate::util::{
     self, AppState, ExploreState, SolverSession, get_solver_global, set_solver_global,
+    set_solver_global_session,
 };
 
 use demystify::json::{Problem, Statement};
@@ -842,6 +844,56 @@ fn load_model(
     let plan = PuzzlePlanner::new(puz);
     set_solver_global(session, plan);
     Ok(())
+}
+
+// ─── Export / import ───
+
+pub async fn solver_export(session: Session<SessionNullPool>) -> Result<Response, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let solver = solver.lock().unwrap();
+
+    let snapshot = solver.export_snapshot()?;
+    let json = serde_json::to_string_pretty(&snapshot).context("Failed to serialize session")?;
+
+    Ok(Response::builder()
+        .header("Content-Type", "application/json")
+        .header(
+            "Content-Disposition",
+            "attachment; filename=\"demystify-session.json\"",
+        )
+        .body(Body::from(json))
+        .unwrap())
+}
+
+pub async fn solver_import(
+    session: Session<SessionNullPool>,
+    mut multipart: Multipart,
+) -> Result<Response, util::AppError> {
+    let mut json_data: Option<Vec<u8>> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .context("Failed to parse multipart upload")?
+    {
+        let name = field.name().unwrap_or("");
+        if name == "session_file" {
+            let data = field.bytes().await.context("Failed to read file bytes")?;
+            json_data = Some(data.to_vec());
+        }
+    }
+
+    let json_data = json_data.context("No session file uploaded")?;
+    let snapshot: util::SessionSnapshot =
+        serde_json::from_slice(&json_data).context("Invalid session JSON")?;
+
+    let solver_session = util::import_snapshot(snapshot)?;
+    let round = solver_session.history.len().saturating_sub(1) as u32;
+
+    set_solver_global_session(&session, solver_session);
+    session.set("round", round);
+
+    Ok(Redirect::to("/solver").into_response())
 }
 
 // ─── Legacy compatibility: old JSON full-solve endpoint ───

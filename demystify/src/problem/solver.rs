@@ -12,6 +12,8 @@ use rustsat::types::Lit;
 use thread_local::ThreadLocal;
 use tracing::info;
 
+use serde::{Deserialize, Serialize};
+
 use crate::problem::musdict::MusContext;
 use crate::{
     problem::{PuzVar, VarValPair},
@@ -21,7 +23,7 @@ use crate::{
 use super::{PuzLit, musdict::MusDict, parse::PuzzleParse};
 
 /// The strategy to use when finding a minimal unsatisfiable subset (MUS)
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum Strategy {
     /// Uses a quick algorithm that may find larger MUSes
     Quick,
@@ -34,7 +36,7 @@ pub enum Strategy {
     Dynamic,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct MusConfig {
     pub base_size_mus: i64,
     pub mus_add_step: i64,
@@ -80,7 +82,7 @@ impl MusConfig {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 pub struct SolverConfig {
     pub only_assignments: bool,
 }

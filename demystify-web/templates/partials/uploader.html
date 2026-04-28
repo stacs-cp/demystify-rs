@@ -21,5 +21,13 @@
       </div>
       <button type="submit" class="he-btn primary" style="margin-top:0.75rem;">Upload &amp; solve &rarr;</button>
     </form>
+
+    <hr style="margin:1.5rem 0; border:none; border-top:1px solid var(--rule);">
+    <h3>Import a saved session</h3>
+    <form method="post" action="/solver/import" enctype="multipart/form-data"
+          style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+      <input type="file" name="session_file" accept=".json" required>
+      <button type="submit" class="he-btn">Import &rarr;</button>
+    </form>
   {% endif %}
 </div>

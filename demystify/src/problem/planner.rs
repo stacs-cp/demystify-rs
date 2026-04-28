@@ -4,6 +4,7 @@ use std::sync::Arc;
 use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
@@ -20,10 +21,10 @@ use super::{
     PuzLit,
     musdict::MusDict,
     parse::PuzzleParse,
-    solver::{MusConfig, PuzzleSolver},
+    solver::{MusConfig, PuzzleSolver, SolverConfig},
 };
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, clap::ValueEnum)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize, clap::ValueEnum)]
 pub enum MusMethod {
     /// Raw SAT cores only: get cores for all lits, minimise the smallest.
     Core,
@@ -35,7 +36,7 @@ pub enum MusMethod {
     CorePlusMus,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct PlannerConfig {
     pub mus_config: MusConfig,
     pub merge_small_threshold: i64,
@@ -1006,6 +1007,14 @@ impl PuzzlePlanner {
 
     pub fn puzzle_arc(&self) -> Arc<PuzzleParse> {
         self.psolve.puzzleparse_arc()
+    }
+
+    pub fn planner_config(&self) -> PlannerConfig {
+        self.config
+    }
+
+    pub fn solver_config(&self) -> SolverConfig {
+        self.psolve.solver_config()
     }
 
     pub fn fork(&self) -> anyhow::Result<PuzzlePlanner> {
