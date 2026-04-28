@@ -18,6 +18,7 @@ tarpaulin-report.html
 out.html
 out*.sat
 etc/example-outputs/
+bench-results/
 
 # IDE and editor files
 *.swp

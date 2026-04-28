@@ -1,41 +1,20 @@
 #!/usr/bin/env bash
-# Core-guided vs standard MUS experiment.
-#
-# For each puzzle category, runs instances 01–20 with both --mus-method mus
-# (standard) and --mus-method core (core-guided).
-#
-# Results go to $OUTDIR (default /tmp/bench-cores-experiment/).
-# Each run produces three files:
-#   <name>-<NN>.<method>.{stdout,stderr,time}
-# where <method> is "standard" or "core".
-#
-# Usage:
-#   bash scripts/bench-experiment.sh              # full run
-#   bash scripts/bench-experiment.sh --dry-run    # print what would run
+# Run remaining benchmark categories + re-run futoshiki 9x9 with updated model.
+# Sources the run_one/run_category functions from bench-experiment.sh.
 
 set -eu
 
-OUTDIR="${BENCH_OUTDIR:-/tmp/bench-cores-experiment}"
+export BENCH_OUTDIR="${BENCH_OUTDIR:-/tmp/bench-cores-experiment}"
+EPRIME="eprime"
+
+# Inline the helpers from bench-experiment.sh
 INSTANCES="01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20"
-DRY_RUN=false
-[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
-
-mkdir -p "$OUTDIR"
-
 BINARY="$(cd "$(dirname "$0")/.." && pwd)/target/release/demystify"
-
-if [ "$DRY_RUN" = false ]; then
-    cargo build --release --bin demystify
-    if [ ! -x "$BINARY" ]; then
-        echo "ERROR: $BINARY not found after build" >&2
-        exit 1
-    fi
-fi
 
 run_one() {
     local name="$1"
     local instance="$2"
-    local method="$3"   # "standard", "core", or "core+mus"
+    local method="$3"
     local model="$4"
     local param="$5"
     local extra="${6:-}"
@@ -48,15 +27,8 @@ run_one() {
     esac
 
     local tag="${name}-${instance}.${method}"
-    local outfile="$OUTDIR/$tag"
+    local outfile="$BENCH_OUTDIR/$tag"
 
-    if [ "$DRY_RUN" = true ]; then
-        echo "  $tag: $BINARY --model $model --param $param $method_flag --log progress $extra"
-        return
-    fi
-
-    # Use /usr/bin/time to capture CPU time and max RSS.
-    # On macOS: -l gives detailed stats; on Linux: -v.
     local time_flag="-l"
     [ "$(uname)" = "Linux" ] && time_flag="-v"
 
@@ -65,17 +37,14 @@ run_one() {
         $method_flag --log progress $extra \
         > "${outfile}.stdout" 2> "${outfile}.stderr" || true
 
-    # Extract wall/user/sys times from the time output at the end of stderr.
     python3 -c "
 import re, sys
 text = open('${outfile}.stderr').read()
-# macOS /usr/bin/time -l format
 wall = re.search(r'([\d.]+)\s+real', text)
 user = re.search(r'([\d.]+)\s+user', text)
 syst = re.search(r'([\d.]+)\s+sys', text)
 rss  = re.search(r'(\d+)\s+maximum resident set size', text)
 if not wall:
-    # Linux /usr/bin/time -v format
     wall = re.search(r'Elapsed.*?:\s*([\d:.]+)', text)
     user = re.search(r'User time.*?:\s*([\d.]+)', text)
     syst = re.search(r'System time.*?:\s*([\d.]+)', text)
@@ -85,7 +54,6 @@ if wall: d['wall'] = wall.group(1)
 if user: d['user'] = user.group(1)
 if syst: d['sys']  = syst.group(1)
 if rss:  d['rss_kb'] = rss.group(1)
-# Phase timings from demystify itself
 conj = re.search(r'conjure/savilerow completed in ([\d.]+)s', text)
 setup = re.search(r'parse setup completed in ([\d.]+)s', text)
 solve = re.search(r'solve completed in ([\d.]+)s', text)
@@ -101,13 +69,13 @@ run_category() {
     local name="$1"
     local model="$2"
     local param_dir="$3"
-    local param_pattern="$4"  # e.g. "6x6-easy"
+    local param_pattern="$4"
     local extra="${5:-}"
 
     echo -n "  ${name}-${param_pattern} "
     for nn in $INSTANCES; do
         local param="${param_dir}/${param_pattern}-${nn}.param"
-        if [ ! -f "$param" ] && [ "$DRY_RUN" = false ]; then
+        if [ ! -f "$param" ]; then
             echo -n "?"
             continue
         fi
@@ -119,22 +87,8 @@ run_category() {
     echo " done"
 }
 
-EPRIME="eprime"
-
-echo "=== Binairo (6x6, 10x10, 20x20) ==="
-for diff in 6x6-easy 6x6-hard 10x10-easy 10x10-hard 20x20-easy 20x20-hard; do
-    run_category binairo "$EPRIME/binairo.essence" "$EPRIME/binairo/puzzle-binairo-com" "$diff" "--only-assign"
-done
-
-echo ""
-echo "=== Sudoku (all difficulties) ==="
-for diff in basic easy intermediate advanced extreme evil; do
-    run_category sudoku "$EPRIME/sudoku.eprime" "$EPRIME/sudoku/puzzle-sudoku-com" "$diff"
-done
-
-echo ""
-echo "=== Futoshiki (4x4, 5x5, 9x9) ==="
-for diff in 4x4-easy 5x5-easy 5x5-normal 5x5-hard 9x9-easy 9x9-normal 9x9-hard; do
+echo "=== Re-running Futoshiki 9x9 (updated model with contains constraints) ==="
+for diff in 9x9-easy 9x9-normal 9x9-hard; do
     run_category futoshiki "$EPRIME/futoshiki.eprime" "$EPRIME/futoshiki/puzzle-futoshiki-com" "$diff"
 done
 
@@ -157,17 +111,5 @@ for diff in 6x6-easy 6x6-hard 10x10-easy 10x10-hard; do
 done
 
 echo ""
-echo "=== Futoshiki --only-assign (4x4, 5x5, 9x9) ==="
-for diff in 4x4-easy 5x5-easy 5x5-normal 5x5-hard 9x9-easy 9x9-normal 9x9-hard; do
-    run_category futoshiki-oa "$EPRIME/futoshiki.eprime" "$EPRIME/futoshiki/puzzle-futoshiki-com" "$diff" "--only-assign"
-done
-
-echo ""
-echo "=== Tents --only-assign (6x6, 10x10) ==="
-for diff in 6x6-easy 6x6-hard 10x10-easy 10x10-hard; do
-    run_category tents-oa "$EPRIME/tents.eprime" "$EPRIME/tents/puzzle-tents-com" "$diff" "--only-assign"
-done
-
-echo ""
-echo "All experiments done. Results in $OUTDIR"
-echo "Generate table: python3 scripts/bench-table.py $OUTDIR"
+echo "All remaining experiments done."
+echo "Generate table: python3 scripts/bench-table.py $BENCH_OUTDIR --plain"

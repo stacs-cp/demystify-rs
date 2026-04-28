@@ -43,13 +43,48 @@ CLASSES = [
         "6x6-easy", "6x6-hard",
         "10x10-easy", "10x10-hard",
     ]),
+    ("Futoshiki-OA", "futoshiki-oa", [
+        "4x4-easy",
+        "5x5-easy", "5x5-normal", "5x5-hard",
+        "9x9-easy", "9x9-normal", "9x9-hard",
+    ]),
+    ("Tents-OA", "tents-oa", [
+        "6x6-easy", "6x6-hard",
+        "10x10-easy", "10x10-hard",
+    ]),
 ]
 
 
-def read_time(path):
+def read_times(path):
+    """Read the key=value time file. Returns dict with wall, user, sys, rss_kb."""
+    d = {}
     try:
-        return float(open(path).read().strip())
-    except (FileNotFoundError, ValueError):
+        for line in open(path):
+            line = line.strip()
+            if "=" in line:
+                k, v = line.split("=", 1)
+                d[k] = v
+    except FileNotFoundError:
+        pass
+    # Also handle old-format single-number files.
+    if not d:
+        try:
+            d["wall"] = open(path).read().strip()
+        except (FileNotFoundError, ValueError):
+            pass
+    return d
+
+
+def parse_seconds(s):
+    """Parse a time string like '1.23' or '1:23.45' into seconds."""
+    if s is None:
+        return None
+    try:
+        if ":" in s:
+            parts = s.split(":")
+            return float(parts[0]) * 60 + float(parts[1])
+        return float(s)
+    except ValueError:
         return None
 
 
@@ -64,20 +99,51 @@ def max_mus_size(stderr_path):
     return max(sizes) if sizes else None
 
 
+def step_count(stderr_path):
+    try:
+        text = open(stderr_path).read()
+    except FileNotFoundError:
+        return None
+    steps = re.findall(r"(\d+) steps,", text)
+    return int(steps[-1]) + 1 if steps else None
+
+
 def collect(outdir, prefix, diff, method):
-    """Collect times and max-MUS-sizes across instances 01–20."""
-    times = []
+    """Collect times, CPU times, and max-MUS-sizes across instances 01–20."""
+    wall_times = []
+    cpu_times = []
     mus_maxes = []
+    steps_list = []
+    conjure_times = []
+    setup_times = []
+    solve_times = []
     for i in range(1, 21):
         nn = f"{i:02d}"
         tag = f"{prefix}-{diff}-{nn}.{method}"
-        t = read_time(os.path.join(outdir, f"{tag}.time"))
+        d = read_times(os.path.join(outdir, f"{tag}.time"))
+        w = parse_seconds(d.get("wall"))
+        u = parse_seconds(d.get("user"))
+        s = parse_seconds(d.get("sys"))
         m = max_mus_size(os.path.join(outdir, f"{tag}.stderr"))
-        if t is not None:
-            times.append(t)
+        sc = step_count(os.path.join(outdir, f"{tag}.stderr"))
+        tc = parse_seconds(d.get("t_conjure"))
+        ts = parse_seconds(d.get("t_setup"))
+        tv = parse_seconds(d.get("t_solve"))
+        if w is not None:
+            wall_times.append(w)
+        if u is not None and s is not None:
+            cpu_times.append(u + s)
         if m is not None:
             mus_maxes.append(m)
-    return times, mus_maxes
+        if sc is not None:
+            steps_list.append(sc)
+        if tc is not None:
+            conjure_times.append(tc)
+        if ts is not None:
+            setup_times.append(ts)
+        if tv is not None:
+            solve_times.append(tv)
+    return wall_times, cpu_times, mus_maxes, steps_list, conjure_times, setup_times, solve_times
 
 
 def mean_or_none(xs):
@@ -100,22 +166,28 @@ def fmt_mus(m):
     return f"{m:.1f}"
 
 
+METHODS = ["standard", "core", "core+mus"]
+
+
 def generate(outdir):
     rows = []
     for class_name, prefix, difficulties in CLASSES:
         class_rows = []
         for diff in difficulties:
-            st, sm = collect(outdir, prefix, diff, "standard")
-            ct, cm = collect(outdir, prefix, diff, "core")
-            n_found = len(st)
-            class_rows.append((
-                diff,
-                mean_or_none(st),
-                mean_or_none(ct),
-                mean_or_none(sm),
-                mean_or_none(cm),
-                n_found,
-            ))
+            row = {"diff": diff}
+            for method in METHODS:
+                wt, ct, mm, sc, conj, stp, slv = collect(outdir, prefix, diff, method)
+                row[method] = {
+                    "wall": mean_or_none(wt),
+                    "cpu": mean_or_none(ct),
+                    "max_mus": mean_or_none(mm),
+                    "steps": mean_or_none(sc),
+                    "t_conjure": mean_or_none(conj),
+                    "t_setup": mean_or_none(stp),
+                    "t_solve": mean_or_none(slv),
+                    "n": len(wt),
+                }
+            class_rows.append(row)
         rows.append((class_name, class_rows))
     return rows
 
@@ -124,24 +196,31 @@ def latex(rows):
     lines = []
     lines.append(r"\begin{table}[t]")
     lines.append(r"\centering")
-    lines.append(r"\caption{Comparison of standard MUS search vs.\ raw SAT cores"
-                 r" (mean over 20 instances, 50-step cap).}")
-    lines.append(r"\label{tab:core-comparison}")
-    lines.append(r"\begin{tabular}{ll rr rr}")
+    lines.append(r"\caption{Comparison of MUS methods"
+                 r" (mean over 20 instances).}")
+    lines.append(r"\label{tab:mus-comparison}")
+    lines.append(r"\begin{tabular}{ll rrr rrr}")
     lines.append(r"\toprule")
-    lines.append(r" & & \multicolumn{2}{c}{Time (s)} & \multicolumn{2}{c}{Max MUS size} \\")
-    lines.append(r"\cmidrule(lr){3-4} \cmidrule(lr){5-6}")
-    lines.append(r"Class & Difficulty & Standard & Core & Standard & Core \\")
+    lines.append(r" & & \multicolumn{3}{c}{CPU time (s)}"
+                 r" & \multicolumn{3}{c}{Max MUS size} \\")
+    lines.append(r"\cmidrule(lr){3-5} \cmidrule(lr){6-8}")
+    lines.append(r"Class & Difficulty"
+                 r" & MUS & Core & C+M"
+                 r" & MUS & Core & C+M \\")
     lines.append(r"\midrule")
 
     for i, (class_name, class_rows) in enumerate(rows):
         if i > 0:
             lines.append(r"\addlinespace")
-        for j, (diff, nt, ct, nm, cm, n) in enumerate(class_rows):
+        for j, row in enumerate(class_rows):
             label = class_name if j == 0 else ""
+            s = row.get("standard", {})
+            c = row.get("core", {})
+            h = row.get("core+mus", {})
             lines.append(
-                f"  {label} & {diff} & {fmt_time(nt)} & {fmt_time(ct)}"
-                f" & {fmt_mus(nm)} & {fmt_mus(cm)} \\\\"
+                f"  {label} & {row['diff']}"
+                f" & {fmt_time(s.get('cpu'))} & {fmt_time(c.get('cpu'))} & {fmt_time(h.get('cpu'))}"
+                f" & {fmt_mus(s.get('max_mus'))} & {fmt_mus(c.get('max_mus'))} & {fmt_mus(h.get('max_mus'))} \\\\"
             )
 
     lines.append(r"\bottomrule")
@@ -152,16 +231,33 @@ def latex(rows):
 
 def plain(rows):
     lines = []
-    hdr = (f"{'Class':<12} {'Difficulty':<14} {'N-time':>7} {'C-time':>7}"
-           f"   {'N-max':>6} {'C-max':>6}  {'n':>3}")
+    hdr = (f"{'Class':<12} {'Difficulty':<14}"
+           f" {'Conj':>6} {'Setup':>6}"
+           f" {'MUS-s':>7} {'Core-s':>7} {'C+M-s':>7}"
+           f" {'MUS-w':>7} {'Core-w':>7} {'C+M-w':>7}"
+           f" {'MUS-c':>7} {'Core-c':>7} {'C+M-c':>7}"
+           f" {'MUS-m':>6} {'Core-m':>6} {'C+M-m':>6}"
+           f" {'n':>3}")
     lines.append(hdr)
     lines.append("-" * len(hdr))
     for class_name, class_rows in rows:
-        for j, (diff, nt, ct, nm, cm, n) in enumerate(class_rows):
+        for j, row in enumerate(class_rows):
             label = class_name if j == 0 else ""
+            s = row.get("standard", {})
+            c = row.get("core", {})
+            h = row.get("core+mus", {})
+            n = max(s.get("n", 0), c.get("n", 0), h.get("n", 0))
+            # conjure/setup are the same across methods; take from whichever has data
+            t_conj = s.get("t_conjure") or c.get("t_conjure") or h.get("t_conjure")
+            t_setup = s.get("t_setup") or c.get("t_setup") or h.get("t_setup")
             lines.append(
-                f"{label:<12} {diff:<14} {fmt_time(nt):>7} {fmt_time(ct):>7}"
-                f"   {fmt_mus(nm):>6} {fmt_mus(cm):>6}  {n:>3}"
+                f"{label:<12} {row['diff']:<14}"
+                f" {fmt_time(t_conj):>6} {fmt_time(t_setup):>6}"
+                f" {fmt_time(s.get('t_solve')):>7} {fmt_time(c.get('t_solve')):>7} {fmt_time(h.get('t_solve')):>7}"
+                f" {fmt_time(s.get('wall')):>7} {fmt_time(c.get('wall')):>7} {fmt_time(h.get('wall')):>7}"
+                f" {fmt_time(s.get('cpu')):>7} {fmt_time(c.get('cpu')):>7} {fmt_time(h.get('cpu')):>7}"
+                f" {fmt_mus(s.get('max_mus')):>6} {fmt_mus(c.get('max_mus')):>6} {fmt_mus(h.get('max_mus')):>6}"
+                f" {n:>3}"
             )
         lines.append("")
     return "\n".join(lines)
