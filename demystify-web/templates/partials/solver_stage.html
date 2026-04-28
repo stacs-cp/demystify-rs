@@ -121,6 +121,23 @@
       </div>
     </div>
 
+    {% if history_len > 1 %}
+    <div class="he-paper he-mini">
+      <h4>History</h4>
+      <div class="he-history">
+        {% for i in range(end=history_len) %}
+        <button class="he-hist-btn {% if i == round %}active{% endif %}"
+                hx-post="/solver/goto"
+                hx-target="#solver-stage"
+                hx-swap="outerHTML"
+                hx-vals='{"step": {{ i }}}'>
+          {{ i }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if techniques | length > 0 %}
     <div class="he-paper he-mini">
       <h4>Constraint types</h4>

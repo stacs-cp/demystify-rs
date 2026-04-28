@@ -129,6 +129,7 @@ async fn main() {
         // htmx partial routes
         .route("/solver/advance", post(wrap::solver_advance))
         .route("/solver/reset", post(wrap::solver_reset))
+        .route("/solver/goto", post(wrap::solver_goto))
         .route("/solver/difficulties", post(wrap::solver_difficulties))
         .route("/solver/explain", post(wrap::solver_explain))
         // Explore mode

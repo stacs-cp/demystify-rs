@@ -1297,6 +1297,11 @@ impl PuzzleSolver {
     pub fn puzzleparse_arc(&self) -> Arc<PuzzleParse> {
         self.puzzleparse.clone()
     }
+
+    #[must_use]
+    pub fn solver_config(&self) -> SolverConfig {
+        self.solver_config
+    }
 }
 
 #[cfg(test)]

@@ -1008,6 +1008,19 @@ impl PuzzlePlanner {
         self.psolve.puzzleparse_arc()
     }
 
+    pub fn fork(&self) -> anyhow::Result<PuzzlePlanner> {
+        let solver = PuzzleSolver::fork_with_known_lits(
+            self.psolve.puzzleparse_arc(),
+            self.psolve.get_known_lits(),
+            self.psolve.solver_config(),
+        )?;
+        Ok(PuzzlePlanner {
+            psolve: solver,
+            config: self.config,
+            mus_cache: self.mus_cache.clone(),
+        })
+    }
+
     /// Returns a mutable reference to the solver. Warning, incorrect use of underlying
     /// solver can result in incorrect answers.
     pub fn solver(&mut self) -> &mut PuzzleSolver {

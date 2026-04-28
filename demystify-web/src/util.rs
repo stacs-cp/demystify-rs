@@ -27,15 +27,34 @@ pub struct SolverSession {
     pub planner: PuzzlePlanner,
     pub explore: Option<ExploreState>,
     pub explore_enabled: bool,
+    pub history: Vec<PuzzlePlanner>,
 }
 
 impl SolverSession {
     pub fn new(planner: PuzzlePlanner) -> Self {
+        let snapshot = planner
+            .fork()
+            .expect("Failed to fork initial planner state");
         Self {
             planner,
             explore: None,
             explore_enabled: false,
+            history: vec![snapshot],
         }
+    }
+
+    pub fn snapshot(&mut self) {
+        let snapshot = self.planner.fork().expect("Failed to fork planner state");
+        self.history.push(snapshot);
+    }
+
+    pub fn goto_step(&mut self, step: usize) -> anyhow::Result<()> {
+        anyhow::ensure!(step < self.history.len(), "Step {step} out of range");
+        self.planner = self.history[step].fork()?;
+        self.history.truncate(step + 1);
+        self.explore = None;
+        self.explore_enabled = false;
+        Ok(())
     }
 }
 

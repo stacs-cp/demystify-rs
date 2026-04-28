@@ -387,6 +387,8 @@ fn build_solver_stage_context(
     let puzzle_info: Vec<String> = problem.puzzle.info.as_ref().cloned().unwrap_or_default();
     ctx.insert("puzzle_info", &puzzle_info);
 
+    ctx.insert("history_len", &session.history.len());
+
     ctx.insert("explore_mode", &session.explore_enabled);
     if let Some(ref explore) = session.explore {
         ctx.insert("explore_active", &true);
@@ -481,6 +483,7 @@ pub async fn solver_advance(
     round += 1;
     session.set("round", round);
 
+    solver.snapshot();
     let (problem, _lits) = solver.planner.solve_step();
     let ctx = build_solver_stage_context(&problem, round, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
@@ -497,6 +500,28 @@ pub async fn solver_reset(
 
     let (problem, _lits) = solver.planner.refresh_problem();
     let ctx = build_solver_stage_context(&problem, round, &solver);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+#[derive(Deserialize)]
+pub struct StepParam {
+    step: usize,
+}
+
+pub async fn solver_goto(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+    form: axum::extract::Form<StepParam>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+
+    solver.goto_step(form.step)?;
+    session.set("round", form.step as u32);
+
+    let (problem, _lits) = solver.planner.refresh_problem();
+    let ctx = build_solver_stage_context(&problem, form.step as u32, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
     Ok(Html(html))
 }
@@ -522,13 +547,18 @@ pub async fn solver_explain(
 ) -> Result<Html<String>, util::AppError> {
     let solver = get_solver_global(&session)?;
     let mut solver = solver.lock().unwrap();
-    let round: u32 = session.get("round").unwrap_or(0);
 
     let cell = parse_cell_literal(&headers)?;
 
     if solver.explore_enabled {
+        let round: u32 = session.get("round").unwrap_or(0);
         return render_explore_explain(&state, &mut solver, round, cell);
     }
+
+    solver.snapshot();
+    let mut round: u32 = session.get("round").unwrap_or(0);
+    round += 1;
+    session.set("round", round);
 
     let (problem, _lits) = solver.planner.solve_step_for_literal(cell);
     let ctx = build_solver_stage_context(&problem, round, &solver);

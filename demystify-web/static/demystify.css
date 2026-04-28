@@ -1026,6 +1026,34 @@ body:has(#solver-stage.htmx-request) {
   margin: 0.5rem 0;
 }
 
+/* ─── Step history ─── */
+
+.he-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.he-hist-btn {
+  min-width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-mid);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.he-hist-btn:hover { background: var(--mist); }
+.he-hist-btn.active {
+  background: var(--heather);
+  color: white;
+  border-color: var(--heather);
+}
+
 /* ─── Responsive ─── */
 
 /* ─── Solve tree page ─── */
