@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use itertools::Itertools;
 use rayon::iter::{ParallelBridge, ParallelIterator};
@@ -1001,6 +1002,10 @@ impl PuzzlePlanner {
     /// A reference to the `PuzzleParse` instance representing the puzzle being solved.
     pub fn puzzle(&self) -> &PuzzleParse {
         self.psolve.puzzleparse()
+    }
+
+    pub fn puzzle_arc(&self) -> Arc<PuzzleParse> {
+        self.psolve.puzzleparse_arc()
     }
 
     /// Returns a mutable reference to the solver. Warning, incorrect use of underlying

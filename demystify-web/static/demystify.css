@@ -1028,6 +1028,121 @@ body:has(#solver-stage.htmx-request) {
 
 /* ─── Responsive ─── */
 
+/* ─── Solve tree page ─── */
+
+.st-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.st-controls {
+  margin-bottom: 1.5rem;
+}
+
+.st-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.st-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-mid);
+}
+
+.st-status {
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.st-status.loading { color: var(--heather); }
+.st-status.error { color: #8b2020; }
+
+.st-canvas-wrap {
+  position: relative;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper);
+  min-height: 500px;
+  overflow: hidden;
+}
+
+.st-canvas-wrap svg {
+  display: block;
+  width: 100%;
+  height: 600px;
+}
+
+.st-detail {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  max-width: 360px;
+  max-height: 80%;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  z-index: 10;
+}
+
+.st-detail h4 {
+  font-family: var(--display);
+  font-size: 0.95rem;
+  margin: 0 0 0.4rem;
+}
+
+.st-detail p {
+  margin: 0 0 0.3rem;
+  color: var(--ink-mid);
+}
+
+.st-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
+.st-tag.terminal {
+  background: var(--sage);
+  color: white;
+}
+
+.st-edges {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+}
+
+.st-edges li {
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-mid);
+}
+
+.st-edges li:first-child { border-top: none; }
+.st-edges li.merged { color: var(--warm); font-weight: 500; }
+.st-edges li.merged ul { font-weight: 400; color: var(--ink-mid); padding-left: 1rem; }
+
+.st-stats {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-mid);
+  text-align: center;
+  padding: 0.75rem;
+}
+
+.st-stats strong { color: var(--ink); }
+
+/* ─── Responsive ─── */
+
 @media (max-width: 900px) {
   .he-solver-grid {
     grid-template-columns: 1fr;
@@ -1040,5 +1155,13 @@ body:has(#solver-stage.htmx-request) {
   }
   .he-insp-grid {
     grid-template-columns: 1fr;
+  }
+  .st-form {
+    flex-direction: column;
+  }
+  .st-detail {
+    position: static;
+    max-width: none;
+    margin-top: 1rem;
   }
 }

@@ -1,0 +1,236 @@
+{% extends "layout.html" %}
+{% block title %}Demystify — solve tree{% endblock title %}
+{% block content %}
+<div class="st-page">
+  <section class="he-paper st-controls">
+    <h3>Solve Tree Explorer</h3>
+    <p class="desc">Explore all solving paths through a puzzle by branching on every distinct minimum-sized MUS.</p>
+
+    <div class="st-form">
+      <label>
+        Merge strategy
+        <select id="stMerge" class="he-btn">
+          <option value="none" selected>None</option>
+          <option value="greedy">Greedy</option>
+          <option value="minimal">Minimal</option>
+        </select>
+      </label>
+      <label>
+        Merge MUS size &le;
+        <input id="stMergeSize" type="number" class="he-btn" value="1" min="0" max="99" style="width:5rem;">
+      </label>
+      <button id="stBuild" class="he-btn primary">Build tree</button>
+    </div>
+    <div id="stStatus" class="st-status"></div>
+  </section>
+
+  <section class="st-canvas-wrap">
+    <svg id="stCanvas"></svg>
+    <div id="stDetail" class="he-paper st-detail" style="display:none;"></div>
+  </section>
+
+  <section id="stStats" class="he-paper st-stats" style="display:none;"></section>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+(function() {
+  const btn = document.getElementById('stBuild');
+  const status = document.getElementById('stStatus');
+  const canvas = document.getElementById('stCanvas');
+  const detail = document.getElementById('stDetail');
+  const statsEl = document.getElementById('stStats');
+
+  btn.addEventListener('click', async () => {
+    const merge = document.getElementById('stMerge').value;
+    const mergeSize = document.getElementById('stMergeSize').value;
+
+    btn.disabled = true;
+    status.textContent = 'Building solve tree… (this may take a while)';
+    status.className = 'st-status loading';
+    detail.style.display = 'none';
+    statsEl.style.display = 'none';
+
+    try {
+      const resp = await fetch('/solvetree/build', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `merge_strategy=${merge}&merge_mus_size=${mergeSize}`
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || resp.statusText);
+      }
+      const data = await resp.json();
+      status.textContent = '';
+      status.className = 'st-status';
+      renderTree(data);
+      showStats(data.stats);
+    } catch(e) {
+      status.textContent = 'Error: ' + e.message;
+      status.className = 'st-status error';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function showStats(s) {
+    statsEl.style.display = '';
+    statsEl.innerHTML =
+      `<strong>${s.total_nodes}</strong> nodes &middot; ` +
+      `<strong>${s.total_edges}</strong> edges &middot; ` +
+      `max depth <strong>${s.max_depth}</strong> &middot; ` +
+      `<strong>${s.terminal_nodes}</strong> terminal &middot; ` +
+      `<strong>${s.merged_edges}</strong> merged &middot; ` +
+      `<strong>${s.lattice_hits}</strong> lattice hits`;
+  }
+
+  function renderTree(data) {
+    d3.select(canvas).selectAll('*').remove();
+
+    const wrap = canvas.parentElement;
+    const W = wrap.clientWidth;
+    const H = Math.max(500, wrap.clientHeight);
+    d3.select(canvas).attr('width', W).attr('height', H);
+
+    const maxDepth = data.stats.max_depth || 1;
+
+    const depthColor = d3.scaleSequential(d3.interpolateViridis).domain([0, maxDepth]);
+
+    const maxMus = d3.max(data.nodes, d => d.min_mus_count) || 1;
+    const nodeSize = d3.scaleSqrt().domain([0, maxMus]).range([4, 16]);
+
+    const sim = d3.forceSimulation(data.nodes)
+      .force('link', d3.forceLink(data.links).id(d => d.id).distance(50).strength(0.3))
+      .force('charge', d3.forceManyBody().strength(-120))
+      .force('x', d3.forceX(W / 2).strength(0.05))
+      .force('y', d3.forceY().y(d => 60 + (d.depth / maxDepth) * (H - 120)).strength(0.7))
+      .force('collide', d3.forceCollide(d => nodeSize(d.min_mus_count) + 3));
+
+    // Initialise positions by depth.
+    data.nodes.forEach(d => {
+      d.x = W / 2 + (Math.random() - 0.5) * 100;
+      d.y = 60 + (d.depth / maxDepth) * (H - 120);
+    });
+
+    const g = d3.select(canvas)
+      .append('g');
+
+    d3.select(canvas).call(
+      d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on('zoom', e => g.attr('transform', e.transform))
+    );
+
+    const link = g.append('g')
+      .selectAll('line')
+      .data(data.links)
+      .join('line')
+      .attr('stroke', d => d.merged_count ? 'var(--warm)' : 'var(--ink-soft)')
+      .attr('stroke-width', d => Math.max(1, Math.min(d.deduced_count, 6)))
+      .attr('stroke-dasharray', d => d.merged_count ? '5,3' : null)
+      .attr('stroke-opacity', 0.6);
+
+    const node = g.append('g')
+      .selectAll('g')
+      .data(data.nodes)
+      .join('g')
+      .attr('cursor', 'pointer')
+      .call(d3.drag()
+        .on('start', (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+        .on('end', (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+      );
+
+    // Terminal = square, otherwise circle.
+    node.each(function(d) {
+      const el = d3.select(this);
+      const r = nodeSize(d.min_mus_count);
+      if (d.is_terminal) {
+        el.append('rect')
+          .attr('width', r * 2).attr('height', r * 2)
+          .attr('x', -r).attr('y', -r)
+          .attr('rx', 2)
+          .attr('fill', depthColor(d.depth))
+          .attr('stroke', '#fff').attr('stroke-width', 1.5);
+      } else {
+        el.append('circle')
+          .attr('r', r)
+          .attr('fill', depthColor(d.depth))
+          .attr('stroke', '#fff').attr('stroke-width', 1.5);
+      }
+    });
+
+    // Root indicator.
+    const rootNode = data.nodes.find(d => d.id === data.stats.root_id);
+    if (rootNode) {
+      g.append('circle')
+        .attr('r', nodeSize(rootNode.min_mus_count) + 5)
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--warm)')
+        .attr('stroke-width', 2)
+        .attr('stroke-dasharray', '4,3')
+        .datum(rootNode);
+    }
+
+    node.on('click', (e, d) => {
+      e.stopPropagation();
+      showDetail(d, data.links);
+    });
+
+    d3.select(canvas).on('click', () => { detail.style.display = 'none'; });
+
+    sim.on('tick', () => {
+      link
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y);
+
+      node.attr('transform', d => `translate(${d.x},${d.y})`);
+
+      // Move root indicator.
+      const ri = g.select('circle[stroke-dasharray]');
+      if (rootNode) ri.attr('cx', rootNode.x).attr('cy', rootNode.y);
+    });
+  }
+
+  function showDetail(d, links) {
+    const outEdges = links.filter(l =>
+      (typeof l.source === 'object' ? l.source.id : l.source) === d.id
+    );
+
+    let html = `<h4>Node ${d.id.slice(0,8)}…</h4>`;
+    html += `<p>Depth: ${d.depth} &middot; Remaining: ${d.remaining} &middot; Known: ${d.known_lits_count}</p>`;
+    if (d.is_terminal) {
+      html += `<p class="st-tag terminal">Terminal</p>`;
+    } else {
+      html += `<p>MUSes: ${d.min_mus_count} of size ${d.min_mus_size}</p>`;
+    }
+
+    if (outEdges.length > 0) {
+      html += '<ul class="st-edges">';
+      for (const e of outEdges) {
+        if (e.merged_count) {
+          html += `<li class="merged">Merged ${e.merged_count} MUSes (${e.deduced_count} deductions)`;
+          if (e.merged) {
+            html += '<ul>';
+            for (const m of e.merged) {
+              html += `<li>${m.description}</li>`;
+            }
+            html += '</ul>';
+          }
+          html += '</li>';
+        } else {
+          html += `<li>${e.description}</li>`;
+        }
+      }
+      html += '</ul>';
+    }
+
+    detail.innerHTML = html;
+    detail.style.display = '';
+  }
+})();
+</script>
+{% endblock content %}

@@ -983,7 +983,7 @@ impl PuzzleSolver {
             info!(target: "musdetail", "cake chunk {}/{} lit={:?} bound={} chunk_size={} result={} {:.1?}",
                   i, num_groups, lit, max_size,
                   chunk.len(),
-                  if mus.is_some() { format!("found({})", mus.as_ref().unwrap().len()) } else { "none".to_string() },
+                  if let Some(m) = &mus { format!("found({})", m.len()) } else { "none".to_string() },
                   t0.elapsed());
             if let Some(m) = mus {
                 return Ok(Some(
@@ -1291,6 +1291,11 @@ impl PuzzleSolver {
     #[must_use]
     pub fn puzzleparse(&self) -> &PuzzleParse {
         &self.puzzleparse
+    }
+
+    #[must_use]
+    pub fn puzzleparse_arc(&self) -> Arc<PuzzleParse> {
+        self.puzzleparse.clone()
     }
 }
 

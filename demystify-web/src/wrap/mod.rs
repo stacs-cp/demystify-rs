@@ -14,7 +14,12 @@ use crate::util::{
 };
 
 use demystify::json::{Problem, Statement};
-use demystify::problem::{self, planner::PuzzlePlanner, solver::PuzzleSolver};
+use demystify::problem::{
+    self,
+    planner::PuzzlePlanner,
+    solver::PuzzleSolver,
+    solvetree::{MergeStrategy, SolveTree, SolveTreeConfig},
+};
 use demystify::web::puzsvg::PuzzleDraw;
 
 macro_rules! include_model_file {
@@ -818,4 +823,56 @@ pub async fn dump_full_solve(
     let mut solver = solver.lock().unwrap();
     let solve = solver.planner.quick_solve();
     Ok(axum::Json(serde_json::value::to_value(solve).unwrap()))
+}
+
+// ─── Solve tree ───
+
+pub async fn solvetree_page(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+) -> Result<Response, util::AppError> {
+    if get_solver_global(&session).is_err() {
+        let mut ctx = tera::Context::new();
+        ctx.insert("view", "solvetree");
+        let html = state.tera.render("no_puzzle.html", &ctx)?;
+        return Ok(Html(html).into_response());
+    }
+
+    let mut ctx = tera::Context::new();
+    ctx.insert("view", "solvetree");
+    let html = state.tera.render("solvetree.html", &ctx)?;
+    Ok(Html(html).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct SolveTreeParams {
+    merge_strategy: Option<String>,
+    merge_mus_size: Option<usize>,
+}
+
+pub async fn solvetree_build(
+    session: Session<SessionNullPool>,
+    form: axum::extract::Form<SolveTreeParams>,
+) -> Result<axum::Json<serde_json::Value>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let puzzle = solver.lock().unwrap().planner.puzzle_arc();
+
+    let merge_strategy = match form.merge_strategy.as_deref() {
+        Some("greedy") => MergeStrategy::Greedy,
+        Some("minimal") => MergeStrategy::Minimal,
+        _ => MergeStrategy::None,
+    };
+
+    let config = SolveTreeConfig {
+        merge_strategy,
+        merge_mus_size: form.merge_mus_size.unwrap_or(1),
+        ..SolveTreeConfig::default()
+    };
+
+    let tree = tokio::task::spawn_blocking(move || SolveTree::build(puzzle, &config))
+        .await
+        .context("Tree build task panicked")??;
+
+    let json = tree.to_d3_json();
+    Ok(axum::Json(serde_json::to_value(json)?))
 }

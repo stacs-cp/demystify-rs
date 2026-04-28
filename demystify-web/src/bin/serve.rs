@@ -66,6 +66,13 @@ fn build_templates() -> tera::Tera {
                 "/templates/partials/param_editor.html"
             )),
         ),
+        (
+            "solvetree.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/solvetree.html"
+            )),
+        ),
     ])
     .expect("Failed to load templates");
 
@@ -135,6 +142,9 @@ async fn main() {
         .route("/previewExample", post(wrap::preview_example))
         .route("/submitExample", post(wrap::submit_example))
         .route("/loadExample", post(wrap::load_example_and_redirect))
+        // Solve tree
+        .route("/solvetree", get(wrap::solvetree_page))
+        .route("/solvetree/build", post(wrap::solvetree_build))
         // Legacy JSON endpoint
         .route("/quickFullSolve", post(wrap::dump_full_solve))
         // Static assets
