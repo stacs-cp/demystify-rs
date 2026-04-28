@@ -213,6 +213,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);
+    let t_solve = std::time::Instant::now();
 
     if opt.html {
         let html = planner.quick_solve_html();
@@ -242,6 +243,9 @@ fn main() -> anyhow::Result<()> {
             println!("{p:?}");
         }
     }
+
+    let solve_secs = t_solve.elapsed().as_secs_f64();
+    tracing::info!(target: "progress", "solve completed in {solve_secs:.2}s");
 
     if !opt.quiet {
         print_mus_stats();

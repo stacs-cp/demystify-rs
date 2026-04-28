@@ -299,10 +299,30 @@ impl PuzzlePlanner {
             return muses;
         }
 
-        for mus in &muses {
-            let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
-            for lit in &mus.lits {
-                self.psolve.verify_mus(*lit, &mus_cons);
+        // Re-minimise each MUS: cached MUSes from earlier steps are still
+        // unsatisfiable subsets but may no longer be minimal after new
+        // known_lits were added.
+        let muses: Vec<MusContext> = muses
+            .into_iter()
+            .map(|mc| {
+                let lit = *mc.lits.iter().next().unwrap();
+                let cons: Vec<Lit> = mc.mus.iter().copied().collect();
+                match self.psolve.minimise_core_for_lit(lit, &cons) {
+                    Ok(minimised) => {
+                        let new_mus: BTreeSet<Lit> = minimised.into_iter().collect();
+                        MusContext { mus: new_mus, ..mc }
+                    }
+                    Err(_) => mc,
+                }
+            })
+            .collect();
+
+        if cfg!(debug_assertions) {
+            for mus in &muses {
+                let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
+                for lit in &mus.lits {
+                    self.psolve.verify_mus(*lit, &mus_cons);
+                }
             }
         }
         let muses = merge_muscontexts(&muses);

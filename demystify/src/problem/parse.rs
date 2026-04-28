@@ -1122,8 +1122,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
 }
 
 pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Result<PuzzleParse> {
-    //let mut litmap = BTreeMap::new();
-    //let mut varlist = Vec::new();
+    let t_total = std::time::Instant::now();
 
     let tdir = tempfile::Builder::new()
         .prefix(".demystify-")
@@ -1210,6 +1209,10 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         );
     }
 
+    let conjure_secs = t_total.elapsed().as_secs_f64();
+    info!(target: "progress", "conjure/savilerow completed in {conjure_secs:.2}s");
+    let t_setup = std::time::Instant::now();
+
     let original_input_path = PathBuf::from(&eprime);
 
     // Need to put '.dimacs' on the end in this slightly horrible way.
@@ -1226,6 +1229,10 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     read_dimacs(&in_dimacs_path, &mut eprimeparse).context("reading variable info from dimacs")?;
 
     eprimeparse.finalise().context("finalisation of parsing failed. The most likely reason for this is you gave a puzzle which has no solutions!")?;
+
+    let setup_secs = t_setup.elapsed().as_secs_f64();
+    let total_secs = t_total.elapsed().as_secs_f64();
+    info!(target: "progress", "parse setup completed in {setup_secs:.2}s (total parse: {total_secs:.2}s)");
 
     Ok(eprimeparse)
 }
