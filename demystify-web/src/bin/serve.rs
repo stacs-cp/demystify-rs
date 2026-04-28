@@ -122,6 +122,21 @@ async fn main() {
         };
     }
 
+    macro_rules! serve_static_bytes {
+        ($path:expr, $content_type:expr) => {
+            get(move |_: Request<Body>| async {
+                let content: &'static [u8] =
+                    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), $path));
+                Ok::<_, Infallible>(
+                    Response::builder()
+                        .header("Content-Type", $content_type)
+                        .body(Body::from(content))
+                        .unwrap(),
+                )
+            })
+        };
+    }
+
     let app = Router::new()
         // Page routes
         .route("/", get(wrap::landing))
@@ -143,6 +158,9 @@ async fn main() {
         .route("/previewExample", post(wrap::preview_example))
         .route("/submitExample", post(wrap::submit_example))
         .route("/loadExample", post(wrap::load_example_and_redirect))
+        // Export / import
+        .route("/solver/export", get(wrap::solver_export))
+        .route("/solver/import", post(wrap::solver_import))
         // Solve tree
         .route("/solvetree", get(wrap::solvetree_page))
         .route("/solvetree/build", post(wrap::solvetree_build))
@@ -159,6 +177,36 @@ async fn main() {
                 "/static/demystify.js",
                 "application/javascript; charset=utf-8"
             ),
+        )
+        .route(
+            "/static/vendor/htmx.min.js",
+            serve_static!(
+                "/static/vendor/htmx.min.js",
+                "application/javascript; charset=utf-8"
+            ),
+        )
+        .route(
+            "/static/vendor/d3.v7.min.js",
+            serve_static!(
+                "/static/vendor/d3.v7.min.js",
+                "application/javascript; charset=utf-8"
+            ),
+        )
+        .route(
+            "/static/fonts/fonts.css",
+            serve_static!("/static/fonts/fonts.css", "text/css; charset=utf-8"),
+        )
+        .route(
+            "/static/fonts/inter.woff2",
+            serve_static_bytes!("/static/fonts/inter.woff2", "font/woff2"),
+        )
+        .route(
+            "/static/fonts/fraunces-normal.woff2",
+            serve_static_bytes!("/static/fonts/fraunces-normal.woff2", "font/woff2"),
+        )
+        .route(
+            "/static/fonts/fraunces-italic.woff2",
+            serve_static_bytes!("/static/fonts/fraunces-italic.woff2", "font/woff2"),
         )
         // Legacy static assets (base.css/base.js from demystify core, for CLI compatibility)
         .route(
