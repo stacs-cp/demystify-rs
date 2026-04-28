@@ -543,13 +543,19 @@ impl PuzzleSolver {
         self.tosolvelits = None;
     }
 
-    /// Forces a literal to be true, without checking if
-    /// this can be logically deduced.
-    ///
-    /// # Arguments
-    ///
-    /// * `lit` - The literal to add.
-    fn add_known_lit_unchecked(&mut self, lit: Lit) {
+    pub fn fork_with_known_lits(
+        puzzleparse: Arc<PuzzleParse>,
+        known_lits: &[Lit],
+        solver_config: SolverConfig,
+    ) -> anyhow::Result<PuzzleSolver> {
+        let mut solver = PuzzleSolver::new_with_config(puzzleparse, solver_config)?;
+        for &lit in known_lits {
+            solver.add_known_lit_unchecked(lit);
+        }
+        Ok(solver)
+    }
+
+    pub(crate) fn add_known_lit_unchecked(&mut self, lit: Lit) {
         if self.knownlits.contains(&lit) {
             return;
         }

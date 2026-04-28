@@ -4,6 +4,7 @@ pub mod parse;
 pub mod planner;
 pub mod serialize;
 pub mod solver;
+pub mod solvetree;
 pub mod util;
 
 use std::{
