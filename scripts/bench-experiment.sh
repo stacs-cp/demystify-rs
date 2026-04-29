@@ -17,6 +17,7 @@ set -eu
 
 OUTDIR="${BENCH_OUTDIR:-/tmp/bench-cores-experiment}"
 INSTANCES="01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20"
+EXTRA_ARGS="${BENCH_EXTRA_ARGS:-}"
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
 
@@ -62,7 +63,7 @@ run_one() {
 
     /usr/bin/time $time_flag \
         "$BINARY" --model "$model" --param "$param" \
-        $method_flag --log progress $extra \
+        $method_flag --log progress $EXTRA_ARGS $extra \
         > "${outfile}.stdout" 2> "${outfile}.stderr" || true
 
     # Extract wall/user/sys times from the time output at the end of stderr.

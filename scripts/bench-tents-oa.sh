@@ -6,6 +6,7 @@ OUTDIR="${BENCH_OUTDIR:-/tmp/bench-tents-oa}"
 BINARY="/Users/caj/files/reps/demystify/rust/demystify-rs/target/release/demystify"
 EPRIME="eprime"
 INSTANCES="01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20"
+EXTRA_ARGS="${BENCH_EXTRA_ARGS:-}"
 
 mkdir -p "$OUTDIR"
 
@@ -24,7 +25,7 @@ run_one() {
 
     /usr/bin/time $time_flag \
         "$BINARY" --model "$model" --param "$param" \
-        $method_flag --log progress --only-assign $extra \
+        $method_flag --log progress --only-assign $EXTRA_ARGS $extra \
         > "${outfile}.stdout" 2> "${outfile}.stderr" || true
 
     python3 -c "
