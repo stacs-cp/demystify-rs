@@ -59,6 +59,9 @@ struct Opt {
     #[arg(long, help = "Suppress progress and statistics output on stderr")]
     quiet: bool,
 
+    #[arg(long, help = "Disable expanding a MUS to all literals it can deduce")]
+    no_expand: bool,
+
     #[arg(
         long,
         help = "Emit each solve step as a JSON object (instead of the default debug format)"
@@ -86,8 +89,8 @@ struct Opt {
 
     #[arg(
         long,
-        default_value_t = 1_000_000,
-        help = "Per-SAT-call conflict limit (0 = no limit). Default 1,000,000."
+        default_value_t = 100,
+        help = "Per-SAT-call conflict limit (0 = no limit). Default 100."
     )]
     conflict_limit: i64,
 
@@ -207,7 +210,7 @@ fn main() -> anyhow::Result<()> {
         mus_config,
         merge_small_threshold: opt.merge,
         skip_small_threshold: opt.skip,
-        expand_to_all_deductions: true,
+        expand_to_all_deductions: !opt.no_expand,
         max_steps: opt.max_steps,
         mus_method: opt.mus_method,
     };

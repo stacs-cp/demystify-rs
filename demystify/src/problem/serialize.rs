@@ -268,29 +268,50 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
             .map(i32_to_lit)
             .collect::<Result<_>>()?;
 
+        let direct = parse::DirectEncoding {
+            litmap: s
+                .litmap
+                .into_iter()
+                .map(|(k, v)| Ok((k, i32_to_lit(v)?)))
+                .collect::<Result<_>>()?,
+            invlitmap: s
+                .invlitmap
+                .into_iter()
+                .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+                .collect::<Result<_>>()?,
+            domainmap: s.domainmap.into_iter().collect(),
+        };
+        let constraints =
+            parse::ConstraintStore::from_raw(conset, invconset, varlits_in_con, conset_lits);
+        let order = parse::OrderEncoding {
+            map: s
+                .order_encoding_map
+                .into_iter()
+                .map(|(k, v)| {
+                    let lits: Result<HashSet<Lit>> = v.into_iter().map(i32_to_lit).collect();
+                    Ok((k, lits?))
+                })
+                .collect::<Result<_>>()?,
+            inv_map: s
+                .inv_order_encoding_map
+                .into_iter()
+                .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+                .collect::<Result<_>>()?,
+            all_lits: s
+                .order_encoding_all_lits
+                .into_iter()
+                .map(i32_to_lit)
+                .collect::<Result<_>>()?,
+        };
+
+        let var_to_cons = parse::PuzzleParse::build_var_to_cons(&constraints, &direct, &order);
+
         Ok(Self {
             eprime: s.eprime.into(),
             satinstance,
             cnf: Some(Arc::new(cnf)),
-            direct: parse::DirectEncoding {
-                litmap: s
-                    .litmap
-                    .into_iter()
-                    .map(|(k, v)| Ok((k, i32_to_lit(v)?)))
-                    .collect::<Result<_>>()?,
-                invlitmap: s
-                    .invlitmap
-                    .into_iter()
-                    .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
-                    .collect::<Result<_>>()?,
-                domainmap: s.domainmap.into_iter().collect(),
-            },
-            constraints: parse::ConstraintStore::from_raw(
-                conset,
-                invconset,
-                varlits_in_con,
-                conset_lits,
-            ),
+            direct,
+            constraints,
             var_lits: parse::VarLitSets::from_raw(
                 s.varset_lits
                     .into_iter()
@@ -305,31 +326,13 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
                     .map(i32_to_lit)
                     .collect::<Result<_>>()?,
             ),
-            order: parse::OrderEncoding {
-                map: s
-                    .order_encoding_map
-                    .into_iter()
-                    .map(|(k, v)| {
-                        let lits: Result<HashSet<Lit>> = v.into_iter().map(i32_to_lit).collect();
-                        Ok((k, lits?))
-                    })
-                    .collect::<Result<_>>()?,
-                inv_map: s
-                    .inv_order_encoding_map
-                    .into_iter()
-                    .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
-                    .collect::<Result<_>>()?,
-                all_lits: s
-                    .order_encoding_all_lits
-                    .into_iter()
-                    .map(i32_to_lit)
-                    .collect::<Result<_>>()?,
-            },
+            order,
             reveal_map: s
                 .reveal_map
                 .into_iter()
                 .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, i32_to_lit(v)?)))
                 .collect::<Result<_>>()?,
+            var_to_cons,
         })
     }
 }

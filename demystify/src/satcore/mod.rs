@@ -128,10 +128,17 @@ pub struct SatCore {
 // Solvers can sometimes time out, so we add a conflict limit.
 // We also set a 'counter', which checks if the solver is frequently hitting it's limit, if so
 // we increase the limit
-static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
+static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(100);
 /// Upper bound on the auto-ramp conflict limit — prevents overflow on very long runs.
 const MAX_CONFLICT_LIMIT: i64 = 100_000_000;
-static CONFLICT_COUNT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+/// Number of limited SAT calls since the last ramp check.
+static LIMITED_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+/// Number of interrupted calls since the last ramp check.
+static LIMITED_INTERRUPTED: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+/// Warmup period: wait this many limited calls before checking the interrupt ratio.
+const RAMP_WARMUP: i64 = 100;
+/// If the interrupt ratio exceeds this threshold, multiply the limit by 10.
+const RAMP_THRESHOLD: f64 = 0.10;
 static SOLVER_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
 // --- Diagnostic timers for `_no_limit` path.
@@ -292,6 +299,7 @@ impl SatCore {
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
         solver.clear_conflict_limit();
         crate::stats::record_sat_call(call_duration, conflicts_delta, solve);
+        Self::warn_long_call(call_duration, conflicts_delta, &solve, lits, "no_limit");
         solve
     }
 
@@ -313,47 +321,51 @@ impl SatCore {
         solver.clear_conflict_limit();
 
         crate::stats::record_sat_call(call_duration, conflicts_delta, solve);
+        Self::warn_long_call(call_duration, conflicts_delta, &solve, lits, "limited");
 
         if matches!(solve, SolverResult::Interrupted) {
-            //eprintln!("SAT solver limit tripped");
-            // This code may well have some race conditions, but
-            // if we are in this situation, I don't mind if we
-            // end up increasing the limit even more than intended,
-            // as long as it is increased, and the counter reset.
-            let count = CONFLICT_COUNT.fetch_add(1, Relaxed);
-            if count > 1000 {
+            LIMITED_INTERRUPTED.fetch_add(1, Relaxed);
+        }
+        let total = LIMITED_CALLS.fetch_add(1, Relaxed) + 1;
+        if total >= RAMP_WARMUP {
+            let interrupted = LIMITED_INTERRUPTED.load(Relaxed);
+            let ratio = interrupted as f64 / total as f64;
+            if ratio >= RAMP_THRESHOLD {
                 let limit = CONFLICT_LIMIT.load(Relaxed);
-                eprintln!(
-                    "Warning: The puzzle is hard to solve, increasing limits in SAT solver from {} to {}",
-                    limit,
-                    limit * 10
-                );
-                CONFLICT_LIMIT.store(
-                    (CONFLICT_LIMIT.load(Relaxed) * 10).min(MAX_CONFLICT_LIMIT),
-                    Relaxed,
-                );
-                CONFLICT_COUNT.store(0, Relaxed);
-            } else {
-                let _ = CONFLICT_COUNT.fetch_update(Relaxed, Relaxed, |count| {
-                    if count > 0 { Some(count - 1) } else { Some(0) }
-                });
+                let new_limit = (limit * 10).min(MAX_CONFLICT_LIMIT);
+                if new_limit > limit {
+                    eprintln!(
+                        "Auto-ramp: {interrupted}/{total} calls interrupted ({:.0}%), increasing conflict limit from {limit} to {new_limit}",
+                        ratio * 100.0,
+                    );
+                    CONFLICT_LIMIT.store(new_limit, Relaxed);
+                }
+                LIMITED_CALLS.store(0, Relaxed);
+                LIMITED_INTERRUPTED.store(0, Relaxed);
             }
         }
 
         solve
     }
 
-    /// Solves the CNF formula with the given assumption and known
-    /// values.
-    ///
-    /// # Arguments
-    ///
-    /// * `known` - Literal known to be true
-    /// * `lits` - The assumptions to use during solving.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the formula is satisfiable, `false` if it is unsatisfiable.
+    const LONG_CALL_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(10);
+
+    fn warn_long_call(
+        duration: std::time::Duration,
+        conflicts: usize,
+        result: &SolverResult,
+        lits: &[Lit],
+        path: &str,
+    ) {
+        if duration >= Self::LONG_CALL_THRESHOLD {
+            eprintln!(
+                "LONG SAT call ({path}): {:.1}s, {conflicts} conflicts, result={result:?}, assumptions={} lits",
+                duration.as_secs_f64(),
+                lits.len(),
+            );
+        }
+    }
+
     pub fn assumption_solve(&self, known: &[Lit], lits: &[Lit]) -> SearchResult<bool> {
         let t0 = std::time::Instant::now();
         self.fix_values(known);

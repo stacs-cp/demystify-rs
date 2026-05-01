@@ -327,13 +327,26 @@ impl PuzzlePlanner {
                 }
             }
         }
+
+        // Re-minimisation may have shrunk some MUSes below the original
+        // minimum. Re-filter to the new minimum size.
+        let new_min = muses.iter().map(|mc| mc.mus_len()).min().unwrap();
+        let muses: Vec<MusContext> = muses
+            .into_iter()
+            .filter(|mc| mc.mus_len() == new_min)
+            .collect();
+
         let muses = merge_muscontexts(&muses);
         if muses[0].mus_len() as i64 <= self.config.merge_small_threshold {
             return muses;
         }
         if self.config.expand_to_all_deductions {
-            let expanded = self.psolve.get_all_lits_solved_by_mus(&muses[0]);
-            vec![expanded]
+            let best = muses
+                .iter()
+                .map(|mc| self.psolve.get_all_lits_solved_by_mus(mc))
+                .max_by_key(|mc| mc.lits.len())
+                .unwrap();
+            vec![best]
         } else {
             vec![muses[0].clone()]
         }

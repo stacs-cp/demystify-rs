@@ -507,6 +507,7 @@ pub struct PuzzleParse {
     pub var_lits: VarLitSets,
     pub order: OrderEncoding,
     pub reveal_map: BTreeMap<Lit, Lit>,
+    pub(crate) var_to_cons: BTreeMap<PuzVar, BTreeSet<Lit>>,
 }
 
 impl PuzzleParse {
@@ -539,6 +540,7 @@ impl PuzzleParse {
             var_lits: VarLitSets::new(),
             order: OrderEncoding::new(),
             reveal_map: BTreeMap::new(),
+            var_to_cons: BTreeMap::new(),
         }
     }
 
@@ -712,7 +714,30 @@ impl PuzzleParse {
             }
         }
 
+        self.var_to_cons = Self::build_var_to_cons(&self.constraints, &self.direct, &self.order);
+
         Ok(())
+    }
+
+    pub fn build_var_to_cons(
+        constraints: &ConstraintStore,
+        direct: &DirectEncoding,
+        order: &OrderEncoding,
+    ) -> BTreeMap<PuzVar, BTreeSet<Lit>> {
+        let mut var_to_cons: BTreeMap<PuzVar, BTreeSet<Lit>> = BTreeMap::new();
+        for &con_lit in constraints.lits() {
+            for vl in constraints.var_lits(&con_lit) {
+                if let Some(puzlits) = direct.invlitmap.get(vl) {
+                    for pl in puzlits {
+                        var_to_cons.entry(pl.var()).or_default().insert(con_lit);
+                    }
+                }
+                if let Some(var) = order.inv_map.get(vl) {
+                    var_to_cons.entry(var.clone()).or_default().insert(con_lit);
+                }
+            }
+        }
+        var_to_cons
     }
 
     #[must_use]
@@ -817,19 +842,10 @@ impl PuzzleParse {
     #[must_use]
     pub fn cons_for_var_lit(&self, lit: &Lit) -> BTreeSet<Lit> {
         if let Some(puzlits) = self.direct.invlitmap.get(lit) {
-            let target_vars: BTreeSet<PuzVar> = puzlits.iter().map(|pl| pl.var()).collect();
-
             let mut cons = BTreeSet::new();
-            for &con_lit in self.constraints.lits() {
-                for vl in self.constraints.var_lits(&con_lit) {
-                    if self
-                        .direct_or_ordered_lit_to_varvalpair(vl)
-                        .iter()
-                        .any(|vvp| target_vars.contains(vvp.var()))
-                    {
-                        cons.insert(con_lit);
-                        break;
-                    }
+            for pl in puzlits {
+                if let Some(con_lits) = self.var_to_cons.get(&pl.var()) {
+                    cons.extend(con_lits);
                 }
             }
             if !cons.is_empty() {
