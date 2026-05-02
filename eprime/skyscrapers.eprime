@@ -53,6 +53,8 @@ find row_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
 $#CON clues_left_on "the count for {{['left','top','right','bottom'] | nth(n=(index[0]-1))}} {{index[1]}} is {{params['side_labels'][index[0]][index[1]]}}"
 find clues_left_on : matrix indexed by [int(1..4),RANGE] of bool
 
+$#FAMILY line_alldiff "Line all-different" row_alldiff "Row" col_alldiff "Column"
+
 $#AUX max_left
 find max_left : matrix indexed by [int(1..4),RANGE, VALUES] of VALUES
 

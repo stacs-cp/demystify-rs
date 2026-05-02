@@ -42,6 +42,9 @@ find col_contains: matrix indexed by [RANGE,RANGE] of bool
 $#CON less_than "{% set i = index[0] + 1 %}cell ({{params['lt'][i][1]}},{{params['lt'][i][2]}}), must be less than cell ({{params['lt'][i][3]}},{{params['lt'][i][4]}})"
 find less_than : matrix indexed by [NUMQD] of bool
 
+$#FAMILY line_alldiff "Line all-different" row_alldiff "Row" col_alldiff "Column"
+$#FAMILY line_contains "Line contains"     row_contains "Row" col_contains "Column"
+
 such that
 
 $ all columns have to be different

@@ -35,6 +35,12 @@ $ columns sum up, and down, to starcount
 find blockup: matrix indexed by [griddim] of bool
 find blockdown: matrix indexed by [griddim] of bool
 
+$ Group the per-region "at least starcount" / "at most starcount" atoms by
+$ region kind (row / column / block) and by direction (up / down).
+$#FAMILY unit_up   "Unit at-least"  rowup   "Row" colup   "Column" blockup   "Block"
+$#FAMILY unit_down "Unit at-most"   rowdown "Row" coldown "Column" blockdown "Block"
+$#FAMILY line_up   "Line at-least"  rowup   "Row" colup   "Column"
+$#FAMILY line_down "Line at-most"   rowdown "Row" coldown "Column"
 
 such that
 forAll i,j: griddim. forAll k: int(0..1). forAll l: int(-1..1). $ We only need to check 4 directions (we do backwards and the downwards)

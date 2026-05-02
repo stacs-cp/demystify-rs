@@ -35,6 +35,14 @@ find alldiffrow: matrix indexed by [ndim, ndim] of bool
 $#CON alldiffcol "cols {{index[0]}} and {{index[1]}} must be different"
 find alldiffcol: matrix indexed by [ndim, ndim] of bool
 
+$ Group by axis (row vs column) so MUS fingerprints can surface "Row" /
+$ "Column" orientation prefixes; subgroup by colour where useful.
+$#FAMILY line_white   "Line white-half" rowwhite      "Row" colwhite      "Column"
+$#FAMILY line_black   "Line black-half" rowblack      "Row" colblack      "Column"
+$#FAMILY line_match_w "Line no-three-white" rowmatchwhite "Row" colmatchwhite "Column"
+$#FAMILY line_match_b "Line no-three-black" rowmatchblack "Row" colmatchblack "Column"
+$#FAMILY line_alldiff "Line all-different"  alldiffrow    "Row" alldiffcol    "Column"
+
 such that
 
 forAll i,j: ndim.(

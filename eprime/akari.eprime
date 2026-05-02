@@ -50,6 +50,8 @@ $ Constraint: each numbered black cell has exactly the required number of adjace
 $#CON clue "numbered cell ({{index[0]}},{{index[1]}}) requires exactly {{params['start_grid'][index[0]][index[1]]}} adjacent bulb(s)"
 find clue : matrix indexed by [int(1..height), int(1..width)] of bool
 
+$#FAMILY line_no_two "Line no-two-bulbs" no_two_row "Row" no_two_col "Column"
+
 such that
 
 $ Bulbs can only be placed in white cells
