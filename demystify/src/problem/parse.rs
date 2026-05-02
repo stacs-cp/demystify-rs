@@ -54,6 +54,25 @@ pub struct EPrimeAnnotations {
     pub info: Vec<String>,
     /// SVG decoration flags collected from $#DEC directives
     pub decs: Vec<String>,
+    /// Constraint-family groups collected from $#FAMILY directives.
+    /// Maps a group id to the `Family` describing its label and its members
+    /// (each member is a constraint-family prefix — the part before `[` in a
+    /// constraint name — together with a group-relative human label).
+    /// A constraint family may belong to multiple groups.
+    pub families: BTreeMap<String, Family>,
+}
+
+/// A family-group declared by a `$#FAMILY` directive. Carries human-readable
+/// labels that are *group-relative*: the same member id (e.g. `row_alldiff`)
+/// can have different labels in different groups depending on what the group
+/// abstracts over.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Family {
+    /// Group-level human label (defaults to the group id when not given).
+    pub label: String,
+    /// Member id → group-relative member label.  Member labels default to
+    /// the member id when not given.
+    pub members: BTreeMap<String, String>,
 }
 
 impl EPrimeAnnotations {
@@ -277,6 +296,11 @@ pub struct ConstraintStore {
     conset: BTreeMap<Lit, String>,
     invconset: BTreeMap<String, Lit>,
     varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
+    /// Constraint-family root name (e.g. `row_alldiff`) for each constraint
+    /// lit.  This is the `$#CON` declaration name without index substitution
+    /// — needed by the named-strategy fingerprinter to identify families,
+    /// since the rendered `description` is template-substituted free text.
+    family_of: BTreeMap<Lit, String>,
     lits: BTreeSet<Lit>,
 }
 
@@ -287,6 +311,7 @@ impl ConstraintStore {
             conset: BTreeMap::new(),
             invconset: BTreeMap::new(),
             varlits_in_con: BTreeMap::new(),
+            family_of: BTreeMap::new(),
             lits: BTreeSet::new(),
         }
     }
@@ -294,11 +319,13 @@ impl ConstraintStore {
     pub fn insert(
         &mut self,
         lit: Lit,
+        family: String,
         description: String,
         var_lits: Vec<Lit>,
     ) -> anyhow::Result<()> {
         safe_insert(&mut self.conset, lit, description.clone())?;
         safe_insert(&mut self.invconset, description, lit)?;
+        safe_insert(&mut self.family_of, lit, family)?;
         self.lits.insert(lit);
         safe_insert(&mut self.varlits_in_con, lit, var_lits)?;
         Ok(())
@@ -310,6 +337,7 @@ impl ConstraintStore {
             self.invconset.remove(&name);
         }
         self.varlits_in_con.remove(lit);
+        self.family_of.remove(lit);
     }
 
     pub fn retain(&mut self, mut f: impl FnMut(&Lit) -> bool) {
@@ -333,6 +361,18 @@ impl ConstraintStore {
     #[must_use]
     pub fn try_description(&self, lit: &Lit) -> Option<&String> {
         self.conset.get(lit)
+    }
+
+    /// Constraint-family root name for a lit (e.g. `"row_alldiff"`), or
+    /// `None` if the lit is not in the store.
+    #[must_use]
+    pub fn family_of(&self, lit: &Lit) -> Option<&String> {
+        self.family_of.get(lit)
+    }
+
+    /// Iterate over `(lit, family-root-name)` pairs.
+    pub fn families(&self) -> impl Iterator<Item = (&Lit, &String)> {
+        self.family_of.iter()
     }
 
     #[must_use]
@@ -375,12 +415,14 @@ impl ConstraintStore {
         conset: BTreeMap<Lit, String>,
         invconset: BTreeMap<String, Lit>,
         varlits_in_con: BTreeMap<Lit, Vec<Lit>>,
+        family_of: BTreeMap<Lit, String>,
         lits: BTreeSet<Lit>,
     ) -> Self {
         Self {
             conset,
             invconset,
             varlits_in_con,
+            family_of,
             lits,
         }
     }
@@ -512,6 +554,7 @@ pub struct PuzzleParse {
 
 impl PuzzleParse {
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn new_from_eprime(
         vars: BTreeSet<String>,
         auxvars: BTreeSet<String>,
@@ -520,6 +563,7 @@ impl PuzzleParse {
         params: BTreeMap<String, serde_json::value::Value>,
         kind: Option<String>,
         info: Vec<String>,
+        families: BTreeMap<String, Family>,
     ) -> PuzzleParse {
         PuzzleParse {
             eprime: EPrimeAnnotations {
@@ -532,6 +576,7 @@ impl PuzzleParse {
                 kind,
                 info,
                 decs: vec![],
+                families,
             },
             satinstance: SatInstance::new(),
             cnf: None,
@@ -669,7 +714,8 @@ impl PuzzleParse {
                     continue;
                 }
                 info!("MAP {} {:?}", &constraintname, &connections);
-                self.constraints.insert(lit, constraintname, connections)?;
+                self.constraints
+                    .insert(lit, varid.name().clone(), constraintname, connections)?;
             }
         }
 
@@ -894,6 +940,7 @@ impl PuzzleParse {
     }
 }
 
+#[derive(Debug)]
 struct ParsedEprimeData {
     vars: BTreeSet<String>,
     auxvars: BTreeSet<String>,
@@ -902,6 +949,114 @@ struct ParsedEprimeData {
     kind: Option<String>,
     info: Vec<String>,
     decs: Vec<String>,
+    families: BTreeMap<String, Family>,
+}
+
+#[derive(Debug, PartialEq)]
+enum FamilyToken {
+    Bare(String),
+    Quoted(String),
+}
+
+/// Tokenise a `$#FAMILY` body, distinguishing bare identifiers from
+/// double-quoted labels.  No escape sequences are supported inside quotes
+/// (an embedded `"` ends the string).  Whitespace separates tokens.
+fn tokenize_family_body(s: &str) -> anyhow::Result<Vec<FamilyToken>> {
+    let mut out = Vec::new();
+    let mut chars = s.chars().peekable();
+    loop {
+        while chars.peek().is_some_and(|c| c.is_whitespace()) {
+            chars.next();
+        }
+        match chars.peek() {
+            None => break,
+            Some(&'"') => {
+                chars.next();
+                let mut buf = String::new();
+                let mut closed = false;
+                for c in chars.by_ref() {
+                    if c == '"' {
+                        closed = true;
+                        break;
+                    }
+                    buf.push(c);
+                }
+                if !closed {
+                    bail!("unterminated quoted string in $#FAMILY directive");
+                }
+                out.push(FamilyToken::Quoted(buf));
+            }
+            Some(_) => {
+                let mut buf = String::new();
+                while let Some(&c) = chars.peek() {
+                    if c.is_whitespace() || c == '"' {
+                        break;
+                    }
+                    buf.push(c);
+                    chars.next();
+                }
+                out.push(FamilyToken::Bare(buf));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Pop the next token from `iter` if it is a quoted label, returning the
+/// label string. Returns `None` when the next token is bare or absent —
+/// the caller should fall back to a default label in that case.
+fn next_label(iter: &mut std::iter::Peekable<std::vec::IntoIter<FamilyToken>>) -> Option<String> {
+    match iter.next_if(|t| matches!(t, FamilyToken::Quoted(_)))? {
+        FamilyToken::Quoted(s) => Some(s),
+        FamilyToken::Bare(_) => unreachable!("filtered by next_if above"),
+    }
+}
+
+/// Parse the body of a `$#FAMILY` directive (everything after the directive
+/// name) into a `(group_id, Family)` pair.
+///
+/// Format: `<group> ["group label"] <member1> ["label1"] <member2> ["label2"] ...`
+/// Quoted strings are labels (optional); bare tokens are identifiers.
+fn parse_family_line(rest: &str) -> anyhow::Result<(String, Family)> {
+    let tokens = tokenize_family_body(rest)?;
+    let mut iter = tokens.into_iter().peekable();
+
+    let group_id = match iter.next() {
+        Some(FamilyToken::Bare(s)) => s,
+        Some(FamilyToken::Quoted(_)) => {
+            bail!("$#FAMILY: group id must be a bare identifier, not a quoted label")
+        }
+        None => bail!("$#FAMILY: empty directive"),
+    };
+
+    let group_label = next_label(&mut iter).unwrap_or_else(|| group_id.clone());
+
+    let mut members: BTreeMap<String, String> = BTreeMap::new();
+    while let Some(tok) = iter.next() {
+        let member_id = match tok {
+            FamilyToken::Bare(s) => s,
+            FamilyToken::Quoted(_) => {
+                bail!("$#FAMILY: unexpected quoted label where a member id was expected")
+            }
+        };
+        let member_label = next_label(&mut iter).unwrap_or_else(|| member_id.clone());
+        if members.contains_key(&member_id) {
+            bail!("$#FAMILY '{group_id}': member '{member_id}' declared twice");
+        }
+        members.insert(member_id, member_label);
+    }
+
+    if members.is_empty() {
+        bail!("$#FAMILY '{group_id}': no members specified");
+    }
+
+    Ok((
+        group_id,
+        Family {
+            label: group_label,
+            members,
+        },
+    ))
 }
 
 fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
@@ -918,6 +1073,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 
     let mut info: Vec<String> = Vec::new();
     let mut decs: Vec<String> = Vec::new();
+    let mut families: BTreeMap<String, Family> = BTreeMap::new();
 
     let mut kind: Option<String> = None;
 
@@ -1000,6 +1156,17 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 let dec_string = line.strip_prefix("$#DEC ").unwrap_or("").trim().to_string();
                 info!(target: "parser", "Found DEC: '{}'", dec_string);
                 decs.push(dec_string);
+            } else if line.starts_with("$#FAMILY ") {
+                let rest = line.strip_prefix("$#FAMILY ").unwrap_or("");
+                let (group_id, family) = parse_family_line(rest)
+                    .with_context(|| format!("Failed to parse $#FAMILY line: {line}"))?;
+                info!(target: "parser",
+                    "Found FAMILY: group '{}' label '{}' members {:?}",
+                    group_id, family.label, family.members);
+                if families.contains_key(&group_id) {
+                    bail!(format!("FAMILY group '{group_id}' defined twice"));
+                }
+                families.insert(group_id, family);
             } else if line.starts_with("$#REVEAL ") {
                 if parts.len() != 3 {
                     bail!(format!(
@@ -1038,6 +1205,21 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         }
     }
 
+    // Validate that every $#FAMILY member id refers to a declared $#CON
+    // constraint name.  Catches typos like `$#FAMILY g row_alldif` (missing
+    // an 'f') that would otherwise silently never match anything.
+    for (group_id, family) in &families {
+        for member_id in family.members.keys() {
+            if !cons.contains_key(member_id) {
+                bail!(
+                    "$#FAMILY '{group_id}': member '{member_id}' is not a declared \
+                     $#CON constraint (declared: {:?})",
+                    cons.keys().collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+
     info!(target: "parser", "Names parsed from ESSENCE': vars: {:?} auxvars: {:?} cons {:?}", vars, auxvars, cons);
 
     Ok(ParsedEprimeData {
@@ -1048,6 +1230,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         kind,
         info,
         decs,
+        families,
     })
 }
 
@@ -1063,6 +1246,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
         params,
         parsed_eprime.kind,
         parsed_eprime.info,
+        parsed_eprime.families,
     );
     puzzleparse.eprime.decs = parsed_eprime.decs;
     Ok(puzzleparse)
@@ -1584,5 +1768,185 @@ mod tests {
 
         // Verify the info field is empty
         assert_eq!(parsed.info.len(), 0, "Should have no info messages");
+    }
+
+    #[test]
+    fn test_parse_family_directives_with_labels() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON row_alldiff \"row\"").unwrap();
+        writeln!(temp_file, "$#CON con_alldiff \"col\"").unwrap();
+        writeln!(temp_file, "$#CON box_alldiff \"box\"").unwrap();
+        writeln!(
+            temp_file,
+            "$#FAMILY unit_alldiff \"Unit all-different\" row_alldiff \"Row\" con_alldiff \"Column\" box_alldiff \"Box\""
+        )
+        .unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parsing should succeed");
+
+        let f = parsed.families.get("unit_alldiff").expect("group present");
+        assert_eq!(f.label, "Unit all-different");
+        assert_eq!(f.members.len(), 3);
+        assert_eq!(f.members.get("row_alldiff"), Some(&"Row".to_string()));
+        assert_eq!(f.members.get("con_alldiff"), Some(&"Column".to_string()));
+        assert_eq!(f.members.get("box_alldiff"), Some(&"Box".to_string()));
+    }
+
+    #[test]
+    fn test_parse_family_no_labels_defaults_to_ids() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON a \"a\"").unwrap();
+        writeln!(temp_file, "$#CON b \"b\"").unwrap();
+        writeln!(temp_file, "$#CON c \"c\"").unwrap();
+        writeln!(temp_file, "$#FAMILY g a b c").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parsing should succeed");
+
+        let f = parsed.families.get("g").expect("group present");
+        assert_eq!(f.label, "g", "group label defaults to group id");
+        assert_eq!(f.members.get("a"), Some(&"a".to_string()));
+        assert_eq!(f.members.get("b"), Some(&"b".to_string()));
+        assert_eq!(f.members.get("c"), Some(&"c".to_string()));
+    }
+
+    #[test]
+    fn test_parse_family_mixed_labels() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON a \"a\"").unwrap();
+        writeln!(temp_file, "$#CON b \"b\"").unwrap();
+        writeln!(temp_file, "$#CON c \"c\"").unwrap();
+        // Group label given, member b labelled, members a and c not labelled.
+        writeln!(temp_file, "$#FAMILY g \"Group G\" a b \"Bee\" c").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parsing should succeed");
+
+        let f = parsed.families.get("g").expect("group present");
+        assert_eq!(f.label, "Group G");
+        assert_eq!(f.members.get("a"), Some(&"a".to_string()));
+        assert_eq!(f.members.get("b"), Some(&"Bee".to_string()));
+        assert_eq!(f.members.get("c"), Some(&"c".to_string()));
+    }
+
+    #[test]
+    fn test_parse_family_label_with_spaces() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON a \"a\"").unwrap();
+        writeln!(
+            temp_file,
+            "$#FAMILY g \"This label has spaces\" a \"Another spaced label\""
+        )
+        .unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parsing should succeed");
+
+        let f = parsed.families.get("g").expect("group present");
+        assert_eq!(f.label, "This label has spaces");
+        assert_eq!(
+            f.members.get("a"),
+            Some(&"Another spaced label".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_family_unterminated_quote_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#FAMILY g \"unterminated").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "Unterminated quote should fail");
+    }
+
+    #[test]
+    fn test_parse_family_duplicate_group_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#FAMILY g a b").unwrap();
+        writeln!(temp_file, "$#FAMILY g c d").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "Duplicate family group should fail");
+    }
+
+    #[test]
+    fn test_parse_family_no_members_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#FAMILY only_group").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "FAMILY with no members should fail");
+    }
+
+    #[test]
+    fn test_parse_family_duplicate_member_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON a \"a\"").unwrap();
+        writeln!(temp_file, "$#FAMILY g a a").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "Duplicate member should fail");
+    }
+
+    #[test]
+    fn test_parse_family_unknown_member_fails() {
+        // $#FAMILY referencing a member that wasn't declared as $#CON should
+        // be caught at parse time, not silently accepted.
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON real_con \"real\"").unwrap();
+        writeln!(temp_file, "$#FAMILY g real_con typo_con").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(
+            result.is_err(),
+            "FAMILY referencing undeclared $#CON should fail"
+        );
+        let err = format!("{:?}", result.unwrap_err());
+        assert!(
+            err.contains("typo_con"),
+            "error message should name the missing constraint, got: {err}"
+        );
     }
 }

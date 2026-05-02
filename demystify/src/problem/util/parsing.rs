@@ -92,8 +92,16 @@ mod tests {
 
         let reveal = BTreeMap::new();
 
-        let _dp =
-            PuzzleParse::new_from_eprime(vars, auxvars, cons, reveal, params, None, Vec::new());
+        let _dp = PuzzleParse::new_from_eprime(
+            vars,
+            auxvars,
+            cons,
+            reveal,
+            params,
+            None,
+            Vec::new(),
+            BTreeMap::new(),
+        );
 
         // Test case 1: n starts with a variable in variables
         let n1 = "var1_00001_00002_00003";

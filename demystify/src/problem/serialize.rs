@@ -32,6 +32,8 @@ pub struct SerializableEPrimeAnnotations {
     pub info: Vec<String>,
     #[serde(default)]
     pub decs: Vec<String>,
+    #[serde(default)]
+    pub families: BTreeMap<String, parse::Family>,
 }
 
 impl From<&EPrimeAnnotations> for SerializableEPrimeAnnotations {
@@ -46,6 +48,7 @@ impl From<&EPrimeAnnotations> for SerializableEPrimeAnnotations {
             kind: e.kind.clone(),
             info: e.info.clone(),
             decs: e.decs.clone(),
+            families: e.families.clone(),
         }
     }
 }
@@ -62,6 +65,7 @@ impl From<SerializableEPrimeAnnotations> for EPrimeAnnotations {
             kind: s.kind,
             info: s.info,
             decs: s.decs,
+            families: s.families,
         }
     }
 }
@@ -89,6 +93,10 @@ pub struct SerializablePuzzleParse {
     pub invconset: BTreeMap<String, i32>,
     /// varlits_in_con with Lit converted to i32 (as string key for JSON)
     pub varlits_in_con: BTreeMap<String, Vec<i32>>,
+    /// family_of with Lit converted to i32 (as string key for JSON).
+    /// Constraint-family root name (the `$#CON` declaration name) per lit.
+    #[serde(default)]
+    pub family_of: BTreeMap<String, String>,
     /// varset_lits with Lit converted to i32
     pub varset_lits: BTreeSet<i32>,
     /// varset_lits_neg with Lit converted to i32
@@ -179,6 +187,11 @@ impl TryFrom<&PuzzleParse> for SerializablePuzzleParse {
                     )
                 })
                 .collect(),
+            family_of: p
+                .constraints
+                .families()
+                .map(|(&k, v)| (lit_to_i32(k).to_string(), v.clone()))
+                .collect(),
             varset_lits: p
                 .var_lits
                 .positive()
@@ -262,6 +275,11 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
                 Ok((i32_to_lit(str_to_i32(&k)?)?, lits?))
             })
             .collect::<Result<_>>()?;
+        let family_of: BTreeMap<Lit, String> = s
+            .family_of
+            .into_iter()
+            .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+            .collect::<Result<_>>()?;
         let conset_lits: BTreeSet<Lit> = s
             .conset_lits
             .into_iter()
@@ -281,8 +299,13 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
                 .collect::<Result<_>>()?,
             domainmap: s.domainmap.into_iter().collect(),
         };
-        let constraints =
-            parse::ConstraintStore::from_raw(conset, invconset, varlits_in_con, conset_lits);
+        let constraints = parse::ConstraintStore::from_raw(
+            conset,
+            invconset,
+            varlits_in_con,
+            family_of,
+            conset_lits,
+        );
         let order = parse::OrderEncoding {
             map: s
                 .order_encoding_map
