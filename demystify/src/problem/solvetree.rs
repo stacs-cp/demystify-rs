@@ -293,15 +293,16 @@ impl SolveTree {
                 .map(|mus_ctx| {
                     let child_known = child_known_lits(&known_lits, &mus_ctx.lits);
                     let child_hash = hash_lits(&child_known);
-                    let (puzlits, constraints) = planner.mus_to_user_mus(mus_ctx);
+                    let user_mus = planner.mus_to_user_mus(mus_ctx);
                     let description = format!(
                         "{} because {}",
-                        puzlits
+                        user_mus
+                            .lits
                             .iter()
                             .map(|p| p.to_string())
                             .collect::<Vec<_>>()
                             .join(", "),
-                        constraints.join(", ")
+                        user_mus.constraints.join(", ")
                     );
                     ChildCandidate {
                         mus_ctx: mus_ctx.clone(),

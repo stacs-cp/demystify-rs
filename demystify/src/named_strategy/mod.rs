@@ -1,0 +1,162 @@
+//! Named-strategy recognition for MUSes.
+//!
+//! Computes a canonical *fingerprint* of a MUS — a (constraint-family multiset,
+//! overlap graph) pair, in canonical form — that two MUSes share iff their
+//! structure is identical up to graph isomorphism (with edge-cardinalities
+//! quantised). A name database maps fingerprints to human-recognisable
+//! technique names like "naked single" or "X-wing".
+//!
+//! See `doc/named-strategies.md` for the full design.
+
+pub mod database;
+pub mod family;
+pub mod fingerprint;
+
+pub use database::{Database, Strategy, display_name};
+pub use family::FamilyMap;
+pub use fingerprint::{MusFingerprint, fingerprint};
+
+#[cfg(test)]
+mod integration_tests {
+    //! End-to-end tests: real .eprime + .param + the shipped Sudoku DB,
+    //! verifying that named techniques flow through the planner output.
+    //! These tests run Conjure, so they're slower than the unit tests in
+    //! the sibling submodules — keep them focused.
+
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use crate::named_strategy::Database;
+    use crate::problem::planner::PuzzlePlanner;
+    use crate::problem::solver::PuzzleSolver;
+    use crate::problem::util::test_utils::build_puzzleparse;
+
+    fn db_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("named-strategies")
+    }
+
+    /// Run the full pipeline (parse + solve + name lookup) on the shipped
+    /// `eprime/sudoku.eprime` + a SudokuWiki hidden-singles puzzle, and
+    /// collect every named technique that appears.
+    fn run_named_solve(param_rel: &str) -> Vec<String> {
+        let parse = build_puzzleparse("../eprime/sudoku.eprime", param_rel);
+        let solver = PuzzleSolver::new(Arc::new(parse)).expect("solver init");
+        let db = Arc::new(Database::load_from_dir(&db_path()).expect("db load"));
+        let mut planner = PuzzlePlanner::new(solver).with_database(db);
+        planner
+            .quick_solve()
+            .into_iter()
+            .flatten()
+            .filter_map(|um| um.name)
+            .collect()
+    }
+
+    #[test]
+    fn shipped_db_loads_without_errors() {
+        let db = Database::load_from_dir(&db_path()).expect("DB should load");
+        assert!(
+            !db.is_empty(),
+            "shipped Sudoku.toml should contain at least one strategy"
+        );
+    }
+
+    /// Every `orientation_group` referenced in the shipped `Sudoku.toml`
+    /// must correspond to a `$#FAMILY` group declared in
+    /// `eprime/sudoku.eprime`. Otherwise the orientation prefix would
+    /// silently never apply at display time.
+    ///
+    /// This is the round-trip check: load both ends of the contract and
+    /// confirm they line up. If you rename a `$#FAMILY` group in the model
+    /// without updating the DB, this test catches it.
+    #[test]
+    fn shipped_db_orientation_groups_exist_in_sudoku_model() {
+        // Need a real PuzzleParse to access the families. Use the smallest
+        // available sudoku param so this test stays fast.
+        let parse = build_puzzleparse(
+            "../eprime/sudoku.eprime",
+            "../eprime/sudoku/sudokuwiki/hiddensingles/hiddensingles.param",
+        );
+        let declared_groups: std::collections::BTreeSet<&str> =
+            parse.eprime.families.keys().map(String::as_str).collect();
+
+        // Re-read the DB file directly so we can inspect every entry by name.
+        let db_file: toml::Value = toml::from_str(
+            &std::fs::read_to_string(db_path().join("Sudoku.toml"))
+                .expect("Sudoku.toml should exist"),
+        )
+        .expect("Sudoku.toml should be valid TOML");
+        let strategies = db_file
+            .get("strategy")
+            .and_then(toml::Value::as_array)
+            .expect("Sudoku.toml should contain a [[strategy]] array");
+
+        let mut bad: Vec<(String, String)> = Vec::new();
+        for entry in strategies {
+            let name = entry
+                .get("name")
+                .and_then(toml::Value::as_str)
+                .expect("strategy missing 'name'");
+            if let Some(group) = entry.get("orientation_group").and_then(toml::Value::as_str)
+                && !declared_groups.contains(group)
+            {
+                bad.push((name.to_string(), group.to_string()));
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "Sudoku.toml references orientation_group(s) not declared in eprime/sudoku.eprime: {bad:?}"
+        );
+    }
+
+    #[test]
+    fn fingerprint_pipeline_produces_named_steps_on_hidden_singles() {
+        // Hidden-singles puzzle from the SudokuWiki test corpus — should
+        // yield at least one "hidden single" named step in some orientation.
+        let names =
+            run_named_solve("../eprime/sudoku/sudokuwiki/hiddensingles/hiddensingles.param");
+        assert!(
+            !names.is_empty(),
+            "expected at least one named step; got none"
+        );
+        assert!(
+            names.iter().any(|n| n.ends_with("hidden single")),
+            "expected at least one 'hidden single' step; names were: {names:?}"
+        );
+    }
+
+    #[test]
+    fn fingerprint_pipeline_finds_hidden_pair_and_triple() {
+        // The hidden-triples SudokuWiki puzzle requires both hidden pair and
+        // hidden triple reasoning along the way; demystify's planner should
+        // surface at least one of each.  (`hiddenpairs-1.param` is *named*
+        // for hidden pairs but turns out to be solvable without them — easier
+        // path through hidden singles wins.)
+        let names =
+            run_named_solve("../eprime/sudoku/sudokuwiki/hiddenpairstriples/hiddentriples.param");
+        assert!(
+            names.iter().any(|n| n.ends_with("hidden pair")),
+            "expected at least one 'hidden pair' step; names were: {names:?}"
+        );
+        assert!(
+            names.iter().any(|n| n.ends_with("hidden triple")),
+            "expected at least one 'hidden triple' step; names were: {names:?}"
+        );
+    }
+
+    #[test]
+    fn named_steps_carry_orientation_prefix() {
+        // The orientation prefix ("Row" / "Column" / "Box") must be set
+        // on at least one named step — confirms the orientation_group
+        // resolution is wired correctly.
+        let names =
+            run_named_solve("../eprime/sudoku/sudokuwiki/hiddensingles/hiddensingles.param");
+        let prefixed: Vec<&String> = names
+            .iter()
+            .filter(|n| n.starts_with("Row ") || n.starts_with("Column ") || n.starts_with("Box "))
+            .collect();
+        assert!(
+            !prefixed.is_empty(),
+            "expected at least one orientation-prefixed name; names were: {names:?}"
+        );
+    }
+}

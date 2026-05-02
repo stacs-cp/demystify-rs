@@ -227,11 +227,11 @@ impl LuaUserData for LuaPlanner {
             let mut all_constraints = Vec::new();
 
             for mus in &muses {
-                let (lits, cons) = planner.mus_to_user_mus(mus);
-                for lit in lits {
+                let user_mus = planner.mus_to_user_mus(mus);
+                for lit in user_mus.lits {
                     all_lits.push(format_puzlit(&lit));
                 }
-                all_constraints.extend(cons);
+                all_constraints.extend(user_mus.constraints);
             }
 
             // Mark the literals as deduced
@@ -271,20 +271,25 @@ impl LuaUserData for LuaPlanner {
             for (step_idx, step) in solve.iter().enumerate() {
                 let step_table = lua.create_table()?;
 
-                for (mus_idx, (lits, cons)) in step.iter().enumerate() {
+                for (mus_idx, um) in step.iter().enumerate() {
                     let mus_table = lua.create_table()?;
 
                     let literals_table = lua.create_table()?;
-                    for (i, lit) in lits.iter().enumerate() {
+                    for (i, lit) in um.lits.iter().enumerate() {
                         literals_table.set(i + 1, format_puzlit(lit))?;
                     }
                     mus_table.set("literals", literals_table)?;
 
                     let constraints_table = lua.create_table()?;
-                    for (i, con) in cons.iter().enumerate() {
+                    for (i, con) in um.constraints.iter().enumerate() {
                         constraints_table.set(i + 1, con.clone())?;
                     }
                     mus_table.set("constraints", constraints_table)?;
+
+                    mus_table.set("fingerprint", um.fingerprint.clone())?;
+                    if let Some(name) = &um.name {
+                        mus_table.set("name", name.clone())?;
+                    }
 
                     step_table.set(mus_idx + 1, mus_table)?;
                 }

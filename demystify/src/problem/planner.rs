@@ -9,6 +9,7 @@ use tracing::info;
 
 use crate::{
     json::{DescriptionStatement, Problem},
+    named_strategy::{Database, FamilyMap, display_name, fingerprint},
     problem::{
         VarValPair,
         musdict::{MusContext, merge_muscontexts},
@@ -61,6 +62,24 @@ impl Default for PlannerConfig {
     }
 }
 
+/// User-facing form of a single MUS produced by the planner.
+///
+/// Carries the deduced literals, the human-readable constraint descriptions,
+/// the canonical-form fingerprint of the MUS structure (always present —
+/// useful for DB curation), and an optional matched technique name (set when
+/// the fingerprint hits an entry in the configured `Database`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserMus {
+    pub lits: BTreeSet<PuzLit>,
+    pub constraints: Vec<String>,
+    /// Canonical-form `MusFingerprint` string. Always set so DB curators can
+    /// inspect the fingerprint of any MUS in the GUI/JSON output.
+    pub fingerprint: String,
+    /// Matched technique name, possibly with an orientation prefix (e.g.
+    /// "Row hidden single"). `None` when no DB entry matched the fingerprint.
+    pub name: Option<String>,
+}
+
 /// The `PuzzlePlanner` struct represents a puzzle planner that can be used to solve puzzles.
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
@@ -70,6 +89,13 @@ pub struct PuzzlePlanner {
     /// no longer be minimal). We carry it forward so we can skip re-searching lits whose cached
     /// MUS size already meets the current search target.
     mus_cache: MusDict,
+    /// Named-strategy database for fingerprint → technique name lookup.
+    /// Default is empty (every lookup misses); set via `with_database`.
+    strategy_db: Arc<Database>,
+    /// Family-group remap applied during fingerprint computation. v1 uses
+    /// identity (raw constraint families); future versions may try multiple
+    /// groupings to broaden DB matches.
+    family_map: FamilyMap,
 }
 
 type FilterType = Box<dyn Fn(&Lit, &mut PuzzlePlanner) -> bool>;
@@ -105,6 +131,8 @@ impl PuzzlePlanner {
             psolve,
             config: PlannerConfig::default(),
             mus_cache: MusDict::new(),
+            strategy_db: Arc::new(Database::empty()),
+            family_map: FamilyMap::identity(),
         };
         pp.mark_trivial_lits_as_deduced();
         pp
@@ -126,9 +154,42 @@ impl PuzzlePlanner {
             psolve,
             config,
             mus_cache: MusDict::new(),
+            strategy_db: Arc::new(Database::empty()),
+            family_map: FamilyMap::identity(),
         };
         pp.mark_trivial_lits_as_deduced();
         pp
+    }
+
+    /// Attach a named-strategy database for fingerprint-to-name lookup.
+    /// Without this, every `UserMus` returned by the planner has `name: None`
+    /// (but the fingerprint string is still populated).
+    ///
+    /// Logs a warning for each strategy whose `orientation_group` does not
+    /// match any `$#FAMILY` declaration in this puzzle's model — those
+    /// entries would silently lose their orientation prefix at display time.
+    #[must_use]
+    pub fn with_database(mut self, db: Arc<Database>) -> Self {
+        if let Some(kind) = self.psolve.puzzleparse().eprime.kind.as_deref() {
+            let declared: std::collections::BTreeSet<&str> = self
+                .psolve
+                .puzzleparse()
+                .eprime
+                .families
+                .keys()
+                .map(String::as_str)
+                .collect();
+            for s in db.dangling_orientation_groups(kind, &declared) {
+                tracing::warn!(target: "named_strategy",
+                    "strategy DB '{}' entry '{}' references orientation_group '{}' \
+                     which is not declared in the model; orientation prefix will not apply",
+                    kind,
+                    s.name,
+                    s.orientation_group.as_deref().unwrap_or(""));
+            }
+        }
+        self.strategy_db = db;
+        self
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle,
@@ -364,28 +425,37 @@ impl PuzzlePlanner {
         self.apply_config_to_muses(muses)
     }
 
-    /// Converts a MUS to a user-friendly MUS representation.
-    ///
-    /// # Arguments
-    ///
-    /// * `mus` - The MUS tuple to convert.
-    ///
-    /// # Returns
-    ///
-    /// A tuple containing a set of user-friendly literals and a vector of user-friendly constraints.
-    pub fn mus_to_user_mus(&self, mc: &MusContext) -> (BTreeSet<PuzLit>, Vec<String>) {
-        let lits = &mc.lits;
-        let x = &mc.mus;
-        (
-            lits.iter()
-                .flat_map(|l| self.psolve.puzzleparse().lit_to_vars(l))
-                .cloned()
-                .collect(),
-            x.iter()
-                .map(|c| self.psolve.puzzleparse().lit_to_con(c))
-                .cloned()
-                .collect_vec(),
-        )
+    /// Convert a `MusContext` to a `UserMus`: human-readable constraint
+    /// descriptions, deduced `PuzLit`s, the canonical-form fingerprint of
+    /// the MUS structure, and (if the planner has a strategy database
+    /// attached and the fingerprint matches) the named-technique label.
+    pub fn mus_to_user_mus(&self, mc: &MusContext) -> UserMus {
+        let parse = self.psolve.puzzleparse();
+        let lits: BTreeSet<PuzLit> = mc
+            .lits
+            .iter()
+            .flat_map(|l| parse.lit_to_vars(l))
+            .cloned()
+            .collect();
+        let constraints: Vec<String> = mc
+            .mus
+            .iter()
+            .map(|c| parse.lit_to_con(c))
+            .cloned()
+            .collect_vec();
+        let fp = fingerprint(parse, mc, &self.family_map);
+        let name = parse
+            .eprime
+            .kind
+            .as_deref()
+            .and_then(|kind| self.strategy_db.lookup(kind, &fp))
+            .map(|s| display_name(s, mc, parse));
+        UserMus {
+            lits,
+            constraints,
+            fingerprint: fp.canonical,
+            name,
+        }
     }
 
     /// Deal with MUSes of 0 (which mean the puzzle has deduction that can be made without
@@ -434,7 +504,7 @@ impl PuzzlePlanner {
     }
 
     /// Solves the puzzle quickly and returns a sequence of steps.
-    pub fn quick_solve(&mut self) -> Vec<Vec<(BTreeSet<PuzLit>, Vec<String>)>> {
+    pub fn quick_solve(&mut self) -> Vec<Vec<UserMus>> {
         let mut solvesteps = vec![];
         'litloop: while !self.psolve.get_provable_varlits().is_empty() {
             if self.config.max_steps.is_some_and(|n| solvesteps.len() >= n) {
@@ -511,7 +581,7 @@ impl PuzzlePlanner {
                 solvesteps.len(),
                 core_min.map_or("none".to_string(), |v| v.to_string()),
                 core_count_1,
-                muses[0].1.len(),
+                muses[0].constraints.len(),
                 mus_count_1,
             );
 
@@ -519,7 +589,7 @@ impl PuzzlePlanner {
                 "{} steps, just found {} muses of size {}, {} left, {} solver calls so far",
                 solvesteps.len(),
                 muses.len(),
-                muses[0].1.len(),
+                muses[0].constraints.len(),
                 self.psolve.get_provable_varlits().len(),
                 get_solver_calls(),
             );
@@ -699,7 +769,7 @@ impl PuzzlePlanner {
                 .map(|mus| self.mus_to_user_mus(mus))
                 .collect_vec();
 
-            let all_deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.0.clone()).collect();
+            let all_deduced: BTreeSet<_> = muses.iter().flat_map(|x| x.lits.clone()).collect();
 
             let pre_string = if base_muses.len() > 1 {
                 format!(
@@ -712,10 +782,12 @@ impl PuzzlePlanner {
 
             let mut description_list: Vec<DescriptionStatement> = Vec::new();
             for mus in &muses {
-                let deduced = PuzLit::nice_puzlit_list_html(&mus.0);
+                let deduced = PuzLit::nice_puzlit_list_html(&mus.lits);
                 description_list.push(DescriptionStatement {
                     result: deduced,
-                    constraints: mus.1.clone(),
+                    constraints: mus.constraints.clone(),
+                    name: mus.name.clone(),
+                    fingerprint: Some(mus.fingerprint.clone()),
                 });
             }
 
@@ -818,11 +890,13 @@ impl PuzzlePlanner {
     /// Render a single MUS as a `Problem` for display without advancing solver state.
     pub fn preview_mus(&mut self, mus: &MusContext) -> Problem {
         let user_mus = self.mus_to_user_mus(mus);
-        let all_deduced: BTreeSet<_> = user_mus.0.clone();
+        let all_deduced: BTreeSet<_> = user_mus.lits.clone();
 
         let description_list = vec![DescriptionStatement {
-            result: PuzLit::nice_puzlit_list_html(&user_mus.0),
-            constraints: user_mus.1.clone(),
+            result: PuzLit::nice_puzlit_list_html(&user_mus.lits),
+            constraints: user_mus.constraints.clone(),
+            name: user_mus.name.clone(),
+            fingerprint: Some(user_mus.fingerprint.clone()),
         }];
 
         let varlits = self.psolve.get_provable_varlits().clone();
@@ -1040,6 +1114,8 @@ impl PuzzlePlanner {
             psolve: solver,
             config: self.config,
             mus_cache: self.mus_cache.clone(),
+            strategy_db: Arc::clone(&self.strategy_db),
+            family_map: self.family_map.clone(),
         })
     }
 
@@ -1056,7 +1132,7 @@ mod tests {
 
     use crate::problem::{
         PuzLit,
-        planner::{PlannerConfig, PuzzlePlanner},
+        planner::{PlannerConfig, PuzzlePlanner, UserMus},
         solver::{MusConfig, PuzzleSolver},
     };
     use itertools::Itertools;
@@ -1079,12 +1155,12 @@ mod tests {
 
         assert_eq!(sequence.iter().flatten().collect_vec().len(), 8);
 
-        for (litset, cons) in sequence.iter().flatten() {
-            assert!(!litset.is_empty());
+        for um in sequence.iter().flatten() {
+            assert!(!um.lits.is_empty());
             // It should be trivial to prove we only need one
             // constraint here, but MUS algorithms be tricky, if
             // this next line starts failing, it can be commented out.
-            assert!(cons.len() <= 1);
+            assert!(um.constraints.len() <= 1);
         }
     }
 
@@ -1146,10 +1222,7 @@ mod tests {
             let mut plan = PuzzlePlanner::new_with_config(puz, config);
             let seq = plan.quick_solve();
             // Collect the flat list of deduced literal sets across all steps.
-            seq.into_iter()
-                .flatten()
-                .map(|(lits, _)| lits)
-                .collect_vec()
+            seq.into_iter().flatten().map(|um| um.lits).collect_vec()
         };
 
         let with_find_one = run_solve(true);
@@ -1167,17 +1240,18 @@ mod tests {
     /// - non-empty (the puzzle was actually solved)
     /// - every sub-step deduces at least one literal
     /// - no PuzLit appears in more than one sub-step
-    fn assert_valid_sequence(sequence: &[Vec<(BTreeSet<PuzLit>, Vec<String>)>]) {
+    fn assert_valid_sequence(sequence: &[Vec<UserMus>]) {
         assert!(!sequence.is_empty(), "solve produced no steps");
 
         let mut seen = BTreeSet::<PuzLit>::new();
         for step in sequence {
             for substep in step {
-                let litset = &substep.0;
-                let cons = &substep.1;
-                assert!(!litset.is_empty(), "sub-step deduced no literals");
-                assert!(!cons.is_empty(), "sub-step has no constraints");
-                for lit in litset {
+                assert!(!substep.lits.is_empty(), "sub-step deduced no literals");
+                assert!(
+                    !substep.constraints.is_empty(),
+                    "sub-step has no constraints"
+                );
+                for lit in &substep.lits {
                     assert!(
                         seen.insert(lit.clone()),
                         "PuzLit {lit:?} appears in more than one sub-step"
@@ -1273,10 +1347,10 @@ mod tests {
         // Changes should be sanity checked by printing out the sequence.
         assert_eq!(sequence.iter().flatten().collect_vec().len(), 8);
 
-        for (litset, cons) in sequence.iter().flatten() {
-            assert!(!litset.is_empty());
+        for um in sequence.iter().flatten() {
+            assert!(!um.lits.is_empty());
             // If this next line starts failing, it can be commented out.
-            assert!(cons.len() <= 2);
+            assert!(um.constraints.len() <= 2);
         }
     }
 

@@ -362,6 +362,11 @@ pub struct Problem {
 pub struct DescriptionStatement {
     pub result: String,
     pub constraints: Vec<String>,
+    /// Matched named-strategy display name, if any (e.g. "Row hidden single").
+    pub name: Option<String>,
+    /// Canonical-form `MusFingerprint` string. Always populated for MUS-derived
+    /// statements; empty for non-MUS statements (e.g. initial state).
+    pub fingerprint: Option<String>,
 }
 
 impl DescriptionStatement {
@@ -369,6 +374,8 @@ impl DescriptionStatement {
         Self {
             result,
             constraints,
+            name: None,
+            fingerprint: None,
         }
     }
 }
@@ -509,9 +516,26 @@ impl Problem {
         let mut statements = Vec::new();
 
         for deduction in deduction_list {
+            // Bundle the technique name (if matched) and fingerprint (always)
+            // into the same Statement as the deduction text, so they form
+            // one visual block instead of looking like sibling deductions
+            // in the flat statements list.
+            let mut header = String::new();
+            if let Some(name) = &deduction.name {
+                header.push_str(&format!(
+                    "<div class=\"technique-name\">{}</div>",
+                    tera::escape_html(name)
+                ));
+            }
+            if let Some(fp) = &deduction.fingerprint {
+                header.push_str(&format!(
+                    "<div class=\"technique-fingerprint\"><code>fp: {}</code></div>",
+                    tera::escape_html(fp)
+                ));
+            }
             statements.push(Statement {
-                content: deduction.result.clone(),
-                classes: vec![],
+                content: format!("{header}{}", deduction.result),
+                classes: vec!["deduction".to_string()],
             });
             for constraint in &deduction.constraints {
                 let num = constraint_num.get(constraint).unwrap();

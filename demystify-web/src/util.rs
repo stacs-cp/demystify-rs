@@ -23,6 +23,7 @@ use uuid::Uuid;
 #[derive(Clone)]
 pub struct AppState {
     pub tera: Arc<tera::Tera>,
+    pub strategy_db: Arc<demystify::named_strategy::Database>,
 }
 
 pub struct ExploreState {
@@ -190,12 +191,16 @@ impl SolverSession {
     }
 }
 
-pub fn import_snapshot(snapshot: SessionSnapshot) -> anyhow::Result<SolverSession> {
+pub fn import_snapshot(
+    snapshot: SessionSnapshot,
+    strategy_db: Arc<demystify::named_strategy::Database>,
+) -> anyhow::Result<SolverSession> {
     let puzzle: demystify::problem::parse::PuzzleParse = snapshot.puzzle.try_into()?;
     let puzzle = Arc::new(puzzle);
 
     let solver = PuzzleSolver::new_with_config(puzzle, snapshot.solver_config)?;
-    let planner = PuzzlePlanner::new_with_config(solver, snapshot.planner_config);
+    let planner =
+        PuzzlePlanner::new_with_config(solver, snapshot.planner_config).with_database(strategy_db);
 
     let mut session = SolverSession::new(planner);
 

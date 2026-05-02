@@ -674,6 +674,7 @@ pub struct SubmitExampleParams {
 }
 
 pub async fn upload_files(
+    State(state): State<AppState>,
     session: Session<SessionNullPool>,
     mut multipart: Multipart,
 ) -> Result<Response, util::AppError> {
@@ -740,12 +741,13 @@ pub async fn upload_files(
         return Err(anyhow!("Please upload a parameter file (.param or .json)").into());
     }
 
-    load_model(&session, temp_dir, model, param)?;
+    load_model(&session, &state, temp_dir, model, param)?;
     session.set("round", 0u32);
     Ok(Redirect::to("/solver").into_response())
 }
 
 pub async fn load_example_and_redirect(
+    State(state): State<AppState>,
     session: Session<SessionNullPool>,
     form: axum::extract::Form<ExampleParams>,
 ) -> Result<Response, util::AppError> {
@@ -769,6 +771,7 @@ pub async fn load_example_and_redirect(
 
     load_model(
         &session,
+        &state,
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
@@ -798,6 +801,7 @@ pub async fn preview_example(
 }
 
 pub async fn submit_example(
+    State(state): State<AppState>,
     session: Session<SessionNullPool>,
     form: axum::extract::Form<SubmitExampleParams>,
 ) -> Result<Response, util::AppError> {
@@ -821,6 +825,7 @@ pub async fn submit_example(
 
     load_model(
         &session,
+        &state,
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
@@ -831,6 +836,7 @@ pub async fn submit_example(
 
 fn load_model(
     session: &Session<SessionNullPool>,
+    state: &AppState,
     temp_dir: tempfile::TempDir,
     model: Option<PathBuf>,
     param: Option<PathBuf>,
@@ -841,7 +847,7 @@ fn load_model(
     )?;
     let puzzle = Arc::new(puzzle);
     let puz = PuzzleSolver::new(puzzle)?;
-    let plan = PuzzlePlanner::new(puz);
+    let plan = PuzzlePlanner::new(puz).with_database(state.strategy_db.clone());
     set_solver_global(session, plan);
     Ok(())
 }
@@ -866,6 +872,7 @@ pub async fn solver_export(session: Session<SessionNullPool>) -> Result<Response
 }
 
 pub async fn solver_import(
+    State(state): State<AppState>,
     session: Session<SessionNullPool>,
     mut multipart: Multipart,
 ) -> Result<Response, util::AppError> {
@@ -887,7 +894,7 @@ pub async fn solver_import(
     let snapshot: util::SessionSnapshot =
         serde_json::from_slice(&json_data).context("Invalid session JSON")?;
 
-    let solver_session = util::import_snapshot(snapshot)?;
+    let solver_session = util::import_snapshot(snapshot, state.strategy_db.clone())?;
     let round = solver_session.history.len().saturating_sub(1) as u32;
 
     set_solver_global_session(&session, solver_session);

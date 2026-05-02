@@ -313,3 +313,24 @@ g.con-preview .cell-bg {
 .constraint-instance:hover {
     background-color: #f5f5f5;
 }
+
+/* Named-strategy badge: shows the matched technique name above the
+ * deduction's constraint list.  Always rendered as an obvious heading
+ * so the user immediately sees "Row hidden single" etc. */
+.technique-name {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #2a4d8f;
+    margin-top: 0.5em;
+    display: block;
+}
+
+/* Fingerprint debug line: small monospace, low contrast — useful when
+ * curating the strategy DB but should not distract during normal use. */
+.technique-fingerprint {
+    font-family: monospace;
+    font-size: 0.8em;
+    color: #888;
+    display: block;
+    margin-bottom: 0.25em;
+}

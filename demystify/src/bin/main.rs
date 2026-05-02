@@ -1,5 +1,6 @@
 use clap::Parser;
 use demystify::{
+    named_strategy::Database,
     problem::{
         self,
         planner::{MusMethod, PlannerConfig, PuzzlePlanner},
@@ -108,6 +109,12 @@ struct Opt {
         help = "Enable logging targets on stderr (comma-separated). Available: progress, cores, solver, planner, solve, parser"
     )]
     log: Vec<String>,
+
+    #[arg(
+        long,
+        help = "Path to the named-strategy database directory. Each <KIND>.toml file inside defines named techniques for that puzzle kind. Defaults to <crate>/named-strategies."
+    )]
+    strategy_db: Option<PathBuf>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -215,7 +222,28 @@ fn main() -> anyhow::Result<()> {
         mus_method: opt.mus_method,
     };
 
-    let mut planner = PuzzlePlanner::new_with_config(solver, planner_config);
+    // Resolve the strategy DB directory: explicit --strategy-db wins, then a
+    // few sensible defaults relative to the working directory.
+    let db_dir = opt.strategy_db.clone().or_else(|| {
+        for candidate in [
+            "demystify/named-strategies",
+            "named-strategies",
+            "../demystify/named-strategies",
+        ] {
+            let p = PathBuf::from(candidate);
+            if p.exists() {
+                return Some(p);
+            }
+        }
+        None
+    });
+    let strategy_db = match db_dir {
+        Some(dir) => Arc::new(Database::load_from_dir(&dir)?),
+        None => Arc::new(Database::empty()),
+    };
+
+    let mut planner =
+        PuzzlePlanner::new_with_config(solver, planner_config).with_database(strategy_db);
     let t_solve = std::time::Instant::now();
 
     if opt.html {
@@ -232,10 +260,12 @@ fn main() -> anyhow::Result<()> {
         for step in planner.quick_solve() {
             let json_step: Vec<serde_json::Value> = step
                 .iter()
-                .map(|(lits, constraints)| {
+                .map(|um| {
                     serde_json::json!({
-                        "lits": lits,
-                        "constraints": constraints,
+                        "lits": um.lits,
+                        "constraints": um.constraints,
+                        "fingerprint": um.fingerprint,
+                        "name": um.name,
                     })
                 })
                 .collect();

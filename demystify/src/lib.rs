@@ -46,9 +46,12 @@
 //! let solution = planner.quick_solve();
 //! for (step_num, step) in solution.iter().enumerate() {
 //!     println!("Step {}:", step_num + 1);
-//!     for (literals, constraints) in step {
-//!         println!("  Deduced: {:?}", literals);
-//!         println!("  Using: {:?}", constraints);
+//!     for um in step {
+//!         println!("  Deduced: {:?}", um.lits);
+//!         println!("  Using: {:?}", um.constraints);
+//!         if let Some(name) = &um.name {
+//!             println!("  Technique: {}", name);
+//!         }
 //!     }
 //! }
 //! ```
@@ -116,6 +119,7 @@
 #![allow(dead_code)]
 
 pub mod json;
+pub mod named_strategy;
 pub mod problem;
 pub mod satcore;
 pub mod stats;

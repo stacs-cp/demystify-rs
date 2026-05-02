@@ -1,0 +1,165 @@
+# Named-strategy database for Sudoku ($#KIND Sudoku).
+#
+# Each entry maps a canonical MUS fingerprint to a human-recognised
+# technique name. `orientation_group` (optional) names a $#FAMILY group
+# whose member labels prefix the technique name at display time, so a
+# single entry covers Row/Column/Box variants of the same shape — e.g.
+# "Hidden single" + a row_contains constraint → "Row hidden single".
+#
+# Add new entries by inspecting the fingerprint column in the JSON / HTML
+# output of `demystify --json --model eprime/sudoku.eprime --param ...`.
+
+# ─── Single-atom: one atmost atom forces eliminations from peers (the basic
+#     Sudoku scan).  A row already contains an X somewhere, eliminate X from
+#     the rest of the row.  Not a "named" technique in classical Sudoku
+#     vocabulary, but useful to label so the GUI doesn't render it anonymous.
+[[strategy]]
+name = "scan"
+fingerprint = "row_atmost;"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "scan"
+fingerprint = "con_atmost;"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "scan"
+fingerprint = "box_atmost;"
+orientation_group = "unit_atmost"
+
+# ─── Hidden single: one *_contains atom alone deduces a placement.
+#     The unit must contain digit X, and 8 of the 9 cells already can't be X
+#     (via prior eliminations), so the remaining cell takes X.
+[[strategy]]
+name = "hidden single"
+fingerprint = "row_contains;"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "hidden single"
+fingerprint = "con_contains;"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "hidden single"
+fingerprint = "box_contains;"
+orientation_group = "unit_contains"
+
+# ─── Naked pair: two *_atmost atoms in the same unit, ≥3-cell overlap.
+#     Two cells in the unit have only the same two candidates; those
+#     candidates are confined to those cells, so eliminate from peers.
+[[strategy]]
+name = "naked pair"
+fingerprint = "row_atmost,row_atmost;0-1:3"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "naked pair"
+fingerprint = "con_atmost,con_atmost;0-1:3"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "naked pair"
+fingerprint = "box_atmost,box_atmost;0-1:3"
+orientation_group = "unit_atmost"
+
+# ─── Hidden pair: two *_contains atoms in the same unit, ≥3-cell overlap.
+#     Two digits in the unit can each only go in the same two cells;
+#     those cells are pinned to those two digits, eliminating other candidates.
+[[strategy]]
+name = "hidden pair"
+fingerprint = "row_contains,row_contains;0-1:3"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "hidden pair"
+fingerprint = "con_contains,con_contains;0-1:3"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "hidden pair"
+fingerprint = "box_contains,box_contains;0-1:3"
+orientation_group = "unit_contains"
+
+# ─── Naked triple: three *_atmost atoms in the same unit, fully connected
+#     (each pair shares ≥3 cells).
+[[strategy]]
+name = "naked triple"
+fingerprint = "row_atmost,row_atmost,row_atmost;0-1:3,0-2:3,1-2:3"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "naked triple"
+fingerprint = "con_atmost,con_atmost,con_atmost;0-1:3,0-2:3,1-2:3"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "naked triple"
+fingerprint = "box_atmost,box_atmost,box_atmost;0-1:3,0-2:3,1-2:3"
+orientation_group = "unit_atmost"
+
+# ─── Hidden triple: three *_contains atoms in the same unit, fully
+#     connected.  Three digits, three cells, mutually confined.
+[[strategy]]
+name = "hidden triple"
+fingerprint = "row_contains,row_contains,row_contains;0-1:3,0-2:3,1-2:3"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "hidden triple"
+fingerprint = "con_contains,con_contains,con_contains;0-1:3,0-2:3,1-2:3"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "hidden triple"
+fingerprint = "box_contains,box_contains,box_contains;0-1:3,0-2:3,1-2:3"
+orientation_group = "unit_contains"
+
+# ─── Box-line interactions (pointing / claiming).
+#     A box_atmost + line_contains (or box_contains + line_atmost) where the
+#     two atoms overlap on a 2-cell or 3-cell row/column slice of the box.
+#     Hodoku terms: pointing pair (box→line) and claiming/box-line
+#     reduction (line→box).  Both share the same MUS shape; we lump them
+#     under "box-line interaction" and prefix with the row/column label of
+#     the line involved (so the box's label, which is always "Box", isn't
+#     redundantly printed).
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_atmost,row_contains;0-1:2"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_atmost,con_contains;0-1:2"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_atmost,row_contains;0-1:3"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_atmost,con_contains;0-1:3"
+orientation_group = "unit_contains"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_contains,row_atmost;0-1:2"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_contains,con_atmost;0-1:2"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_contains,row_atmost;0-1:3"
+orientation_group = "unit_atmost"
+
+[[strategy]]
+name = "box-line interaction"
+fingerprint = "box_contains,con_atmost;0-1:3"
+orientation_group = "unit_atmost"
