@@ -40,15 +40,27 @@ pub const BRUTE_FORCE_CAP: usize = 8;
 
 /// A canonical fingerprint of a MUS. Two `MusFingerprint` values compare
 /// equal iff their structural representations match.
+///
+/// The internal canonical-form string is encapsulated so the format can
+/// evolve without breaking external callers; expose only `as_str()` and
+/// `Display`. Crate-internal callers (planner, tests) can still construct
+/// and move-out the string via `pub(crate)` access.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MusFingerprint {
-    pub canonical: String,
+    pub(crate) canonical: String,
 }
 
 impl MusFingerprint {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.canonical
+    }
+
+    /// Consume the fingerprint and return its canonical-form string.
+    /// Used by the planner when wrapping the fingerprint into a `UserMus`.
+    #[must_use]
+    pub fn into_canonical(self) -> String {
+        self.canonical
     }
 }
 

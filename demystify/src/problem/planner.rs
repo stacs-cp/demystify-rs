@@ -453,7 +453,7 @@ impl PuzzlePlanner {
         UserMus {
             lits,
             constraints,
-            fingerprint: fp.canonical,
+            fingerprint: fp.into_canonical(),
             name,
         }
     }

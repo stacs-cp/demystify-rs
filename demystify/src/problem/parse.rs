@@ -1079,6 +1079,11 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 
     let conmatch = Regex::new(r#"\$#CON (.*) "(.*)" *$"#).unwrap();
 
+    // Identifiers used in $#CON / $#FAMILY / etc. must be safe to embed in
+    // the named-strategy fingerprint serialisation (which uses `,;:|-` as
+    // delimiters). Restrict to the identifier-safe character class.
+    let ident_re = Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap();
+
     let file = File::open(in_path)?;
     let reader = io::BufReader::new(file);
 
@@ -1122,6 +1127,13 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 
                 info!(target: "parser", "Found CON: '{}' '{}'", con_name, con_value);
 
+                if !ident_re.is_match(&con_name) {
+                    bail!(
+                        "$#CON name '{con_name}' must match [a-zA-Z][a-zA-Z0-9_]* \
+                         (kept identifier-safe so the named-strategy fingerprint \
+                         serialisation stays unambiguous)"
+                    );
+                }
                 if all_names.contains(&con_name) {
                     bail!(format!("{con_name} defined twice"));
                 }
@@ -1163,6 +1175,20 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 info!(target: "parser",
                     "Found FAMILY: group '{}' label '{}' members {:?}",
                     group_id, family.label, family.members);
+                if !ident_re.is_match(&group_id) {
+                    bail!(
+                        "$#FAMILY group id '{group_id}' must match \
+                         [a-zA-Z][a-zA-Z0-9_]* (identifier-safe)"
+                    );
+                }
+                for member in family.members.keys() {
+                    if !ident_re.is_match(member) {
+                        bail!(
+                            "$#FAMILY '{group_id}': member id '{member}' must match \
+                             [a-zA-Z][a-zA-Z0-9_]* (identifier-safe)"
+                        );
+                    }
+                }
                 if families.contains_key(&group_id) {
                     bail!(format!("FAMILY group '{group_id}' defined twice"));
                 }
@@ -1923,6 +1949,40 @@ mod tests {
         let path = temp_file.path().to_path_buf();
         let result = super::parse_eprime_file(&path);
         assert!(result.is_err(), "Duplicate member should fail");
+    }
+
+    #[test]
+    fn test_parse_con_name_with_special_chars_fails() {
+        // Constraint names go into fingerprint serialisation; embedded
+        // delimiter chars would corrupt it.
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON has,comma \"bad\"").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "$#CON name with special chars should fail");
+    }
+
+    #[test]
+    fn test_parse_family_group_with_special_chars_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON real \"r\"").unwrap();
+        writeln!(temp_file, "$#FAMILY group:bad real").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(
+            result.is_err(),
+            "$#FAMILY group id with special chars should fail"
+        );
     }
 
     #[test]
