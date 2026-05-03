@@ -55,6 +55,10 @@ path = "src/bin/main.rs"
 name = "demystify-makesvg"
 path = "src/bin/makesvg.rs"
 
+[[bin]]
+name = "demystify-fingerprint"
+path = "src/bin/fingerprint.rs"
+
 [dependencies.clap]
 version = "4.0"
 features = ["derive"]
