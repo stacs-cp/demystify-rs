@@ -1,22 +1,18 @@
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex, OnceLock},
 };
 
-use anyhow::{Context, bail};
+use anyhow::bail;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use rustsat::types::Lit;
-use serde::{Deserialize, Serialize};
 
 use axum_session::{Session, SessionNullPool};
-use demystify::problem::{
-    musdict::MusContext,
-    planner::{PlannerConfig, PuzzlePlanner},
-    serialize::SerializablePuzzleParse,
-    solver::{PuzzleSolver, SolverConfig},
+use demystify::{
+    problem::{musdict::MusContext, planner::PuzzlePlanner},
+    snapshot::{SessionSnapshot, export_snapshot, import_snapshot},
 };
 use uuid::Uuid;
 
@@ -132,91 +128,32 @@ pub fn set_solver_global_session(
 }
 
 // ─── Export / import ───
-
-#[derive(Serialize, Deserialize)]
-pub struct SessionSnapshot {
-    pub puzzle: SerializablePuzzleParse,
-    pub planner_config: PlannerConfig,
-    pub solver_config: SolverConfig,
-    pub steps: Vec<StepSnapshot>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct StepSnapshot {
-    pub deduced_lits: Vec<i32>,
-}
+//
+// Snapshot data structures and the JSON-replay logic live in
+// `demystify::snapshot`. Here we expose thin web-shaped wrappers around them:
+// `SolverSession::export_snapshot` works on the session's `history`, and
+// `import_snapshot_into_session` rebuilds a `SolverSession` from a replayed
+// planner-history.
 
 impl SolverSession {
     pub fn export_snapshot(&self) -> anyhow::Result<SessionSnapshot> {
-        let puzzle = SerializablePuzzleParse::try_from(self.planner.puzzle())?;
-        let planner_config = self.planner.planner_config();
-        let solver_config = self.planner.solver_config();
-
-        let mut steps = Vec::new();
-
-        // Step 0: initial/trivial lits
-        let step0_lits: Vec<i32> = self.history[0]
-            .get_all_known_lits()
-            .iter()
-            .map(|lit| lit.to_ipasir())
-            .collect();
-        steps.push(StepSnapshot {
-            deduced_lits: step0_lits,
-        });
-
-        // Steps 1..N: diff from previous
-        for i in 1..self.history.len() {
-            let prev: BTreeSet<Lit> = self.history[i - 1]
-                .get_all_known_lits()
-                .iter()
-                .copied()
-                .collect();
-            let deduced: Vec<i32> = self.history[i]
-                .get_all_known_lits()
-                .iter()
-                .filter(|lit| !prev.contains(lit))
-                .map(|lit| lit.to_ipasir())
-                .collect();
-            steps.push(StepSnapshot {
-                deduced_lits: deduced,
-            });
-        }
-
-        Ok(SessionSnapshot {
-            puzzle,
-            planner_config,
-            solver_config,
-            steps,
-        })
+        export_snapshot(&self.history)
     }
 }
 
-pub fn import_snapshot(
+pub fn import_snapshot_into_session(
     snapshot: SessionSnapshot,
     strategy_db: Arc<demystify::named_strategy::Database>,
 ) -> anyhow::Result<SolverSession> {
-    let puzzle: demystify::problem::parse::PuzzleParse = snapshot.puzzle.try_into()?;
-    let puzzle = Arc::new(puzzle);
-
-    let solver = PuzzleSolver::new_with_config(puzzle, snapshot.solver_config)?;
-    let planner =
-        PuzzlePlanner::new_with_config(solver, snapshot.planner_config).with_database(strategy_db);
-
-    let mut session = SolverSession::new(planner);
-
-    for (i, step) in snapshot.steps.iter().enumerate().skip(1) {
-        let lits: Vec<Lit> = step
-            .deduced_lits
-            .iter()
-            .map(|&ipasir| Lit::from_ipasir(ipasir))
-            .collect::<Result<Vec<_>, _>>()
-            .context(format!("Invalid literal in step {i}"))?;
-
-        for lit in &lits {
-            session.planner.solver().add_not_provable_known_lit(*lit);
-        }
-        session.snapshot();
-    }
-
-    Ok(session)
+    let history = import_snapshot(snapshot, strategy_db)?;
+    let live = history
+        .last()
+        .expect("import_snapshot returns at least one entry")
+        .fork()?;
+    Ok(SolverSession {
+        planner: live,
+        explore: None,
+        explore_enabled: false,
+        history,
+    })
 }

@@ -891,10 +891,10 @@ pub async fn solver_import(
     }
 
     let json_data = json_data.context("No session file uploaded")?;
-    let snapshot: util::SessionSnapshot =
+    let snapshot: demystify::snapshot::SessionSnapshot =
         serde_json::from_slice(&json_data).context("Invalid session JSON")?;
 
-    let solver_session = util::import_snapshot(snapshot, state.strategy_db.clone())?;
+    let solver_session = util::import_snapshot_into_session(snapshot, state.strategy_db.clone())?;
     let round = solver_session.history.len().saturating_sub(1) as u32;
 
     set_solver_global_session(&session, solver_session);
