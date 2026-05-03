@@ -930,6 +930,18 @@ impl PuzzlePlanner {
         .expect("Cannot make puzzle json")
     }
 
+    /// All alternative MUSes for a single literal, sorted smallest to largest,
+    /// each promoted to the user-facing `UserMus` form (with fingerprint and
+    /// looked-up technique name).
+    ///
+    /// Wraps [`Self::all_muses_for_literal`] + [`Self::mus_to_user_mus`] for
+    /// callers that want to enumerate alternative explanations of a single
+    /// deduction without re-implementing the conversion.
+    pub fn all_alternatives_for_literal(&mut self, lit_def: Vec<i64>) -> Vec<UserMus> {
+        let muses = self.all_muses_for_literal(lit_def);
+        muses.iter().map(|mc| self.mus_to_user_mus(mc)).collect()
+    }
+
     /// Compute all MUSes for a single literal, sorted smallest to largest.
     pub fn all_muses_for_literal(&mut self, lit_def: Vec<i64>) -> Vec<MusContext> {
         let varlits = self.psolve.get_provable_varlits().clone();

@@ -159,4 +159,62 @@ mod integration_tests {
             "expected at least one orientation-prefixed name; names were: {names:?}"
         );
     }
+
+    /// `all_alternatives_for_literal` must return at least one MUS — with a
+    /// populated fingerprint — for a literal that the planner *would* deduce
+    /// next. This is the per-candidate query mystify calls in pass 2: take a
+    /// state and a literal, get back every minimal explanation with its
+    /// technique label.
+    ///
+    /// We pick a literal off the *first* solve step rather than hard-coding
+    /// cell coordinates, so the test stays robust to model edits.
+    #[test]
+    fn all_alternatives_for_literal_returns_named_muses() {
+        let parse = build_puzzleparse(
+            "../eprime/sudoku.eprime",
+            "../eprime/sudoku/sudokuwiki/hiddensingles/hiddensingles.param",
+        );
+        let solver = PuzzleSolver::new(Arc::new(parse)).expect("solver init");
+        let db = Arc::new(Database::load_from_dir(&db_path()).expect("db load"));
+        let mut planner = PuzzlePlanner::new(solver).with_database(db);
+
+        // Pull one chosen MUS out of step 1, get its target literal as a
+        // (var-indices, value) tuple — exactly the shape `lit_def` wants.
+        let first_step = planner
+            .quick_solve()
+            .into_iter()
+            .next()
+            .expect("first step");
+        let first_um = first_step.into_iter().next().expect("first mus");
+        let first_lit = first_um.lits.iter().next().expect("first lit").clone();
+        let mut lit_def: Vec<i64> = first_lit.var().indices().clone();
+        lit_def.push(first_lit.val());
+
+        // Fresh planner from the same starting state — quick_solve mutated
+        // the previous one.
+        let parse2 = build_puzzleparse(
+            "../eprime/sudoku.eprime",
+            "../eprime/sudoku/sudokuwiki/hiddensingles/hiddensingles.param",
+        );
+        let solver2 = PuzzleSolver::new(Arc::new(parse2)).expect("solver init 2");
+        let db2 = Arc::new(Database::load_from_dir(&db_path()).expect("db load 2"));
+        let mut planner2 = PuzzlePlanner::new(solver2).with_database(db2);
+
+        let alts = planner2.all_alternatives_for_literal(lit_def);
+        assert!(
+            !alts.is_empty(),
+            "expected at least one alternative MUS for lit {first_lit:?}"
+        );
+        for um in &alts {
+            assert!(
+                !um.fingerprint.is_empty(),
+                "every UserMus must carry a fingerprint"
+            );
+        }
+        // Sorted smallest-first.
+        let sizes: Vec<usize> = alts.iter().map(|u| u.constraints.len()).collect();
+        let mut sorted = sizes.clone();
+        sorted.sort();
+        assert_eq!(sizes, sorted, "alternatives must be sorted smallest-first");
+    }
 }
