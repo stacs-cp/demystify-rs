@@ -4,6 +4,7 @@ given n: int
 letting half be n/2
 letting ndim be domain int(1..n)
 letting ndim2 be domain int(1..n-2)
+$#SHOW start_grid givens
 given start_grid: matrix indexed by [ndim, ndim] of int(0,1,2)
 $ 0: black, 1: white, 2=empty
 

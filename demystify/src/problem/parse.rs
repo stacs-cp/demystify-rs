@@ -13,7 +13,7 @@ use rustsat::instances::{self, BasicVarManager, Cnf, SatInstance};
 use rustsat::types::Lit;
 
 use std::cmp::max;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use std::fs;
 use std::io::BufReader;
@@ -76,6 +76,35 @@ pub enum ShowRole {
     /// Primary deduction matrix; rendered as foreground glyphs/digits.
     /// At most one `main` per model.
     Main,
+    /// Cage layout: a `[row, col]` matrix of integer cage IDs.  Used to
+    /// draw cage borders. At most one `cages` per model.
+    Cages,
+    /// Pre-filled values: a `[row, col]` matrix of integers (with sentinel 0
+    /// or absent for blank cells) shown as immutable givens.  At most one.
+    Givens,
+    /// Cage sums: a `[cage_id]` vector of integers shown inside cage cells.
+    /// At most one.
+    CageSums,
+    /// Less-than relations: a vector of `[r1, c1, r2, c2]` 1-indexed cell
+    /// pairs.  At most one.
+    LessThan,
+    /// Thermometer paths.  Carries the name of the scalar `step` parameter
+    /// used to decode the encoded therm-id/position grid.  At most one.
+    Thermometers { step: String },
+    /// Edge labels for one side of the grid.  At most one per side.
+    Edge { side: EdgeSide },
+    /// Combined four-side edge labels: a 4-row matrix in left/top/right/
+    /// bottom order.  At most one.
+    SideLabels,
+}
+
+/// Which side of the grid an `edge` SHOW directive labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum EdgeSide {
+    Top,
+    Left,
+    Right,
+    Bottom,
 }
 
 /// One `$#SHOW <var> <role> [args...]` directive.  Carries the variable name
@@ -1237,19 +1266,65 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                     );
                 }
                 let role = match role_token {
-                    "main" => {
+                    "main" | "cages" | "givens" | "cage_sums" | "less_than" | "side_labels" => {
                         if !role_args.is_empty() {
                             bail!(
-                                "$#SHOW {show_var} main: role 'main' takes \
-                                 no arguments, got {role_args:?}"
+                                "$#SHOW {show_var} {role_token}: takes no \
+                                 arguments, got {role_args:?}"
                             );
                         }
-                        ShowRole::Main
+                        match role_token {
+                            "main" => ShowRole::Main,
+                            "cages" => ShowRole::Cages,
+                            "givens" => ShowRole::Givens,
+                            "cage_sums" => ShowRole::CageSums,
+                            "less_than" => ShowRole::LessThan,
+                            "side_labels" => ShowRole::SideLabels,
+                            _ => unreachable!(),
+                        }
+                    }
+                    "thermometers" => {
+                        if role_args.len() != 1 {
+                            bail!(
+                                "$#SHOW {show_var} thermometers: needs exactly \
+                                 one arg (name of the scalar step parameter), \
+                                 got {role_args:?}"
+                            );
+                        }
+                        let step = role_args[0].to_string();
+                        if !ident_re.is_match(&step) {
+                            bail!(
+                                "$#SHOW {show_var} thermometers {step}: step \
+                                 name must match [a-zA-Z][a-zA-Z0-9_]*"
+                            );
+                        }
+                        ShowRole::Thermometers { step }
+                    }
+                    "edge" => {
+                        if role_args.len() != 1 {
+                            bail!(
+                                "$#SHOW {show_var} edge: needs exactly one \
+                                 arg (side: top|left|right|bottom), got \
+                                 {role_args:?}"
+                            );
+                        }
+                        let side = match role_args[0] {
+                            "top" => EdgeSide::Top,
+                            "left" => EdgeSide::Left,
+                            "right" => EdgeSide::Right,
+                            "bottom" => EdgeSide::Bottom,
+                            other => bail!(
+                                "$#SHOW {show_var} edge: unknown side \
+                                 '{other}' (expected top|left|right|bottom)"
+                            ),
+                        };
+                        ShowRole::Edge { side }
                     }
                     other => bail!(
-                        "$#SHOW: unknown role '{other}' (recognised: main). \
-                         Roles are a closed set; new ones must be added in \
-                         parse.rs and the renderer."
+                        "$#SHOW: unknown role '{other}' (recognised: main, \
+                         cages, givens, cage_sums, less_than, thermometers, \
+                         edge, side_labels). Roles are a closed set; new \
+                         ones must be added in parse.rs and the renderer."
                     ),
                 };
                 info!(target: "parser", "Found SHOW: var '{}' role {:?}", show_var, role);
@@ -1310,39 +1385,52 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         }
     }
 
-    // Validate $#SHOW directives:
-    //   - var must be a declared variable (in `vars` or `auxvars`)
-    //   - at most one directive per var
-    //   - at most one `main` per model
+    // Validate $#SHOW directives at parse-file time:
+    //   - at most one directive per name
+    //   - singleton roles (Main, Cages, Givens, CageSums, LessThan,
+    //     Thermometers, SideLabels) appear at most once across the model
+    //   - Edge directives appear at most once per side
+    // Name-existence (var/aux/param) is checked later in `parse_eprime`
+    // where the runtime params are also available.
     {
         let mut seen_vars: HashSet<&str> = HashSet::new();
-        let mut main_var: Option<&str> = None;
+        let mut singleton_seen: HashMap<&str, &str> = HashMap::new();
+        let mut edge_seen: HashMap<EdgeSide, &str> = HashMap::new();
         for d in &show {
-            if !vars.contains(&d.var) && !auxvars.contains(&d.var) {
-                bail!(
-                    "$#SHOW: var '{}' is not declared as $#VAR or $#AUX \
-                     (declared vars: {:?}, aux: {:?})",
-                    d.var,
-                    vars.iter().collect::<Vec<_>>(),
-                    auxvars.iter().collect::<Vec<_>>()
-                );
-            }
             if !seen_vars.insert(d.var.as_str()) {
                 bail!(
-                    "$#SHOW: var '{}' has more than one directive; each var \
-                     may have at most one role",
+                    "$#SHOW: name '{}' has more than one directive; each \
+                     name may have at most one role",
                     d.var
                 );
             }
-            if d.role == ShowRole::Main {
-                if let Some(prev) = main_var {
-                    bail!(
-                        "$#SHOW: at most one 'main' allowed per model, \
-                         got both '{prev}' and '{}'",
-                        d.var
-                    );
-                }
-                main_var = Some(d.var.as_str());
+            let singleton_key = match &d.role {
+                ShowRole::Main => Some("main"),
+                ShowRole::Cages => Some("cages"),
+                ShowRole::Givens => Some("givens"),
+                ShowRole::CageSums => Some("cage_sums"),
+                ShowRole::LessThan => Some("less_than"),
+                ShowRole::Thermometers { .. } => Some("thermometers"),
+                ShowRole::SideLabels => Some("side_labels"),
+                ShowRole::Edge { .. } => None,
+            };
+            if let Some(key) = singleton_key
+                && let Some(prev) = singleton_seen.insert(key, d.var.as_str())
+            {
+                bail!(
+                    "$#SHOW: at most one '{key}' allowed per model, got \
+                     both '{prev}' and '{}'",
+                    d.var
+                );
+            }
+            if let ShowRole::Edge { side } = d.role
+                && let Some(prev) = edge_seen.insert(side, d.var.as_str())
+            {
+                bail!(
+                    "$#SHOW: at most one 'edge {side:?}' allowed per model, \
+                     got both '{prev}' and '{}'",
+                    d.var
+                );
             }
         }
     }
@@ -1365,6 +1453,25 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
     let parsed_eprime = parse_eprime_file(in_path)?;
     let params = read_essence_param(eprimeparam)?;
+
+    // Now that we have both the model annotations and the runtime params,
+    // validate that every $#SHOW name is declared somewhere.
+    for d in &parsed_eprime.show {
+        let known = parsed_eprime.vars.contains(&d.var)
+            || parsed_eprime.auxvars.contains(&d.var)
+            || params.contains_key(&d.var);
+        if !known {
+            bail!(
+                "$#SHOW: name '{}' is not declared as $#VAR, $#AUX, or a \
+                 given parameter (declared vars: {:?}, aux: {:?}, \
+                 params: {:?})",
+                d.var,
+                parsed_eprime.vars.iter().collect::<Vec<_>>(),
+                parsed_eprime.auxvars.iter().collect::<Vec<_>>(),
+                params.keys().collect::<Vec<_>>()
+            );
+        }
+    }
 
     let mut puzzleparse = PuzzleParse::new_from_eprime(
         parsed_eprime.vars,
@@ -2138,37 +2245,15 @@ mod tests {
             .tempfile_in(".")
             .unwrap();
         writeln!(temp_file, "$#VAR grid").unwrap();
-        writeln!(temp_file, "$#SHOW grid cages").unwrap();
+        writeln!(temp_file, "$#SHOW grid bogusrole").unwrap();
 
         let path = temp_file.path().to_path_buf();
         let result = super::parse_eprime_file(&path);
         assert!(result.is_err(), "Unknown role should fail");
         let err = format!("{:?}", result.unwrap_err());
         assert!(
-            err.contains("cages"),
+            err.contains("bogusrole"),
             "error message should name the rejected role, got: {err}"
-        );
-    }
-
-    #[test]
-    fn test_parse_show_undeclared_var_fails() {
-        let mut temp_file = tempfile::Builder::new()
-            .prefix(".demystify-")
-            .tempfile_in(".")
-            .unwrap();
-        writeln!(temp_file, "$#VAR grid").unwrap();
-        writeln!(temp_file, "$#SHOW typo main").unwrap();
-
-        let path = temp_file.path().to_path_buf();
-        let result = super::parse_eprime_file(&path);
-        assert!(
-            result.is_err(),
-            "$#SHOW referencing undeclared var should fail"
-        );
-        let err = format!("{:?}", result.unwrap_err());
-        assert!(
-            err.contains("typo"),
-            "error message should name the missing var, got: {err}"
         );
     }
 
@@ -2231,5 +2316,93 @@ mod tests {
         let path = temp_file.path().to_path_buf();
         let result = super::parse_eprime_file(&path);
         assert!(result.is_err(), "$#SHOW with no role should fail");
+    }
+
+    #[test]
+    fn test_parse_show_edge_side_arg() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW row_clues edge top").unwrap();
+        writeln!(temp_file, "$#SHOW col_clues edge left").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parse should succeed");
+        assert_eq!(parsed.show.len(), 2);
+        assert_eq!(
+            parsed.show[0].role,
+            super::ShowRole::Edge {
+                side: super::EdgeSide::Top
+            }
+        );
+        assert_eq!(
+            parsed.show[1].role,
+            super::ShowRole::Edge {
+                side: super::EdgeSide::Left
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_show_edge_unknown_side_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW row_clues edge nowhere").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "edge with unknown side should fail");
+    }
+
+    #[test]
+    fn test_parse_show_thermometers_needs_step() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW therms thermometers").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "thermometers with no step arg should fail");
+    }
+
+    #[test]
+    fn test_parse_show_two_cages_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW c1 cages").unwrap();
+        writeln!(temp_file, "$#SHOW c2 cages").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "two cages directives should fail");
+    }
+
+    #[test]
+    fn test_parse_show_two_edge_top_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW a edge top").unwrap();
+        writeln!(temp_file, "$#SHOW b edge top").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(
+            result.is_err(),
+            "two edge directives for the same side should fail"
+        );
     }
 }

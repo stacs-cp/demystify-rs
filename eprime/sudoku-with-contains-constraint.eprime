@@ -5,7 +5,8 @@ letting Ds be {1,2,3,4,5,6,7,8,9}
 
 letting C be domain int(0..2)
 
-given fixed : matrix indexed by [D,D] of int(0..9) 
+$#SHOW fixed givens
+given fixed : matrix indexed by [D,D] of int(0..9)
 
 $#VAR grid
 $#SHOW grid main

@@ -27,6 +27,7 @@ $ side_labels[2,..] is clues along top of grid pointing down
 $ side_labels[3,..] is clues along right of grid pointing left
 $ side_labels[4,..] is clues along bottom of grid pointing up.
 
+$#SHOW side_labels side_labels
 given     side_labels : matrix indexed by [int(1..4),RANGE] of int(0..MAXCLUES)
 
 $$ And GRID, any initial values provided for cells (or 0 for no value)

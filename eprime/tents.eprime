@@ -7,7 +7,9 @@ letting X be int(1..x)
 letting Y be int(1..y)
 
 $ -1 means 'no constraint'
+$#SHOW row_sums edge top
 given row_sums: matrix indexed by [X] of int
+$#SHOW col_sums edge left
 given col_sums: matrix indexed by [Y] of int
 
 given trees: matrix indexed by [X,Y] of int(0..treecount)

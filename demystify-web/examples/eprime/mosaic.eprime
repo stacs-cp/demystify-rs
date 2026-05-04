@@ -12,6 +12,7 @@ $#INFO Mosaic: each number counts how many black cells are in its 3x3 neighbourh
 given height, width : int(1..)
 
 $ start_grid[r,c] = -1 means no clue; 0..9 = exact count of black cells in 3x3 neighbourhood
+$#SHOW start_grid givens
 given start_grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..9)
 
 $#VAR grid

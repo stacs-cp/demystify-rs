@@ -19,6 +19,7 @@ letting   NUMQD  be domain int(0..(lastdx))
 
 
 $ list of < relations in the problem
+$#SHOW lt less_than
 given     lt     : matrix indexed by [NUMQD, int(0..3)] of RANGE
 
 $#VAR field

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::{
     PuzLit, VarValPair,
-    parse::{PuzzleParse, ShowRole},
+    parse::{EdgeSide, PuzzleParse, ShowRole},
     solver::PuzzleSolver,
 };
 
@@ -33,6 +33,32 @@ fn clue_matrix_to_layers(clues: &[Vec<i64>]) -> Vec<Vec<String>> {
         }
     }
     layers
+}
+
+/// Read an edge-labels parameter, returning the layered-labels representation
+/// the renderer expects.  Accepts two shapes:
+///
+/// - a 1-D vector: produces a single layer of stringified entries.
+/// - a 2-D matrix (e.g. nonogram clue runs with trailing-zero padding):
+///   produces multiple layers via [`clue_matrix_to_layers`].
+///
+/// Returns `None` if the param is the zero-only matrix shape (all rows empty),
+/// matching the legacy "no labels to render" behaviour.
+fn read_edge_labels(
+    eprime: &crate::problem::parse::EPrimeAnnotations,
+    name: &str,
+) -> anyhow::Result<Option<Vec<Vec<String>>>> {
+    // Try matrix shape first (numeric clue grids).  param_vec_vec_i64 errors
+    // out for vector params, so fall back to param_vec_string in that case.
+    if let Ok(m) = eprime.param_vec_vec_i64(name) {
+        let layers = clue_matrix_to_layers(&m);
+        return Ok(if layers.is_empty() {
+            None
+        } else {
+            Some(layers)
+        });
+    }
+    Ok(Some(vec![eprime.param_vec_string(name)?]))
 }
 
 /// One instantiated constraint from a `$#CON` class, with the grid cells it covers.
@@ -127,84 +153,68 @@ impl Puzzle {
         let mut left_labels = None;
         let mut right_labels = None;
 
-        for label in ["row_labels", "top_labels", "row_sums"] {
-            if problem.eprime.has_param(label) {
-                top_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
-            }
+        // Renderer roles are driven entirely by `$#SHOW` directives now;
+        // there are no longer any magic-name fallbacks (`fixed`, `cages`,
+        // `start_grid`, etc.).  See `ShowRole` in parse.rs.
+        let show = &problem.eprime.show;
+        let find_role = |pred: &dyn Fn(&ShowRole) -> bool| -> Option<&str> {
+            show.iter().find(|d| pred(&d.role)).map(|d| d.var.as_str())
+        };
+
+        // Edge labels: vector of strings (or a 2-D clue matrix) per side.
+        let edge_param = |side: EdgeSide| -> Option<String> {
+            find_role(&|r| matches!(r, ShowRole::Edge { side: s } if *s == side))
+                .map(str::to_string)
+        };
+        if let Some(p) = edge_param(EdgeSide::Top) {
+            top_labels = read_edge_labels(&problem.eprime, &p)?;
+        }
+        if let Some(p) = edge_param(EdgeSide::Left) {
+            left_labels = read_edge_labels(&problem.eprime, &p)?;
+        }
+        if let Some(p) = edge_param(EdgeSide::Bottom) {
+            bottom_labels = read_edge_labels(&problem.eprime, &p)?;
+        }
+        if let Some(p) = edge_param(EdgeSide::Right) {
+            right_labels = read_edge_labels(&problem.eprime, &p)?;
         }
 
-        for label in ["col_labels", "left_labels", "col_sums"] {
-            if problem.eprime.has_param(label) {
-                left_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
-            }
-        }
-
-        for label in ["bottom_labels"] {
-            if problem.eprime.has_param(label) {
-                bottom_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
-            }
-        }
-
-        for label in ["right_labels"] {
-            if problem.eprime.has_param(label) {
-                right_labels = Some(vec![problem.eprime.param_vec_string(label)?]);
-            }
-        }
-
-        if problem.eprime.has_param("side_labels") {
-            let side_labels = problem.eprime.param_vec_vec_string("side_labels")?;
+        // Combined four-side labels: a [side, slot] matrix in left/top/right/
+        // bottom order.  Overrides individual edge directives if present.
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::SideLabels)) {
+            let side_labels = problem.eprime.param_vec_vec_string(p)?;
             left_labels = Some(vec![side_labels[0].clone()]);
             top_labels = Some(vec![side_labels[1].clone()]);
             right_labels = Some(vec![side_labels[2].clone()]);
             bottom_labels = Some(vec![side_labels[3].clone()]);
         }
 
-        // Nonogram clues: matrix indexed by [side_count, maxruns] of ints with trailing-zero
-        // padding. Convert to layered labels, right-aligned so the last clue sits nearest
-        // the grid and empty trailing layers are trimmed.
-        if problem.eprime.has_param("row_clues") {
-            let m = problem.eprime.param_vec_vec_i64("row_clues")?;
-            let layers = clue_matrix_to_layers(&m);
-            if !layers.is_empty() {
-                top_labels = Some(layers);
-            }
-        }
-        if problem.eprime.has_param("col_clues") {
-            let m = problem.eprime.param_vec_vec_i64("col_clues")?;
-            let layers = clue_matrix_to_layers(&m);
-            if !layers.is_empty() {
-                left_labels = Some(layers);
-            }
+        // Givens (pre-filled values shown as immutable in cells).
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::Givens)) {
+            start_grid = Some(problem.eprime.param_vec_vec_option_i64(p)?);
         }
 
-        if problem.eprime.has_param("start_grid") {
-            start_grid = Some(problem.eprime.param_vec_vec_option_i64("start_grid")?);
-        }
-
-        if problem.eprime.has_param("fixed") {
-            start_grid = Some(problem.eprime.param_vec_vec_option_i64("fixed")?);
-        }
-
-        if problem.eprime.has_param("cages") {
-            cages = Some(problem.eprime.param_vec_vec_option_i64("cages")?);
-        }
-
-        // Killer Sudoku uses "grid" for cage IDs (not the solver variable) and "hints" for sums.
-        if problem.eprime.has_param("grid")
-            && !problem.eprime.vars.contains("grid")
-            && problem.eprime.has_param("hints")
-        {
-            cages = Some(problem.eprime.param_vec_vec_option_i64("grid")?);
+        // Cages (matrix of cage ids per cell).
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::Cages)) {
+            cages = Some(problem.eprime.param_vec_vec_option_i64(p)?);
         }
 
         let mut thermometers = None;
         let mut less_than = None;
         let mut cage_sums = None;
 
-        // Parse thermometer paths from therms[col][row] = therm_id * step + position.
-        if problem.eprime.has_param("therms") && problem.eprime.has_param("step") {
-            let step = problem.eprime.param_i64("step")?;
-            let therms_raw = problem.eprime.param_vec_vec_i64("therms")?;
+        // Thermometer paths.  Decoder: therms_raw[col][row] = therm_id * step
+        // + position.  The directive carries both the therms matrix name
+        // and the name of the scalar `step` integer.
+        if let Some(d) = show
+            .iter()
+            .find(|d| matches!(d.role, ShowRole::Thermometers { .. }))
+        {
+            let ShowRole::Thermometers { step: step_name } = &d.role else {
+                unreachable!()
+            };
+            let step = problem.eprime.param_i64(step_name)?;
+            let therms_raw = problem.eprime.param_vec_vec_i64(&d.var)?;
             // therms_raw[col_0][row_0] (0-indexed), outer index = col, inner index = row.
             let mut therm_paths: BTreeMap<i64, BTreeMap<i64, [i64; 2]>> = BTreeMap::new();
             for (col_0, col_data) in therms_raw.iter().enumerate() {
@@ -229,9 +239,9 @@ impl Puzzle {
             }
         }
 
-        // Parse less-than constraints: lt[i] = [r1, c1, r2, c2] (1-indexed).
-        if problem.eprime.has_param("lt") {
-            let lt_raw = problem.eprime.param_vec_vec_i64("lt")?;
+        // Less-than relations: vector of [r1, c1, r2, c2] 1-indexed cell pairs.
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::LessThan)) {
+            let lt_raw = problem.eprime.param_vec_vec_i64(p)?;
             let pairs: Vec<[i64; 4]> = lt_raw
                 .iter()
                 .map(|v| [v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1])
@@ -241,10 +251,9 @@ impl Puzzle {
             }
         }
 
-        // Parse cage sums from "hints" (used by Killer Sudoku).
-        if problem.eprime.has_param("hints") {
-            let hints = problem.eprime.param_vec_i64("hints")?;
-            cage_sums = Some(hints);
+        // Cage sums: vector of integers indexed by cage id.
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::CageSums)) {
+            cage_sums = Some(problem.eprime.param_vec_i64(p)?);
         }
 
         if width.is_none() || height.is_none() {

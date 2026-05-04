@@ -10,9 +10,11 @@ $#INFO Nonogram: fill cells black/white so each row and column has the given run
 given height, width, maxruns : int(1..)
 
 $ row_clues[r,k] = length of k-th run in row r; 0 = no run (padding)
+$#SHOW row_clues edge top
 given row_clues : matrix indexed by [int(1..height), int(1..maxruns)] of int(0..width)
 
 $ col_clues[c,k] = length of k-th run in column c; 0 = no run (padding)
+$#SHOW col_clues edge left
 given col_clues : matrix indexed by [int(1..width), int(1..maxruns)] of int(0..height)
 
 $#VAR grid

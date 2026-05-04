@@ -1,7 +1,9 @@
 language ESSENCE' 1.0
 
 given grid_size : int
+$#SHOW top_labels edge top
 given top_labels : matrix indexed by [int(1..grid_size)] of int(1..sum( [i | i : int(1..grid_size)] ))
+$#SHOW right_labels edge right
 given right_labels : matrix indexed by [int(1..grid_size)] of int(1..sum( [i | i : int(1..grid_size)] ))
 
 

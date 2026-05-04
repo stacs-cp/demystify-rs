@@ -32,6 +32,7 @@ $ the numeric values specified in the puzzle
 letting   VALUES be domain int( 0..grid_size )
 letting   RANGE  be domain int( 1..grid_size )
 
+$#SHOW side_labels side_labels
 given     side_labels : matrix indexed by [int(1..4),RANGE] of VALUES
 
 given GRID : matrix indexed by [RANGE,RANGE] of VALUES

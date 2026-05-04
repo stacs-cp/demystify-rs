@@ -6,8 +6,11 @@ given thermcount: int
 letting X be int(1..width)
 letting Y be int(1..height)
 
+$#SHOW therms thermometers step
 given therms: matrix indexed by [X,Y] of int(0..step*thermcount)
+$#SHOW row_sums edge top
 given row_sums: matrix indexed by [Y] of int
+$#SHOW col_sums edge left
 given col_sums: matrix indexed by [X] of int
 
 $#VAR grid

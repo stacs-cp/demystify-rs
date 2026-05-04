@@ -5,6 +5,7 @@ $#KIND star-battle
 given grid_size: int
 letting griddim be domain int(1..grid_size)
 given starcount: int
+$#SHOW cages cages
 given cages: matrix indexed by [griddim, griddim] of int(1..grid_size)
 
 $#VAR stars

@@ -26,6 +26,7 @@ $#INFO Akari (Light Up): place bulbs in white cells. Each white cell must be ill
 
 given height, width : int(1..)
 
+$#SHOW start_grid givens
 given start_grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..5)
 
 $ grid[row, col] = 1 if a bulb is placed here, 0 otherwise
