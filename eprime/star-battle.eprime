@@ -8,6 +8,7 @@ given starcount: int
 given cages: matrix indexed by [griddim, griddim] of int(1..grid_size)
 
 $#VAR stars
+$#SHOW stars main
 find stars: matrix indexed by [griddim, griddim] of bool
 
 

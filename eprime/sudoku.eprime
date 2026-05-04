@@ -24,6 +24,7 @@ letting C be domain int(0..2)
 given fixed : matrix indexed by [D,D] of int(0..9)
 
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [D,D] of D
 
 $#CON row_atmost "Row {{index[0]}} contains at most one {{index[1]}}"

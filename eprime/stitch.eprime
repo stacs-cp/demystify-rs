@@ -13,6 +13,7 @@ given starty: matrix indexed by [blockdim] of griddim_y
 given blocksize: matrix indexed by [blockdim] of int
 
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [griddim_y, griddim_x] of blockdim
 
 $#VAR blockx

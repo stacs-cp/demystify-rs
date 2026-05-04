@@ -38,6 +38,7 @@ given GRID : matrix indexed by [RANGE,RANGE] of VALUES
 
 
 $#VAR field
+$#SHOW field main
 
 find      field  : matrix indexed by [RANGE, RANGE] of RANGE
 

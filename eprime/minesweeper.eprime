@@ -17,6 +17,7 @@ given     mines : matrix indexed by [int(1..height),int(1..width)] of bool
 
 $ Output grid of mine locations that is to be produced
 $#VAR grid
+$#SHOW grid main
 find      grid : matrix indexed by [int(1..height),int(1..width)] of bool
 
 $#CON sumcheck "Use the sum of ({{index[0]}},{{index[1]}})"

@@ -11,6 +11,7 @@ given row_sums: matrix indexed by [Y] of int
 given col_sums: matrix indexed by [X] of int
 
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [Y,X] of bool
 
 $#CON fluid "thermometer {{index[0]}} is valid"

@@ -395,6 +395,7 @@ orientation_grup = "unit_contains"
             Some("Sudoku".into()),
             Vec::new(),
             families,
+            Vec::new(),
         );
         for (lit, family, desc) in constraints {
             parse

@@ -28,6 +28,7 @@ letting prices be domain int(4,8,12,16)
 
 $peeps[sauces, pastas, prices]
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [peeps,int(1..3)] of int(4..16)
 
 $#CON con1 "The person who ordered capellini paid less than the person who chose arrabiata sauce"

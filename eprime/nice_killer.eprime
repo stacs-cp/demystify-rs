@@ -8,6 +8,7 @@ given hints : matrix indexed by [int(1..n_hints)] of int(1..45)
 given grid : matrix indexed by [int(1..9),int(1..9)] of int(0..n_hints) 
 
 $#VAR x
+$#SHOW x main
 find x : matrix indexed by [int(1..9),int(1..9)] of int(1..9) 
 
 $ all the reasoning

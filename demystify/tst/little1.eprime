@@ -16,6 +16,7 @@ letting ndim be int(1..n)
 letting ndim2 be int(1..n-2)
 
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [ndim] of ndim
 
 $#REVEAL grid outgrid

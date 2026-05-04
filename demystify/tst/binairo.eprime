@@ -9,6 +9,7 @@ $ 0: black, 1: white, 2=empty
 
 
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [ndim, ndim] of bool
 
 $#CON rowwhite "row {{index[0]}} must be at least half white"

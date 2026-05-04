@@ -30,6 +30,7 @@ letting cities be domain int(other_city..tehama)
 letting ages be domain int(109..113)
 
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [peeps, int(0..2)] of int(6..113)
 
 $#CON con01 "Mattie is 113 years old"

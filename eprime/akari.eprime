@@ -30,6 +30,7 @@ given start_grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..
 
 $ grid[row, col] = 1 if a bulb is placed here, 0 otherwise
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
 
 $ Constraint: two cells in the same row segment (no black between them) cannot both hold bulbs.

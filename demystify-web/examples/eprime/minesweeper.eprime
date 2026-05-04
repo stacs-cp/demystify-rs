@@ -22,6 +22,7 @@ given mines : matrix indexed by [int(1..height), int(1..width)] of bool
 
 $ grid[r,c]: what we are deducing — 1 = mine, 0 = safe
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [int(1..height), int(1..width)] of bool
 
 $ sumcheck[r,c]: constraint that revealed safe cell (r,c) has the correct neighbour mine count

@@ -12,6 +12,7 @@ $ regions[i,j] gives the region number (1-9) for cell (i,j)
 given regions : matrix indexed by [D,D] of D
 
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [D,D] of D
 
 $#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"

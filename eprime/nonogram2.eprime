@@ -13,6 +13,7 @@ given row_clues : matrix indexed by [int(1..height), int(1..maxruns)] of int(0..
 given col_clues : matrix indexed by [int(1..width), int(1..maxruns)] of int(0..height)
 
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
 
 $#AUX row_start

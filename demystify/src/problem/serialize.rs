@@ -34,6 +34,8 @@ pub struct SerializableEPrimeAnnotations {
     pub decs: Vec<String>,
     #[serde(default)]
     pub families: BTreeMap<String, parse::Family>,
+    #[serde(default)]
+    pub show: Vec<parse::ShowDirective>,
 }
 
 impl From<&EPrimeAnnotations> for SerializableEPrimeAnnotations {
@@ -49,6 +51,7 @@ impl From<&EPrimeAnnotations> for SerializableEPrimeAnnotations {
             info: e.info.clone(),
             decs: e.decs.clone(),
             families: e.families.clone(),
+            show: e.show.clone(),
         }
     }
 }
@@ -66,6 +69,7 @@ impl From<SerializableEPrimeAnnotations> for EPrimeAnnotations {
             info: s.info,
             decs: s.decs,
             families: s.families,
+            show: s.show,
         }
     }
 }

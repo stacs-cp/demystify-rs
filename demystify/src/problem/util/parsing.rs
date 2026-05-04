@@ -101,6 +101,7 @@ mod tests {
             None,
             Vec::new(),
             BTreeMap::new(),
+            Vec::new(),
         );
 
         // Test case 1: n starts with a variable in variables

@@ -22,6 +22,7 @@ given grid : matrix indexed by [rows,cols] of int(0..4)
 $ 'x' is just here so we have something the current GUI can display
 
 $#VAR x
+$#SHOW x main
 find x: matrix indexed by [int(1..n*2+1), int(1..m*2+1)] of int(-1..4)
 
 $#AUX edges

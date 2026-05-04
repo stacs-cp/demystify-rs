@@ -11,6 +11,7 @@ letting NROWS be domain int(1..height)
 letting NCOLS be domain int(1..width)
 
 $#VAR res
+$#SHOW res main
 find res : matrix indexed by [NROWS,NCOLS] of VALUES
 
 $ Here comes the MUS/SAT reasoning mess

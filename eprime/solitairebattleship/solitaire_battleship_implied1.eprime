@@ -62,6 +62,7 @@ $$   agrid : size of ship occupying cell or 0 if empty
 $$   sij : boolean whether cell is occupied or not
 
 $#VAR agrid
+$#SHOW agrid main
 find    agrid  :         matrix indexed by [ROW_RANGE, COL_RANGE] of SQUARE_STATUS
 
 $#AUX sij

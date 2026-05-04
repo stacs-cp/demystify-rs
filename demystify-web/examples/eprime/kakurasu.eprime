@@ -6,6 +6,7 @@ given right_labels : matrix indexed by [int(1..grid_size)] of int(1..sum( [i | i
 
 
 $#VAR res
+$#SHOW res main
 find res : matrix indexed by [int(1..grid_size), int(1..grid_size)] of int(0,1)
 
 $#CON rowcon "The sum of row {{index[0]}} is {{params['right_labels'][index[0]]}}"

@@ -34,6 +34,7 @@ $$ And GRID, any initial values provided for cells (or 0 for no value)
 given     GRID : matrix indexed by [RANGE,RANGE] of VALUES
 
 $#VAR field
+$#SHOW field main
 find field : matrix indexed by [RANGE,RANGE] of RANGE
 
 $$ For all four dimensions I decided it would be too risky to try to change the

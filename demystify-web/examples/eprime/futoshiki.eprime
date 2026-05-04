@@ -23,6 +23,7 @@ $ list of < relations in the problem
 given     lt     : matrix indexed by [NUMQD, int(0..3)] of RANGE
 
 $#VAR field
+$#SHOW field main
 find      field  : matrix indexed by [RANGE, RANGE] of RANGE
 
 

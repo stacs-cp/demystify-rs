@@ -15,6 +15,7 @@ given grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..8)
 
 $ 1 = mine, 0 = no mine
 $#VAR mines
+$#SHOW mines main
 find mines : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
 
 $#CON clue "cell ({{index[0]}},{{index[1]}}) sees {{params['grid'][index[0]][index[1]]}} mine(s) among its neighbours"

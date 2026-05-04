@@ -15,6 +15,7 @@ $ start_grid[r,c] = -1 means no clue; 0..9 = exact count of black cells in 3x3 n
 given start_grid : matrix indexed by [int(1..height), int(1..width)] of int(-1..9)
 
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [int(1..height), int(1..width)] of int(0..1)
 
 $#CON clue "cell ({{index[0]}},{{index[1]}}) has {{params['start_grid'][index[0]][index[1]]}} black neighbour(s) in its 3x3 region"

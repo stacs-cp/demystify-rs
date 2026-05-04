@@ -5,7 +5,11 @@ use anyhow::Context;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::problem::{PuzLit, VarValPair, parse::PuzzleParse, solver::PuzzleSolver};
+use crate::problem::{
+    PuzLit, VarValPair,
+    parse::{PuzzleParse, ShowRole},
+    solver::PuzzleSolver,
+};
 
 /// Convert a 2D clue matrix (outer = side entry, inner = padded-with-trailing-zeros clue slots)
 /// into layered border labels. Non-zero values in each row are right-aligned across layers so
@@ -409,26 +413,18 @@ impl Problem {
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
-        let varnames = tosolve
+        let main_show = solver
+            .puzzleparse()
+            .eprime
+            .show
             .iter()
-            .map(|x| x.var().name().clone())
-            .chain(known.iter().map(|x| x.var().name().clone()))
-            .collect::<HashSet<String>>();
-
-        let allowed_names: HashSet<String> = if varnames.len() == 1 {
-            varnames
-        } else if varnames.contains("grid") {
-            {
-                let mut set = HashSet::new();
-                set.insert("grid".to_string());
-                set
-            }
-        } else {
-            return Err(anyhow::anyhow!(
-                "More than one variable matrix, and none called 'grid', so not sure what to print: {:?}",
-                varnames
-            ));
-        };
+            .find(|d| d.role == ShowRole::Main)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "model has no `$#SHOW <var> main` directive — required for rendering"
+                )
+            })?;
+        let allowed_names: HashSet<String> = std::iter::once(main_show.var.clone()).collect();
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
             vec![
@@ -571,26 +567,18 @@ impl Problem {
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
 
-        let varnames = tosolve
+        let main_show = solver
+            .puzzleparse()
+            .eprime
+            .show
             .iter()
-            .map(|x| x.var().name().clone())
-            .chain(known.iter().map(|x| x.var().name().clone()))
-            .collect::<HashSet<String>>();
-
-        let allowed_names: HashSet<String> = if varnames.len() == 1 {
-            varnames
-        } else if varnames.contains("grid") {
-            {
-                let mut set = HashSet::new();
-                set.insert("grid".to_string());
-                set
-            }
-        } else {
-            return Err(anyhow::anyhow!(
-                "More than one variable matrix, and none called 'grid', so not sure what to print: {:?}",
-                varnames
-            ));
-        };
+            .find(|d| d.role == ShowRole::Main)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "model has no `$#SHOW <var> main` directive — required for rendering"
+                )
+            })?;
+        let allowed_names: HashSet<String> = std::iter::once(main_show.var.clone()).collect();
 
         let mut knowledgegrid: Vec<Vec<Option<Vec<StateLit>>>> =
             vec![

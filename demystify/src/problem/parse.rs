@@ -60,6 +60,30 @@ pub struct EPrimeAnnotations {
     /// constraint name — together with a group-relative human label).
     /// A constraint family may belong to multiple groups.
     pub families: BTreeMap<String, Family>,
+    /// Renderer display directives collected from `$#SHOW` lines.  Each
+    /// entry assigns one variable to one display role (e.g. `main`).
+    /// The role set is intentionally closed — unknown roles are rejected at
+    /// parse time so that half-implemented roles fail loudly rather than
+    /// silently rendering as a default.
+    pub show: Vec<ShowDirective>,
+}
+
+/// Renderer roles a variable can play in the rendered output.  Closed enum:
+/// new roles need both a parser arm and a renderer implementation, so adding
+/// a variant here is intentional.  See `$#SHOW` directive parsing.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ShowRole {
+    /// Primary deduction matrix; rendered as foreground glyphs/digits.
+    /// At most one `main` per model.
+    Main,
+}
+
+/// One `$#SHOW <var> <role> [args...]` directive.  Carries the variable name
+/// the directive applies to plus the role it should play in rendering.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ShowDirective {
+    pub var: String,
+    pub role: ShowRole,
 }
 
 /// A family-group declared by a `$#FAMILY` directive. Carries human-readable
@@ -564,6 +588,7 @@ impl PuzzleParse {
         kind: Option<String>,
         info: Vec<String>,
         families: BTreeMap<String, Family>,
+        show: Vec<ShowDirective>,
     ) -> PuzzleParse {
         PuzzleParse {
             eprime: EPrimeAnnotations {
@@ -577,6 +602,7 @@ impl PuzzleParse {
                 info,
                 decs: vec![],
                 families,
+                show,
             },
             satinstance: SatInstance::new(),
             cnf: None,
@@ -950,6 +976,7 @@ struct ParsedEprimeData {
     info: Vec<String>,
     decs: Vec<String>,
     families: BTreeMap<String, Family>,
+    show: Vec<ShowDirective>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -1074,6 +1101,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     let mut info: Vec<String> = Vec::new();
     let mut decs: Vec<String> = Vec::new();
     let mut families: BTreeMap<String, Family> = BTreeMap::new();
+    let mut show: Vec<ShowDirective> = Vec::new();
 
     let mut kind: Option<String> = None;
 
@@ -1193,6 +1221,42 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                     bail!(format!("FAMILY group '{group_id}' defined twice"));
                 }
                 families.insert(group_id, family);
+            } else if line.starts_with("$#SHOW ") {
+                let rest = line.strip_prefix("$#SHOW ").unwrap_or("").trim();
+                let toks: Vec<&str> = rest.split_whitespace().collect();
+                if toks.len() < 2 {
+                    bail!("$#SHOW needs <var> <role> [args...]: got '{line}'");
+                }
+                let show_var = toks[0].to_string();
+                let role_token = toks[1];
+                let role_args = &toks[2..];
+                if !ident_re.is_match(&show_var) {
+                    bail!(
+                        "$#SHOW: var '{show_var}' must match \
+                         [a-zA-Z][a-zA-Z0-9_]*"
+                    );
+                }
+                let role = match role_token {
+                    "main" => {
+                        if !role_args.is_empty() {
+                            bail!(
+                                "$#SHOW {show_var} main: role 'main' takes \
+                                 no arguments, got {role_args:?}"
+                            );
+                        }
+                        ShowRole::Main
+                    }
+                    other => bail!(
+                        "$#SHOW: unknown role '{other}' (recognised: main). \
+                         Roles are a closed set; new ones must be added in \
+                         parse.rs and the renderer."
+                    ),
+                };
+                info!(target: "parser", "Found SHOW: var '{}' role {:?}", show_var, role);
+                show.push(ShowDirective {
+                    var: show_var,
+                    role,
+                });
             } else if line.starts_with("$#REVEAL ") {
                 if parts.len() != 3 {
                     bail!(format!(
@@ -1246,6 +1310,43 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         }
     }
 
+    // Validate $#SHOW directives:
+    //   - var must be a declared variable (in `vars` or `auxvars`)
+    //   - at most one directive per var
+    //   - at most one `main` per model
+    {
+        let mut seen_vars: HashSet<&str> = HashSet::new();
+        let mut main_var: Option<&str> = None;
+        for d in &show {
+            if !vars.contains(&d.var) && !auxvars.contains(&d.var) {
+                bail!(
+                    "$#SHOW: var '{}' is not declared as $#VAR or $#AUX \
+                     (declared vars: {:?}, aux: {:?})",
+                    d.var,
+                    vars.iter().collect::<Vec<_>>(),
+                    auxvars.iter().collect::<Vec<_>>()
+                );
+            }
+            if !seen_vars.insert(d.var.as_str()) {
+                bail!(
+                    "$#SHOW: var '{}' has more than one directive; each var \
+                     may have at most one role",
+                    d.var
+                );
+            }
+            if d.role == ShowRole::Main {
+                if let Some(prev) = main_var {
+                    bail!(
+                        "$#SHOW: at most one 'main' allowed per model, \
+                         got both '{prev}' and '{}'",
+                        d.var
+                    );
+                }
+                main_var = Some(d.var.as_str());
+            }
+        }
+    }
+
     info!(target: "parser", "Names parsed from ESSENCE': vars: {:?} auxvars: {:?} cons {:?}", vars, auxvars, cons);
 
     Ok(ParsedEprimeData {
@@ -1257,6 +1358,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
         info,
         decs,
         families,
+        show,
     })
 }
 
@@ -1273,6 +1375,7 @@ fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<Puzz
         parsed_eprime.kind,
         parsed_eprime.info,
         parsed_eprime.families,
+        parsed_eprime.show,
     );
     puzzleparse.eprime.decs = parsed_eprime.decs;
     Ok(puzzleparse)
@@ -2008,5 +2111,125 @@ mod tests {
             err.contains("typo_con"),
             "error message should name the missing constraint, got: {err}"
         );
+    }
+
+    #[test]
+    fn test_parse_show_main() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR stars").unwrap();
+        writeln!(temp_file, "$#VAR cages").unwrap();
+        writeln!(temp_file, "$#SHOW stars main").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parsing should succeed");
+
+        assert_eq!(parsed.show.len(), 1);
+        assert_eq!(parsed.show[0].var, "stars");
+        assert_eq!(parsed.show[0].role, super::ShowRole::Main);
+    }
+
+    #[test]
+    fn test_parse_show_unknown_role_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW grid cages").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "Unknown role should fail");
+        let err = format!("{:?}", result.unwrap_err());
+        assert!(
+            err.contains("cages"),
+            "error message should name the rejected role, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_show_undeclared_var_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW typo main").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(
+            result.is_err(),
+            "$#SHOW referencing undeclared var should fail"
+        );
+        let err = format!("{:?}", result.unwrap_err());
+        assert!(
+            err.contains("typo"),
+            "error message should name the missing var, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_parse_show_main_takes_no_args() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW grid main extra").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "main role should reject extra args");
+    }
+
+    #[test]
+    fn test_parse_show_two_main_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR a").unwrap();
+        writeln!(temp_file, "$#VAR b").unwrap();
+        writeln!(temp_file, "$#SHOW a main").unwrap();
+        writeln!(temp_file, "$#SHOW b main").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "two 'main' directives should fail");
+    }
+
+    #[test]
+    fn test_parse_show_duplicate_var_fails() {
+        // Each var may appear in at most one $#SHOW directive.  Even if a
+        // future role is added, the same var cannot have two roles.
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW grid main").unwrap();
+        writeln!(temp_file, "$#SHOW grid main").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "two $#SHOW lines for same var should fail");
+    }
+
+    #[test]
+    fn test_parse_show_missing_role_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR grid").unwrap();
+        writeln!(temp_file, "$#SHOW grid").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "$#SHOW with no role should fail");
     }
 }

@@ -15,6 +15,7 @@ given trees: matrix indexed by [X,Y] of int(0..treecount)
 
 $ Tree is negative number, tent is positive, -i is connected to i
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [X,Y] of int(-treecount..treecount)
 
 $#CON adj "({{index[0]}}, {{index[1]}}) and ({{index[0]+index[2]}}, {{index[1]+index[3]}}) cannot both contain tents"

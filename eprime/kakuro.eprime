@@ -12,6 +12,7 @@ where forAll x: X. forAll y : Y. vertsums[x,y] != 0 -> blanks[x+1,y] = 1
 where forAll x: X. forAll y : Y. horzsums[x,y] != 0 -> blanks[x,y+1] = 1
 
 $#VAR grid
+$#SHOW grid main
 find grid : matrix indexed by [X,Y] of int(0..9)
 
 $#CON vertalldiff "The vertical block starting at {{[index[0], index[1],index[2],index[3]]}} is all different"

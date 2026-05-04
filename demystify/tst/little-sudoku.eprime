@@ -7,6 +7,7 @@ letting ndim be int(1..n)
 
 
 $#VAR grid
+$#SHOW grid main
 find grid: matrix indexed by [ndim] of ndim
 
 $#CON different "{{index[0]}} and {{index[1]}} cannot both be {{index[2]}}"
