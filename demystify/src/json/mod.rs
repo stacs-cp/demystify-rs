@@ -35,6 +35,135 @@ fn clue_matrix_to_layers(clues: &[Vec<i64>]) -> Vec<Vec<String>> {
     layers
 }
 
+/// Read a `$#SHOW` name as a 2-D `Option<i64>` matrix, falling back to
+/// known PuzLits when the name is a find/aux variable rather than a given
+/// parameter.  Mystify uses this path: every `puz_*` matrix is a `find`
+/// var whose values arrive at render-time via injected known lits, not via
+/// a `letting` block.
+fn read_2d_option_i64(
+    pp: &PuzzleParse,
+    known: &BTreeSet<PuzLit>,
+    name: &str,
+) -> anyhow::Result<Vec<Vec<Option<i64>>>> {
+    if pp.eprime.has_param(name) {
+        return pp.eprime.param_vec_vec_option_i64(name);
+    }
+    if !pp.eprime.vars.contains(name) && !pp.eprime.auxvars.contains(name) {
+        anyhow::bail!("$#SHOW name '{name}' is neither a parameter nor a find/aux variable");
+    }
+    let dims = pp
+        .get_matrix_indices(name)
+        .with_context(|| format!("variable '{name}' has no shape information for rendering"))?;
+    if dims.len() != 2 {
+        anyhow::bail!(
+            "$#SHOW '{name}': expected 2-D matrix, got {} dimensions",
+            dims.len()
+        );
+    }
+    let h = dims[0].max(0) as usize;
+    let w = dims[1].max(0) as usize;
+    let mut grid = vec![vec![None; w]; h];
+    for lit in known {
+        if !lit.sign() || lit.var().name() != name {
+            continue;
+        }
+        let lit_var = lit.var();
+        let idx = lit_var.indices();
+        if idx.len() != 2 {
+            continue;
+        }
+        let r = (idx[0] - 1) as usize;
+        let c = (idx[1] - 1) as usize;
+        if r < h && c < w {
+            grid[r][c] = Some(lit.val());
+        }
+    }
+    Ok(grid)
+}
+
+/// Read a `$#SHOW` name as a 2-D `i64` matrix.  Same dispatch as
+/// [`read_2d_option_i64`] but cells without a known lit default to 0.
+fn read_2d_i64(
+    pp: &PuzzleParse,
+    known: &BTreeSet<PuzLit>,
+    name: &str,
+) -> anyhow::Result<Vec<Vec<i64>>> {
+    if pp.eprime.has_param(name) {
+        return pp.eprime.param_vec_vec_i64(name);
+    }
+    let m = read_2d_option_i64(pp, known, name)?;
+    Ok(m.into_iter()
+        .map(|row| row.into_iter().map(|c| c.unwrap_or(0)).collect())
+        .collect())
+}
+
+/// Read a `$#SHOW` name as a 1-D `i64` vector.
+fn read_1d_i64(pp: &PuzzleParse, known: &BTreeSet<PuzLit>, name: &str) -> anyhow::Result<Vec<i64>> {
+    if pp.eprime.has_param(name) {
+        return pp.eprime.param_vec_i64(name);
+    }
+    if !pp.eprime.vars.contains(name) && !pp.eprime.auxvars.contains(name) {
+        anyhow::bail!("$#SHOW name '{name}' is neither a parameter nor a find/aux variable");
+    }
+    let dims = pp
+        .get_matrix_indices(name)
+        .with_context(|| format!("variable '{name}' has no shape information for rendering"))?;
+    if dims.len() != 1 {
+        anyhow::bail!(
+            "$#SHOW '{name}': expected 1-D vector, got {} dimensions",
+            dims.len()
+        );
+    }
+    let n = dims[0].max(0) as usize;
+    let mut out = vec![0; n];
+    for lit in known {
+        if !lit.sign() || lit.var().name() != name {
+            continue;
+        }
+        let lit_var = lit.var();
+        let idx = lit_var.indices();
+        if idx.len() != 1 {
+            continue;
+        }
+        let i = (idx[0] - 1) as usize;
+        if i < n {
+            out[i] = lit.val();
+        }
+    }
+    Ok(out)
+}
+
+/// Read a `$#SHOW` name as a scalar `i64`.
+fn read_scalar_i64(pp: &PuzzleParse, known: &BTreeSet<PuzLit>, name: &str) -> anyhow::Result<i64> {
+    if pp.eprime.has_param(name) {
+        return pp.eprime.param_i64(name);
+    }
+    for lit in known {
+        if lit.sign() && lit.var().name() == name && lit.var().indices().is_empty() {
+            return Ok(lit.val());
+        }
+    }
+    anyhow::bail!(
+        "$#SHOW name '{name}': scalar has no value (not a parameter, and no \
+         known equality literal found)"
+    )
+}
+
+/// Read a 2-D `String` matrix.  Used for `side_labels`-shaped params.
+fn read_2d_string(
+    pp: &PuzzleParse,
+    known: &BTreeSet<PuzLit>,
+    name: &str,
+) -> anyhow::Result<Vec<Vec<String>>> {
+    if pp.eprime.has_param(name) {
+        return pp.eprime.param_vec_vec_string(name);
+    }
+    let m = read_2d_i64(pp, known, name)?;
+    Ok(m.into_iter()
+        .map(|row| row.into_iter().map(|c| c.to_string()).collect())
+        .collect())
+}
+
 /// Read an edge-labels parameter, returning the layered-labels representation
 /// the renderer expects.  Accepts two shapes:
 ///
@@ -45,12 +174,19 @@ fn clue_matrix_to_layers(clues: &[Vec<i64>]) -> Vec<Vec<String>> {
 /// Returns `None` if the param is the zero-only matrix shape (all rows empty),
 /// matching the legacy "no labels to render" behaviour.
 fn read_edge_labels(
-    eprime: &crate::problem::parse::EPrimeAnnotations,
+    pp: &PuzzleParse,
+    known: &BTreeSet<PuzLit>,
     name: &str,
 ) -> anyhow::Result<Option<Vec<Vec<String>>>> {
-    // Try matrix shape first (numeric clue grids).  param_vec_vec_i64 errors
-    // out for vector params, so fall back to param_vec_string in that case.
-    if let Ok(m) = eprime.param_vec_vec_i64(name) {
+    // Try matrix shape first (numeric clue grids).
+    let dims = if pp.eprime.has_param(name) {
+        // Probe the param shape: vec_vec_i64 errors out for 1-D params.
+        pp.eprime.param_vec_vec_i64(name).ok().map(|_| 2)
+    } else {
+        pp.get_matrix_indices(name).map(|d| d.len())
+    };
+    if let Some(2) = dims {
+        let m = read_2d_i64(pp, known, name)?;
         let layers = clue_matrix_to_layers(&m);
         return Ok(if layers.is_empty() {
             None
@@ -58,7 +194,13 @@ fn read_edge_labels(
             Some(layers)
         });
     }
-    Ok(Some(vec![eprime.param_vec_string(name)?]))
+    // 1-D fallback: vec_string for params (preserves any string entries),
+    // stringified i64 for find vars.
+    if pp.eprime.has_param(name) {
+        return Ok(Some(vec![pp.eprime.param_vec_string(name)?]));
+    }
+    let v = read_1d_i64(pp, known, name)?;
+    Ok(Some(vec![v.iter().map(|x| x.to_string()).collect()]))
 }
 
 /// One instantiated constraint from a `$#CON` class, with the grid cells it covers.
@@ -104,7 +246,24 @@ pub struct Puzzle {
 }
 
 impl Puzzle {
+    /// Build a [`Puzzle`] from a parsed model with no known literals.  Use
+    /// this when you don't have a [`PuzzleSolver`] handy (mostly tests and
+    /// unit tests).  All `$#SHOW` directives whose name resolves to a
+    /// `find` variable will produce empty matrices, since there's no known
+    /// state to read values from.
     pub fn new_from_puzzle(problem: &PuzzleParse) -> anyhow::Result<Puzzle> {
+        Self::new_from_puzzle_and_known(problem, &BTreeSet::new())
+    }
+
+    /// Build a [`Puzzle`] from a parsed model plus a set of known PuzLits.
+    /// `known` is consulted whenever a `$#SHOW` directive names a `find`
+    /// or `aux` variable rather than a `given` parameter — this is the
+    /// path mystify uses to render `puz_*` clue values that are injected
+    /// at runtime via [`PuzzleSolver::add_not_provable_known_lit`].
+    pub fn new_from_puzzle_and_known(
+        problem: &PuzzleParse,
+        known: &BTreeSet<PuzLit>,
+    ) -> anyhow::Result<Puzzle> {
         let kind = problem.eprime.kind.clone().unwrap_or("Unknown".to_string());
 
         let mut width = None;
@@ -167,22 +326,22 @@ impl Puzzle {
                 .map(str::to_string)
         };
         if let Some(p) = edge_param(EdgeSide::Top) {
-            top_labels = read_edge_labels(&problem.eprime, &p)?;
+            top_labels = read_edge_labels(problem, known, &p)?;
         }
         if let Some(p) = edge_param(EdgeSide::Left) {
-            left_labels = read_edge_labels(&problem.eprime, &p)?;
+            left_labels = read_edge_labels(problem, known, &p)?;
         }
         if let Some(p) = edge_param(EdgeSide::Bottom) {
-            bottom_labels = read_edge_labels(&problem.eprime, &p)?;
+            bottom_labels = read_edge_labels(problem, known, &p)?;
         }
         if let Some(p) = edge_param(EdgeSide::Right) {
-            right_labels = read_edge_labels(&problem.eprime, &p)?;
+            right_labels = read_edge_labels(problem, known, &p)?;
         }
 
         // Combined four-side labels: a [side, slot] matrix in left/top/right/
         // bottom order.  Overrides individual edge directives if present.
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::SideLabels)) {
-            let side_labels = problem.eprime.param_vec_vec_string(p)?;
+            let side_labels = read_2d_string(problem, known, p)?;
             left_labels = Some(vec![side_labels[0].clone()]);
             top_labels = Some(vec![side_labels[1].clone()]);
             right_labels = Some(vec![side_labels[2].clone()]);
@@ -191,12 +350,12 @@ impl Puzzle {
 
         // Givens (pre-filled values shown as immutable in cells).
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::Givens)) {
-            start_grid = Some(problem.eprime.param_vec_vec_option_i64(p)?);
+            start_grid = Some(read_2d_option_i64(problem, known, p)?);
         }
 
         // Cages (matrix of cage ids per cell).
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::Cages)) {
-            cages = Some(problem.eprime.param_vec_vec_option_i64(p)?);
+            cages = Some(read_2d_option_i64(problem, known, p)?);
         }
 
         let mut thermometers = None;
@@ -213,8 +372,8 @@ impl Puzzle {
             let ShowRole::Thermometers { step: step_name } = &d.role else {
                 unreachable!()
             };
-            let step = problem.eprime.param_i64(step_name)?;
-            let therms_raw = problem.eprime.param_vec_vec_i64(&d.var)?;
+            let step = read_scalar_i64(problem, known, step_name)?;
+            let therms_raw = read_2d_i64(problem, known, &d.var)?;
             // therms_raw[col_0][row_0] (0-indexed), outer index = col, inner index = row.
             let mut therm_paths: BTreeMap<i64, BTreeMap<i64, [i64; 2]>> = BTreeMap::new();
             for (col_0, col_data) in therms_raw.iter().enumerate() {
@@ -241,7 +400,7 @@ impl Puzzle {
 
         // Less-than relations: vector of [r1, c1, r2, c2] 1-indexed cell pairs.
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::LessThan)) {
-            let lt_raw = problem.eprime.param_vec_vec_i64(p)?;
+            let lt_raw = read_2d_i64(problem, known, p)?;
             let pairs: Vec<[i64; 4]> = lt_raw
                 .iter()
                 .map(|v| [v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1])
@@ -253,7 +412,7 @@ impl Puzzle {
 
         // Cage sums: vector of integers indexed by cage id.
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::CageSums)) {
-            cage_sums = Some(problem.eprime.param_vec_i64(p)?);
+            cage_sums = Some(read_1d_i64(problem, known, p)?);
         }
 
         if width.is_none() || height.is_none() {
@@ -420,7 +579,7 @@ impl Problem {
         deduction_list: &[DescriptionStatement],
         comments: &str,
     ) -> anyhow::Result<Problem> {
-        let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
+        let puzzle = Puzzle::new_from_puzzle_and_known(solver.puzzleparse(), known)?;
 
         let main_show = solver
             .puzzleparse()
@@ -574,7 +733,7 @@ impl Problem {
         complexity: &BTreeMap<VarValPair, usize>,
         description: &str,
     ) -> anyhow::Result<Problem> {
-        let puzzle = Puzzle::new_from_puzzle(solver.puzzleparse())?;
+        let puzzle = Puzzle::new_from_puzzle_and_known(solver.puzzleparse(), known)?;
 
         let main_show = solver
             .puzzleparse()
@@ -691,6 +850,48 @@ mod tests {
 
     use crate::json::Puzzle;
     use crate::problem::util::test_utils::build_puzzleparse;
+
+    #[test]
+    fn givens_role_reads_from_known_puzlits_for_find_var() -> anyhow::Result<()> {
+        use crate::problem::PuzLit;
+        use crate::problem::PuzVar;
+        use crate::problem::VarValPair;
+        use crate::problem::parse::{ShowDirective, ShowRole};
+        use std::collections::BTreeSet;
+
+        // Mystify-style scenario: `grid` is a `find` matrix declared in the
+        // model; values arrive at render-time via known PuzLits rather than
+        // a `letting` block.  Re-target the existing $#SHOW directives so
+        // that `grid` plays the `givens` role, then check the renderer
+        // builds `start_grid` from the supplied known lits.
+        let mut puz = build_puzzleparse("./tst/binairo.eprime", "./tst/binairo-1.param");
+        puz.eprime.show = vec![
+            ShowDirective {
+                var: "grid".to_string(),
+                role: ShowRole::Main,
+            },
+            ShowDirective {
+                var: "grid".to_string(),
+                role: ShowRole::Givens,
+            },
+        ];
+
+        let mut known: BTreeSet<PuzLit> = BTreeSet::new();
+        // Pin a single cell so we can verify the matrix is filled from `known`.
+        known.insert(PuzLit::new_eq(VarValPair::new(
+            &PuzVar::new("grid", vec![1, 1]),
+            1,
+        )));
+
+        let p = Puzzle::new_from_puzzle_and_known(&puz, &known)?;
+        let sg = p
+            .start_grid
+            .expect("givens role should populate start_grid");
+        assert_eq!(sg[0][0], Some(1), "known grid[1,1]=1 should appear");
+        // Cells without a known lit should remain None.
+        assert_eq!(sg[0][1], None);
+        Ok(())
+    }
 
     #[test]
     fn test_parse_essence_binairo() -> anyhow::Result<()> {
