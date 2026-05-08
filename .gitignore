@@ -19,6 +19,14 @@ out.html
 out*.sat
 etc/example-outputs/
 bench-results/
+bench-results-*/
+.demystify-*/
+conjure-output/
+*.stderr
+*.stdout
+profile.json.gz
+*.trace
+cargo-flamegraph.trace
 
 # IDE and editor files
 *.swp
