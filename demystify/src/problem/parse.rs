@@ -88,6 +88,14 @@ pub enum ShowRole {
     /// Less-than relations: a vector of `[r1, c1, r2, c2]` 1-indexed cell
     /// pairs.  At most one.
     LessThan,
+    /// Less-than relations encoded as a per-axis sign matrix between
+    /// adjacent cells (rather than the tuple-list form of `LessThan`).
+    /// Cell value 1 = `<` (the lower-coordinate cell is less);
+    /// 2 = `>` (the higher-coordinate cell is less); 0 = no sign.
+    /// Horizontal axis: `[D, D-1]` matrix, sign at `[i,j]` sits between
+    /// `(i,j)` and `(i,j+1)`. Vertical axis: `[D-1, D]` matrix, sign at
+    /// `[i,j]` sits between `(i,j)` and `(i+1,j)`.  At most one per axis.
+    LessThanGrid { axis: LtAxis },
     /// Thermometer paths.  Carries the name of the scalar `step` parameter
     /// used to decode the encoded therm-id/position grid.  At most one.
     Thermometers { step: String },
@@ -96,6 +104,13 @@ pub enum ShowRole {
     /// Combined four-side edge labels: a 4-row matrix in left/top/right/
     /// bottom order.  At most one.
     SideLabels,
+}
+
+/// Which axis a `less_than_grid` SHOW directive labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum LtAxis {
+    Horizontal,
+    Vertical,
 }
 
 /// Which side of the grid an `edge` SHOW directive labels.
@@ -1320,11 +1335,30 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                         };
                         ShowRole::Edge { side }
                     }
+                    "less_than_grid" => {
+                        if role_args.len() != 1 {
+                            bail!(
+                                "$#SHOW {show_var} less_than_grid: needs \
+                                 exactly one arg (axis: horizontal|vertical), \
+                                 got {role_args:?}"
+                            );
+                        }
+                        let axis = match role_args[0] {
+                            "horizontal" => LtAxis::Horizontal,
+                            "vertical" => LtAxis::Vertical,
+                            other => bail!(
+                                "$#SHOW {show_var} less_than_grid: unknown \
+                                 axis '{other}' (expected horizontal|vertical)"
+                            ),
+                        };
+                        ShowRole::LessThanGrid { axis }
+                    }
                     other => bail!(
                         "$#SHOW: unknown role '{other}' (recognised: main, \
-                         cages, givens, cage_sums, less_than, thermometers, \
-                         edge, side_labels). Roles are a closed set; new \
-                         ones must be added in parse.rs and the renderer."
+                         cages, givens, cage_sums, less_than, less_than_grid, \
+                         thermometers, edge, side_labels). Roles are a closed \
+                         set; new ones must be added in parse.rs and the \
+                         renderer."
                     ),
                 };
                 info!(target: "parser", "Found SHOW: var '{}' role {:?}", show_var, role);
@@ -1390,12 +1424,14 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     //   - singleton roles (Main, Cages, Givens, CageSums, LessThan,
     //     Thermometers, SideLabels) appear at most once across the model
     //   - Edge directives appear at most once per side
+    //   - LessThanGrid directives appear at most once per axis
     // Name-existence (var/aux/param) is checked later in `parse_eprime`
     // where the runtime params are also available.
     {
         let mut seen_vars: HashSet<&str> = HashSet::new();
         let mut singleton_seen: HashMap<&str, &str> = HashMap::new();
         let mut edge_seen: HashMap<EdgeSide, &str> = HashMap::new();
+        let mut lt_grid_seen: HashMap<LtAxis, &str> = HashMap::new();
         for d in &show {
             if !seen_vars.insert(d.var.as_str()) {
                 bail!(
@@ -1412,7 +1448,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 ShowRole::LessThan => Some("less_than"),
                 ShowRole::Thermometers { .. } => Some("thermometers"),
                 ShowRole::SideLabels => Some("side_labels"),
-                ShowRole::Edge { .. } => None,
+                ShowRole::Edge { .. } | ShowRole::LessThanGrid { .. } => None,
             };
             if let Some(key) = singleton_key
                 && let Some(prev) = singleton_seen.insert(key, d.var.as_str())
@@ -1429,6 +1465,15 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 bail!(
                     "$#SHOW: at most one 'edge {side:?}' allowed per model, \
                      got both '{prev}' and '{}'",
+                    d.var
+                );
+            }
+            if let ShowRole::LessThanGrid { axis } = d.role
+                && let Some(prev) = lt_grid_seen.insert(axis, d.var.as_str())
+            {
+                bail!(
+                    "$#SHOW: at most one 'less_than_grid {axis:?}' allowed \
+                     per model, got both '{prev}' and '{}'",
                     d.var
                 );
             }
@@ -2357,6 +2402,84 @@ mod tests {
         let path = temp_file.path().to_path_buf();
         let result = super::parse_eprime_file(&path);
         assert!(result.is_err(), "edge with unknown side should fail");
+    }
+
+    #[test]
+    fn test_parse_show_less_than_grid_axes() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR puz_lt_h").unwrap();
+        writeln!(temp_file, "$#VAR puz_lt_v").unwrap();
+        writeln!(temp_file, "$#SHOW puz_lt_h less_than_grid horizontal").unwrap();
+        writeln!(temp_file, "$#SHOW puz_lt_v less_than_grid vertical").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path).expect("parse should succeed");
+        assert_eq!(parsed.show.len(), 2);
+        assert_eq!(
+            parsed.show[0].role,
+            super::ShowRole::LessThanGrid {
+                axis: super::LtAxis::Horizontal
+            }
+        );
+        assert_eq!(
+            parsed.show[1].role,
+            super::ShowRole::LessThanGrid {
+                axis: super::LtAxis::Vertical
+            }
+        );
+    }
+
+    #[test]
+    fn test_parse_show_less_than_grid_unknown_axis_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR puz_lt").unwrap();
+        writeln!(temp_file, "$#SHOW puz_lt less_than_grid sideways").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(
+            result.is_err(),
+            "less_than_grid with unknown axis should fail"
+        );
+    }
+
+    #[test]
+    fn test_parse_show_less_than_grid_missing_axis_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR puz_lt").unwrap();
+        writeln!(temp_file, "$#SHOW puz_lt less_than_grid").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(result.is_err(), "less_than_grid with no axis should fail");
+    }
+
+    #[test]
+    fn test_parse_show_two_less_than_grid_horizontal_fails() {
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR a").unwrap();
+        writeln!(temp_file, "$#VAR b").unwrap();
+        writeln!(temp_file, "$#SHOW a less_than_grid horizontal").unwrap();
+        writeln!(temp_file, "$#SHOW b less_than_grid horizontal").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let result = super::parse_eprime_file(&path);
+        assert!(
+            result.is_err(),
+            "two less_than_grid directives for the same axis should fail"
+        );
     }
 
     #[test]

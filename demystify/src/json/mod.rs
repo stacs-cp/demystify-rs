@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::{
     PuzLit, VarValPair,
-    parse::{EdgeSide, PuzzleParse, ShowRole},
+    parse::{EdgeSide, LtAxis, PuzzleParse, ShowRole},
     solver::PuzzleSolver,
 };
 
@@ -399,15 +399,45 @@ impl Puzzle {
         }
 
         // Less-than relations: vector of [r1, c1, r2, c2] 1-indexed cell pairs.
+        // Collect from both the tuple-list role (`less_than`) and the per-axis
+        // sign-matrix role (`less_than_grid horizontal|vertical`).  Cells are
+        // emitted as 0-indexed [r1, c1, r2, c2] where (r1,c1) is the smaller.
+        let mut pairs: Vec<[i64; 4]> = Vec::new();
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::LessThan)) {
             let lt_raw = read_2d_i64(problem, known, p)?;
-            let pairs: Vec<[i64; 4]> = lt_raw
-                .iter()
-                .map(|v| [v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1])
-                .collect();
-            if !pairs.is_empty() {
-                less_than = Some(pairs);
+            pairs.extend(
+                lt_raw
+                    .iter()
+                    .map(|v| [v[0] - 1, v[1] - 1, v[2] - 1, v[3] - 1]),
+            );
+        }
+        for d in show.iter() {
+            let axis = match d.role {
+                ShowRole::LessThanGrid { axis } => axis,
+                _ => continue,
+            };
+            let m = read_2d_i64(problem, known, &d.var)?;
+            for (r, row) in m.iter().enumerate() {
+                for (c, &v) in row.iter().enumerate() {
+                    let (r, c) = (r as i64, c as i64);
+                    let pair = match (axis, v) {
+                        (LtAxis::Horizontal, 1) => [r, c, r, c + 1],
+                        (LtAxis::Horizontal, 2) => [r, c + 1, r, c],
+                        (LtAxis::Vertical, 1) => [r, c, r + 1, c],
+                        (LtAxis::Vertical, 2) => [r + 1, c, r, c],
+                        (_, 0) => continue,
+                        (_, other) => anyhow::bail!(
+                            "$#SHOW {} less_than_grid {axis:?}: cell [{r},{c}] \
+                             has unexpected value {other} (expected 0, 1, or 2)",
+                            d.var
+                        ),
+                    };
+                    pairs.push(pair);
+                }
             }
+        }
+        if !pairs.is_empty() {
+            less_than = Some(pairs);
         }
 
         // Cage sums: vector of integers indexed by cage id.
@@ -680,21 +710,16 @@ impl Problem {
         let mut statements = Vec::new();
 
         for deduction in deduction_list {
-            // Bundle the technique name (if matched) and fingerprint (always)
-            // into the same Statement as the deduction text, so they form
-            // one visual block instead of looking like sibling deductions
-            // in the flat statements list.
+            // Bundle the technique name (if matched) into the same Statement
+            // as the deduction text, so they form one visual block instead of
+            // looking like sibling deductions in the flat statements list.
+            // Fingerprint rendering is suppressed for now — the format is not
+            // yet stable and the raw string confuses readers.
             let mut header = String::new();
             if let Some(name) = &deduction.name {
                 header.push_str(&format!(
                     "<div class=\"technique-name\">{}</div>",
                     tera::escape_html(name)
-                ));
-            }
-            if let Some(fp) = &deduction.fingerprint {
-                header.push_str(&format!(
-                    "<div class=\"technique-fingerprint\"><code>fp: {}</code></div>",
-                    tera::escape_html(fp)
                 ));
             }
             statements.push(Statement {
