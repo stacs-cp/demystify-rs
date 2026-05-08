@@ -9,6 +9,7 @@ use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha20Rng;
 use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
+#[cfg(not(feature = "deterministic"))]
 use thread_local::ThreadLocal;
 use tracing::info;
 
@@ -89,6 +90,7 @@ pub struct SolverConfig {
 
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
+    #[cfg(not(feature = "deterministic"))]
     satcore: ThreadLocal<SatCore>,
     puzzleparse: Arc<PuzzleParse>,
 
@@ -110,6 +112,7 @@ impl PuzzleSolver {
     /// A `PuzzleSolver` instance.
     pub fn new(puzzleparse: Arc<PuzzleParse>) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
+            #[cfg(not(feature = "deterministic"))]
             satcore: ThreadLocal::new(),
             puzzleparse,
             tosolvelits: None,
@@ -133,6 +136,7 @@ impl PuzzleSolver {
         solver_config: SolverConfig,
     ) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
+            #[cfg(not(feature = "deterministic"))]
             satcore: ThreadLocal::new(),
             puzzleparse,
             tosolvelits: None,
@@ -142,13 +146,17 @@ impl PuzzleSolver {
     }
 
     /// Retrieves the `SatCore` instance associated with the `PuzzleSolver`.
-    ///
-    /// # Returns
-    ///
-    /// A reference to the `SatCore` instance.
+    /// Normally a thread-local cache so learned clauses survive across calls;
+    /// under the `deterministic` feature we rebuild on every call to keep
+    /// each SAT call independent of state from prior calls.
+    #[cfg(not(feature = "deterministic"))]
     fn get_satcore(&self) -> &SatCore {
         self.satcore
             .get_or(|| SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap())
+    }
+    #[cfg(feature = "deterministic")]
+    fn get_satcore(&self) -> SatCore {
+        SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap()
     }
 
     /// Converts a `PuzLit` instance to a `Lit`.
@@ -1117,6 +1125,46 @@ impl PuzzleSolver {
         config: &MusConfig,
         musdict: Option<MusDict>,
     ) -> MusDict {
+        // Source of the size-bound for the parallel MUS pass.  Workers
+        // normally re-read the live MusDict so each new MUS tightens the
+        // bound for in-flight peers — that's a feedback loop on completion
+        // order, which is what makes parallel search nondeterministic.
+        // Under the `deterministic` feature we instead capture one snapshot
+        // before the pass; every worker reads the same value.  This keeps
+        // the read/write split structural rather than scattering cfg checks
+        // through the loop body.
+        struct BoundRead {
+            #[cfg(feature = "deterministic")]
+            snapshot: Option<usize>,
+        }
+        impl BoundRead {
+            fn snapshot(md: &Mutex<MusDict>, lits: &BTreeSet<Lit>) -> Self {
+                #[cfg(feature = "deterministic")]
+                {
+                    Self {
+                        snapshot: md.lock().unwrap().min_filtered(lits),
+                    }
+                }
+                #[cfg(not(feature = "deterministic"))]
+                {
+                    let _ = (md, lits);
+                    Self {}
+                }
+            }
+            fn read(&self, md: &Mutex<MusDict>, lits: &BTreeSet<Lit>) -> Option<usize> {
+                #[cfg(feature = "deterministic")]
+                {
+                    let _ = (md, lits);
+                    self.snapshot
+                }
+                #[cfg(not(feature = "deterministic"))]
+                {
+                    let _ = self;
+                    md.lock().unwrap().min_filtered(lits)
+                }
+            }
+        }
+
         let md =
             Mutex::new(musdict.unwrap_or_else(|| MusDict::with_keep_all(config.keep_all_muses)));
 
@@ -1199,6 +1247,8 @@ impl PuzzleSolver {
             }
         }
 
+        let bound_read = BoundRead::snapshot(&md, lits);
+
         let search_t0 = Instant::now();
         lits.iter()
             .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
@@ -1207,8 +1257,7 @@ impl PuzzleSolver {
                 let mus_test_size = if config.find_bigger {
                     mus_size + 9
                 } else {
-                    let g = md.lock().unwrap();
-                    match g.min_filtered(lits) {
+                    match bound_read.read(&md, lits) {
                         Some(found) => {
                             let bound = (found as i64).min(mus_size);
                             if config.find_one { bound - 1 } else { bound }
@@ -1235,7 +1284,7 @@ impl PuzzleSolver {
                 crate::stats::record_mus_search(elapsed, outcome, func);
 
                 if let Ok(Some(y)) = ret {
-                    if y.len() <= 1 {
+                    if y.len() <= 1 && !config.find_bigger {
                         eprintln!(
                             "WARNING: General MUS search found size-{} MUS for lit {} — should have been caught by size-1 scan (possible scoping bug)",
                             y.len(), x
@@ -1321,6 +1370,31 @@ mod tests {
 
     use rand::SeedableRng;
     use test_log::test;
+
+    /// Regression target for the `deterministic` feature: the same input must
+    /// produce a byte-identical `MusDict` across runs. Disabled without the
+    /// feature flag because parallel bound-tightening intentionally makes
+    /// normal-mode output order-dependent.
+    #[cfg(feature = "deterministic")]
+    #[test]
+    fn test_deterministic_mus_search_is_repeatable() {
+        let pp = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        ));
+        let run_once = || {
+            let mut puz = PuzzleSolver::new(pp.clone()).unwrap();
+            let varlits = puz.get_provable_varlits().clone();
+            puz.get_many_vars_small_mus_quick(&varlits, &MusConfig::default(), None)
+        };
+        let r1 = run_once();
+        let r2 = run_once();
+        assert_eq!(
+            format!("{:?}", r1.muses()),
+            format!("{:?}", r2.muses()),
+            "deterministic feature: same input must yield same MusDict across runs"
+        );
+    }
 
     #[test]
     fn test_parse_essence() -> anyhow::Result<()> {
