@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use crate::json::StateLit;
 
-use crate::json::{Problem, Puzzle};
+use crate::json::{ConstraintShape, ConstraintShapeKind, Problem, Puzzle};
 use itertools::Itertools;
 use svg::Node;
 
@@ -150,15 +150,21 @@ impl PuzzleDraw {
         let mut out = self.draw_grid(puzzle);
 
         let mut cells = self.make_cells(puzzle);
+        let mut text_cells = self.make_text_cells(puzzle);
 
         if let Some(start_grid) = &puzzle.start_grid {
-            self.fill_fixed_state(&mut cells, start_grid);
+            self.fill_fixed_state(&mut cells, &mut text_cells, start_grid);
         }
 
         if let Some(state) = &puzjson.state
             && let Some(knowledge_grid) = &state.knowledge_grid
         {
-            self.fill_knowledge(&mut cells, &puzzle.start_grid, knowledge_grid);
+            self.fill_knowledge(
+                &mut cells,
+                &mut text_cells,
+                &puzzle.start_grid,
+                knowledge_grid,
+            );
         }
 
         if let Some(state) = &puzjson.state
@@ -199,9 +205,24 @@ impl PuzzleDraw {
 
         out.append(cellgrp);
 
-        // Overlays drawn after cells.
+        // Overlays drawn after cell backgrounds but BEFORE the text overlay,
+        // so digits / candidate numbers always sit on top.
         out.append(self.draw_less_than(puzzle));
         out.append(self.draw_cage_sums(puzzle));
+        if let Some(state) = &puzjson.state
+            && let Some(shapes) = &state.constraint_shapes
+        {
+            out.append(self.draw_constraint_shapes(puzzle, shapes));
+        }
+
+        let mut textgrp = element::Group::new();
+        textgrp.assign("class", "cell-text-overlays");
+        for row in text_cells {
+            for c in row {
+                textgrp.append(c);
+            }
+        }
+        out.append(textgrp);
 
         let out = self.fill_outside_labels(out, puzzle);
 
@@ -316,6 +337,7 @@ impl PuzzleDraw {
     fn fill_fixed_state(
         &self,
         cells: &mut Vec<Vec<element::Group>>,
+        text_cells: &mut Vec<Vec<element::Group>>,
         contents: &Vec<Vec<Option<i64>>>,
     ) {
         let wall_below = self.decorations.wall_below();
@@ -356,7 +378,7 @@ impl PuzzleDraw {
                         node.assign("y", 0.65);
                         node.assign("dominant-baseline", "middle");
                         node.assign("text-anchor", "middle");
-                        cells[i][j].append(node);
+                        text_cells[i][j].append(node);
                     }
                     continue;
                 }
@@ -377,7 +399,7 @@ impl PuzzleDraw {
                         node.assign("transform", "translate(0.2, 0.9)");
                     }
 
-                    cells[i][j].append(node);
+                    text_cells[i][j].append(node);
                 }
             }
         }
@@ -386,6 +408,7 @@ impl PuzzleDraw {
     fn fill_knowledge(
         &self,
         cells: &mut Vec<Vec<element::Group>>,
+        text_cells: &mut Vec<Vec<element::Group>>,
         fixed_contents: &Option<Vec<Vec<Option<i64>>>>,
         contents: &Vec<Vec<Option<Vec<StateLit>>>>,
     ) {
@@ -411,32 +434,11 @@ impl PuzzleDraw {
                             if a * sqrt_length + b < cell.len() {
                                 let state = &cell[a * sqrt_length + b];
                                 let s = state.val.to_string();
-
-                                let mut group = svg::node::element::Group::new();
-                                group.assign(
-                                    "transform",
-                                    format!(
-                                        "translate({}, {})",
-                                        0.05 + (b as f64 * little_step),
-                                        0.05 + (a as f64 + 1.0) * little_step
-                                    ),
+                                let transform = format!(
+                                    "translate({}, {})",
+                                    0.05 + (b as f64 * little_step),
+                                    0.05 + (a as f64 + 1.0) * little_step
                                 );
-
-                                let mut rect = svg::node::element::Rectangle::new();
-                                rect.assign("width", little_step);
-                                rect.assign("height", little_step);
-                                rect.assign("y", -little_step);
-                                rect.assign("class", "litbox");
-                                group.append(rect);
-
-                                let mut node = svg::node::element::Text::new(s);
-                                node.assign("font-size", little_step);
-                                node.assign("x", little_step / 2.0);
-                                node.assign("y", -little_step / 3.0);
-                                node.assign("dominant-baseline", "middle");
-                                node.assign("text-anchor", "middle");
-
-                                group.append(node);
 
                                 let id = format!(
                                     "D_{}_{}_{}",
@@ -444,18 +446,46 @@ impl PuzzleDraw {
                                     j + 1,
                                     cell[a * sqrt_length + b].val
                                 );
-                                group.assign("id", id.clone());
-                                group.assign("name", id);
-                                group.assign("data-cand", state.val.to_string());
-                                group.assign("class", "literal");
-                                let mut classes = vec!["literal".to_owned()];
 
+                                let mut classes = vec!["literal".to_owned()];
                                 if let Some(extra_classes) = &state.classes {
                                     classes.extend(extra_classes.iter().cloned());
                                 }
-                                group.assign("class", classes.iter().join(" "));
+                                let class_str = classes.iter().join(" ");
 
-                                cells[i][j].append(group);
+                                // Background group — interactive: holds the litbox rect that
+                                // turns red on hover, plus the id/classes the JS hover layer
+                                // uses to find peers.
+                                let mut bg_group = svg::node::element::Group::new();
+                                bg_group.assign("transform", transform.clone());
+
+                                let mut rect = svg::node::element::Rectangle::new();
+                                rect.assign("width", little_step);
+                                rect.assign("height", little_step);
+                                rect.assign("y", -little_step);
+                                rect.assign("class", "litbox");
+                                bg_group.append(rect);
+
+                                bg_group.assign("id", id.clone());
+                                bg_group.assign("name", id);
+                                bg_group.assign("data-cand", state.val.to_string());
+                                bg_group.assign("class", class_str.clone());
+                                cells[i][j].append(bg_group);
+
+                                // Text group — non-interactive (pointer-events inherits the
+                                // text_cells default of `none`), but keeps the same visual
+                                // classes so styles like `.litneg text { line-through }` work.
+                                let mut text_group = svg::node::element::Group::new();
+                                text_group.assign("transform", transform);
+                                let mut node = svg::node::element::Text::new(s);
+                                node.assign("font-size", little_step);
+                                node.assign("x", little_step / 2.0);
+                                node.assign("y", -little_step / 3.0);
+                                node.assign("dominant-baseline", "middle");
+                                node.assign("text-anchor", "middle");
+                                text_group.append(node);
+                                text_group.assign("class", class_str);
+                                text_cells[i][j].append(text_group);
                             }
                         }
                     }
@@ -819,6 +849,92 @@ impl PuzzleDraw {
         grp
     }
 
+    /// Draw a per-MUS-constraint visual indicator on the grid.
+    /// All colour, dash pattern, and stroke width are CSS-controlled — the
+    /// renderer only emits structural classes (`constraint-shape`,
+    /// the kind subclass, and the `highlight_conN` class that already drives
+    /// the cell tint).
+    fn draw_constraint_shapes(
+        &self,
+        puzzle: &Puzzle,
+        shapes: &[ConstraintShape],
+    ) -> element::Group {
+        let mut grp = element::Group::new();
+        grp.assign("class", "constraint-shapes");
+        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
+        let stagger_unit = step * 0.04;
+
+        for shape in shapes {
+            let class = format!(
+                "constraint-shape {} highlight_con{}",
+                match shape.kind {
+                    ConstraintShapeKind::Row => "row",
+                    ConstraintShapeKind::Col => "col",
+                    ConstraintShapeKind::Pair => "pair",
+                    ConstraintShapeKind::Region => "region",
+                },
+                shape.idx
+            );
+            match shape.kind {
+                ConstraintShapeKind::Row => {
+                    if shape.cells.len() < 2 {
+                        continue;
+                    }
+                    let row = shape.cells[0][0] as f64;
+                    let cols: Vec<i64> = shape.cells.iter().map(|c| c[1]).collect();
+                    let c0 = (*cols.iter().min().unwrap()) as f64;
+                    let c1 = (*cols.iter().max().unwrap()) as f64;
+                    let y = step * (row + 0.5) + stagger_unit * shape.stagger as f64;
+                    let mut line = element::Line::new();
+                    line.assign("x1", step * (c0 + 0.5));
+                    line.assign("y1", y);
+                    line.assign("x2", step * (c1 + 0.5));
+                    line.assign("y2", y);
+                    line.assign("class", class);
+                    grp.append(line);
+                }
+                ConstraintShapeKind::Col => {
+                    if shape.cells.len() < 2 {
+                        continue;
+                    }
+                    let col = shape.cells[0][1] as f64;
+                    let rows: Vec<i64> = shape.cells.iter().map(|c| c[0]).collect();
+                    let r0 = (*rows.iter().min().unwrap()) as f64;
+                    let r1 = (*rows.iter().max().unwrap()) as f64;
+                    let x = step * (col + 0.5) + stagger_unit * shape.stagger as f64;
+                    let mut line = element::Line::new();
+                    line.assign("x1", x);
+                    line.assign("y1", step * (r0 + 0.5));
+                    line.assign("x2", x);
+                    line.assign("y2", step * (r1 + 0.5));
+                    line.assign("class", class);
+                    grp.append(line);
+                }
+                ConstraintShapeKind::Pair => {
+                    let [a, b] = [shape.cells[0], shape.cells[1]];
+                    let mut line = element::Line::new();
+                    line.assign("x1", step * (a[1] as f64 + 0.5));
+                    line.assign("y1", step * (a[0] as f64 + 0.5));
+                    line.assign("x2", step * (b[1] as f64 + 0.5));
+                    line.assign("y2", step * (b[0] as f64 + 0.5));
+                    line.assign("class", class);
+                    grp.append(line);
+                }
+                ConstraintShapeKind::Region => {
+                    let path_d = region_perimeter_path(&shape.cells, step);
+                    if path_d.is_empty() {
+                        continue;
+                    }
+                    let mut p = element::Path::new();
+                    p.assign("d", path_d);
+                    p.assign("class", class);
+                    grp.append(p);
+                }
+            }
+        }
+        grp
+    }
+
     /// Draw small cage sum labels in the top-left corner of each cage's top-left cell.
     fn draw_cage_sums(&self, puzzle: &Puzzle) -> element::Group {
         let mut grp = element::Group::new();
@@ -882,6 +998,74 @@ impl PuzzleDraw {
 
         out
     }
+
+    /// Parallel grid of empty groups sharing each cell's local-coordinate
+    /// transform.  Used as the destination for text content (digits and
+    /// candidates) so they can be rendered AFTER overlays — keeping numbers
+    /// always on top of constraint-shape lines/regions.  No `id` (would
+    /// clash with the corresponding cell `<g>`) and no background rect.
+    fn make_text_cells(&self, puzzle: &Puzzle) -> Vec<Vec<element::Group>> {
+        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
+
+        let mut out = Vec::new();
+        for i in 0..puzzle.height {
+            out.push(vec![]);
+            for j in 0..puzzle.width {
+                let i_f = i as f64;
+                let j_f = j as f64;
+                let mut g = element::Group::new();
+                g.assign(
+                    "transform",
+                    format!(
+                        "translate({} {}) scale({})",
+                        step * (j_f + 0.05),
+                        step * (i_f + 0.05),
+                        step * 0.9
+                    ),
+                );
+                // Mouse / hover handling stays on the underlying cell <g>.
+                g.assign("pointer-events", "none");
+                g.assign("class", "cell-text-overlay");
+                out.last_mut().unwrap().push(g);
+            }
+        }
+
+        out
+    }
+}
+
+/// Build an SVG `path d` attribute tracing the outline of the union of `cells`,
+/// skipping any cell-edge that's shared with another cell in the same set.
+/// Edges sit exactly on cell boundaries (no inset).  Output is a series of
+/// disconnected `M x y L x y` segments — fine for stroking, the path is not
+/// expected to be closed or filled.
+fn region_perimeter_path(cells: &[[i64; 2]], step: f64) -> String {
+    use std::collections::BTreeSet;
+    let cellset: BTreeSet<[i64; 2]> = cells.iter().copied().collect();
+    let mut out = String::new();
+    for &[r, c] in cells {
+        let x0 = step * c as f64;
+        let x1 = step * (c + 1) as f64;
+        let y0 = step * r as f64;
+        let y1 = step * (r + 1) as f64;
+        // Top edge — skip if cell (r-1, c) is in scope.
+        if !cellset.contains(&[r - 1, c]) {
+            out.push_str(&format!("M {x0} {y0} L {x1} {y0} "));
+        }
+        // Bottom edge — skip if cell (r+1, c) is in scope.
+        if !cellset.contains(&[r + 1, c]) {
+            out.push_str(&format!("M {x0} {y1} L {x1} {y1} "));
+        }
+        // Left edge — skip if cell (r, c-1) is in scope.
+        if !cellset.contains(&[r, c - 1]) {
+            out.push_str(&format!("M {x0} {y0} L {x0} {y1} "));
+        }
+        // Right edge — skip if cell (r, c+1) is in scope.
+        if !cellset.contains(&[r, c + 1]) {
+            out.push_str(&format!("M {x1} {y0} L {x1} {y1} "));
+        }
+    }
+    out
 }
 
 fn make_cell(i: i64, j: i64, step: f64) -> element::Group {

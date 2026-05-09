@@ -203,6 +203,97 @@ fn read_edge_labels(
     Ok(Some(vec![v.iter().map(|x| x.to_string()).collect()]))
 }
 
+/// Build the list of `ConstraintShape`s for the constraints in `constraint_num`.
+/// Cells are extracted from each constraint's scope, filtered to the main `$#SHOW`
+/// var (so non-grid auxiliaries don't leak in), kind detected, and stagger
+/// assigned per row/col group.
+fn build_constraint_shapes(
+    solver: &PuzzleSolver,
+    constraint_num: &HashMap<String, usize>,
+    allowed_names: &HashSet<String>,
+) -> Vec<ConstraintShape> {
+    let mut shapes: Vec<ConstraintShape> = Vec::with_capacity(constraint_num.len());
+    for (name, &idx) in constraint_num.iter() {
+        let scope = solver.puzzleparse().constraint_scope(name);
+        let cells: BTreeSet<[i64; 2]> = scope
+            .iter()
+            .filter(|p| allowed_names.contains(p.var().name()))
+            .filter_map(|p| {
+                let i = p.var().indices();
+                if i.len() == 2 && i[0] >= 1 && i[1] >= 1 {
+                    Some([i[0] - 1, i[1] - 1])
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if cells.is_empty() {
+            continue;
+        }
+        let cells: Vec<[i64; 2]> = cells.into_iter().collect();
+        let kind = detect_constraint_shape_kind(&cells);
+        shapes.push(ConstraintShape {
+            idx,
+            kind,
+            cells,
+            stagger: 0,
+        });
+    }
+    shapes.sort_by_key(|s| s.idx);
+
+    // Stagger assignment: group Row constraints by row index, Col by column,
+    // assign 0, +1, -1, +2, -2, ... in shape-idx order.  Pair and Region get 0.
+    let mut row_groups: BTreeMap<i64, Vec<usize>> = BTreeMap::new();
+    let mut col_groups: BTreeMap<i64, Vec<usize>> = BTreeMap::new();
+    for (vec_pos, shape) in shapes.iter().enumerate() {
+        match shape.kind {
+            ConstraintShapeKind::Row => {
+                row_groups
+                    .entry(shape.cells[0][0])
+                    .or_default()
+                    .push(vec_pos);
+            }
+            ConstraintShapeKind::Col => {
+                col_groups
+                    .entry(shape.cells[0][1])
+                    .or_default()
+                    .push(vec_pos);
+            }
+            _ => {}
+        }
+    }
+    for indices in row_groups.values().chain(col_groups.values()) {
+        for (slot, &vec_pos) in indices.iter().enumerate() {
+            shapes[vec_pos].stagger = stagger_slot(slot);
+        }
+    }
+    shapes
+}
+
+/// 0, +1, -1, +2, -2, ...
+fn stagger_slot(n: usize) -> i32 {
+    let half = (n as i32 + 1) / 2;
+    if n.is_multiple_of(2) { half } else { -half }
+}
+
+fn detect_constraint_shape_kind(cells: &[[i64; 2]]) -> ConstraintShapeKind {
+    if cells.is_empty() {
+        return ConstraintShapeKind::Region;
+    }
+    let same_row = cells.iter().all(|c| c[0] == cells[0][0]);
+    if same_row {
+        return ConstraintShapeKind::Row;
+    }
+    let same_col = cells.iter().all(|c| c[1] == cells[0][1]);
+    if same_col {
+        return ConstraintShapeKind::Col;
+    }
+    if cells.len() == 2 {
+        return ConstraintShapeKind::Pair;
+    }
+    ConstraintShapeKind::Region
+}
+
 /// One instantiated constraint from a `$#CON` class, with the grid cells it covers.
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ConstraintInstance {
@@ -547,6 +638,38 @@ pub struct State {
     /// Populated only in difficulty view to show non-deducable cells visually.
     #[serde(default)]
     pub blocked_cells: Option<Vec<[i64; 2]>>,
+    /// One entry per MUS constraint in this step, describing how the renderer
+    /// should draw the constraint's scope.  Indexed by `idx` matching the
+    /// `highlight_conN` class on the cells.
+    #[serde(default)]
+    pub constraint_shapes: Option<Vec<ConstraintShape>>,
+}
+
+/// How the renderer should draw a constraint's scope on the grid.  Detected
+/// from the cell layout; a constraint whose cells share a row is `Row`, share
+/// a column is `Col`, has exactly two non-aligned cells is `Pair`, otherwise
+/// `Region`.
+#[derive(Clone, Copy, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ConstraintShapeKind {
+    Row,
+    Col,
+    Pair,
+    Region,
+}
+
+/// A drawable constraint scope: which cells it covers and how to render them.
+#[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct ConstraintShape {
+    /// Matches the `highlight_conN` index used on cell tags so CSS can drive
+    /// per-constraint colour from a single source.
+    pub idx: usize,
+    pub kind: ConstraintShapeKind,
+    /// 0-indexed `[row, col]`, sorted.
+    pub cells: Vec<[i64; 2]>,
+    /// Perpendicular offset slot for line/pair shapes that share an axis with
+    /// other constraints (`0, +1, -1, +2, -2, ...`); the renderer multiplies
+    /// by a small fraction of cell width.  Always `0` for `Region`.
+    pub stagger: i32,
 }
 
 #[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -738,11 +861,18 @@ impl Problem {
             }
         }
 
+        let constraint_shapes = build_constraint_shapes(solver, &constraint_num, &allowed_names);
+
         let state = State {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
             description: Some(comments.to_owned()),
             blocked_cells: None,
+            constraint_shapes: if constraint_shapes.is_empty() {
+                None
+            } else {
+                Some(constraint_shapes)
+            },
         };
 
         Ok(Problem {
@@ -860,6 +990,7 @@ impl Problem {
             statements: Some(statements),
             description: Some(description.to_owned()),
             blocked_cells,
+            constraint_shapes: None,
         };
 
         Ok(Problem {
@@ -875,6 +1006,34 @@ mod tests {
 
     use crate::json::Puzzle;
     use crate::problem::util::test_utils::build_puzzleparse;
+
+    #[test]
+    fn detect_kind_classifies_layouts() {
+        use super::{ConstraintShapeKind as K, detect_constraint_shape_kind};
+        assert_eq!(detect_constraint_shape_kind(&[[3, 1], [3, 5]]), K::Row);
+        assert_eq!(
+            detect_constraint_shape_kind(&[[3, 1], [3, 2], [3, 9]]),
+            K::Row
+        );
+        assert_eq!(detect_constraint_shape_kind(&[[1, 4], [7, 4]]), K::Col);
+        assert_eq!(detect_constraint_shape_kind(&[[1, 1], [3, 5]]), K::Pair);
+        assert_eq!(
+            detect_constraint_shape_kind(&[[1, 1], [1, 2], [2, 1]]),
+            K::Region
+        );
+        // Single cell — degenerate case, classified as Row (zero-length line).
+        assert_eq!(detect_constraint_shape_kind(&[[2, 2]]), K::Row);
+    }
+
+    #[test]
+    fn stagger_slot_pattern() {
+        use super::stagger_slot;
+        assert_eq!(stagger_slot(0), 0);
+        assert_eq!(stagger_slot(1), -1);
+        assert_eq!(stagger_slot(2), 1);
+        assert_eq!(stagger_slot(3), -2);
+        assert_eq!(stagger_slot(4), 2);
+    }
 
     #[test]
     fn givens_role_reads_from_known_puzlits_for_find_var() -> anyhow::Result<()> {
