@@ -1,0 +1,19 @@
+$ Tiny non-square minesweeper for testing.  Standard convention: minesweeper.eprime
+$ declares `find grid : matrix indexed by [int(1..height), int(1..width)]`, so
+$ index[0] is the row axis (= height) and index[1] is the column axis (= width).
+$ Used as a control case alongside the kakuro non-square test — both should
+$ produce puzzle.width=3, puzzle.height=2.
+language ESSENCE' 1.0
+
+letting width be 3
+letting height be 2
+
+letting known be [
+[true,  true,  true],
+[true,  true,  true]
+]
+
+letting mines be [
+[false, true,  false],
+[false, false, false]
+]

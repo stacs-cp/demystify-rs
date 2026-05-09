@@ -1,0 +1,26 @@
+$ Tiny non-square kakuro for testing.
+$ kakuro.eprime declares `find grid : matrix indexed by [X,Y]` with X = 1..width and
+$ Y = 1..height — first index is the row axis and second is the column axis, so the
+$ visible grid is 2 rows × 3 cols.  Regression target: rendering must derive
+$ puzzle.width=3 / puzzle.height=2 from the matrix shape, not the param names.
+
+letting width be 2
+letting height be 3
+
+letting blanks be
+[
+    [0,0,0],
+    [0,1,1]
+]
+
+letting vertsums be
+[
+    [0,1,2],
+    [0,0,0]
+]
+
+letting horzsums be
+[
+    [0,0,0],
+    [3,0,0]
+]

@@ -1,0 +1,65 @@
+$ Copy of eprime/kakuro.eprime kept inside `tst/` so tests can reference it
+$ via the standard `./tst/...` path used by build_puzzleparse.
+$ Important property for tests: declares `find grid : matrix indexed by [X,Y]`
+$ with X = 1..width and Y = 1..height — index[0] is the row axis but is bounded
+$ by `width`, the inverse of the usual convention.  Non-square instances need
+$ Puzzle::width / Puzzle::height to come from the matrix shape, not the param
+$ names, or the renderer's `cells[row][col]` indexing goes out of bounds.
+
+language ESSENCE' 1.0
+
+given width,height : int
+letting X be int(1..width)
+letting Y be int(1..height)
+
+given blanks : matrix indexed by [X,Y] of int(0..1)
+given vertsums: matrix indexed by [X,Y] of int
+given horzsums: matrix indexed by [X,Y] of int
+
+where forAll x: X. forAll y : Y. vertsums[x,y] != 0 -> blanks[x+1,y] = 1
+where forAll x: X. forAll y : Y. horzsums[x,y] != 0 -> blanks[x,y+1] = 1
+
+$#KIND Kakuro
+$#VAR grid
+$#SHOW grid main
+find grid : matrix indexed by [X,Y] of int(0..9)
+
+$#CON vertalldiff "The vertical block starting at {{[index[0], index[1],index[2],index[3]]}} is all different"
+find vertalldiff: matrix indexed by [X,X,X,Y] of bool
+
+$#CON vertsum "The vertical block starting at {{[index[0], index[1]]}} sums to {{params['vertsums'][index[0]][index[1]]}}"
+find vertsum: matrix indexed by [X,Y] of bool
+
+$#CON horzalldiff "The horizontal block starting at {{[index[0], index[1],index[2],index[3]]}} is all different"
+find horzalldiff: matrix indexed by [X,Y,Y,Y] of bool
+
+$#CON horzsum "The horizontal block starting at {{[index[0], index[1]]}} sums to {{params['horzsums'][index[0]][index[1]]}}"
+find horzsum: matrix indexed by [X,Y] of bool
+
+
+such that
+forAll x : X. forAll y : Y. blanks[x,y] = 0 <-> grid[x,y] = 0,
+
+
+forAll x: X.  forAll y : Y. forAll x2: int(x+1..width). forAll x3: int(x2+1..width).
+vertalldiff[x,x2,x3,y] ->
+( (vertsums[x,y] != 0 /\ and([ blanks[i,y] = 1 | i : int(x+1..x3)]) ) -> (grid[x2,y] != grid[x3,y]) ),
+
+
+forAll x: X. forAll y : Y.
+vertsum[x,y] -> (
+vertsums[x,y] != 0 ->
+( vertsums[x,y] = sum([ grid[i,y] | i : int(x+1..width), forAll q:int(x+1..i). blanks[q,y]=1]) )),
+
+
+forAll x: X.  forAll y : Y. forAll y2: int(y+1..height). forAll y3: int(y2+1..height).
+horzalldiff[x,y,y2,y3] ->
+( (horzsums[x,y] != 0 /\ and([ blanks[x,j] = 1 | j : int(y+1..y3)]) ) -> (grid[x,y2] != grid[x,y3]) ),
+
+
+forAll x: X. forAll y : Y.
+horzsum[x,y] -> (
+horzsums[x,y] != 0 ->
+( horzsums[x,y] = sum([ grid[x,j] | j : int(y+1..height), forAll q:int(y+1..j). blanks[x,q]=1]) )),
+
+true

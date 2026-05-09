@@ -357,43 +357,32 @@ impl Puzzle {
     ) -> anyhow::Result<Puzzle> {
         let kind = problem.eprime.kind.clone().unwrap_or("Unknown".to_string());
 
-        let mut width = None;
-        let mut height = None;
-
-        for label in ["width", "x", "x_dim"] {
-            if problem.eprime.has_param(label) {
-                width = Some(problem.eprime.param_i64(label)?);
-            }
-        }
-
-        for label in ["height", "y", "y_dim"] {
-            if problem.eprime.has_param(label) {
-                height = Some(problem.eprime.param_i64(label)?);
-            }
-        }
-
-        if problem.eprime.has_param("grid_size") {
-            height = Some(problem.eprime.param_i64("grid_size")?);
-            width = Some(problem.eprime.param_i64("grid_size")?);
-        }
-
-        if problem.eprime.has_param("size") {
-            height = Some(problem.eprime.param_i64("size")?);
-            width = Some(problem.eprime.param_i64("size")?);
-        }
-
-        // If there is only one 'VAR', then it might tell us what to draw
-        if height.is_none() && width.is_none() && problem.eprime.vars.len() == 1 {
-            let var = problem.eprime.vars.iter().next().unwrap();
-
-            let indices = problem.get_matrix_indices(var);
-            if let Some(v) = indices
-                && v.len() == 2
-            {
-                width = Some(v[1]);
-                height = Some(v[0]);
-            }
-        }
+        // The renderer treats `cells[i][j]` as `cells[row][col]`, so
+        // `puzzle.height = dims[0]` and `puzzle.width = dims[1]` of the
+        // main `$#SHOW` var's matrix.  Param-named `width` / `height` are
+        // model-internal — kakuro puts `width` on index[0], opposite the
+        // usual convention — so only the main var's shape is authoritative.
+        let main_show = problem
+            .eprime
+            .show
+            .iter()
+            .find(|d| d.role == ShowRole::Main)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "model has no `$#SHOW <var> main` directive — required for rendering"
+                )
+            })?;
+        let dims = problem
+            .get_matrix_indices(&main_show.var)
+            .with_context(|| format!("main var '{}' has no shape information", main_show.var))?;
+        anyhow::ensure!(
+            dims.len() == 2,
+            "main var '{}' must be a 2-D matrix for rendering, got {} dimensions",
+            main_show.var,
+            dims.len()
+        );
+        let height = dims[0];
+        let width = dims[1];
 
         let mut start_grid = None;
         let mut cages = None;
@@ -536,16 +525,6 @@ impl Puzzle {
             cage_sums = Some(read_1d_i64(problem, known, p)?);
         }
 
-        if width.is_none() || height.is_none() {
-            if let Some(sg) = &start_grid {
-                width = Some(sg[0].len() as i64);
-                height = Some(sg.len() as i64);
-            } else if let Some(cg) = &cages {
-                width = Some(cg[0].len() as i64);
-                height = Some(cg.len() as i64);
-            }
-        }
-
         // $#INFO lines
         let info = if problem.eprime.info.is_empty() {
             None
@@ -604,8 +583,8 @@ impl Puzzle {
 
         Ok(Puzzle {
             kind,
-            width: width.context("'width' not given as a param, and unable to deduce")?,
-            height: height.context("'height' not given as a param, and unable to deduce")?,
+            width,
+            height,
             start_grid,
             solution_grid: None,
             cages,
@@ -1154,6 +1133,94 @@ mod tests {
             sg.iter().all(|row| row.iter().all(|c| c.is_none()))
         });
         assert!(all_empty, "minesweeper should have no fixed start cells");
+        Ok(())
+    }
+
+    /// Non-square kakuro: the model declares the main grid as
+    /// `matrix indexed by [X,Y]` with X = 1..width and Y = 1..height — the
+    /// row axis is bounded by the param named `width`, opposite the usual
+    /// convention.  The renderer needs `puzzle.width` / `puzzle.height` to
+    /// match the visible col/row counts (= `dims[1]` / `dims[0]` of the
+    /// main var), not the param names.  Was a bug: pre-fix the renderer
+    /// pulled `puzzle.width` from the `width` param and indexed the
+    /// knowledge grid out of bounds on a non-square instance.
+    #[test]
+    fn test_puzzle_kakuro_non_square_dimensions() -> anyhow::Result<()> {
+        let puz = build_puzzleparse("./tst/kakuro.eprime", "./tst/kakuro-non-square.param");
+        let p = Puzzle::new_from_puzzle(&puz)?;
+        // Param has width=2, height=3 (kakuro letting names).  Visible grid:
+        // 2 rows × 3 cols, so puzzle.height=2, puzzle.width=3.
+        assert_eq!(
+            p.height, 2,
+            "kakuro: puzzle.height must follow main var index[0] domain (2), not the `height` param (3)"
+        );
+        assert_eq!(
+            p.width, 3,
+            "kakuro: puzzle.width must follow main var index[1] domain (3), not the `width` param (2)"
+        );
+        Ok(())
+    }
+
+    /// Non-square minesweeper: control case for the kakuro test above.
+    /// Minesweeper uses the standard convention (`matrix indexed by
+    /// [int(1..height), int(1..width)]`) so the param-named width/height
+    /// already match the renderer's row/col counts; a regression here
+    /// would mean the fix has flipped the standard case the wrong way.
+    #[test]
+    fn test_puzzle_minesweeper_non_square_dimensions() -> anyhow::Result<()> {
+        let puz = build_puzzleparse(
+            "./tst/minesweeper.eprime",
+            "./tst/minesweeper-non-square.param",
+        );
+        let p = Puzzle::new_from_puzzle(&puz)?;
+        assert_eq!(p.width, 3, "minesweeper: width param=3 is the col count");
+        assert_eq!(p.height, 2, "minesweeper: height param=2 is the row count");
+        Ok(())
+    }
+
+    /// Full pipeline regression: end-to-end through `PuzzleSolver` and
+    /// `Problem::new_from_puzzle_and_state`, which is where the original
+    /// out-of-bounds panic fired (`json/mod.rs:823`) when the knowledge
+    /// grid was sized as `[height][width]` but indexed by the var's
+    /// first/second indices.
+    #[test]
+    fn test_problem_kakuro_non_square_no_panic() -> anyhow::Result<()> {
+        use crate::problem::PuzLit;
+        use crate::problem::solver::PuzzleSolver;
+        use std::collections::BTreeSet;
+        use std::sync::Arc;
+
+        let pp = Arc::new(build_puzzleparse(
+            "./tst/kakuro.eprime",
+            "./tst/kakuro-non-square.param",
+        ));
+        let mut solver = PuzzleSolver::new(pp)?;
+
+        // Build the same `tosolve` shape the planner does — varvalpairs of
+        // every provable literal — so the knowledge grid is populated for
+        // every cell of the main var.
+        let varlits = solver.get_provable_varlits().clone();
+        let tosolve: BTreeSet<_> = varlits
+            .iter()
+            .flat_map(|x| solver.lit_to_puzlit(x))
+            .map(PuzLit::varval)
+            .collect();
+        let known = BTreeSet::new();
+        let deduced = BTreeSet::new();
+
+        // Pre-fix: this panicked with `index out of bounds` because the
+        // knowledge grid was sized [height_param=3][width_param=2] but the
+        // main var's index[1] (col) ran 1..3, exceeding the inner length 2.
+        let problem =
+            super::Problem::new_from_puzzle_and_state(&solver, &tosolve, &known, &deduced, "test")?;
+
+        let kg = problem
+            .state
+            .as_ref()
+            .and_then(|s| s.knowledge_grid.as_ref())
+            .expect("state should have a knowledge grid");
+        assert_eq!(kg.len(), 2, "outer (row) length must be 2");
+        assert_eq!(kg[0].len(), 3, "inner (col) length must be 3");
         Ok(())
     }
 }
