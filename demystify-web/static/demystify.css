@@ -909,6 +909,10 @@ body.he-root {
   stroke-width: 0.01;
   stroke: rgba(107,63,181,0.2);
   fill: none;
+  /* fill:none + default visiblePainted means clicks pass through the rect
+   * interior — only the thin stroke would catch them. Force capture so
+   * clicks anywhere inside the candidate cell reach its [data-cand] <g>. */
+  pointer-events: all;
 }
 
 @keyframes lit-pulse {
@@ -1193,3 +1197,68 @@ body:has(#solver-stage.htmx-request) {
     margin-top: 1rem;
   }
 }
+
+/* ─── Game mode ─── */
+
+.he-level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.he-level-card {
+  position: relative;
+  border: 1px solid var(--line, #d6d3cf);
+  background: var(--paper, #faf9f6);
+  padding: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.he-level-card:hover { border-color: var(--ink, #1f1d1a); }
+
+.he-level-card-name { font-weight: 600; }
+.he-level-card-diff { font-size: 0.8rem; margin-top: 0.25rem; }
+.he-level-card-badge {
+  position: absolute;
+  top: 0.5rem; right: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--ink-mid, #65605a);
+}
+.he-level-card-badge--done { color: green; font-weight: 600; }
+
+.he-game-flash-wrong svg {
+  animation: he-game-shake 0.32s ease;
+  outline: 3px solid rgba(220, 50, 50, 0.65);
+  outline-offset: -3px;
+}
+@keyframes he-game-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+.he-game-won, .he-game-gaveup {
+  background: var(--paper, #ffffff);
+  border: 1px solid var(--rule, #e5dcef);
+  padding: 1rem;
+  border-radius: 6px;
+  text-align: center;
+}
+.he-game-won h3 { color: green; margin-top: 0; }
+.he-game-gaveup h3 { color: var(--ink-mid, #4a3e5e); margin-top: 0; }
+
+.he-btn-active { background: var(--ink, #1d1430); color: var(--paper, #ffffff); }
+
+.he-howto-summary { cursor: pointer; list-style: none; }
+.he-howto-summary::-webkit-details-marker { display: none; }
+.he-howto-summary h4 { display: inline; margin: 0; }
+.he-howto-summary::after { content: "  ▾"; font-size: 0.7rem; color: var(--ink-mid, #4a3e5e); }
+.he-howto[open] .he-howto-summary::after { content: "  ▴"; }
+.he-howto-list { margin: 0.6rem 0 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--ink-mid, #4a3e5e); }
+.he-howto-list li { margin-bottom: 0.3rem; line-height: 1.35; }
+.he-howto-list strong { color: var(--ink, #1d1430); }

@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block title %}Demystify — Game{% endblock title %}
+{% block content %}
+<div class="he-landing">
+  <section class="he-hero">
+    <h1>Play.</h1>
+    <p>Pick a level. Left-click a cell value to place it; right-click to rule it out. Wrong clicks bounce.</p>
+  </section>
+
+  <section class="he-start">
+    <div class="he-paper">
+      <h3>Levels</h3>
+      <div id="game-level-grid" class="he-level-grid">
+        {% for lvl in levels %}
+        <form method="post" action="/game/start" style="margin:0;">
+          <input type="hidden" name="level_id" value="{{ lvl.id }}">
+          <button type="submit" class="he-level-card" data-level-id="{{ lvl.id }}">
+            <div class="he-level-card-name">{{ lvl.name }}</div>
+            <div class="he-level-card-diff muted">{{ lvl.difficulty }}</div>
+            <div class="he-level-card-badge" data-badge-for="{{ lvl.id }}"></div>
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+      <p class="muted" style="margin-top:1rem;font-size:0.85rem;">
+        Progress is stored in your browser's local storage; it's per-device.
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock content %}

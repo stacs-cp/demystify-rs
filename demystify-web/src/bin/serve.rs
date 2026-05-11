@@ -4,6 +4,7 @@ use axum::http::Request;
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum_session::{SessionConfig, SessionLayer, SessionNullPool, SessionStore};
+use demystify_web::game;
 use demystify_web::util::AppState;
 use demystify_web::wrap;
 use std::convert::Infallible;
@@ -71,6 +72,27 @@ fn build_templates() -> tera::Tera {
             include_str!(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/templates/solvetree.html"
+            )),
+        ),
+        (
+            "game_select.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/game_select.html"
+            )),
+        ),
+        (
+            "game_play.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/game_play.html"
+            )),
+        ),
+        (
+            "partials/game_stage.html",
+            include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/templates/partials/game_stage.html"
             )),
         ),
     ])
@@ -190,6 +212,15 @@ async fn main() {
         .route("/solvetree/build", post(wrap::solvetree_build))
         // Legacy JSON endpoint
         .route("/quickFullSolve", post(wrap::dump_full_solve))
+        // Game mode
+        .route("/game", get(game::game_select))
+        .route("/game/start", post(game::game_start))
+        .route("/game/play", get(game::game_play))
+        .route("/game/click", post(game::game_click))
+        .route("/game/hint/heatmap", post(game::game_hint_heatmap))
+        .route("/game/hint/why", post(game::game_hint_why))
+        .route("/game/give-up", post(game::game_give_up))
+        .route("/game/quit", post(game::game_quit))
         // Static assets
         .route(
             "/static/demystify.css",
@@ -231,29 +262,6 @@ async fn main() {
         .route(
             "/static/fonts/fraunces-italic.woff2",
             serve_static_bytes!("/static/fonts/fraunces-italic.woff2", "font/woff2"),
-        )
-        // Legacy static assets (base.css/base.js from demystify core, for CLI compatibility)
-        .route(
-            "/base/base.css",
-            get(move |_: Request<Body>| async {
-                Ok::<_, Infallible>(
-                    Response::builder()
-                        .header("Content-Type", "text/css")
-                        .body(Body::from(demystify::web::base_css()))
-                        .unwrap(),
-                )
-            }),
-        )
-        .route(
-            "/base/base.js",
-            get(move |_: Request<Body>| async {
-                Ok::<_, Infallible>(
-                    Response::builder()
-                        .header("Content-Type", "application/javascript")
-                        .body(Body::from(demystify::web::base_javascript()))
-                        .unwrap(),
-                )
-            }),
         )
         .with_state(app_state)
         .layer(cors)

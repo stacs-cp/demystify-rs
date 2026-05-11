@@ -1,0 +1,137 @@
+{# Dynamic region for game mode: HUD strip, the board (reused render_svg
+   output), and side controls. Swapped via HTMX after every click or hint. #}
+<div id="game-stage"
+     class="he-solver-grid he-game-stage"
+     data-game-mode="true"
+     data-level-id="{{ game_level_id }}"
+     data-failures="{{ game_failures }}"
+     data-hints="{{ game_hints }}"
+     data-won="{{ game_won }}">
+  <section class="he-stage">
+
+  <figure class="he-board">
+    <figcaption class="he-board-cap">
+      <span>{{ puzzle_name }} &middot; {{ puzzle_dim }}</span>
+      <span class="muted">{{ givens_count }} given</span>
+    </figcaption>
+
+    {{ board_svg | safe }}
+
+    <div class="he-board-foot">
+      <div class="legend">
+        <span><i class="sw given"></i>given</span>
+        <span><i class="sw placed"></i>placed</span>
+        <span class="muted" style="margin-left:1rem;">
+          <strong>Left-click</strong> to place a value &middot;
+          <strong>Right-click</strong> to rule it out
+        </span>
+      </div>
+    </div>
+  </figure>
+
+  <aside class="he-deductions" aria-live="polite">
+    {% if game_won %}
+    <div class="he-game-won">
+      <h3>Solved!</h3>
+      <p>Failures: <strong>{{ game_failures }}</strong> &middot; Hints used: <strong>{{ game_hints }}</strong></p>
+      <form method="post" action="/game/quit" style="margin:0;">
+        <button class="he-btn primary" type="submit">Back to levels</button>
+      </form>
+    </div>
+    {% elif gave_up %}
+    <div class="he-game-gaveup">
+      <h3>Gave up.</h3>
+      <p>The solution is shown on the board.</p>
+      <form method="post" action="/game/quit" style="margin:0;">
+        <button class="he-btn primary" type="submit">Back to levels</button>
+      </form>
+    </div>
+    {% elif legend_items | length > 0 %}
+    <h3>Difficulty legend</h3>
+    <div class="he-difficulty-legend">
+      {% for item in legend_items %}
+      <div class="he-legend-item {% for cls in item.classes %}{{ cls }} {% endfor %}js_highlighter">
+        <span class="he-legend-swatch {% for cls in item.classes %}{{ cls }} {% endfor %}"></span>
+        {{ item.content }}
+      </div>
+      {% endfor %}
+    </div>
+    {% elif deductions | length > 0 %}
+    <h3>Why?</h3>
+    <div class="he-steplist-scroll">
+    <ol class="he-steplist">
+      {% for d in deductions %}
+      <li class="he-step {% for cls in d.classes %}{{ cls }} {% endfor %}" tabindex="0">
+        <div class="he-step-num"></div>
+        <div class="he-step-body">
+          <div class="code">{{ d.result | safe }}</div>
+          {% if d.constraints | length > 0 %}
+          <span class="because">because&hellip;</span>
+          {% for con in d.constraints %}
+          <div class="prose {% for cls in d.constraint_classes[loop.index0] %}{{ cls }} {% endfor %}js_highlighter">{{ con }}</div>
+          {% endfor %}
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    </div>
+    {% else %}
+    <h3>Your turn</h3>
+    <p class="muted">
+      Find a candidate value that <em>has to be</em> in its cell (left-click to
+      place it) or <em>cannot be</em> in its cell (right-click to rule it out).
+      Clicks are accepted only when the rules force them &mdash; guesses
+      bounce.
+    </p>
+    {% endif %}
+  </aside>
+
+  </section>
+
+  <aside class="he-rail">
+    <details class="he-paper he-mini he-howto" open>
+      <summary class="he-howto-summary"><h4>How to play</h4></summary>
+      <ul class="he-howto-list">
+        <li><strong>Left-click</strong> a candidate to place it in its cell.</li>
+        <li><strong>Right-click</strong> a candidate to rule it out.</li>
+        <li>Only logically forced clicks are accepted &mdash; wrong clicks bounce and add to your failure count.</li>
+        <li>Stuck? <em>Heatmap</em> shows where the easiest deductions are; <em>Why?</em> then a cell explains one in full.</li>
+      </ul>
+    </details>
+
+    <div class="he-paper he-mini">
+      <h4>Score</h4>
+      <div class="row"><span>Failures</span><span class="b">{{ game_failures }}</span></div>
+      <div class="row"><span>Hints used</span><span class="b">{{ game_hints }}</span></div>
+      <div class="row"><span>Cells placed</span><span class="b">{{ placed }} / {{ total_cells }}</span></div>
+      <div class="row"><span>Candidates left</span><span class="n">{{ candidates_left }}</span></div>
+    </div>
+
+    <div class="he-paper he-mini">
+      <h4>Hints</h4>
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        <button class="he-btn"
+                hx-post="/game/hint/heatmap"
+                hx-target="#game-stage"
+                hx-swap="outerHTML">
+          Heatmap
+        </button>
+        <button class="he-btn" id="game-why-toggle" type="button">
+          Why? (click a cell)
+        </button>
+        <form method="post" action="/game/give-up" style="margin:0;"
+              hx-post="/game/give-up"
+              hx-target="#game-stage"
+              hx-swap="outerHTML">
+          <button class="he-btn" type="submit" onclick="return confirm('Give up and reveal the solution?');">
+            Give up
+          </button>
+        </form>
+        <form method="post" action="/game/quit" style="margin:0;">
+          <button class="he-btn" type="submit">Quit to menu</button>
+        </form>
+      </div>
+    </div>
+  </aside>
+</div>

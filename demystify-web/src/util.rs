@@ -32,6 +32,26 @@ pub struct SolverSession {
     pub explore: Option<ExploreState>,
     pub explore_enabled: bool,
     pub history: Vec<PuzzlePlanner>,
+    pub game: Option<GameState>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GameState {
+    pub level_id: String,
+    pub failures: u32,
+    pub hints_used: u32,
+    pub completed: bool,
+}
+
+impl GameState {
+    pub fn new(level_id: String) -> Self {
+        Self {
+            level_id,
+            failures: 0,
+            hints_used: 0,
+            completed: false,
+        }
+    }
 }
 
 impl SolverSession {
@@ -44,6 +64,7 @@ impl SolverSession {
             explore: None,
             explore_enabled: false,
             history: vec![snapshot],
+            game: None,
         }
     }
 
@@ -155,5 +176,6 @@ pub fn import_snapshot_into_session(
         explore: None,
         explore_enabled: false,
         history,
+        game: None,
     })
 }

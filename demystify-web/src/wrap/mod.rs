@@ -579,6 +579,18 @@ fn parse_cell_literal(headers: &axum::http::header::HeaderMap) -> anyhow::Result
     Ok(cell?)
 }
 
+pub fn parse_cell_literal_pub(headers: &axum::http::header::HeaderMap) -> anyhow::Result<Vec<i64>> {
+    parse_cell_literal(headers)
+}
+
+pub fn build_solver_stage_context_pub(
+    problem: &Problem,
+    round: u32,
+    session: &SolverSession,
+) -> tera::Context {
+    build_solver_stage_context(problem, round, session)
+}
+
 fn render_explore_explain(
     state: &AppState,
     solver: &mut SolverSession,
