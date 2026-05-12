@@ -78,37 +78,28 @@ both roles: generation (no pinning) and solving/explaining (pinned). There is
 no need for a separate "solver-only" copy of the model — and keeping one
 would mean two copies of the constraint semantics that must stay in lock-step.
 
-## Migrating `mystify`
+## `mystify` side
 
-`mystify` currently has its own copy of the assignment-pinning logic. It
-should call into demystify instead:
+`mystify/src/corpus.rs::build_planner` already pins via
+`planner.solver().pin_assignment(saved.json["puzzle"])` (its old
+`walk_assign`/`apply_puzzle_clues` copy is gone). `PuzzleDesign::apply_to_planner`
+in `mystify/src/puzzle.rs` still iterates `(PuzVar, val)` pairs and calls
+`add_not_provable_known_lit` directly — that's the same primitive without the
+JSON detour, so it needs no change; the `neighbourhood_`-prefixed variant is
+generation-specific and stays. `mystify` keeps its own `PuzzleContext::from_json`
+/ `make_planner` parsing path — only the *pinning* came across.
 
-- **`mystify/src/corpus.rs`** — `apply_puzzle_clues` + `walk_assign` walk the
-  saved `"puzzle"` JSON and call `solver.add_not_provable_known_lit` per leaf.
-  Replace the `apply_puzzle_clues(&mut planner, puzzle_clues)?` call in
-  `build_planner` with
+### Colour-region tinting
 
-  ```rust
-  planner.solver().pin_assignment(puzzle_clues)?;
-  ```
-
-  and delete `apply_puzzle_clues` and `walk_assign`. (`puzzle_clues` is the
-  `"puzzle"` sub-object — `saved.json["puzzle"]`; `pin_assignment` pins every
-  variable it finds, which is correct because that object only ever contains
-  the `puz_*` clue cells. If a future format puts non-clue keys there, slice
-  first.) `mystify` keeps its own `PuzzleContext::from_json` / `make_planner`
-  parsing path — only the *pinning* moves.
-
-- **`mystify/src/puzzle.rs`** — `PuzzleDesign::apply_to_planner` /
-  `apply_to_planner_impl` already do the minimal thing (iterate `(PuzVar, val)`
-  pairs, call `add_not_provable_known_lit`) and don't go through JSON, so they
-  need no change. `apply_to_planner_neighbourhood` (the `neighbourhood_`-prefixed
-  variant) is generation-specific and stays as is. If you later want a single
-  code path, `PuzzleDesign` could expose its assignment as a `PuzVar::to_json_map`
-  and feed it to `pin_assignment`, but that is optional.
-
-After migrating, `mystify` inherits the input validation for free, and the
-demystify dependency must be at a revision that includes `pin_assignment`.
+The jigsaw-minesweeper models declare their colour partition with
+`$#SHOW puz_colour cages`, which draws thick borders between adjacent cells of
+different colour and treats colour `0` as a real cage. The `region_tint`
+`$#SHOW` role (added for this — see `ShowRole` in `demystify/src/problem/parse.rs`)
+is the right fit: it tints coloured cells, honours `0` as "uncoloured", and
+draws no borders. The demystify-side test fixtures
+(`demystify/tst/{pp,}jigsawminesweeper.eprime`) already use `region_tint`; the
+`mystify`-side `examples/{pp,}jigsawminesweeper.eprime` should switch
+`$#SHOW puz_colour cages` → `$#SHOW puz_colour region_tint` to match.
 
 [`PuzVar::to_json_map`]: ../demystify/src/problem/mod.rs
 [`PuzzleSolver::pin_assignment`]: ../demystify/src/problem/solver.rs

@@ -109,6 +109,48 @@ fn jigsawminesweeper_pinned_instance_fully_solves() {
 }
 
 #[test]
+fn ppjigsawminesweeper_colour_regions_render_as_tints() {
+    // The fixture model uses `$#SHOW puz_colour region_tint`.  Once the
+    // generated `puz_colour` is pinned, the rendered SVG should tint the
+    // coloured cells; with `maxColours = 2` the two colours map to the first
+    // two palette entries (`#85586f`, `#d6efed` — see puzsvg's `colours_list`).
+    let inst = read_instance("ppjigsawminesweeper-instance.json");
+    let assignment = mystify_puzzle_assignment(&inst).unwrap();
+    let solver = parse_essence_with_assignment(
+        &tst("ppjigsawminesweeper.eprime"),
+        &tst("ppjigsawminesweeper.param"),
+        assignment,
+        SolverConfig::default(),
+    )
+    .expect("parse + pin should succeed");
+
+    let mut planner = PuzzlePlanner::new(solver);
+    let (problem, _) = planner.refresh_problem();
+
+    let tints = problem
+        .puzzle
+        .region_tint
+        .as_ref()
+        .expect("region_tint should be populated from the pinned puz_colour");
+    let coloured = tints.iter().flatten().filter(|c| c.is_some()).count();
+    assert!(coloured > 0, "fixture has coloured cells");
+    // `region_tint` draws no borders, so the `cages` role must be absent.
+    assert!(problem.puzzle.cages.is_none());
+
+    let svg = demystify::web::puzsvg::PuzzleDraw::new(&problem.puzzle.kind)
+        .draw_puzzle(&problem)
+        .to_string();
+    assert!(
+        svg.contains("#85586f"),
+        "colour-1 tint should appear in the SVG"
+    );
+    assert!(
+        svg.contains("#d6efed"),
+        "colour-2 tint should appear in the SVG"
+    );
+}
+
+#[test]
 fn pin_assignment_rejects_non_object() {
     let mut solver = parse_only("ppjigsawminesweeper");
     let err = solver.pin_assignment(&json!([1, 2, 3])).unwrap_err();

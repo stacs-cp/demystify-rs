@@ -36,7 +36,7 @@ $#SHOW puz_initial givens
 find puz_initial : matrix indexed by [RDIM, CDIM] of BIT
 
 $#VAR puz_colour
-$#SHOW puz_colour cages
+$#SHOW puz_colour region_tint
 find puz_colour : matrix indexed by [RDIM, CDIM] of COLOUR
 
 $#VAR puz_header

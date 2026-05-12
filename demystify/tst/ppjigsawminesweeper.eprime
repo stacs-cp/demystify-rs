@@ -30,7 +30,7 @@ $#SHOW puz_grid givens
 find puz_grid : matrix indexed by [RDIM, CDIM] of CLUE
 
 $#VAR puz_colour
-$#SHOW puz_colour cages
+$#SHOW puz_colour region_tint
 find puz_colour : matrix indexed by [RDIM, CDIM] of COLOUR
 
 $ ---------- Tidiness (cleanup-pass target) ----------
