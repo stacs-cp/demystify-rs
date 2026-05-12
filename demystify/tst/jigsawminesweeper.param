@@ -1,0 +1,5 @@
+language ESSENCE' 1.0
+letting height be 5
+letting width be 5
+letting fixedMineCount be -1
+letting maxColours be 2

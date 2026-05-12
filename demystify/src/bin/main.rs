@@ -90,6 +90,16 @@ struct Opt {
 
     #[arg(
         long,
+        help = "Pin an externally-generated puzzle assignment (JSON) onto the model as known givens. \
+                Accepts either a bare assignment object {\"puz_grid\": {...}, ...} or a full mystify \
+                output JSON (the assignment is read from its top-level `puzzle` key). Use this with \
+                models — such as mystify's — whose clue cells are `find` variables that a .param file \
+                cannot assign."
+    )]
+    pin_assignment: Option<PathBuf>,
+
+    #[arg(
+        long,
         default_value_t = 100,
         help = "Per-SAT-call conflict limit (0 = no limit). Default 100."
     )]
@@ -194,12 +204,33 @@ fn main() -> anyhow::Result<()> {
 
     let puzzle = Arc::new(puzzle);
 
-    let solver = PuzzleSolver::new_with_config(
+    let mut solver = PuzzleSolver::new_with_config(
         puzzle,
         SolverConfig {
             only_assignments: opt.only_assign,
         },
     )?;
+
+    // Pin an externally-generated puzzle assignment, if one was supplied.
+    if let Some(ref pin_path) = opt.pin_assignment {
+        eprintln!("Pinning puzzle assignment from {:?}", pin_path);
+        let json: serde_json::Value =
+            serde_json::from_reader(std::io::BufReader::new(File::open(pin_path)?))
+                .map_err(|e| anyhow::anyhow!("reading {pin_path:?}: {e}"))?;
+        // Accept either a bare assignment object or a full mystify output JSON.
+        let assignment = if json.get("puzzle").is_some() {
+            problem::parse::mystify_puzzle_assignment(&json)?
+        } else {
+            &json
+        };
+        solver.pin_assignment(assignment)?;
+        if !solver.is_currently_solvable() {
+            anyhow::bail!(
+                "the pinned puzzle assignment makes the model unsatisfiable — \
+                 either the assignment is inconsistent or it does not match this model"
+            );
+        }
+    }
 
     let mus_config: MusConfig = {
         let mut cfg = if let Some(searches) = opt.searches {

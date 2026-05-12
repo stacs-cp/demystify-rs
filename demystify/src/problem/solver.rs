@@ -88,6 +88,41 @@ pub struct SolverConfig {
     pub only_assignments: bool,
 }
 
+/// Recursively flatten a nested `index → … → integer` JSON object for a single
+/// variable name into `(PuzVar, value)` leaves.  Used by
+/// [`PuzzleSolver::pin_assignment`]; only validates JSON shape (not the model).
+fn collect_assignment_leaves(
+    name: &str,
+    v: &serde_json::Value,
+    indices: &mut Vec<i64>,
+    out: &mut Vec<(PuzVar, i64)>,
+) -> anyhow::Result<()> {
+    match v {
+        serde_json::Value::Object(map) => {
+            for (k, vv) in map {
+                let idx: i64 = k.parse().map_err(|_| {
+                    anyhow::anyhow!("pin_assignment: non-integer index key `{k}` under `{name}`")
+                })?;
+                indices.push(idx);
+                collect_assignment_leaves(name, vv, indices, out)?;
+                indices.pop();
+            }
+            Ok(())
+        }
+        serde_json::Value::Number(n) => {
+            let val = n.as_i64().ok_or_else(|| {
+                anyhow::anyhow!("pin_assignment: non-integer value `{n}` under `{name}{indices:?}`")
+            })?;
+            out.push((PuzVar::new(name, indices.clone()), val));
+            Ok(())
+        }
+        other => anyhow::bail!(
+            "pin_assignment: expected nested objects ending in integers under `{name}`, \
+             got `{other}` at `{name}{indices:?}`"
+        ),
+    }
+}
+
 /// Represents a puzzle solver.
 pub struct PuzzleSolver {
     #[cfg(not(feature = "deterministic"))]
@@ -551,6 +586,67 @@ impl PuzzleSolver {
     pub fn add_not_provable_known_lit(&mut self, lit: Lit) {
         self.add_known_lit_unchecked(lit);
         self.tosolvelits = None;
+    }
+
+    /// Pins a JSON assignment object as known givens.
+    ///
+    /// `assignment` must be a JSON object mapping variable names to nested
+    /// `index → … → value` objects — exactly the shape produced by
+    /// [`PuzVar::to_json_map`], e.g.
+    /// `{"puz_grid": {"1": {"1": -1, "2": 3}}, "puz_colour": {"1": {"1": 2}}}`
+    /// meaning `puz_grid[1,1] = -1`, `puz_grid[1,2] = 3`, `puz_colour[1,1] = 2`.
+    /// Every integer leaf becomes a `var[indices] = value` known equality
+    /// literal, added via [`Self::add_not_provable_known_lit`] (i.e. as an
+    /// axiom the solver is not required to prove).
+    ///
+    /// This is the entry point for loading an externally-generated puzzle: an
+    /// Essence model that declares its clue cells as `find` variables (rather
+    /// than `given` parameters) — as the puzzle-generator `mystify` does —
+    /// becomes a concrete instance by parsing the model and then pinning the
+    /// generated assignment with this method.
+    ///
+    /// Validation happens before anything is pinned, so a malformed assignment
+    /// leaves the solver untouched.
+    ///
+    /// # Errors
+    ///
+    /// Fails if `assignment` is not a JSON object, contains a non-integer index
+    /// key, has a leaf that is not an integer, names a variable the model does
+    /// not declare, or gives a value outside that variable's domain.
+    pub fn pin_assignment(&mut self, assignment: &serde_json::Value) -> anyhow::Result<()> {
+        let obj = assignment.as_object().ok_or_else(|| {
+            anyhow::anyhow!("pin_assignment: expected a JSON object, got {assignment}")
+        })?;
+
+        // First pass: flatten the nested object into (var, value) leaves,
+        // checking JSON shape only.
+        let mut leaves: Vec<(PuzVar, i64)> = Vec::new();
+        for (name, sub) in obj {
+            let mut indices: Vec<i64> = Vec::new();
+            collect_assignment_leaves(name, sub, &mut indices, &mut leaves)?;
+        }
+
+        // Second pass: validate every leaf against the model (unknown vars,
+        // out-of-domain values) before mutating anything.
+        for (var, val) in &leaves {
+            let domain =
+                self.puzzleparse.direct.domainmap.get(var).ok_or_else(|| {
+                    anyhow::anyhow!("pin_assignment: model has no variable `{var}`")
+                })?;
+            if !domain.contains(val) {
+                anyhow::bail!(
+                    "pin_assignment: value {val} is outside the domain of `{var}` ({domain:?})"
+                );
+            }
+        }
+
+        // All leaves valid — pin them.
+        for (var, val) in leaves {
+            let puzlit = PuzLit::new_eq(VarValPair::new(&var, val));
+            let lit = self.puzlit_to_lit(&puzlit);
+            self.add_not_provable_known_lit(lit);
+        }
+        Ok(())
     }
 
     pub fn fork_with_known_lits(

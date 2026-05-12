@@ -1,0 +1,158 @@
+language ESSENCE' 1.0
+
+$#KIND JigsawMinesweeper
+
+$ Reveal-style jigsaw minesweeper: normal minesweeper plus coloured
+$ regions.  Each cell may carry a colour (0 = uncoloured) chosen by
+$ the designer; the colour partition is visible from the start.  Each
+$ used colour has exactly one "header" cell.  When the player reveals
+$ the header for colour k, they additionally learn the count of mines
+$ in the whole colour-k region (in addition to the usual 8-neighbour
+$ count for that cell).  Non-header coloured cells, when revealed,
+$ behave like ordinary cells (only the 8-neighbour count is exposed).
+$
+$   puz_mines[i,j]   in 0..1: ground truth; hidden.
+$   puz_initial[i,j] in 0..1: 1 = cell starts revealed (must be safe).
+$   puz_colour[i,j]  in 0..maxColours: cell's colour (0 = uncoloured).
+$   puz_header[i,j]  in 0..1: 1 = (r,c) is the header of its colour.
+$   mines[i,j]       in 0..1: player's deduction (user variable).
+
+given height, width  : int(3..)
+given fixedMineCount : int(-1..)
+given maxColours     : int(0..)
+
+letting RDIM   be domain int(1..height)
+letting CDIM   be domain int(1..width)
+letting BIT    be domain int(0..1)
+letting COLOUR be domain int(0..maxColours)
+
+$ ---------- Designer's choices ----------
+
+$#VAR puz_mines
+find puz_mines : matrix indexed by [RDIM, CDIM] of BIT
+
+$#VAR puz_initial
+$#SHOW puz_initial givens
+find puz_initial : matrix indexed by [RDIM, CDIM] of BIT
+
+$#VAR puz_colour
+$#SHOW puz_colour cages
+find puz_colour : matrix indexed by [RDIM, CDIM] of COLOUR
+
+$#VAR puz_header
+find puz_header : matrix indexed by [RDIM, CDIM] of BIT
+
+$ ---------- Tidiness (cleanup-pass target) ----------
+
+$#AUX demystify_tidiness_measure
+find demystify_tidiness_measure : int(0..height*width)
+
+$ ---------- Neighbourhood machinery ----------
+
+$#AUX neighbourhood_puz_mines
+find neighbourhood_puz_mines : matrix indexed by [RDIM, CDIM] of BIT
+
+$#AUX neighbourhood_puz_initial
+find neighbourhood_puz_initial : matrix indexed by [RDIM, CDIM] of BIT
+
+$#AUX neighbourhood_puz_colour
+find neighbourhood_puz_colour : matrix indexed by [RDIM, CDIM] of COLOUR
+
+$#AUX neighbourhood_puz_header
+find neighbourhood_puz_header : matrix indexed by [RDIM, CDIM] of BIT
+
+$#AUX distance_neighbourhood
+find distance_neighbourhood : int(0..height*width*4)
+
+$ ---------- User variable ----------
+
+$#VAR mines
+$#SHOW mines main
+find mines : matrix indexed by [RDIM, CDIM] of BIT
+
+$ ---------- Reveal mechanism ----------
+
+$#REVEAL mines facts
+find facts : matrix indexed by [RDIM, CDIM, BIT] of bool
+
+$ ---------- Reified constraints ----------
+
+$#CON clue "cell ({{index[0]}},{{index[1]}}) sees its neighbour mine count"
+find clue : matrix indexed by [RDIM, CDIM] of bool
+
+$#CON colour_clue "revealing the colour-{{index[0]}} header at ({{index[1]}},{{index[2]}}) exposes the regional mine count"
+find colour_clue : matrix indexed by [int(1..maxColours), RDIM, CDIM] of bool
+
+such that
+
+$ Hamming distance over all four designer matrices.
+sum([ toInt(puz_mines[i,j]   != neighbourhood_puz_mines[i,j])
+    + toInt(puz_initial[i,j] != neighbourhood_puz_initial[i,j])
+    + toInt(puz_colour[i,j]  != neighbourhood_puz_colour[i,j])
+    + toInt(puz_header[i,j]  != neighbourhood_puz_header[i,j])
+    | i : RDIM, j : CDIM])
+    = distance_neighbourhood,
+
+$ Initial reveals are safe and pinned in the player's view.
+forAll r : RDIM. forAll c : CDIM.
+    puz_initial[r,c] = 1 -> puz_mines[r,c] = 0,
+forAll r : RDIM. forAll c : CDIM.
+    puz_initial[r,c] = 1 -> mines[r,c] = 0,
+
+$ Header cells must (a) be coloured, (b) be safe (never mines, so that
+$ revealing the header is always possible).
+forAll r : RDIM. forAll c : CDIM.
+    puz_header[r,c] = 1 -> puz_colour[r,c] >= 1,
+forAll r : RDIM. forAll c : CDIM.
+    puz_header[r,c] = 1 -> puz_mines[r,c] = 0,
+
+$ At most one header per colour.
+forAll k : int(1..maxColours).
+    sum([ toInt(puz_header[r,c] = 1 /\ puz_colour[r,c] = k)
+          | r : RDIM, c : CDIM ]) <= 1,
+
+$ If colour k is used anywhere, it must have a header.
+forAll k : int(1..maxColours).
+    (sum([ toInt(puz_colour[r,c] = k) | r : RDIM, c : CDIM]) > 0) ->
+        (sum([ toInt(puz_header[r,c] = 1 /\ puz_colour[r,c] = k)
+               | r : RDIM, c : CDIM ]) = 1),
+
+$ Standard 8-neighbour count clue: active at every revealed safe cell.
+forAll r : RDIM. forAll c : CDIM.
+    (puz_initial[r,c] = 1 \/ facts[r,c,0]) ->
+        (clue[r,c] ->
+         sum([ mines[r2, c2]
+               | r2 : RDIM, c2 : CDIM,
+                 r2 >= r-1 /\ r2 <= r+1 /\ c2 >= c-1 /\ c2 <= c+1 /\
+                 !(r2 = r /\ c2 = c) ])
+         =
+         sum([ puz_mines[r2, c2]
+               | r2 : RDIM, c2 : CDIM,
+                 r2 >= r-1 /\ r2 <= r+1 /\ c2 >= c-1 /\ c2 <= c+1 /\
+                 !(r2 = r /\ c2 = c) ])),
+
+$ Colour-region clue: active when the header is revealed (either
+$ initially or via facts[r,c,0]).  Asserts that the player's count of
+$ mines in the colour-k region matches the truth.
+$ SavileRow forbids decision variables as comprehension filters, so
+$ multiply by toInt(...) rather than filter on puz_colour = k.
+forAll k : int(1..maxColours). forAll r : RDIM. forAll c : CDIM.
+    (puz_header[r,c] = 1 /\ puz_colour[r,c] = k /\
+     (puz_initial[r,c] = 1 \/ facts[r,c,0])) ->
+        (colour_clue[k, r, c] ->
+         sum([ mines[r2, c2] * toInt(puz_colour[r2, c2] = k)
+               | r2 : RDIM, c2 : CDIM ])
+         =
+         sum([ puz_mines[r2, c2] * toInt(puz_colour[r2, c2] = k)
+               | r2 : RDIM, c2 : CDIM ])),
+
+$ Optional fixed mine count (applies to the truth).
+fixedMineCount >= 0 ->
+    sum([puz_mines[r, c] | r : RDIM, c : CDIM]) = fixedMineCount,
+
+$ Tidiness: count of coloured cells.  Lower = tidier.  The cleanup pass
+$ minimises this among puzzles with identical difficulty.
+demystify_tidiness_measure =
+    sum([toInt(puz_colour[r,c] >= 1) | r : RDIM, c : CDIM]),
+
+true
