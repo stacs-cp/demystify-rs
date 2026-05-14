@@ -822,6 +822,8 @@ impl Problem {
                 tags.insert("litknown".to_string());
             }
 
+            tags.insert(format!("var-{}", l.var().name()));
+
             if knowledgegrid[i][j].is_none() {
                 knowledgegrid[i][j] = Some(vec![]);
             }
@@ -947,6 +949,8 @@ impl Problem {
             if known.contains(&PuzLit::new_eq(l.clone())) {
                 tags.insert("litknown".to_string());
             }
+
+            tags.insert(format!("var-{}", l.var().name()));
 
             if knowledgegrid[i][j].is_none() {
                 knowledgegrid[i][j] = Some(vec![]);
