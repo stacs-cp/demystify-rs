@@ -1,6 +1,8 @@
 language ESSENCE' 1.0
 
 $#KIND ppJigsawMinesweeper
+$#DEC blank_input_val=-1
+$#DEC clue_in_corner
 
 $ Jigsaw minesweeper — standard pen-and-paper minesweeper plus coloured
 $ regions.  A coloured number cell ("the red 2") is the unique header
