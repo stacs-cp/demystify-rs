@@ -996,6 +996,25 @@ g.con-preview .cell-bg {
   fill: #888888;
 }
 
+/* ─── Variable-specific styling ─── */
+
+/* Mines: show 1 as filled circle (mine), 0 as empty (safe) */
+.var-mines {
+  font-size: 0 !important;
+}
+
+.var-mines[data-cand="1"] .litbox {
+  stroke: #8b2020;
+  stroke-width: 0.05;
+  fill: #c04040 !important;
+}
+
+.var-mines[data-cand="0"] .litbox {
+  stroke: #5a7a5a;
+  stroke-width: 0.05;
+  fill: #a8d5a8 !important;
+}
+
 /* ─── htmx loading state ─── */
 
 #solver-stage.htmx-request {
