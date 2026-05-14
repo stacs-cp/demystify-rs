@@ -36,3 +36,7 @@ cargo-flamegraph.trace
 # OS files
 .DS_Store
 Thumbs.db
+
+# Playwright MCP working dir (browser snapshots, console logs) — written
+# to repo root when the assistant drives a browser for GUI verification.
+.playwright-mcp/

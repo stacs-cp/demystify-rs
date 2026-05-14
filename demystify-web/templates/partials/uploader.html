@@ -12,13 +12,21 @@
           method="post"
           action="/upload"
           enctype="multipart/form-data">
-      <input type="file" name="model"  accept=".eprime,.essence" required>
-      <input type="file" name="params" accept=".param,.json" required>
+      <input type="file" name="model"      accept=".eprime,.essence" required>
+      <input type="file" name="params"     accept=".param,.json" required>
+      <input type="file" name="assignment" accept=".json">
       <b>Drop files or click to browse</b>
       <div class="he-fileset">
         <span><code>.eprime</code> or <code>.essence</code></span>
         <span><code>.param</code> or <code>.json</code></span>
+        <span><code>.json</code> assignment (optional)</span>
       </div>
+      <p class="desc" style="margin-top:0.5rem; font-size:0.85em;">
+        The third slot is for puzzles whose clue cells are declared as
+        <code>find</code> variables &mdash; supply the JSON produced by a
+        generator (e.g. <em>mystify</em>). Both bare assignment objects and
+        full output JSONs (with a top-level <code>puzzle</code> key) work.
+      </p>
       <button type="submit" class="he-btn primary" style="margin-top:0.75rem;">Upload &amp; solve &rarr;</button>
     </form>
 

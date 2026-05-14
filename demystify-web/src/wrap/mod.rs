@@ -697,19 +697,38 @@ pub async fn upload_files(
 
     let mut model: Option<PathBuf> = None;
     let mut param: Option<PathBuf> = None;
+    let mut assignment: Option<PathBuf> = None;
 
     while let Some(field) = multipart
         .next_field()
         .await
         .context("Failed to parse multipart upload")?
     {
-        let field_name = field.name().unwrap_or("");
-        if field_name != "model" && field_name != "params" {
+        let field_name = field.name().unwrap_or("").to_owned();
+        if field_name != "model" && field_name != "params" && field_name != "assignment" {
             continue;
         }
         let form_file_name = field.file_name().context("No filename")?.to_owned();
 
-        let file_name = if form_file_name.ends_with(".param") || form_file_name.ends_with(".json") {
+        // Multipart fields with no chosen file send an empty filename — let
+        // the user skip the optional `assignment` slot without it counting.
+        if form_file_name.is_empty() {
+            continue;
+        }
+
+        let file_name = if field_name == "assignment" {
+            if !form_file_name.ends_with(".json") {
+                return Err(anyhow!(
+                    "Puzzle assignment must be a .json file, got '{form_file_name}'"
+                )
+                .into());
+            }
+            if assignment.is_some() {
+                return Err(anyhow!("Cannot upload two assignment files").into());
+            }
+            assignment = Some("upload.assignment.json".into());
+            "upload.assignment.json"
+        } else if form_file_name.ends_with(".param") || form_file_name.ends_with(".json") {
             if param.is_some() {
                 return Err(anyhow!("Cannot upload two param files (.param or .json)").into());
             }
@@ -753,7 +772,7 @@ pub async fn upload_files(
         return Err(anyhow!("Please upload a parameter file (.param or .json)").into());
     }
 
-    load_model(&session, &state, temp_dir, model, param)?;
+    load_model(&session, &state, temp_dir, model, param, assignment)?;
     session.set("round", 0u32);
     Ok(Redirect::to("/solver").into_response())
 }
@@ -787,6 +806,7 @@ pub async fn load_example_and_redirect(
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
+        None,
     )?;
     session.set("round", 0u32);
     Ok(Redirect::to("/solver").into_response())
@@ -841,6 +861,7 @@ pub async fn submit_example(
         temp_dir,
         Some("upload.eprime".into()),
         Some("upload.param".into()),
+        None,
     )?;
     session.set("round", 0u32);
     Ok(Redirect::to("/solver").into_response())
@@ -852,13 +873,36 @@ fn load_model(
     temp_dir: tempfile::TempDir,
     model: Option<PathBuf>,
     param: Option<PathBuf>,
+    assignment: Option<PathBuf>,
 ) -> anyhow::Result<()> {
-    let puzzle = problem::parse::parse_essence(
-        &temp_dir.path().join(model.unwrap()),
-        &temp_dir.path().join(param.unwrap()),
-    )?;
-    let puzzle = Arc::new(puzzle);
-    let puz = PuzzleSolver::new(puzzle)?;
+    let model_path = temp_dir.path().join(model.unwrap());
+    let param_path = temp_dir.path().join(param.unwrap());
+
+    let puz = if let Some(assignment) = assignment {
+        // Mystify-style upload: model declares clue cells as `find` variables
+        // and the assignment file pins them.  Accept either a bare assignment
+        // object or a full mystify output JSON.
+        let assignment_path = temp_dir.path().join(assignment);
+        let raw: serde_json::Value = serde_json::from_reader(
+            std::io::BufReader::new(File::open(&assignment_path)?),
+        )
+        .context("assignment file is not valid JSON")?;
+        let assignment_obj = if raw.get("puzzle").is_some() {
+            problem::parse::mystify_puzzle_assignment(&raw)?.clone()
+        } else {
+            raw
+        };
+        problem::parse::parse_essence_with_assignment(
+            &model_path,
+            &param_path,
+            &assignment_obj,
+            Default::default(),
+        )?
+    } else {
+        let puzzle = problem::parse::parse_essence(&model_path, &param_path)?;
+        PuzzleSolver::new(Arc::new(puzzle))?
+    };
+
     let plan = PuzzlePlanner::new(puz).with_database(state.strategy_db.clone());
     set_solver_global(session, plan);
     Ok(())
@@ -976,4 +1020,17 @@ pub async fn solvetree_build(
 
     let json = tree.to_d3_json();
     Ok(axum::Json(serde_json::to_value(json)?))
+}
+
+/// Dev-only: ask the server to exit.  Pair with a shell loop
+/// (`while true; do cargo run -p demystify-web --bin demystify-web; done`)
+/// to get an in-place restart after code changes.  Not linked from the UI.
+pub async fn quit() -> impl IntoResponse {
+    eprintln!("/quit hit — exiting so the launcher can restart the server.");
+    // Spawn the exit so the response has a chance to flush.
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        std::process::exit(0);
+    });
+    "Restarting server.\n"
 }

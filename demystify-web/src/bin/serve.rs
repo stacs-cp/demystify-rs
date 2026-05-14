@@ -212,6 +212,9 @@ async fn main() {
         .route("/solvetree/build", post(wrap::solvetree_build))
         // Legacy JSON endpoint
         .route("/quickFullSolve", post(wrap::dump_full_solve))
+        // Dev-only: GET /quit asks the server to exit so a shell loop can
+        // restart it.  Not linked from the UI.
+        .route("/quit", get(wrap::quit))
         // Game mode
         .route("/game", get(game::game_select))
         .route("/game/start", post(game::game_start))
