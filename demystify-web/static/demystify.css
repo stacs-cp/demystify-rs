@@ -1015,6 +1015,11 @@ g.con-preview .cell-bg {
   fill: #a8d5a8 !important;
 }
 
+/* puz_initial (reveal-style puzzles): don't show as givens, it's only metadata */
+[data-state="given"] .var-puz_initial {
+  display: none !important;
+}
+
 /* ─── htmx loading state ─── */
 
 #solver-stage.htmx-request {
