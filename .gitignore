@@ -28,6 +28,9 @@ profile.json.gz
 *.trace
 cargo-flamegraph.trace
 
+# Sibling git repo nested here for convenience
+/walkthroughs/
+
 # IDE and editor files
 *.swp
 *.swo
