@@ -603,7 +603,17 @@ impl PuzzleSolver {
 
     fn add_known_lit_internal(&mut self, lit: Lit) {
         if let Some(tosolvelits) = self.tosolvelits.as_mut() {
+            // Remove both polarities.  Once `lit` is known to be true,
+            // neither `lit` nor `!lit` is "still to solve": the positive
+            // form is now a known fact, and the negative form is
+            // already known false.  Removing only `lit` (the previous
+            // behaviour) leaks stale `!lit` entries into renderings —
+            // e.g. after deducing `grid[6,2]=6` the cache could still
+            // surface a positive `eq(grid[6,2], 4)` lit forced at an
+            // earlier moment, making the cell display a phantom `4`
+            // candidate.
             tosolvelits.remove(&lit);
+            tosolvelits.remove(&!lit);
         }
         self.knownlits.push(lit);
 
