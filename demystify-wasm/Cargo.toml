@@ -1,0 +1,28 @@
+[package]
+name = "demystify-wasm"
+version = "0.1.0"
+edition = "2024"
+description = "WebAssembly bindings for demystify, a constraint solving tool for explaining puzzles"
+license = "MPL-2.0"
+repository = "https://github.com/stacs-cp/demystify-rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+demystify = { path = "../demystify", version = "0.2.0" }
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+js-sys = "0.3"
+console_error_panic_hook = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+# Enable WebAssembly randomness for the transitive getrandom dependency
+# pulled in via rand. Without `wasm_js`, getrandom 0.4 refuses to compile
+# on wasm32-unknown-unknown.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.4", default-features = false, features = ["wasm_js"] }

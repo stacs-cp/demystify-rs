@@ -1,4 +1,4 @@
-use std::time::Instant;
+use web_time::Instant;
 
 pub struct QuickTimer {
     pub(crate) start: Instant,

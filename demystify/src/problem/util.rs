@@ -5,6 +5,10 @@ use itertools::Itertools;
 use rustsat::{instances::SatInstance, types::Lit};
 use tracing::info;
 
+// `exec` runs `conjure`/`savilerow` via std::process and `which`. Neither
+// works on `wasm32-unknown-unknown` (the `which` crate doesn't compile there),
+// and pre-parsed-JSON is the only intended wasm input path anyway.
+#[cfg(not(target_arch = "wasm32"))]
 pub mod exec;
 pub mod parsing;
 
@@ -125,7 +129,8 @@ mod tests {
 }
 
 /// Utilities for building `PuzzleParse` instances from `.eprime`/`.param` files.
-/// Used by tests and benchmarks.
+/// Used by tests and benchmarks. Skipped on wasm32 (no Conjure / no test runner).
+#[cfg(not(target_arch = "wasm32"))]
 pub mod test_utils {
     use std::fs;
     use std::path::Path;

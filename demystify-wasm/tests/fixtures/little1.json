@@ -1,0 +1,4960 @@
+{
+  "eprime": {
+    "vars": [
+      "grid"
+    ],
+    "auxvars": [],
+    "cons": {
+      "ordered": "{{index[0]}}<{{index[0]+1}}"
+    },
+    "reveal": {
+      "grid": "outgrid"
+    },
+    "reveal_values": [
+      "outgrid"
+    ],
+    "params": {
+      "b1": false,
+      "b2": true,
+      "l": {
+        "1": 2,
+        "2": 4,
+        "3": 6,
+        "4": 8
+      },
+      "l2": {
+        "1": {
+          "1": 1,
+          "2": 2
+        },
+        "2": {
+          "1": 3,
+          "2": 4
+        }
+      },
+      "lb": {
+        "1": false,
+        "2": false,
+        "3": true,
+        "4": false
+      },
+      "lb2": {
+        "1": {
+          "1": false,
+          "2": true
+        },
+        "2": {
+          "1": true,
+          "2": false
+        }
+      },
+      "n": 4
+    },
+    "kind": "Tiny",
+    "info": [],
+    "decs": [],
+    "families": {},
+    "show": [
+      {
+        "var": "grid",
+        "role": "Main"
+      }
+    ]
+  },
+  "cnf_clauses": [
+    [
+      -1,
+      2
+    ],
+    [
+      1,
+      -2,
+      3
+    ],
+    [
+      -3,
+      2
+    ],
+    [
+      -3,
+      -1
+    ],
+    [
+      -2,
+      4
+    ],
+    [
+      2,
+      -4,
+      5
+    ],
+    [
+      -5,
+      4
+    ],
+    [
+      -5,
+      -2
+    ],
+    [
+      1,
+      3,
+      5,
+      -4
+    ],
+    [
+      -6,
+      7
+    ],
+    [
+      6,
+      -7,
+      8
+    ],
+    [
+      -8,
+      7
+    ],
+    [
+      -8,
+      -6
+    ],
+    [
+      -7,
+      9
+    ],
+    [
+      7,
+      -9,
+      10
+    ],
+    [
+      -10,
+      9
+    ],
+    [
+      -10,
+      -7
+    ],
+    [
+      6,
+      8,
+      10,
+      -9
+    ],
+    [
+      -11,
+      12
+    ],
+    [
+      11,
+      -12,
+      13
+    ],
+    [
+      -13,
+      12
+    ],
+    [
+      -13,
+      -11
+    ],
+    [
+      -12,
+      14
+    ],
+    [
+      12,
+      -14,
+      15
+    ],
+    [
+      -15,
+      14
+    ],
+    [
+      -15,
+      -12
+    ],
+    [
+      11,
+      13,
+      15,
+      -14
+    ],
+    [
+      -16,
+      17
+    ],
+    [
+      16,
+      -17,
+      18
+    ],
+    [
+      -18,
+      17
+    ],
+    [
+      -18,
+      -16
+    ],
+    [
+      -17,
+      19
+    ],
+    [
+      17,
+      -19,
+      20
+    ],
+    [
+      -20,
+      19
+    ],
+    [
+      -20,
+      -17
+    ],
+    [
+      16,
+      18,
+      20,
+      -19
+    ],
+    [
+      21,
+      -21
+    ],
+    [
+      22,
+      -22
+    ],
+    [
+      23,
+      -23
+    ],
+    [
+      24,
+      -24
+    ],
+    [
+      25,
+      -25
+    ],
+    [
+      26,
+      -26
+    ],
+    [
+      27,
+      -27
+    ],
+    [
+      28,
+      -28
+    ],
+    [
+      29,
+      -29
+    ],
+    [
+      30,
+      -30
+    ],
+    [
+      31,
+      -31
+    ],
+    [
+      32,
+      -32
+    ],
+    [
+      33,
+      -33
+    ],
+    [
+      34,
+      -34
+    ],
+    [
+      35,
+      -35
+    ],
+    [
+      36,
+      -36
+    ],
+    [
+      40,
+      -40
+    ],
+    [
+      -6,
+      -41
+    ],
+    [
+      1,
+      -7,
+      -41
+    ],
+    [
+      2,
+      -9,
+      -41
+    ],
+    [
+      4,
+      -41
+    ],
+    [
+      6,
+      -1,
+      41
+    ],
+    [
+      7,
+      -2,
+      41
+    ],
+    [
+      9,
+      -4,
+      41
+    ],
+    [
+      -11,
+      -42
+    ],
+    [
+      6,
+      -12,
+      -42
+    ],
+    [
+      7,
+      -14,
+      -42
+    ],
+    [
+      9,
+      -42
+    ],
+    [
+      11,
+      -6,
+      42
+    ],
+    [
+      12,
+      -7,
+      42
+    ],
+    [
+      14,
+      -9,
+      42
+    ],
+    [
+      -16,
+      -43
+    ],
+    [
+      11,
+      -17,
+      -43
+    ],
+    [
+      12,
+      -19,
+      -43
+    ],
+    [
+      14,
+      -43
+    ],
+    [
+      16,
+      -11,
+      43
+    ],
+    [
+      17,
+      -12,
+      43
+    ],
+    [
+      19,
+      -14,
+      43
+    ],
+    [
+      -37,
+      41
+    ],
+    [
+      -38,
+      42
+    ],
+    [
+      -39,
+      43
+    ]
+  ],
+  "litmap": [
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -1
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      1
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      },
+      -3
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      },
+      3
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      },
+      -5
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      },
+      5
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      },
+      4
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      },
+      -4
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -6
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      6
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      },
+      -8
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      },
+      8
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      },
+      -10
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      },
+      10
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      },
+      9
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      },
+      -9
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -11
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      11
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      },
+      -13
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      },
+      13
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      },
+      -15
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      },
+      15
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      },
+      14
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      },
+      -14
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -16
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      16
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      },
+      -18
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      },
+      18
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      },
+      -20
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      },
+      20
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      },
+      19
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      },
+      -19
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      37
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -37
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -37
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      37
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      38
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -38
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -38
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      38
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      39
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -39
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -39
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      39
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      40
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -40
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -40
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      40
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      21
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -21
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -21
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      21
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      22
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -22
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -22
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      22
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      23
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -23
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -23
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      23
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      24
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -24
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -24
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      24
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      25
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -25
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -25
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      25
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      26
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -26
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -26
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      26
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      27
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -27
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -27
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      27
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      28
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -28
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -28
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      28
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      29
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -29
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -29
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      29
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      30
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -30
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -30
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      30
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      31
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -31
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -31
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      31
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      32
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -32
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -32
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      32
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      33
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -33
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -33
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      33
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      34
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -34
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -34
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      34
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      35
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -35
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -35
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      35
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      36
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      -36
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      },
+      -36
+    ],
+    [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      },
+      36
+    ]
+  ],
+  "invlitmap": {
+    "-1": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-10": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      }
+    ],
+    "-11": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-13": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      }
+    ],
+    "-14": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      }
+    ],
+    "-15": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      }
+    ],
+    "-16": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-18": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      }
+    ],
+    "-19": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      }
+    ],
+    "-20": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      }
+    ],
+    "-21": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-22": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-23": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-24": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-25": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-26": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-27": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-28": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-29": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-3": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      }
+    ],
+    "-30": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-31": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-32": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-33": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-34": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-35": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-36": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-37": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-38": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-39": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-4": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      }
+    ],
+    "-40": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": true
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-5": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 3
+        },
+        "equal": false
+      }
+    ],
+    "-6": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": false
+      }
+    ],
+    "-8": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 2
+        },
+        "equal": false
+      }
+    ],
+    "-9": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 4
+        },
+        "equal": true
+      }
+    ],
+    "1": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "10": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      }
+    ],
+    "11": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "13": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      }
+    ],
+    "14": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      }
+    ],
+    "15": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              3
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      }
+    ],
+    "16": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "18": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      }
+    ],
+    "19": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      }
+    ],
+    "20": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              4
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      }
+    ],
+    "21": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "22": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "23": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "24": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              1,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "25": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "26": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "27": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "28": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              2,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "29": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "3": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      }
+    ],
+    "30": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "31": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "32": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              3,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "33": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "34": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "35": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "36": [
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "outgrid",
+            "indices": [
+              4,
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "37": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              1
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "38": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "39": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              3
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "4": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      }
+    ],
+    "40": [
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 0
+        },
+        "equal": false
+      },
+      {
+        "varval": {
+          "var": {
+            "name": "ordered",
+            "indices": [
+              4
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "5": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              1
+            ]
+          },
+          "val": 3
+        },
+        "equal": true
+      }
+    ],
+    "6": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 1
+        },
+        "equal": true
+      }
+    ],
+    "8": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 2
+        },
+        "equal": true
+      }
+    ],
+    "9": [
+      {
+        "varval": {
+          "var": {
+            "name": "grid",
+            "indices": [
+              2
+            ]
+          },
+          "val": 4
+        },
+        "equal": false
+      }
+    ]
+  },
+  "domainmap": [
+    [
+      {
+        "name": "grid",
+        "indices": [
+          1
+        ]
+      },
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    [
+      {
+        "name": "grid",
+        "indices": [
+          2
+        ]
+      },
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    [
+      {
+        "name": "grid",
+        "indices": [
+          3
+        ]
+      },
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    [
+      {
+        "name": "grid",
+        "indices": [
+          4
+        ]
+      },
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          1
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          2
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          3
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          4
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          1
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          2
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          3
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          4
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          1
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          2
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          3
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          4
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          1
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          2
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          3
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          4
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          1
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          2
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          3
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          4
+        ]
+      },
+      [
+        0,
+        1
+      ]
+    ]
+  ],
+  "conset": {
+    "37": "1<2",
+    "38": "2<3",
+    "39": "3<4"
+  },
+  "invconset": {
+    "1<2": 37,
+    "2<3": 38,
+    "3<4": 39
+  },
+  "varlits_in_con": {
+    "37": [
+      -2,
+      -7,
+      4,
+      6,
+      7,
+      -9,
+      -1,
+      -4,
+      -6,
+      2,
+      9,
+      1
+    ],
+    "38": [
+      -6,
+      -7,
+      -12,
+      -9,
+      11,
+      -14,
+      14,
+      -11,
+      6,
+      7,
+      12,
+      9
+    ],
+    "39": [
+      11,
+      17,
+      -12,
+      -19,
+      -16,
+      14,
+      -11,
+      -14,
+      16,
+      19,
+      -17,
+      12
+    ]
+  },
+  "family_of": {
+    "37": "ordered",
+    "38": "ordered",
+    "39": "ordered"
+  },
+  "varset_lits": [
+    -20,
+    -19,
+    -18,
+    -16,
+    -15,
+    -14,
+    -13,
+    -11,
+    -10,
+    -9,
+    -8,
+    -6,
+    -5,
+    -4,
+    -3,
+    -1,
+    1,
+    3,
+    4,
+    5,
+    6,
+    8,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16,
+    18,
+    19,
+    20
+  ],
+  "varset_lits_neg": [
+    -20,
+    -18,
+    -16,
+    -15,
+    -13,
+    -11,
+    -10,
+    -8,
+    -6,
+    -5,
+    -3,
+    -1,
+    4,
+    9,
+    14,
+    19
+  ],
+  "conset_lits": [
+    37,
+    38,
+    39
+  ],
+  "special_lits": [],
+  "order_encoding_map": [
+    [
+      {
+        "name": "grid",
+        "indices": [
+          1
+        ]
+      },
+      [
+        4,
+        2,
+        -4,
+        1,
+        -1,
+        -2
+      ]
+    ],
+    [
+      {
+        "name": "grid",
+        "indices": [
+          2
+        ]
+      },
+      [
+        9,
+        7,
+        -9,
+        6,
+        -6,
+        -7
+      ]
+    ],
+    [
+      {
+        "name": "grid",
+        "indices": [
+          3
+        ]
+      },
+      [
+        14,
+        -14,
+        12,
+        11,
+        -12,
+        -11
+      ]
+    ],
+    [
+      {
+        "name": "grid",
+        "indices": [
+          4
+        ]
+      },
+      [
+        16,
+        17,
+        -17,
+        -19,
+        -16,
+        19
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          1
+        ]
+      },
+      [
+        -37,
+        37
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          2
+        ]
+      },
+      [
+        38,
+        -38
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          3
+        ]
+      },
+      [
+        -39,
+        39
+      ]
+    ],
+    [
+      {
+        "name": "ordered",
+        "indices": [
+          4
+        ]
+      },
+      [
+        40,
+        -40
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          1
+        ]
+      },
+      [
+        21,
+        -21
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          2
+        ]
+      },
+      [
+        22,
+        -22
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          3
+        ]
+      },
+      [
+        23,
+        -23
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          1,
+          4
+        ]
+      },
+      [
+        -24,
+        24
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          1
+        ]
+      },
+      [
+        -25,
+        25
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          2
+        ]
+      },
+      [
+        -26,
+        26
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          3
+        ]
+      },
+      [
+        -27,
+        27
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          2,
+          4
+        ]
+      },
+      [
+        -28,
+        28
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          1
+        ]
+      },
+      [
+        29,
+        -29
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          2
+        ]
+      },
+      [
+        30,
+        -30
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          3
+        ]
+      },
+      [
+        31,
+        -31
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          3,
+          4
+        ]
+      },
+      [
+        -32,
+        32
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          1
+        ]
+      },
+      [
+        -33,
+        33
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          2
+        ]
+      },
+      [
+        -34,
+        34
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          3
+        ]
+      },
+      [
+        35,
+        -35
+      ]
+    ],
+    [
+      {
+        "name": "outgrid",
+        "indices": [
+          4,
+          4
+        ]
+      },
+      [
+        -36,
+        36
+      ]
+    ]
+  ],
+  "inv_order_encoding_map": {
+    "-1": {
+      "name": "grid",
+      "indices": [
+        1
+      ]
+    },
+    "-11": {
+      "name": "grid",
+      "indices": [
+        3
+      ]
+    },
+    "-12": {
+      "name": "grid",
+      "indices": [
+        3
+      ]
+    },
+    "-14": {
+      "name": "grid",
+      "indices": [
+        3
+      ]
+    },
+    "-16": {
+      "name": "grid",
+      "indices": [
+        4
+      ]
+    },
+    "-17": {
+      "name": "grid",
+      "indices": [
+        4
+      ]
+    },
+    "-19": {
+      "name": "grid",
+      "indices": [
+        4
+      ]
+    },
+    "-2": {
+      "name": "grid",
+      "indices": [
+        1
+      ]
+    },
+    "-21": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        1
+      ]
+    },
+    "-22": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        2
+      ]
+    },
+    "-23": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        3
+      ]
+    },
+    "-24": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        4
+      ]
+    },
+    "-25": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        1
+      ]
+    },
+    "-26": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        2
+      ]
+    },
+    "-27": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        3
+      ]
+    },
+    "-28": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        4
+      ]
+    },
+    "-29": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        1
+      ]
+    },
+    "-30": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        2
+      ]
+    },
+    "-31": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        3
+      ]
+    },
+    "-32": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        4
+      ]
+    },
+    "-33": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        1
+      ]
+    },
+    "-34": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        2
+      ]
+    },
+    "-35": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        3
+      ]
+    },
+    "-36": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        4
+      ]
+    },
+    "-37": {
+      "name": "ordered",
+      "indices": [
+        1
+      ]
+    },
+    "-38": {
+      "name": "ordered",
+      "indices": [
+        2
+      ]
+    },
+    "-39": {
+      "name": "ordered",
+      "indices": [
+        3
+      ]
+    },
+    "-4": {
+      "name": "grid",
+      "indices": [
+        1
+      ]
+    },
+    "-40": {
+      "name": "ordered",
+      "indices": [
+        4
+      ]
+    },
+    "-6": {
+      "name": "grid",
+      "indices": [
+        2
+      ]
+    },
+    "-7": {
+      "name": "grid",
+      "indices": [
+        2
+      ]
+    },
+    "-9": {
+      "name": "grid",
+      "indices": [
+        2
+      ]
+    },
+    "1": {
+      "name": "grid",
+      "indices": [
+        1
+      ]
+    },
+    "11": {
+      "name": "grid",
+      "indices": [
+        3
+      ]
+    },
+    "12": {
+      "name": "grid",
+      "indices": [
+        3
+      ]
+    },
+    "14": {
+      "name": "grid",
+      "indices": [
+        3
+      ]
+    },
+    "16": {
+      "name": "grid",
+      "indices": [
+        4
+      ]
+    },
+    "17": {
+      "name": "grid",
+      "indices": [
+        4
+      ]
+    },
+    "19": {
+      "name": "grid",
+      "indices": [
+        4
+      ]
+    },
+    "2": {
+      "name": "grid",
+      "indices": [
+        1
+      ]
+    },
+    "21": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        1
+      ]
+    },
+    "22": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        2
+      ]
+    },
+    "23": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        3
+      ]
+    },
+    "24": {
+      "name": "outgrid",
+      "indices": [
+        1,
+        4
+      ]
+    },
+    "25": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        1
+      ]
+    },
+    "26": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        2
+      ]
+    },
+    "27": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        3
+      ]
+    },
+    "28": {
+      "name": "outgrid",
+      "indices": [
+        2,
+        4
+      ]
+    },
+    "29": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        1
+      ]
+    },
+    "30": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        2
+      ]
+    },
+    "31": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        3
+      ]
+    },
+    "32": {
+      "name": "outgrid",
+      "indices": [
+        3,
+        4
+      ]
+    },
+    "33": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        1
+      ]
+    },
+    "34": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        2
+      ]
+    },
+    "35": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        3
+      ]
+    },
+    "36": {
+      "name": "outgrid",
+      "indices": [
+        4,
+        4
+      ]
+    },
+    "37": {
+      "name": "ordered",
+      "indices": [
+        1
+      ]
+    },
+    "38": {
+      "name": "ordered",
+      "indices": [
+        2
+      ]
+    },
+    "39": {
+      "name": "ordered",
+      "indices": [
+        3
+      ]
+    },
+    "4": {
+      "name": "grid",
+      "indices": [
+        1
+      ]
+    },
+    "40": {
+      "name": "ordered",
+      "indices": [
+        4
+      ]
+    },
+    "6": {
+      "name": "grid",
+      "indices": [
+        2
+      ]
+    },
+    "7": {
+      "name": "grid",
+      "indices": [
+        2
+      ]
+    },
+    "9": {
+      "name": "grid",
+      "indices": [
+        2
+      ]
+    }
+  },
+  "order_encoding_all_lits": [
+    -40,
+    -39,
+    -38,
+    -37,
+    -36,
+    -35,
+    -34,
+    -33,
+    -32,
+    -31,
+    -30,
+    -29,
+    -28,
+    -27,
+    -26,
+    -25,
+    -24,
+    -23,
+    -22,
+    -21,
+    -19,
+    -17,
+    -16,
+    -14,
+    -12,
+    -11,
+    -9,
+    -7,
+    -6,
+    -4,
+    -2,
+    -1,
+    1,
+    2,
+    4,
+    6,
+    7,
+    9,
+    11,
+    12,
+    14,
+    16,
+    17,
+    19,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40
+  ],
+  "reveal_map": {
+    "-14": 32,
+    "-19": 36,
+    "-4": 24,
+    "-9": 28,
+    "1": 21,
+    "10": 27,
+    "11": 29,
+    "13": 30,
+    "15": 31,
+    "16": 33,
+    "18": 34,
+    "20": 35,
+    "3": 22,
+    "5": 23,
+    "6": 25,
+    "8": 26
+  }
+}
