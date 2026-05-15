@@ -48,7 +48,7 @@ The go to the webpage it mentions (usually `https://localhost:8008` )
 To quickly get started with `demystify`, you can run the following command to solve a Sudoku puzzle and generate an explanatory HTML file:
 
 ```sh
-cargo run --bin demystify --release -- --model eprime/sudoku.eprime --param eprime/sudoku/redditexample.param --html --quick --trace > sudoku.html
+cargo run --bin demystify --release -- --model eprime/sudoku.eprime --param eprime/sudoku/redditexample.param --html --trace > sudoku.html
 ```
 
 After running this command, open `sudoku.html` in your web browser to view the solution and its detailed explanation.
