@@ -9,13 +9,16 @@
 use anyhow::{Context, bail};
 use itertools::Itertools;
 use regex::Regex;
+#[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 use rustsat::instances::{self, BasicVarManager, Cnf, SatInstance};
 use rustsat::types::Lit;
 
 use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::BufReader;
 use std::io::prelude::*;
 
@@ -27,7 +30,9 @@ use tracing::{debug, info};
 use std::fs::File;
 use std::io;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::problem::solver::{PuzzleSolver, SolverConfig};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::problem::util::exec::ProgramRunner;
 use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
@@ -1506,6 +1511,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_eprime(in_path: &PathBuf, eprimeparam: &PathBuf) -> anyhow::Result<PuzzleParse> {
     let parsed_eprime = parse_eprime_file(in_path)?;
     let params = read_essence_param(eprimeparam)?;
@@ -1644,8 +1650,9 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
     update_puzzle_parse_with_maps(dimacs, litmap, order_encoding_map, inv_order_encoding_map)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Result<PuzzleParse> {
-    let t_total = std::time::Instant::now();
+    let t_total = web_time::Instant::now();
 
     let tdir = tempfile::Builder::new()
         .prefix(".demystify-")
@@ -1734,7 +1741,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 
     let conjure_secs = t_total.elapsed().as_secs_f64();
     info!(target: "progress", "conjure/savilerow completed in {conjure_secs:.2}s");
-    let t_setup = std::time::Instant::now();
+    let t_setup = web_time::Instant::now();
 
     let original_input_path = PathBuf::from(&eprime);
 
@@ -1781,6 +1788,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 /// or references variables/values the model does not have (see
 /// [`PuzzleSolver::pin_assignment`]), or if the pinned assignment makes the
 /// model unsatisfiable.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn parse_essence_with_assignment(
     eprimein: &PathBuf,
     eprimeparamin: &PathBuf,
@@ -1823,6 +1831,7 @@ pub fn mystify_puzzle_assignment(
     Ok(puzzle)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn read_essence_param(
     eprimeparam: &PathBuf,
 ) -> anyhow::Result<BTreeMap<String, serde_json::value::Value>> {
@@ -1836,6 +1845,7 @@ fn read_essence_param(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn pretty_print_essence(
     file: &PathBuf,
     format: &str,

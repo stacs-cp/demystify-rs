@@ -251,7 +251,7 @@ impl PuzzlePlanner {
             .iter()
             .par_bridge()
             .filter_map(|&lit| {
-                let t0 = std::time::Instant::now();
+                let t0 = web_time::Instant::now();
                 let ret = self.psolve.get_var_mus_size_1(lit, Some(1));
                 let elapsed = t0.elapsed();
                 let outcome = match &ret {

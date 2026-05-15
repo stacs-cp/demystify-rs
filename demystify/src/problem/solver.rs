@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::ops::Neg;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use web_time::Instant;
 
 use itertools::Itertools;
 use rand::seq::SliceRandom;

@@ -387,6 +387,16 @@ impl PuzzleParse {
             serde_json::from_reader(reader).context("Failed to deserialize puzzle")?;
         serializable.try_into()
     }
+
+    /// Load a puzzle parse from a JSON string.
+    ///
+    /// Used by callers that can't (or don't want to) hit the filesystem —
+    /// notably the WASM bindings, which receive the JSON from JS.
+    pub fn load_from_json_str(s: &str) -> Result<Self> {
+        let serializable: SerializablePuzzleParse =
+            serde_json::from_str(s).context("Failed to deserialize puzzle")?;
+        serializable.try_into()
+    }
 }
 
 #[cfg(test)]

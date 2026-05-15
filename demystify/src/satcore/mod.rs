@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use rustsat::instances::Cnf;
+#[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 use rustsat::solvers::{GetInternalStats, Solve, SolveIncremental, SolverResult};
 use rustsat::types::{Assignment, Lit};
 use tracing::info;
@@ -13,37 +14,69 @@ use std::sync::atomic::Ordering::Relaxed;
 // All solver-specific code is isolated here; the rest of the file uses `Solver` uniformly.
 
 /// Which SAT solver backend to use.
+///
+/// On `wasm32-unknown-unknown` only `BatSat` exists (Glucose/CaDiCaL are C/C++
+/// FFI and don't build for wasm).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SolverBackend {
+    #[cfg(not(target_arch = "wasm32"))]
     Glucose,
+    #[cfg(not(target_arch = "wasm32"))]
     CaDiCaL,
+    BatSat,
 }
 
-static SOLVER_BACKEND: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0); // 0=Glucose, 1=CaDiCaL
+#[cfg(not(target_arch = "wasm32"))]
+static SOLVER_BACKEND: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0); // 0=Glucose, 1=CaDiCaL, 2=BatSat
 
 /// Set the SAT solver backend. Should be called before any [`SatCore`] is created.
+///
+/// On `wasm32`, the choice is fixed to BatSat and this setter is ignored.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn set_solver_backend(backend: SolverBackend) {
     SOLVER_BACKEND.store(backend as u8, Relaxed);
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn set_solver_backend(_backend: SolverBackend) {}
+
+#[cfg(target_arch = "wasm32")]
 fn current_backend() -> SolverBackend {
-    if SOLVER_BACKEND.load(Relaxed) == 0 {
-        SolverBackend::Glucose
-    } else {
-        SolverBackend::CaDiCaL
+    SolverBackend::BatSat
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn current_backend() -> SolverBackend {
+    match SOLVER_BACKEND.load(Relaxed) {
+        0 => SolverBackend::Glucose,
+        1 => SolverBackend::CaDiCaL,
+        _ => SolverBackend::BatSat,
     }
 }
 
 pub enum Solver {
+    #[cfg(not(target_arch = "wasm32"))]
     Glucose(rustsat_glucose::core::Glucose),
+    #[cfg(not(target_arch = "wasm32"))]
     CaDiCaL(rustsat_cadical::CaDiCaL<'static, 'static>),
+    BatSat(rustsat_batsat::BasicSolver),
 }
+
+// SAFETY: BatSat's `BasicCallbacks` carries an `Option<Box<dyn Fn() -> bool>>`
+// (a `stop` predicate) which is `!Send`. We never set that callback, so the
+// field stays `None` for the lifetime of the solver, and is trivially safe to
+// transfer between threads. `Solver` is also always held behind `Mutex<Solver>`
+// inside `SatCore`, so concurrent access is already serialized.
+unsafe impl Send for Solver {}
 
 impl Default for Solver {
     fn default() -> Self {
         match current_backend() {
+            #[cfg(not(target_arch = "wasm32"))]
             SolverBackend::Glucose => Solver::Glucose(Default::default()),
+            #[cfg(not(target_arch = "wasm32"))]
             SolverBackend::CaDiCaL => Solver::CaDiCaL(Default::default()),
+            SolverBackend::BatSat => Solver::BatSat(Default::default()),
         }
     }
 }
@@ -51,63 +84,93 @@ impl Default for Solver {
 impl Solver {
     fn add_cnf(&mut self, cnf: Cnf) -> anyhow::Result<()> {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.add_cnf(cnf)?,
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s.add_cnf(cnf)?,
+            Solver::BatSat(s) => s.add_cnf(cnf)?,
         }
         Ok(())
     }
 
     fn add_unit(&mut self, lit: Lit) -> anyhow::Result<()> {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.add_unit(lit)?,
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s.add_unit(lit)?,
+            Solver::BatSat(s) => s.add_unit(lit)?,
         }
         Ok(())
     }
 
     fn solve_assumps(&mut self, lits: &[Lit]) -> anyhow::Result<SolverResult> {
         Ok(match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.solve_assumps(lits)?,
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s.solve_assumps(lits)?,
+            Solver::BatSat(s) => s.solve_assumps(lits)?,
         })
     }
 
     fn full_solution(&self) -> anyhow::Result<Assignment> {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.full_solution(),
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s.full_solution(),
+            Solver::BatSat(s) => s.full_solution(),
         }
     }
 
     fn core(&mut self) -> anyhow::Result<Vec<Lit>> {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.core(),
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s.core(),
+            Solver::BatSat(s) => s.core(),
         }
     }
 
     fn set_conflict_limit(&mut self, limit: i64) {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.set_limit(rustsat_glucose::Limit::Conflicts(limit)),
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s
                 .set_limit(rustsat_cadical::Limit::Conflicts(limit as i32))
                 .expect("CaDiCaL set_limit failed"),
+            // BatSat has no conflict-limit API in rustsat; runs uninterrupted.
+            Solver::BatSat(_) => {
+                let _ = limit;
+            }
         }
     }
 
     fn clear_conflict_limit(&mut self) {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.set_limit(rustsat_glucose::Limit::None),
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s
                 .set_limit(rustsat_cadical::Limit::Conflicts(-1))
                 .expect("CaDiCaL set_limit failed"),
+            Solver::BatSat(_) => {}
         }
     }
 
     fn conflicts(&self) -> usize {
         match self {
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::Glucose(s) => s.conflicts(),
+            #[cfg(not(target_arch = "wasm32"))]
             Solver::CaDiCaL(s) => s.conflicts(),
+            // BatSat doesn't expose a conflict counter via rustsat traits.
+            // The auto-ramp logic that uses this becomes a no-op; that's
+            // acceptable because BatSat has no conflict limit anyway.
+            Solver::BatSat(_) => 0,
         }
     }
 }
@@ -293,7 +356,7 @@ impl SatCore {
         solver.clear_conflict_limit();
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
-        let call_start = std::time::Instant::now();
+        let call_start = web_time::Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
         let call_duration = call_start.elapsed();
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
@@ -314,7 +377,7 @@ impl SatCore {
         }
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
-        let call_start = std::time::Instant::now();
+        let call_start = web_time::Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
         let call_duration = call_start.elapsed();
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
@@ -367,19 +430,19 @@ impl SatCore {
     }
 
     pub fn assumption_solve(&self, known: &[Lit], lits: &[Lit]) -> SearchResult<bool> {
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         self.fix_values(known);
-        let t1 = std::time::Instant::now();
+        let t1 = web_time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
-        let t2 = std::time::Instant::now();
+        let t2 = web_time::Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
-        let t3 = std::time::Instant::now();
+        let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(true),
             rustsat::solvers::SolverResult::Unsat => Ok(false),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
-        let t4 = std::time::Instant::now();
+        let t4 = web_time::Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
         PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
@@ -404,19 +467,19 @@ impl SatCore {
         known: &[Lit],
         lits: &[Lit],
     ) -> SearchResult<Option<Assignment>> {
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         self.fix_values(known);
-        let t1 = std::time::Instant::now();
+        let t1 = web_time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
-        let t2 = std::time::Instant::now();
+        let t2 = web_time::Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
-        let t3 = std::time::Instant::now();
+        let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(Some(solver.full_solution().unwrap())),
             rustsat::solvers::SolverResult::Unsat => Ok(None),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
-        let t4 = std::time::Instant::now();
+        let t4 = web_time::Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
         PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
@@ -438,13 +501,13 @@ impl SatCore {
     /// [`assumption_solve`] and handle the `Err(SearchError::Limit)` case
     /// explicitly.
     pub fn assumption_solve_no_limit(&self, known: &[Lit], lits: &[Lit]) -> bool {
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         self.fix_values(known);
-        let t1 = std::time::Instant::now();
+        let t1 = web_time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
-        let t2 = std::time::Instant::now();
+        let t2 = web_time::Instant::now();
         let solve = SatCore::do_solve_assumps_no_limit(&mut solver, lits);
-        let t3 = std::time::Instant::now();
+        let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => true,
             rustsat::solvers::SolverResult::Unsat => false,
@@ -452,7 +515,7 @@ impl SatCore {
                 unreachable!("assumption_solve_no_limit must not hit a limit")
             }
         };
-        let t4 = std::time::Instant::now();
+        let t4 = web_time::Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
         PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
@@ -495,9 +558,9 @@ impl SatCore {
         known: &[Lit],
         lits: &[Lit],
     ) -> SearchResult<Option<Vec<Lit>>> {
-        let t0 = std::time::Instant::now();
+        let t0 = web_time::Instant::now();
         self.fix_values(known);
-        let t1 = std::time::Instant::now();
+        let t1 = web_time::Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         self.raw_assumption_solve_with_core_timed(lits, t1)
     }
@@ -505,7 +568,7 @@ impl SatCore {
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
     /// *Not memoryless*: Uses whatever set of values are already fixed in the solver.
     fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
-        self.raw_assumption_solve_with_core_timed(lits, std::time::Instant::now())
+        self.raw_assumption_solve_with_core_timed(lits, web_time::Instant::now())
     }
 
     /// Shared body of the core-returning solve.  Accepts an anchor `Instant`
@@ -514,12 +577,12 @@ impl SatCore {
     fn raw_assumption_solve_with_core_timed(
         &self,
         lits: &[Lit],
-        t_after_fix: std::time::Instant,
+        t_after_fix: web_time::Instant,
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
-        let t2 = std::time::Instant::now();
+        let t2 = web_time::Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits);
-        let t3 = std::time::Instant::now();
+        let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(None),
             rustsat::solvers::SolverResult::Unsat => Ok(Some(
@@ -527,7 +590,7 @@ impl SatCore {
             )),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
-        let t4 = std::time::Instant::now();
+        let t4 = web_time::Instant::now();
         // The caller recorded fix_values's start; we recover its duration here.
         // When the raw entry point is used without a fix_values step, we still
         // record mutex/solve/post honestly.
