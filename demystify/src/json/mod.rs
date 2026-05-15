@@ -318,6 +318,10 @@ pub struct Puzzle {
     pub start_grid: Option<Vec<Vec<Option<i64>>>>,
     pub solution_grid: Option<Vec<Vec<Option<i64>>>>,
     pub cages: Option<Vec<Vec<Option<i64>>>>,
+    /// Per-cell colour-region IDs (`Some(k)` with `k >= 1`; `None` = uncoloured).
+    /// Rendered as a per-colour cell tint with no borders. See `ShowRole::RegionTint`.
+    #[serde(default)]
+    pub region_tint: Option<Vec<Vec<Option<i64>>>>,
     /// Border labels on each side. Outer vec is layer depth (0 = furthest from grid for
     /// top/left, 0 = nearest grid for bottom/right). Inner vec runs along the side
     /// (row index for top/bottom_labels, col index for left/right_labels). Depth-1 layer
@@ -393,6 +397,7 @@ impl Puzzle {
 
         let mut start_grid = None;
         let mut cages = None;
+        let mut region_tint = None;
 
         let mut top_labels = None;
         let mut bottom_labels = None;
@@ -443,6 +448,23 @@ impl Puzzle {
         // Cages (matrix of cage ids per cell).
         if let Some(p) = find_role(&|r| matches!(r, ShowRole::Cages)) {
             cages = Some(read_2d_option_i64(problem, known, p)?);
+        }
+
+        // Colour regions (matrix of colour ids; 0/absent = uncoloured -> no tint).
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::RegionTint)) {
+            let raw = read_2d_option_i64(problem, known, p)?;
+            region_tint = Some(
+                raw.into_iter()
+                    .map(|row| {
+                        row.into_iter()
+                            .map(|cell| match cell {
+                                Some(k) if k >= 1 => Some(k),
+                                _ => None,
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            );
         }
 
         let mut thermometers = None;
@@ -595,6 +617,7 @@ impl Puzzle {
             start_grid,
             solution_grid: None,
             cages,
+            region_tint,
             top_labels,
             bottom_labels,
             left_labels,
@@ -844,6 +867,8 @@ impl Problem {
                 tags.insert("litknown".to_string());
             }
 
+            tags.insert(format!("var-{}", l.var().name()));
+
             if knowledgegrid[i][j].is_none() {
                 knowledgegrid[i][j] = Some(vec![]);
             }
@@ -1018,6 +1043,8 @@ impl Problem {
             if known.contains(&PuzLit::new_eq(l.clone())) {
                 tags.insert("litknown".to_string());
             }
+
+            tags.insert(format!("var-{}", l.var().name()));
 
             if knowledgegrid[i][j].is_none() {
                 knowledgegrid[i][j] = Some(vec![]);

@@ -34,6 +34,11 @@
     stroke-width: 0.01;
     stroke:rgba(0,0,255,0.2);
     fill: none;
+    /* fill:none + default visiblePainted means clicks pass through the
+     * interior — only the thin stroke would catch them. Force the rect to
+     * capture clicks anywhere inside its bounds so the cell <g> receives
+     * the event (used by click-to-explain and game-mode clicks). */
+    pointer-events: all;
 }
 
 

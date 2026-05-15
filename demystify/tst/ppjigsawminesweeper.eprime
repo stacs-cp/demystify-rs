@@ -1,0 +1,126 @@
+language ESSENCE' 1.0
+
+$#KIND ppJigsawMinesweeper
+$#DEC blank_input_val=-1
+$#DEC clue_in_corner
+
+$ Jigsaw minesweeper — standard pen-and-paper minesweeper plus coloured
+$ regions.  A coloured number cell ("the red 2") is the unique header
+$ for its colour; the value equals the number of mines among all cells
+$ sharing that colour (anywhere on the board).  Uncoloured numbers
+$ behave like ordinary minesweeper clues.  Clue cells are never mines.
+$
+$   puz_grid[i,j]    in -1..8: -1 = blank, 0..8 = number clue.
+$   puz_colour[i,j]  in 0..maxColours: 0 = uncoloured, k = colour k.
+$   mines[i,j]       in 0..1: 1 = mine.
+
+given height, width  : int(3..)
+$ -1 = no constraint on total mines; >=0 = require exactly that many.
+given fixedMineCount : int(-1..)
+$ Maximum number of distinct colours.  0 collapses to plain minesweeper.
+given maxColours     : int(0..)
+
+letting RDIM   be domain int(1..height)
+letting CDIM   be domain int(1..width)
+letting CLUE   be domain int(-1..8)
+letting COLOUR be domain int(0..maxColours)
+
+$ ---------- Puzzle variables (mystify mutates these) ----------
+
+$#VAR puz_grid
+$#SHOW puz_grid givens
+find puz_grid : matrix indexed by [RDIM, CDIM] of CLUE
+
+$#VAR puz_colour
+$#SHOW puz_colour region_tint
+find puz_colour : matrix indexed by [RDIM, CDIM] of COLOUR
+
+$ ---------- Tidiness (cleanup-pass target) ----------
+$ Mystify's --cleanup pass minimises demystify_tidiness_measure among
+$ puzzles with identical difficulty, removing decorative colour that
+$ doesn't pull its weight in the deduction chain.
+
+$#AUX demystify_tidiness_measure
+find demystify_tidiness_measure : int(0..height*width)
+
+$ ---------- Neighbourhood machinery ----------
+
+$#AUX neighbourhood_puz_grid
+find neighbourhood_puz_grid : matrix indexed by [RDIM, CDIM] of CLUE
+
+$#AUX neighbourhood_puz_colour
+find neighbourhood_puz_colour : matrix indexed by [RDIM, CDIM] of COLOUR
+
+$#AUX distance_neighbourhood
+find distance_neighbourhood : int(0..height*width*2)
+
+$ ---------- User variable ----------
+
+$#VAR mines
+$#SHOW mines main
+find mines : matrix indexed by [RDIM, CDIM] of int(0..1)
+
+$ ---------- Reified constraints ----------
+
+$#CON neighbour_clue "cell ({{index[0]}},{{index[1]}}) sees the published count of mines among its neighbours"
+find neighbour_clue : matrix indexed by [RDIM, CDIM] of bool
+
+$#CON colour_clue "the colour-{{index[0]}} header at ({{index[1]}},{{index[2]}}) sees its published count of mines in the colour region"
+find colour_clue : matrix indexed by [int(1..maxColours), RDIM, CDIM] of bool
+
+such that
+
+$ Hamming distance covers both puz_grid and puz_colour.
+sum([ toInt(puz_grid[i,j]   != neighbourhood_puz_grid[i,j])
+    + toInt(puz_colour[i,j] != neighbourhood_puz_colour[i,j])
+    | i : RDIM, j : CDIM])
+    = distance_neighbourhood,
+
+$ Numbered cells cannot themselves be mines.
+forAll r : RDIM. forAll c : CDIM.
+    puz_grid[r,c] >= 0 -> mines[r,c] = 0,
+
+$ Each numbered cell's value = count of mines in its (up to 8) neighbours.
+forAll r : RDIM. forAll c : CDIM.
+    puz_grid[r,c] >= 0 ->
+        (neighbour_clue[r,c] ->
+         sum([ mines[r2, c2]
+               | r2 : RDIM, c2 : CDIM,
+                 r2 >= r-1 /\ r2 <= r+1 /\ c2 >= c-1 /\ c2 <= c+1 /\
+                 !(r2 = r /\ c2 = c) ]) = puz_grid[r,c]),
+
+$ A colour can only sit on a clue cell or stay 0.  Non-clue cells may
+$ still be coloured (region members without a number); clue cells may
+$ be uncoloured (a plain neighbour-count clue).
+$ -- no constraint here: any cell can carry any colour.
+
+$ At most one header per colour: at most one clue cell wears colour k.
+forAll k : int(1..maxColours).
+    sum([ toInt(puz_grid[r,c] >= 0 /\ puz_colour[r,c] = k)
+          | r : RDIM, c : CDIM ]) <= 1,
+
+$ If colour k is used anywhere, it must have a header.
+forAll k : int(1..maxColours).
+    (sum([ toInt(puz_colour[r,c] = k) | r : RDIM, c : CDIM]) > 0) ->
+        (sum([ toInt(puz_grid[r,c] >= 0 /\ puz_colour[r,c] = k)
+               | r : RDIM, c : CDIM ]) = 1),
+
+$ Header value = mines in the whole colour region.
+$ Filter on `puz_colour = k` would be a decision variable in a
+$ comprehension condition (SavileRow forbids that), so multiply by
+$ toInt(...) instead.
+forAll k : int(1..maxColours). forAll r : RDIM. forAll c : CDIM.
+    (puz_grid[r,c] >= 0 /\ puz_colour[r,c] = k) ->
+        (colour_clue[k, r, c] ->
+         sum([ mines[r2, c2] * toInt(puz_colour[r2, c2] = k)
+               | r2 : RDIM, c2 : CDIM ]) = puz_grid[r,c]),
+
+$ Optional fixed mine count.  fixedMineCount = -1 leaves the count free.
+fixedMineCount >= 0 ->
+    sum([mines[r, c] | r : RDIM, c : CDIM]) = fixedMineCount,
+
+$ Tidiness: count of coloured cells.  Lower = tidier.
+demystify_tidiness_measure =
+    sum([toInt(puz_colour[r,c] >= 1) | r : RDIM, c : CDIM]),
+
+true

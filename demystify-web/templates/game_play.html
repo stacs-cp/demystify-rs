@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block title %}Demystify — Game: {{ game_level_name }}{% endblock title %}
+{% block content %}
+<div class="he-solver">
+  <header class="he-solver-head">
+    <div class="he-solver-head-left">
+      <h1>{{ game_level_name }}</h1>
+      <span class="muted">{{ game_level_difficulty }}</span>
+    </div>
+  </header>
+
+  {% include "partials/game_stage.html" %}
+</div>
+{% endblock content %}

@@ -27,6 +27,7 @@ use tracing::{debug, info};
 use std::fs::File;
 use std::io;
 
+use crate::problem::solver::{PuzzleSolver, SolverConfig};
 use crate::problem::util::exec::ProgramRunner;
 use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
@@ -77,8 +78,15 @@ pub enum ShowRole {
     /// At most one `main` per model.
     Main,
     /// Cage layout: a `[row, col]` matrix of integer cage IDs.  Used to
-    /// draw cage borders. At most one `cages` per model.
+    /// draw cage borders (and tint each cage's cells). At most one `cages`
+    /// per model.
     Cages,
+    /// Colour regions: a `[row, col]` matrix of colour IDs where `0` means
+    /// "uncoloured" and `k >= 1` is colour `k`.  Cells of colour `k` are
+    /// tinted with a per-colour background.  Unlike `cages`, no borders are
+    /// drawn (the regions need not be contiguous) and the `0` value is
+    /// honoured as "no tint".  At most one `region_tint` per model.
+    RegionTint,
     /// Pre-filled values: a `[row, col]` matrix of integers (with sentinel 0
     /// or absent for blank cells) shown as immutable givens.  At most one.
     Givens,
@@ -1281,7 +1289,8 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                     );
                 }
                 let role = match role_token {
-                    "main" | "cages" | "givens" | "cage_sums" | "less_than" | "side_labels" => {
+                    "main" | "cages" | "region_tint" | "givens" | "cage_sums" | "less_than"
+                    | "side_labels" => {
                         if !role_args.is_empty() {
                             bail!(
                                 "$#SHOW {show_var} {role_token}: takes no \
@@ -1291,6 +1300,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                         match role_token {
                             "main" => ShowRole::Main,
                             "cages" => ShowRole::Cages,
+                            "region_tint" => ShowRole::RegionTint,
                             "givens" => ShowRole::Givens,
                             "cage_sums" => ShowRole::CageSums,
                             "less_than" => ShowRole::LessThan,
@@ -1355,10 +1365,10 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                     }
                     other => bail!(
                         "$#SHOW: unknown role '{other}' (recognised: main, \
-                         cages, givens, cage_sums, less_than, less_than_grid, \
-                         thermometers, edge, side_labels). Roles are a closed \
-                         set; new ones must be added in parse.rs and the \
-                         renderer."
+                         cages, region_tint, givens, cage_sums, less_than, \
+                         less_than_grid, thermometers, edge, side_labels). \
+                         Roles are a closed set; new ones must be added in \
+                         parse.rs and the renderer."
                     ),
                 };
                 info!(target: "parser", "Found SHOW: var '{}' role {:?}", show_var, role);
@@ -1421,8 +1431,8 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 
     // Validate $#SHOW directives at parse-file time:
     //   - at most one directive per name
-    //   - singleton roles (Main, Cages, Givens, CageSums, LessThan,
-    //     Thermometers, SideLabels) appear at most once across the model
+    //   - singleton roles (Main, Cages, RegionTint, Givens, CageSums,
+    //     LessThan, Thermometers, SideLabels) appear at most once across the model
     //   - Edge directives appear at most once per side
     //   - LessThanGrid directives appear at most once per axis
     // Name-existence (var/aux/param) is checked later in `parse_eprime`
@@ -1443,6 +1453,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
             let singleton_key = match &d.role {
                 ShowRole::Main => Some("main"),
                 ShowRole::Cages => Some("cages"),
+                ShowRole::RegionTint => Some("region_tint"),
                 ShowRole::Givens => Some("givens"),
                 ShowRole::CageSums => Some("cage_sums"),
                 ShowRole::LessThan => Some("less_than"),
@@ -1747,6 +1758,69 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     info!(target: "progress", "parse setup completed in {setup_secs:.2}s (total parse: {total_secs:.2}s)");
 
     Ok(eprimeparse)
+}
+
+/// Parse an Essence model + param, then pin an externally-generated puzzle
+/// assignment onto the resulting solver.
+///
+/// This is the standard way to load a puzzle whose Essence model declares its
+/// clue cells as `find` variables rather than `given` parameters — as the
+/// puzzle-generator `mystify` does (a `.param` file cannot assign `find`
+/// variables, so the concrete instance is supplied as a separate assignment).
+/// `assignment` is the nested `{name: {idx: … : value}}` object that
+/// [`crate::problem::PuzVar::to_json_map`] produces and [`PuzzleSolver::pin_assignment`]
+/// consumes; in `mystify`'s output JSON it lives under the top-level `"puzzle"`
+/// key (see [`mystify_puzzle_assignment`]).
+///
+/// `config` controls the returned solver; pass [`SolverConfig::default`] unless
+/// you specifically need `only_assignments`.
+///
+/// # Errors
+///
+/// Fails if parsing fails (see [`parse_essence`]), if `assignment` is malformed
+/// or references variables/values the model does not have (see
+/// [`PuzzleSolver::pin_assignment`]), or if the pinned assignment makes the
+/// model unsatisfiable.
+pub fn parse_essence_with_assignment(
+    eprimein: &PathBuf,
+    eprimeparamin: &PathBuf,
+    assignment: &serde_json::Value,
+    config: SolverConfig,
+) -> anyhow::Result<PuzzleSolver> {
+    let parse = parse_essence(eprimein, eprimeparamin)?;
+    let mut solver = PuzzleSolver::new_with_config(Arc::new(parse), config)?;
+    solver
+        .pin_assignment(assignment)
+        .context("pinning the puzzle assignment")?;
+    if !solver.is_currently_solvable() {
+        bail!(
+            "the pinned puzzle assignment makes the model unsatisfiable — \
+             either the assignment is inconsistent or it does not match this model"
+        );
+    }
+    Ok(solver)
+}
+
+/// Pull the puzzle-assignment object out of a `mystify`-style output JSON.
+///
+/// `mystify` writes one JSON file per generated puzzle, with the clue-cell
+/// assignment under a top-level `"puzzle"` key (alongside `"params"`,
+/// `"solution"`, `"difficulty"`, …).  This returns that sub-object, ready to
+/// hand to [`parse_essence_with_assignment`] or [`PuzzleSolver::pin_assignment`].
+///
+/// # Errors
+///
+/// Fails if there is no top-level `"puzzle"` key, or it is not a JSON object.
+pub fn mystify_puzzle_assignment(
+    output_json: &serde_json::Value,
+) -> anyhow::Result<&serde_json::Value> {
+    let puzzle = output_json
+        .get("puzzle")
+        .ok_or_else(|| anyhow::anyhow!("mystify output JSON has no top-level `puzzle` key"))?;
+    if !puzzle.is_object() {
+        bail!("the `puzzle` value in the mystify output JSON is not an object");
+    }
+    Ok(puzzle)
 }
 
 fn read_essence_param(

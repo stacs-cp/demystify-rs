@@ -105,21 +105,145 @@
   }
 
   // ─── Click-to-explain (click a candidate cell → explain that literal) ───
+  // Attach directly to the board SVG element. A per-board "bound" marker keeps
+  // the listener idempotent across HTMX swaps (the SVG is freshly rendered, so
+  // the marker is gone and we re-bind on the new element).
   function initClickToExplain() {
     const board = document.getElementById('board');
     if (!board) return;
-
+    if (board.dataset.solverClickBound === '1') return;
+    if (!document.getElementById('solver-stage')) return; // game pages skip this
+    board.dataset.solverClickBound = '1';
     board.addEventListener('click', (e) => {
       const cand = e.target.closest('[data-cand]');
       if (!cand) return;
       const id = cand.id;
       if (!id || !id.startsWith('D_')) return;
-
       htmx.ajax('POST', '/solver/explain', {
         target: '#solver-stage',
         swap: 'outerHTML',
         headers: { 'X-Cell-Literal': id }
       });
+    });
+  }
+
+  // ─── Game mode: left/right click → place / rule out; flash on reject ───
+  let whyMode = false;
+
+  function postGameClick(id, sign) {
+    htmx.ajax('POST', `/game/click?sign=${sign}`, {
+      target: '#game-stage',
+      swap: 'outerHTML',
+      headers: { 'X-Cell-Literal': id }
+    });
+  }
+
+  function postGameWhy(id) {
+    htmx.ajax('POST', '/game/hint/why', {
+      target: '#game-stage',
+      swap: 'outerHTML',
+      headers: { 'X-Cell-Literal': id }
+    });
+    whyMode = false;
+    const btn = document.getElementById('game-why-toggle');
+    if (btn) btn.classList.remove('he-btn-active');
+  }
+
+  function initGameClicks() {
+    const board = document.getElementById('board');
+    if (!board) return;
+    if (!document.getElementById('game-stage')) return; // solver pages skip this
+    if (board.dataset.gameClickBound !== '1') {
+      board.dataset.gameClickBound = '1';
+      board.addEventListener('click', (e) => {
+        const cand = e.target.closest('[data-cand]');
+        if (!cand) return;
+        const id = cand.id;
+        if (!id || !id.startsWith('D_')) return;
+        e.preventDefault();
+        if (whyMode) { postGameWhy(id); return; }
+        postGameClick(id, 'pos');
+      });
+      board.addEventListener('contextmenu', (e) => {
+        const cand = e.target.closest('[data-cand]');
+        if (!cand) return;
+        e.preventDefault();
+        const id = cand.id;
+        if (!id || !id.startsWith('D_')) return;
+        if (whyMode) { postGameWhy(id); return; }
+        postGameClick(id, 'neg');
+      });
+    }
+    const whyBtn = document.getElementById('game-why-toggle');
+    if (whyBtn && whyBtn.dataset.bound !== '1') {
+      whyBtn.dataset.bound = '1';
+      whyBtn.addEventListener('click', () => {
+        whyMode = !whyMode;
+        whyBtn.classList.toggle('he-btn-active', whyMode);
+      });
+    }
+  }
+
+  function flashRejectedClickIfAny() {
+    const stage = document.getElementById('game-stage');
+    if (!stage) return;
+    if (stage.dataset.gameMode !== 'true') return;
+    // The server returns failures as a data attribute; we don't know which
+    // cell caused the reject across the swap, so just briefly mark the whole
+    // board if failures went up. Track last-seen failures on the window.
+    const fails = parseInt(stage.dataset.failures || '0', 10);
+    if (window.__lastGameFailures === undefined) {
+      window.__lastGameFailures = fails;
+      return;
+    }
+    if (fails > window.__lastGameFailures) {
+      const figure = stage.querySelector('.he-board');
+      if (figure) {
+        figure.classList.add('he-game-flash-wrong');
+        setTimeout(() => figure.classList.remove('he-game-flash-wrong'), 350);
+      }
+    }
+    window.__lastGameFailures = fails;
+  }
+
+  function persistGameProgressIfWon() {
+    const stage = document.getElementById('game-stage');
+    if (!stage) return;
+    if (stage.dataset.gameMode !== 'true') return;
+    if (stage.dataset.won !== 'true') return;
+    const levelId = stage.dataset.levelId;
+    if (!levelId) return;
+    try {
+      const prog = JSON.parse(localStorage.getItem('demystify_progress') || '{}');
+      const existing = prog[levelId];
+      const entry = {
+        failures: parseInt(stage.dataset.failures || '0', 10),
+        hints_used: parseInt(stage.dataset.hints || '0', 10),
+        completed_at: Date.now(),
+      };
+      // Keep the best run (fewest failures, then fewest hints).
+      if (!existing
+        || entry.failures < existing.failures
+        || (entry.failures === existing.failures && entry.hints_used < existing.hints_used)) {
+        prog[levelId] = entry;
+        localStorage.setItem('demystify_progress', JSON.stringify(prog));
+      }
+    } catch (e) {
+      console.warn('Could not persist progress:', e);
+    }
+  }
+
+  function decorateLevelSelect() {
+    const grid = document.getElementById('game-level-grid');
+    if (!grid) return;
+    let prog = {};
+    try { prog = JSON.parse(localStorage.getItem('demystify_progress') || '{}'); } catch (e) {}
+    grid.querySelectorAll('[data-badge-for]').forEach(badge => {
+      const id = badge.dataset.badgeFor;
+      const entry = prog[id];
+      if (!entry) return;
+      badge.textContent = `✓ ${entry.failures}f / ${entry.hints_used}h`;
+      badge.classList.add('he-level-card-badge--done');
     });
   }
 
@@ -150,6 +274,10 @@
     initHighlightFunctions();
     initConstraintPreview();
     initClickToExplain();
+    initGameClicks();
+    flashRejectedClickIfAny();
+    persistGameProgressIfWon();
+    decorateLevelSelect();
   }
 
   document.addEventListener('DOMContentLoaded', () => {

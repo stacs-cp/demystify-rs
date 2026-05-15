@@ -610,6 +610,33 @@ impl PuzzleDraw {
             }
         }
 
+        // Colour-region tints (the `region_tint` $#SHOW role): fill each
+        // coloured cell with a palette colour keyed on the colour id.  No
+        // borders — the regions need not be contiguous, so cell tint is the
+        // only cue.  Uncoloured cells (id 0) were already mapped to `None`.
+        if let Some(tints) = &puzzle.region_tint {
+            for i in 0..width {
+                for j in 0..height {
+                    let Some(k) = tints[j][i] else { continue };
+                    let col = ((k - 1).max(0) as usize) % colours_list.len();
+                    let i_f = i as f64;
+                    let j_f = j as f64;
+                    let path = format!(
+                        "M {} {} H {} V {} H {} Z",
+                        step * i_f,
+                        step * j_f,
+                        step * (i_f + 1.0),
+                        step * (j_f + 1.0),
+                        step * i_f
+                    );
+                    let mut p = element::Path::new();
+                    p.assign("d", path);
+                    p.assign("fill", colours_list[col]);
+                    cagegrp.append(p);
+                }
+            }
+        }
+
         grp.append(cagegrp);
 
         let mut outlinegrp = element::Group::new();
@@ -1152,6 +1179,7 @@ mod tests {
             start_grid: None,
             solution_grid: None,
             cages: None,
+            region_tint: None,
             top_labels: Some(vec![
                 vec!["".into(), "".into(), "".into(), "".into(), "1".into()],
                 vec!["".into(), "1".into(), "3".into(), "2".into(), "1".into()],
