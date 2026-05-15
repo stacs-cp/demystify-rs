@@ -44,7 +44,7 @@ forAll i:X.
 col_sums[i] != -1 -> (colup[i] -> ((sum j:Y. toInt(grid[j,i]>0)) >= col_sums[i])),
 
 forAll i:X.
-col_sums[i] != -1 -> (coldown[i] -> ((sum j:Y. toInt(grid[j,i]>0)) >= col_sums[i])),
+col_sums[i] != -1 -> (coldown[i] -> ((sum j:Y. toInt(grid[j,i]>0)) <= col_sums[i])),
 
 
 $ todo: This is a lot of pain for savile row
