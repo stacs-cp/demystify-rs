@@ -1,0 +1,95 @@
+language ESSENCE' 1.0
+
+$#KIND star-battle
+
+$ Star Battle model with per-cell adjacency atoms.
+$
+$ The default model (`star-battle.eprime`) has one constraint atom per
+$ adjacent *pair* of cells: `adj[i,j,k,l]` says "(i,j) and (i+k, j+l) are
+$ adjacent".  When a deduction needs to rule out a star because it would
+$ touch many cage cells (the "internal-cell" argument) the MUS contains
+$ one adj atom per neighbour — typically size 5 or 6 for the 2x3 cage
+$ examples in the krazydad tutorial.
+$
+$ This model collapses adjacency into one atom per cell:
+$ `cellforbids[i,j]` says "if there is a star at (i,j), then no star may
+$ appear at any cell adjacent to it".  A single cellforbids atom now
+$ accounts for all 8 (or fewer, on edges) neighbours, so the MUS for
+$ "(5,6) cannot be a star because it would touch 5 of the 6 cells in its
+$ cage" shrinks from 6 atoms (5 adj + 1 blockup) to 2 (1 cellforbids + 1
+$ blockup) — much closer to the human walkthrough phrasing.
+$
+$ The model is otherwise identical to `star-battle.eprime` (same row /
+$ column / cage at-least / at-most atoms).  Use whichever is appropriate
+$ for the experiment: paper-comparable runs use the pairwise version;
+$ tutorial walkthroughs that want crisp MUSes use this one.
+
+given grid_size: int
+letting griddim be domain int(1..grid_size)
+given starcount: int
+$#SHOW cages cages
+given cages: matrix indexed by [griddim, griddim] of int(1..grid_size)
+
+$#VAR stars
+$#SHOW stars main
+find stars: matrix indexed by [griddim, griddim] of bool
+
+$#CON cellforbids "A star at ({{index[0]}}, {{index[1]}}) forbids stars at all adjacent cells"
+$ One per cell — captures all 8 neighbours in one atom.
+find cellforbids: matrix indexed by [griddim, griddim] of bool
+
+$#CON rowup "at least {{params['starcount']}} star(s) in row ({{index[0]}})"
+$#CON rowdown "at most {{params['starcount']}} star(s) in row ({{index[0]}})"
+find rowup: matrix indexed by [griddim] of bool
+find rowdown: matrix indexed by [griddim] of bool
+
+$#CON colup "at least {{params['starcount']}} star(s) in column ({{index[0]}})"
+$#CON coldown "at most {{params['starcount']}} star(s) in column ({{index[0]}})"
+find colup: matrix indexed by [griddim] of bool
+find coldown: matrix indexed by [griddim] of bool
+
+$#CON blockup "at least {{params['starcount']}} star(s) in box ({{index[0]}})"
+$#CON blockdown "at most {{params['starcount']}} star(s) in box ({{index[0]}})"
+find blockup: matrix indexed by [griddim] of bool
+find blockdown: matrix indexed by [griddim] of bool
+
+$#FAMILY unit_up   "Unit at-least"  rowup   "Row" colup   "Column" blockup   "Block"
+$#FAMILY unit_down "Unit at-most"   rowdown "Row" coldown "Column" blockdown "Block"
+$#FAMILY line_up   "Line at-least"  rowup   "Row" colup   "Column"
+$#FAMILY line_down "Line at-most"   rowdown "Row" coldown "Column"
+
+such that
+
+$ For each cell (i,j), if cellforbids[i,j] is enabled and there is a star
+$ at (i,j), then no adjacent cell may also contain a star.
+$ Off-board indices are excluded explicitly so we never reference an
+$ out-of-range matrix entry.
+forAll i,j: griddim.
+cellforbids[i,j] ->
+    (stars[i,j] ->
+        and([ !stars[i+k, j+l]
+            | k,l : int(-1..1)
+            , !(k=0 /\ l=0)
+            , i+k >= 1 /\ i+k <= grid_size
+            , j+l >= 1 /\ j+l <= grid_size
+        ])),
+
+forAll i: griddim.
+rowup[i] -> (sum(stars[i,..]) >= starcount),
+
+forAll i: griddim.
+rowdown[i] -> (sum(stars[i,..]) <= starcount),
+
+forAll i: griddim.
+colup[i] -> (sum(stars[..,i]) >= starcount),
+
+forAll i: griddim.
+coldown[i] -> (sum(stars[..,i]) <= starcount),
+
+forAll i: griddim.
+blockup[i] -> (sum([stars[x,y] /\ cages[x,y]=i | x,y:griddim]) >= starcount),
+
+forAll i: int(1..grid_size).
+blockdown[i] -> (sum([stars[x,y] /\ cages[x,y]=i | x,y:griddim]) <= starcount),
+
+true

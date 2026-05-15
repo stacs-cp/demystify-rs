@@ -1,0 +1,134 @@
+language ESSENCE' 1.0
+
+$ Tents-and-trees model with tighter, per-cell adjacency atoms.
+$
+$ The default model (`tents.eprime`) has two per-tree atoms governing
+$ adjacency:
+$
+$   tentneartree[t] :  for every cell, if t is not orth-adjacent, then
+$                      grid[cell] != t.  (One per-tree atom controls all
+$                      cells.)
+$   treetentup[t]   :  somewhere on the board, grid = t.  (No adjacency
+$                      requirement.)
+$
+$ Together these enforce "tree t has exactly one tent and it's adjacent
+$ to t".  But the per-tree shape leaks into MUSes for far-away cells:
+$ "(1,1) is not a tent" requires `tentneartree[1..treecount]` — one
+$ atom per tree (size-`treecount` MUS) even though a player just thinks
+$ "no tree nearby, can't be a tent" (one rule).
+$
+$ This variant tightens both into per-cell / direct-adjacency form:
+$
+$   tentadjtree[i,j]  :  if grid[i,j] = k > 0, then grid = -k at one of
+$                        (i,j)'s 4 orth neighbours.  Per-CELL atom.
+$   treeadjtent[t]    :  the tree t's own position has a neighbour with
+$                        grid = t.  Per-TREE atom but only references
+$                        the tree's 4 neighbours (not the whole board).
+$
+$ Effect on MUSes:
+$   - "far-away cell is X" needs only `tentadjtree[i,j]` — size 1.
+$   - "row 1's only free cell forces a particular tree's tent" still
+$     needs `treeadjtent[t]` (or treetentdown), but no longer pulls in
+$     `tentneartree[*]` for trees nowhere near the cell.
+$
+$ The satisfiable solution set is unchanged — these atoms together
+$ enforce the same "exactly one tent per tree, adjacent to its tree"
+$ constraint as the original model.
+
+given x,y, treecount: int
+letting X be int(1..x)
+letting Y be int(1..y)
+
+$#SHOW row_sums edge top
+given row_sums: matrix indexed by [X] of int
+$#SHOW col_sums edge left
+given col_sums: matrix indexed by [Y] of int
+
+given trees: matrix indexed by [X,Y] of int(0..treecount)
+
+$ Tree is negative number, tent is positive, -i is connected to i
+$#VAR grid
+$#SHOW grid main
+find grid : matrix indexed by [X,Y] of int(-treecount..treecount)
+
+$#CON adj "({{index[0]}}, {{index[1]}}) and ({{index[0]+index[2]}}, {{index[1]+index[3]}}) cannot both contain tents"
+find adj: matrix indexed by [X,Y, int(-1..1), int(-1..1)] of bool
+
+$#CON rowup "at least {{params['row_sums'][index[0]]}} tents(s) in row {{index[0]}}"
+$#CON rowdown "at most {{params['row_sums'][index[0]]}} tents(s) in row {{index[0]}}"
+find rowup: matrix indexed by [X] of bool
+find rowdown: matrix indexed by [X] of bool
+
+$#CON colup "at least {{params['col_sums'][index[0]]}} tents(s) in column {{index[0]}}"
+$#CON coldown "at most {{params['col_sums'][index[0]]}} tents(s) in column {{index[0]}}"
+find colup: matrix indexed by [Y] of bool
+find coldown: matrix indexed by [Y] of bool
+
+$#CON treeadjtent "tree {{index[0]}} has a tent in one of its 4 orth-adjacent cells"
+find treeadjtent: matrix indexed by [int(1..treecount)] of bool
+
+$#CON treetentdown "tree {{index[0]}} has at most one tent"
+find treetentdown: matrix indexed by [int(1..treecount)] of bool
+
+$#CON tentadjtree "if cell ({{index[0]}}, {{index[1]}}) is a tent, it must be adjacent to its matching tree"
+find tentadjtree: matrix indexed by [X,Y] of bool
+
+such that
+
+$ Tree cells are forced to grid = -tree_id.
+forAll i:X. forAll j:Y.
+(trees[i,j]>0 -> grid[i,j]=-trees[i,j]),
+
+$ Non-tree cells have grid >= 0 (either X = 0, or a positive tent index).
+forAll i:X. forAll j:Y.
+(trees[i,j]=0 -> grid[i,j]>=0),
+
+$ Per-cell adjacency: if grid[i,j] is a tent for tree k, then one of
+$ the 4 orth neighbours must contain tree k (i.e. grid = -k there).
+$ Off-board indices are excluded explicitly.
+forAll i:X. forAll j:Y.
+tentadjtree[i,j] -> (
+    forAll t: int(1..treecount).
+    grid[i,j] = t ->
+        ((i-1 >= 1 /\ trees[i-1,j] = t) \/
+         (i+1 <= x /\ trees[i+1,j] = t) \/
+         (j-1 >= 1 /\ trees[i,j-1] = t) \/
+         (j+1 <= y /\ trees[i,j+1] = t))
+),
+
+$ Per-tree: tree t's matching tent must be in one of tree t's 4 orth
+$ neighbours.  This implies "tree t has a tent" without dragging in any
+$ cells far from tree t.
+forAll t: int(1..treecount).
+treeadjtent[t] -> (
+    forAll i:X. forAll j:Y.
+    trees[i,j] = t ->
+        ((i-1 >= 1 /\ grid[i-1,j] = t) \/
+         (i+1 <= x /\ grid[i+1,j] = t) \/
+         (j-1 >= 1 /\ grid[i,j-1] = t) \/
+         (j+1 <= y /\ grid[i,j+1] = t))
+),
+
+$ Tree t has at most one tent (unchanged from base model).
+forAll t:int(1..treecount).
+treetentdown[t] -> ((sum i:X. sum j:Y. toInt(grid[i,j]=t))<=1),
+
+$ Tents can't be adjacent (orth or diag) — unchanged.
+forAll i:X. forAll j:Y. forAll k: int(0..1). forAll l: int(-1..1).
+( !(k=0 /\ l=0) /\ !(k=0 /\ l=1) ) ->
+(adj[i,j,k,l] -> !(grid[i,j]>0 /\ grid[i+k,j+l]>0)),
+
+$ Row / column sums (unchanged).
+forAll i:X.
+(row_sums[i] != -1) -> (rowup[i] -> ((sum j:Y. toInt(grid[i,j]>0)) >= row_sums[i])),
+
+forAll i:X.
+(row_sums[i] != -1) -> (rowdown[i] -> ((sum j:Y. toInt(grid[i,j]>0)) <= row_sums[i])),
+
+forAll j:Y.
+(col_sums[j] != -1) -> (colup[j] -> ((sum i:X. toInt(grid[i,j]>0)) >= col_sums[j])),
+
+forAll j:Y.
+(col_sums[j] != -1) -> (coldown[j] -> ((sum i:X. toInt(grid[i,j]>0)) <= col_sums[j])),
+
+1=1

@@ -1,0 +1,18 @@
+language ESSENCE' 1.0
+
+$ Empty Sudoku puzzle: no givens.  Used as the starting point for
+$ walkthrough scripts that pin specific candidate eliminations via
+$ explicit `deduce`/`pin` ops in TOML — replaces the older
+$ sudoku-domains.eprime + custom-allowed-tensor approach.
+letting fixed be
+[
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0]
+]

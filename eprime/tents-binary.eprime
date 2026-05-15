@@ -1,0 +1,139 @@
+language ESSENCE' 1.0
+
+$#KIND tents
+
+$ Tents-and-Trees: minimal-label model.
+$
+$ Each cell takes a value in {-1, 0, 1}: -1 means tree, 0 means empty,
+$ 1 means tent.  The single-grid encoding (rather than a separate
+$ trees parameter and a Boolean grid) is a rendering convenience —
+$ the SVG composer reads one matrix and shows trees, tents and empty
+$ cells in the same picture.
+$
+$ Crucially, this model does NOT include a labelled tent->tree
+$ matching — there is no explicit "tent k pairs with tree k"
+$ constraint and no `treetentdown`/`alldifferent`/assignment encoding.
+$ Tents share a single value (`1`); trees share a single value (`-1`).
+$
+$ Why that's enough — Tatham's lemma (an adaptation of Hall's marriage
+$ theorem applied to the tree-tent bipartite adjacency graph): for any
+$ tree-tent puzzle with a unique solution, the perfect matching between
+$ trees and tents can always be found by repeatedly choosing a tree of
+$ degree 1 (i.e. a tree with only one possible adjacent tent location)
+$ and assigning that tent.  This means the local constraints below
+$ ("every tree has at least one adjacent tent") are sufficient to force
+$ the correct tent placement on any well-formed puzzle.  Adding an
+$ explicit matching constraint would not change the solution set on
+$ such puzzles but would (a) create N! label-permutation symmetry that
+$ wastes solver effort and (b) drag value-domain channelling clauses
+$ into every MUS, making the MUSes 2-5x larger than they need to be.
+$
+$ See Simon Tatham's `tents.c` header comment for the canonical
+$ exposition of the matching lemma:
+$   https://github.com/ghewgill/puzzles/blob/master/tents.c
+$
+$ Constraint atoms (all per-cell or per-line):
+$   adj[i,j,k,l]    : the pair (i,j) / (i+k, j+l) cannot both be tents
+$                     (8-neighbour adjacency between tents is forbidden).
+$   rowup[i] / rowdown[i]   : at least / at most `row_sums[i]` tents in
+$                             row i (when row_sums[i] != -1).
+$   colup[j] / coldown[j]   : at least / at most `col_sums[j]` tents in
+$                             column j (when col_sums[j] != -1).
+$   treeadjtent[i,j]: only meaningful at tree cells — "the tree here has
+$                     at least one orthogonally-adjacent tent".  Drives
+$                     the page's "tree with one free neighbour" rule.
+$   tentadjtree[i,j]: per cell — "if there is a tent here, at least one
+$                     orthogonal neighbour is a tree".  Drives the
+$                     page's "cell too far from any tree" rule (Rule 2/
+$                     Rule 3).  Strictly redundant under the count +
+$                     no-touch constraints, but kept because it gives
+$                     the cleanest size-1 MUSes for those rules.
+
+given x, y, treecount: int
+letting X be int(1..x)
+letting Y be int(1..y)
+
+$#SHOW row_sums edge top
+given row_sums: matrix indexed by [X] of int
+$#SHOW col_sums edge left
+given col_sums: matrix indexed by [Y] of int
+
+$ trees[i,j] > 0 marks a tree cell; 0 marks an empty cell.  The actual
+$ values 1..treecount are *not* used by this model — they're only there
+$ so existing param files (which label trees) parse without change.
+given trees: matrix indexed by [X,Y] of int(0..treecount)
+
+$ Cell value: -1 = tree, 0 = empty, 1 = tent.
+$#VAR grid
+$#SHOW grid main
+find grid : matrix indexed by [X,Y] of int(-1..1)
+
+$#CON adj "({{index[0]}}, {{index[1]}}) and ({{index[0]+index[2]}}, {{index[1]+index[3]}}) cannot both contain tents"
+find adj: matrix indexed by [X,Y, int(-1..1), int(-1..1)] of bool
+
+$#CON rowup "at least {{params['row_sums'][index[0]]}} tents(s) in row {{index[0]}}"
+$#CON rowdown "at most {{params['row_sums'][index[0]]}} tents(s) in row {{index[0]}}"
+find rowup: matrix indexed by [X] of bool
+find rowdown: matrix indexed by [X] of bool
+
+$#CON colup "at least {{params['col_sums'][index[0]]}} tents(s) in column {{index[0]}}"
+$#CON coldown "at most {{params['col_sums'][index[0]]}} tents(s) in column {{index[0]}}"
+find colup: matrix indexed by [Y] of bool
+find coldown: matrix indexed by [Y] of bool
+
+$#CON treeadjtent "tree at ({{index[0]}}, {{index[1]}}) must have at least one orth-adjacent tent"
+find treeadjtent: matrix indexed by [X, Y] of bool
+
+$#CON tentadjtree "if cell ({{index[0]}}, {{index[1]}}) is a tent, it must have at least one orth-adjacent tree"
+find tentadjtree: matrix indexed by [X, Y] of bool
+
+such that
+
+$ Tree cells take value -1; empty cells take {0, 1}.  Both are
+$ unconditional (not gated by any constraint atom).
+forAll i:X. forAll j:Y.
+(trees[i,j] > 0 -> grid[i,j] = -1),
+
+forAll i:X. forAll j:Y.
+(trees[i,j] = 0 -> grid[i,j] >= 0),
+
+$ Per-tree constraint: each tree has an orth-adjacent tent.  Only
+$ meaningful at tree positions; for empty cells the implication is
+$ vacuously satisfied.
+forAll i:X. forAll j:Y.
+treeadjtent[i,j] -> (trees[i,j] > 0 ->
+    ((i-1 >= 1 /\ grid[i-1,j] = 1) \/
+     (i+1 <= x /\ grid[i+1,j] = 1) \/
+     (j-1 >= 1 /\ grid[i,j-1] = 1) \/
+     (j+1 <= y /\ grid[i,j+1] = 1))),
+
+$ Per-cell constraint: a tent must be adjacent to a tree.
+forAll i:X. forAll j:Y.
+tentadjtree[i,j] -> (grid[i,j] = 1 ->
+    ((i-1 >= 1 /\ trees[i-1,j] > 0) \/
+     (i+1 <= x /\ trees[i+1,j] > 0) \/
+     (j-1 >= 1 /\ trees[i,j-1] > 0) \/
+     (j+1 <= y /\ trees[i,j+1] > 0))),
+
+$ Tents cannot be 8-adjacent.  We only check 4 of the 8 directions
+$ (forward and forward-down) since adjacency is symmetric; off-board
+$ indices are trivially satisfied.
+forAll i:X. forAll j:Y. forAll k: int(0..1). forAll l: int(-1..1).
+( !(k=0 /\ l=0) /\ !(k=0 /\ l=1) ) ->
+(adj[i,j,k,l] -> !(grid[i,j] = 1 /\ grid[i+k,j+l] = 1)),
+
+$ Row sums.
+forAll i:X.
+(row_sums[i] != -1) -> (rowup[i] -> ((sum j:Y. toInt(grid[i,j] = 1)) >= row_sums[i])),
+
+forAll i:X.
+(row_sums[i] != -1) -> (rowdown[i] -> ((sum j:Y. toInt(grid[i,j] = 1)) <= row_sums[i])),
+
+$ Column sums.
+forAll j:Y.
+(col_sums[j] != -1) -> (colup[j] -> ((sum i:X. toInt(grid[i,j] = 1)) >= col_sums[j])),
+
+forAll j:Y.
+(col_sums[j] != -1) -> (coldown[j] -> ((sum i:X. toInt(grid[i,j] = 1)) <= col_sums[j])),
+
+1=1
