@@ -536,7 +536,7 @@ pub async fn solver_difficulties(
     let mut solver = solver.lock().unwrap();
     let round: u32 = session.get("round").unwrap_or(0);
 
-    let problem = solver.planner.difficulty_problem();
+    let problem = solver.planner.difficulty_problem(false);
     let ctx = build_solver_stage_context(&problem, round, &solver);
     let html = state.tera.render("partials/solver_stage.html", &ctx)?;
     Ok(Html(html))

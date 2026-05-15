@@ -831,6 +831,7 @@ impl PuzzlePlanner {
                 &all_deduced,
                 &description_list,
                 &pre_string,
+                false,
             )
             .expect("Cannot make puzzle json");
 
@@ -926,6 +927,7 @@ impl PuzzlePlanner {
             &all_deduced,
             &description_list,
             &pre_string,
+            false,
         )
         .expect("Cannot make puzzle json")
     }
@@ -1012,7 +1014,11 @@ impl PuzzlePlanner {
         self.build_step_problem(Some(vec), "Made the following deductions")
     }
 
-    pub fn difficulty_problem(&mut self) -> Problem {
+    /// Render the difficulty heatmap.  `hide_untouched_candidates`: when
+    /// true, cells with no known literal yet are left blank ("?") instead
+    /// of being filled with every value the planner could in principle
+    /// deduce.  Used by walkthrough scripts in tutorial mode.
+    pub fn difficulty_problem(&mut self, hide_untouched_candidates: bool) -> Problem {
         let base_muses = self.all_muses_with_larger();
 
         let base_difficulties: BTreeMap<Lit, usize> = base_muses
@@ -1049,6 +1055,7 @@ impl PuzzlePlanner {
             &known_puzlits,
             &vvpmap,
             "The difficulty of the problem",
+            hide_untouched_candidates,
         )
         .expect("Cannot make puzzle json")
     }
@@ -1089,6 +1096,7 @@ impl PuzzlePlanner {
             &known_puzlits,
             &vvpmap,
             "The difficulty of the problem",
+            false,
         )
         .expect("Cannot make puzzle json");
 
@@ -1135,6 +1143,13 @@ impl PuzzlePlanner {
     /// solver can result in incorrect answers.
     pub fn solver(&mut self) -> &mut PuzzleSolver {
         &mut self.psolve
+    }
+
+    /// Mutable access to the planner's config — for callers that need to
+    /// adjust `MusConfig` (`repeats`, `strategy`, etc.) between steps.
+    /// The walkthrough script driver is the primary consumer.
+    pub fn config_mut(&mut self) -> &mut PlannerConfig {
+        &mut self.config
     }
 }
 

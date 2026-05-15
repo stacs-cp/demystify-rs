@@ -195,12 +195,19 @@ fn read_edge_labels(
         });
     }
     // 1-D fallback: vec_string for params (preserves any string entries),
-    // stringified i64 for find vars.
+    // stringified i64 for find vars.  By convention, an integer value of
+    // `-1` means "no clue here" — hide the label by mapping it to "".
+    let blank_if_neg_one = |s: String| -> String { if s == "-1" { String::new() } else { s } };
     if pp.eprime.has_param(name) {
-        return Ok(Some(vec![pp.eprime.param_vec_string(name)?]));
+        let labels = pp.eprime.param_vec_string(name)?;
+        return Ok(Some(vec![
+            labels.into_iter().map(blank_if_neg_one).collect(),
+        ]));
     }
     let v = read_1d_i64(pp, known, name)?;
-    Ok(Some(vec![v.iter().map(|x| x.to_string()).collect()]))
+    Ok(Some(vec![
+        v.iter().map(|x| blank_if_neg_one(x.to_string())).collect(),
+    ]))
 }
 
 /// Build the list of `ConstraintShape`s for the constraints in `constraint_num`.
@@ -700,9 +707,17 @@ impl Problem {
         deduced_lits: &BTreeSet<PuzLit>,
         comments: &str,
     ) -> anyhow::Result<Problem> {
-        Self::new_from_puzzle_and_mus(solver, tosolve, known, deduced_lits, &[], comments)
+        Self::new_from_puzzle_and_mus(solver, tosolve, known, deduced_lits, &[], comments, false)
     }
 
+    /// `hide_untouched_candidates`: when true, cells that have no known
+    /// literal yet (positive or negative) are left out of `knowledgegrid`,
+    /// so the renderer falls back to the `blocked_cells` "?" placeholder.
+    /// Used by the walkthrough renderer for tutorial output: untouched
+    /// cells stay visually quiet instead of being filled with every
+    /// candidate value the planner could in principle deduce.  The
+    /// interactive GUI keeps the default (false) so it still has clickable
+    /// candidate lits in every cell.
     pub fn new_from_puzzle_and_mus(
         solver: &PuzzleSolver,
         tosolve: &BTreeSet<VarValPair>,
@@ -710,6 +725,7 @@ impl Problem {
         deduced_lits: &BTreeSet<PuzLit>,
         deduction_list: &[DescriptionStatement],
         comments: &str,
+        hide_untouched_candidates: bool,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle_and_known(solver.puzzleparse(), known)?;
 
@@ -755,6 +771,31 @@ impl Problem {
 
         let all_lits = solver.puzzleparse().all_var_varvals();
 
+        // When `hide_untouched_candidates` is on, cells with no known
+        // literal (= or ≠) are left out of knowledgegrid so the renderer
+        // falls back to "?" (via blocked_cells) instead of showing the
+        // full candidate list.
+        let touched_cells: BTreeSet<(usize, usize)> = if hide_untouched_candidates {
+            known
+                .iter()
+                .filter_map(|p| {
+                    let var = p.varval().var().clone();
+                    if !allowed_names.contains(var.name()) {
+                        return None;
+                    }
+                    let idx = var.indices();
+                    if idx.len() != 2 {
+                        return None;
+                    }
+                    let i = usize::try_from(idx[0]).ok()?.checked_sub(1)?;
+                    let j = usize::try_from(idx[1]).ok()?.checked_sub(1)?;
+                    Some((i, j))
+                })
+                .collect()
+        } else {
+            BTreeSet::new()
+        };
+
         for l in all_lits {
             if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
                 continue;
@@ -769,6 +810,10 @@ impl Problem {
             assert_eq!(index.len(), 2);
             let i = usize::try_from(index[0]).context("negative index 0?")?;
             let j = usize::try_from(index[1]).context("negative index 1?")?;
+
+            if hide_untouched_candidates && !touched_cells.contains(&(i - 1, j - 1)) {
+                continue;
+            }
 
             assert!(i > 0, "Variables should be 1-indexed");
             assert!(j > 0, "Variables should be 1-indexed");
@@ -842,11 +887,33 @@ impl Problem {
 
         let constraint_shapes = build_constraint_shapes(solver, &constraint_num, &allowed_names);
 
+        // Cells with no knowledge_grid entry and no start_grid value
+        // render as "?" (only meaningful when hide_untouched_candidates
+        // is on; otherwise the loop above populates every cell).
+        let height = usize::try_from(puzzle.height).unwrap_or(0);
+        let width = usize::try_from(puzzle.width).unwrap_or(0);
+        let blocked: Vec<[i64; 2]> = (0..height)
+            .flat_map(|r| (0..width).map(move |c| (r, c)))
+            .filter(|&(r, c)| {
+                knowledgegrid[r][c].is_none()
+                    && puzzle
+                        .start_grid
+                        .as_ref()
+                        .is_none_or(|sg| sg[r][c].is_none())
+            })
+            .map(|(r, c)| [r as i64, c as i64])
+            .collect();
+        let blocked_cells = if blocked.is_empty() {
+            None
+        } else {
+            Some(blocked)
+        };
+
         let state = State {
             knowledge_grid: Some(knowledgegrid),
             statements: Some(statements),
             description: Some(comments.to_owned()),
-            blocked_cells: None,
+            blocked_cells,
             constraint_shapes: if constraint_shapes.is_empty() {
                 None
             } else {
@@ -860,12 +927,14 @@ impl Problem {
         })
     }
 
+    /// `hide_untouched_candidates`: see `new_from_puzzle_and_mus`.
     pub fn new_from_puzzle_and_difficulty(
         solver: &PuzzleSolver,
         tosolve: &BTreeSet<VarValPair>,
         known: &BTreeSet<PuzLit>,
         complexity: &BTreeMap<VarValPair, usize>,
         description: &str,
+        hide_untouched_candidates: bool,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle_and_known(solver.puzzleparse(), known)?;
 
@@ -892,6 +961,27 @@ impl Problem {
 
         let complexity_vals: BTreeSet<_> = complexity.values().collect();
 
+        let touched_cells: BTreeSet<(usize, usize)> = if hide_untouched_candidates {
+            known
+                .iter()
+                .filter_map(|p| {
+                    let var = p.varval().var().clone();
+                    if !allowed_names.contains(var.name()) {
+                        return None;
+                    }
+                    let idx = var.indices();
+                    if idx.len() != 2 {
+                        return None;
+                    }
+                    let i = usize::try_from(idx[0]).ok()?.checked_sub(1)?;
+                    let j = usize::try_from(idx[1]).ok()?.checked_sub(1)?;
+                    Some((i, j))
+                })
+                .collect()
+        } else {
+            BTreeSet::new()
+        };
+
         for l in all_lits {
             if !(tosolve.contains(&l) || known.contains(&PuzLit::new_eq(l.clone()))) {
                 continue;
@@ -912,6 +1002,10 @@ impl Problem {
 
             let i = i - 1;
             let j = j - 1;
+
+            if hide_untouched_candidates && !touched_cells.contains(&(i, j)) {
+                continue;
+            }
 
             let mut tags = BTreeSet::new();
 
