@@ -1,0 +1,37 @@
+$ Same thermometer layout as `all-techniques.eprime`, but with most
+$ row/column clues hidden (-1 = "no constraint" — handled by the model
+$ via guards `row_sums[i] != -1`, and by the renderer via the convention
+$ that -1 displays as blank).
+$
+$ Used to demonstrate Rule 4 ("Combine rows or columns") in isolation:
+$ in the full puzzle the deduction grid[2,6]=1 is also derivable via
+$ Rule 1 (row 2 sum=10), so the planner picks the size-1 Rule-1 MUS
+$ instead of the more elaborate Rule-4 reasoning.  Hiding row 2's clue
+$ (and the cols/rows that would let other shortcuts apply) forces the
+$ planner to use only the constraints that the page's Rule 4 narrative
+$ actually relies on.
+$
+$ Visible clues: only the last 5 column sums (cols 6..10 = [6,1,4,3,4]).
+$ Everything else (all row sums, cols 1..5) is set to -1.
+
+letting width be 10
+letting height be 10
+letting step be 10
+letting thermcount be 25
+
+
+letting therms be [
+    [  1, 11, 21, 22, 23, 24, 25, 31, 32, 33],
+    [  2, 12, 93, 43, 42, 41, 72, 53, 52, 51],
+    [  3, 13, 92, 61, 62, 63, 71, 81, 82, 83],
+    [  4, 14, 91,107,106,105,104,103,102,101],
+    [111,112,113,114,115,121,142,152,162,246],
+    [215,131,132,133,134,122,141,151,161,245],
+    [214,171,224,186,185,184,183,182,181,244],
+    [213,172,223,196,195,194,193,192,191,243],
+    [212,173,222,206,205,204,203,202,201,242],
+    [211,174,221,236,235,234,233,232,231,241]
+]
+
+letting row_sums be [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
+letting col_sums be [-1,-1,-1,-1,-1, 6, 1, 4, 3, 4]
