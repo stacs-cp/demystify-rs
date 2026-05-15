@@ -76,9 +76,8 @@ fn provable_literals_nonempty_on_unsolved_puzzle() {
 #[wasm_bindgen_test]
 fn fix_literal_advances_known_set() {
     let planner = load_planner();
-    let provable: Vec<String> =
-        from_value(planner.provable_literals().expect("provable_literals"))
-            .expect("deserialise provable literals");
+    let provable: Vec<String> = from_value(planner.provable_literals().expect("provable_literals"))
+        .expect("deserialise provable literals");
     let first = provable
         .first()
         .expect("there must be at least one provable lit")

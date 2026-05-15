@@ -673,6 +673,23 @@ impl PuzzleParse {
     }
 
     fn finalise(&mut self) -> anyhow::Result<()> {
+        // Validate that every $#VAR / $#AUX / $#CON / $#REVEAL target
+        // refers to a `find` variable that actually exists.  Conjure
+        // silently drops any unused annotation, so without this check
+        // a typo like `$#CON bounds_y "..."` (when the model only
+        // declares `find bounds_x : ...`) compiles cleanly and then
+        // never matches anything at solve time.
+        {
+            let actual_names: BTreeSet<String> = self
+                .direct
+                .litmap
+                .keys()
+                .map(|p| p.var().name().clone())
+                .chain(self.order.map.keys().map(|v| v.name().clone()))
+                .collect();
+            validate_annotation_targets(&self.eprime, &actual_names)?;
+        }
+
         {
             let mut newlitmap = BTreeMap::new();
             for (key, &value) in &self.direct.litmap {
@@ -1034,6 +1051,46 @@ struct ParsedEprimeData {
     decs: Vec<String>,
     families: BTreeMap<String, Family>,
     show: Vec<ShowDirective>,
+}
+
+/// Check that every annotated name (`$#VAR`, `$#AUX`, `$#CON`, and the
+/// target of `$#REVEAL`) corresponds to a `find` variable that actually
+/// exists in the model.
+///
+/// Conjure ignores annotations whose backing variable isn't declared, so
+/// a typo like `$#CON bounds_y "..."` (when the model has
+/// `find bounds_x : ...`) compiles cleanly and silently never matches
+/// anything at solve time.  This check catches that at parse time with
+/// a pointed error message.
+fn validate_annotation_targets(
+    eprime: &EPrimeAnnotations,
+    actual_names: &BTreeSet<String>,
+) -> anyhow::Result<()> {
+    let check = |kind: &str, name: &str| -> anyhow::Result<()> {
+        if !actual_names.contains(name) {
+            bail!(
+                "{kind} '{name}' is declared in the .eprime annotations but no \
+                 `find {name} : ...` exists in the model.  Likely a typo — the \
+                 annotation would silently match nothing.  Vars seen: {:?}",
+                actual_names
+            );
+        }
+        Ok(())
+    };
+
+    for v in &eprime.vars {
+        check("$#VAR", v)?;
+    }
+    for v in &eprime.auxvars {
+        check("$#AUX", v)?;
+    }
+    for v in eprime.cons.keys() {
+        check("$#CON", v)?;
+    }
+    for v in &eprime.reveal_values {
+        check("$#REVEAL target", v)?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, PartialEq)]
@@ -1883,8 +1940,91 @@ mod tests {
     use test_log::test;
 
     use super::pretty_print_essence;
+    use super::{EPrimeAnnotations, validate_annotation_targets};
 
-    use std::{collections::BTreeSet, path::PathBuf};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        path::PathBuf,
+    };
+
+    fn empty_annotations() -> EPrimeAnnotations {
+        EPrimeAnnotations {
+            vars: BTreeSet::new(),
+            auxvars: BTreeSet::new(),
+            cons: BTreeMap::new(),
+            reveal: BTreeMap::new(),
+            reveal_values: BTreeSet::new(),
+            params: BTreeMap::new(),
+            kind: None,
+            info: Vec::new(),
+            decs: Vec::new(),
+            families: BTreeMap::new(),
+            show: Vec::new(),
+        }
+    }
+
+    fn names(strs: &[&str]) -> BTreeSet<String> {
+        strs.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn annotation_targets_accept_when_every_name_has_a_var() {
+        let mut e = empty_annotations();
+        e.vars.insert("grid".to_string());
+        e.auxvars.insert("aux".to_string());
+        e.cons
+            .insert("row_sum".to_string(), "row {{idx}}".to_string());
+        e.reveal_values.insert("facts".to_string());
+        let actual = names(&["grid", "aux", "row_sum", "facts"]);
+        validate_annotation_targets(&e, &actual).expect("valid annotations");
+    }
+
+    #[test]
+    fn annotation_targets_reject_missing_con() {
+        let mut e = empty_annotations();
+        e.cons
+            .insert("bounds_y".to_string(), "fits within".to_string());
+        let actual = names(&["bounds_x"]);
+        let err = validate_annotation_targets(&e, &actual).expect_err("typo'd $#CON should error");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("$#CON"), "error mentions kind: {msg}");
+        assert!(msg.contains("bounds_y"), "error mentions name: {msg}");
+        assert!(msg.contains("find bounds_y"), "error suggests fix: {msg}");
+    }
+
+    #[test]
+    fn annotation_targets_reject_missing_var() {
+        let mut e = empty_annotations();
+        e.vars.insert("grdi".to_string()); // typo: should be `grid`
+        let actual = names(&["grid"]);
+        let err = validate_annotation_targets(&e, &actual).expect_err("typo'd $#VAR");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("$#VAR"), "error mentions kind: {msg}");
+        assert!(msg.contains("grdi"), "error mentions the typo: {msg}");
+    }
+
+    #[test]
+    fn annotation_targets_reject_missing_aux() {
+        let mut e = empty_annotations();
+        e.auxvars.insert("never_declared".to_string());
+        let actual = names(&["something_else"]);
+        let err = validate_annotation_targets(&e, &actual).expect_err("typo'd $#AUX");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("$#AUX"), "error mentions kind: {msg}");
+        assert!(msg.contains("never_declared"), "error mentions name: {msg}");
+    }
+
+    #[test]
+    fn annotation_targets_reject_missing_reveal_target() {
+        let mut e = empty_annotations();
+        e.vars.insert("grid".to_string());
+        e.reveal_values.insert("ftcs".to_string()); // typo: should be `facts`
+        let actual = names(&["grid", "facts"]);
+        let err = validate_annotation_targets(&e, &actual).expect_err("typo'd reveal target");
+        let msg = format!("{err:#}");
+        assert!(msg.contains("$#REVEAL"), "error mentions kind: {msg}");
+        assert!(msg.contains("ftcs"), "error mentions the typo: {msg}");
+    }
 
     #[test]
     fn test_parse_essence_binairo() {
