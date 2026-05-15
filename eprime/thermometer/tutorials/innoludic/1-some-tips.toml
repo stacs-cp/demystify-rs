@@ -1,0 +1,90 @@
+# Source: https://www.innoludic.com/2015-04-30-13-56-29/thermometers/56-rules-of-thermometers.html
+# Local mirror: doc/tutorial-source-pages/innoludic/_html/rules-of-thermometers.html
+#
+# The innoludic page describes the two basic Thermometer techniques on a
+# 6x6 example puzzle, then introduces two advanced techniques ("Forced
+# Move" and "Grouping") on a different, larger puzzle.  This walkthrough
+# only covers the two basic techniques — the param file is the 6x6
+# puzzle from the page's introductory section.
+#
+# Page techniques demonstrated:
+#   1. "Overflowing"  — when a row/column clue is smaller than a
+#                       thermometer's length in that row/column, the
+#                       cells far from the circle cannot be filled.
+#   2. "Backflow"     — when the row/column clue is large enough that
+#                       it forces some cells of a long thermometer to
+#                       be filled regardless of how the other
+#                       thermometers' fluid is distributed.
+#
+# Puzzle layout:
+#   row_sums = [1, 3, 4, 3, 4, 5]
+#   col_sums = [4, 1, 5, 5, 3, 2]
+#   Therm 0 (length 5, vertical in col 1, circle at (5,1), positions 1..5
+#     going up the column: (5,1) circle, (4,1), (3,1), (2,1), (1,1) far end).
+#   Therm 1 (length 4, horizontal in row 6, circle at (6,1) going right).
+# (Note: the param's `therms` matrix uses [col, row] indexing, opposite
+# to most other puzzle types in this codebase.  The cell at row R col C
+# is referenced as `grid[R, C]` in lits.)
+
+model = "eprime/thermometer.eprime"
+param = "eprime/thermometer/solving_techniques/innoludic/1-some-tips.param"
+title = "thermometer — innoludic — basic Overflowing + Backflow techniques"
+hide_untouched_candidates = true
+repeats = 200
+strategy = "cake"
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+# =====================================================================
+# Overflowing — col clue 4 < therm 0 length 5 — far end of therm 0
+# cannot be mercury.
+#
+# Col 1 contains all 5 cells of therm 0 (vertical) plus the circle of
+# therm 1 at (6,1).  Col clue is 4.  Filling (1,1) — therm 0's
+# furthest-from-circle cell (position 5) — would force every cell of
+# therm 0 to be filled (5 cells) plus possibly therm 1's circle, giving
+# at least 5 mercury in col 1, breaking the clue of 4.
+# MUS: `{fluid[0], coldown[1]}` — size 2.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,1]=0"
+title = "Overflowing: grid[1,1]=0 — col 1 clue 4 forbids filling the far end of therm 0 (length 5)"
+
+[[step]]
+op = "deduce"
+lit = "grid[1,1]=0"
+
+# =====================================================================
+# Backflow — col clue 4 forces therm 0's circle to be filled even
+# without knowing whether therm 1's circle is filled.
+#
+# Col 1 holds all 5 cells of therm 0 plus the circle of therm 1 at
+# (6,1).  Col clue is 4.
+#   Case A: therm 1's circle is filled — col 1 needs 3 more cells from
+#           therm 0, which fills positions 1..3 (the circle + 2 above).
+#   Case B: therm 1's circle is empty — col 1 needs all 4 from therm 0,
+#           filling positions 1..4.
+# Either way, therm 0's circle at (5,1) must be filled.  Equivalently:
+# if (5,1) were empty, fluid[0] forces all of therm 0 empty (filled-far
+# implies filled-close — contrapositive: empty-close forces empty-far),
+# leaving col 1 with at most 1 mercury (just therm 1's circle), short
+# of the clue.  MUS: `{fluid[0], colup[1]}` — size 2.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,1]=1"
+title = "Backflow: grid[5,1]=1 — col 1 clue 4 forces therm 0's circle even without committing on therm 1"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,1]=1"
+
+[[step]]
+op = "heatmap"
+title = "After both techniques"
+commentary = "Page also covers two advanced techniques (Forced Move, Grouping) on a different, larger puzzle. This walkthrough only covers the two basic techniques applicable to the 6x6 example."

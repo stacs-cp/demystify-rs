@@ -1,0 +1,45 @@
+# Source: (look up in source page)
+# Kind: skyscrapers    Source ID: conceptispuzzles
+# Original tutorial filename hints at the technique: 9-adv-tech-1.param
+
+model = "eprime/skyscrapers.eprime"
+param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/9-adv-tech-1.param"
+title = "skyscrapers — conceptispuzzles — 9-adv-tech-1"
+
+# Default first step: heatmap to show what is deducible at the start.
+# Look at the rendered HTML, identify the cell + value the source
+# tutorial demonstrates, then uncomment a `[[step]]` below.
+[[step]]
+op = "heatmap"
+title = "Initial state — pick a target deduction from this"
+
+# [[step]]
+# op = "show_mus"
+# lit = "<var>[r,c]=v"  # OR <var>[r,c]!=v for an elimination
+# title = "<technique name from source>"
+
+
+# Auto-filled from planner step 1.  Each [[step]] below shows the
+# smallest MUS for one of the cells deducible at the initial state.
+# Cross-reference with the source page to identify which deduction
+# matches the technique being demonstrated.
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[1,3]!=5"
+title = "Auto-target 1/4: field[1,3]!=5"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[1,5]!=5"
+title = "Auto-target 2/4: field[1,5]!=5"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[2,3]!=5"
+title = "Auto-target 3/4: field[2,3]!=5"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[2,4]!=5"
+title = "Auto-target 4/4: field[2,4]!=5"

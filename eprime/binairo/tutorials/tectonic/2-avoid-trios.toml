@@ -1,0 +1,30 @@
+# Source: (look up in source page)
+# Kind: binairo    Source ID: tectonic
+# Original tutorial filename hints at the technique: 2_avoid_trios.param
+
+model = "eprime/binairo.essence"
+param = "eprime/binairo/solving_techniques/tectonicpuzzel/2_avoid_trios.param"
+title = "binairo — tectonic — 2 avoid trios"
+
+# Default first step: heatmap to show what is deducible at the start.
+# Look at the rendered HTML, identify the cell + value the source
+# tutorial demonstrates, then uncomment a `[[step]]` below.
+[[step]]
+op = "heatmap"
+title = "Initial state — pick a target deduction from this"
+
+# [[step]]
+# op = "show_mus"
+# lit = "<var>[r,c]=v"  # OR <var>[r,c]!=v for an elimination
+# title = "<technique name from source>"
+
+
+# Auto-filled from planner step 1.  Each [[step]] below shows the
+# smallest MUS for one of the cells deducible at the initial state.
+# Cross-reference with the source page to identify which deduction
+# matches the technique being demonstrated.
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,3]=1"
+title = "Auto-target 1/1: grid[3,3]=1"

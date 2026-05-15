@@ -1,0 +1,128 @@
+# Source: http://www.tectonicpuzzel.eu/thermometer-sudoku-puzzle-solving-strategy.html
+# Local mirror: doc/tutorial-source-pages/tectonicpuzzel/_html/thermometer-sudoku-puzzle-solving-strategy.html
+#
+# The tectonicpuzzel page lists 5 thermometer-puzzle techniques.  This
+# walkthrough demonstrates the first four; the page's Rule 5 example
+# ("Thermometers filled from circle") is not exercised on this puzzle
+# (the page uses a different starting position for that one).
+#
+# Puzzle: 10x10, 25 thermometers.
+#   row_sums = [8,10,4,5,4,5,1,7,7,4]
+#   col_sums = [7,8,9,5,8,6,1,4,3,4]
+# (NB: the original param had row_sums and col_sums swapped, which
+# made the puzzle UNSAT — fixed by inspecting the page image: the
+# all-mercury line of clue 10 corresponds to row 2.)
+#
+# Therms matrix is column-major: each inner array is one column read
+# top-to-bottom (so therms[1] in the literal is column 1).  In
+# `grid[R,C]` lits, R is the row, C the column.
+#
+# Relevant therms for the demos below:
+#   Therm 10: vertical column 4, rows 4..10, length 7, circle at (10,4).
+#   Therm 13: vertical column 6, rows 2..5, length 4, circle at (2,6).
+
+model = "eprime/thermometer.eprime"
+param = "eprime/thermometer/solving_techniques/tectonicpuzzel/all-techniques.eprime"
+title = "thermometer — tectonic — page Rules 1–4 walkthrough"
+hide_untouched_candidates = true
+repeats = 200
+strategy = "cake"
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+# =====================================================================
+# Rule 1 — "Number 0 or number 10".  Clue equal to width/height means
+# the line is fully filled (or fully empty when 0).
+# Row 2's clue is 10 (= grid width), so every cell in row 2 is mercury.
+# MUS: `{rowup[2]}` — size 1.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,1]=1"
+title = "Rule 1: grid[2,1]=1 — row 2 clue 10 = row width, every cell filled"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,1]=1"
+
+# =====================================================================
+# Rule 2 — "Number smaller than thermometer length" (Overflow).
+# Col 4's clue is 5 but therm 10 is a 7-cell vertical thermometer in
+# the same column (rows 4..10, circle at row 10).  Filling any cell at
+# position ≥6 forces ≥6 cells of col 4 to be mercury — over the clue.
+# So the two cells furthest from the circle — therm 10 positions 7 and
+# 6 at (4,4) and (5,4) — cannot be mercury.
+# MUS: `{fluid[10], coldown[4]}` — size 2 each.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,4]=0"
+title = "Rule 2 (Overflow): grid[4,4]=0 — col 4 clue 5 forbids the furthest end of therm 10 (length 7)"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,4]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,4]=0"
+title = "Rule 2 (Overflow): grid[5,4]=0 — same col 4 / therm 10 reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,4]=0"
+
+# =====================================================================
+# Rule 3 — "Number bigger than the sum of thermometers" (Backflow).
+# Col 4's clue is 5.  Col 4 holds therm 10 (length 7 vertical) plus
+# 3 cells from other thermometers (rows 1..3).  Those 3 cells can each
+# contribute at most 1 mercury, giving ≤3 from non-therm-10 cells.
+# So therm 10 itself must contribute ≥2 mercury cells — and because
+# thermometers fill from the circle, those are at least the circle
+# (10,4) and position 2 (9,4).
+# MUS: `{fluid[10], colup[4]}` — size 2 each.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[10,4]=1"
+title = "Rule 3 (Backflow): grid[10,4]=1 — col 4 clue 5 forces therm 10's circle"
+
+[[step]]
+op = "deduce"
+lit = "grid[10,4]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[9,4]=1"
+title = "Rule 3 (Backflow): grid[9,4]=1 — col 4 clue 5 forces therm 10's position 2"
+
+[[step]]
+op = "deduce"
+lit = "grid[9,4]=1"
+
+# =====================================================================
+# Rule 4 — "Combine rows or columns".  Two lines with a big clue
+# difference, plus a horizontal/vertical thermometer crossing them,
+# combine to force a specific cell.  In our puzzle col 6 has clue 6
+# and col 7 has clue 1 (difference of 5); the deduction this technique
+# yields on this puzzle is grid[2,6]=mercury — therm 13's circle.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,6]=1"
+title = "Rule 4 (Combine rows/cols): grid[2,6]=1 — combining col 6 (clue 6) and col 7 (clue 1) forces therm 13's circle"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,6]=1"
+
+[[step]]
+op = "heatmap"
+title = "After Rules 1–4"
+commentary = "Page Rule 5 ('Thermometers filled from circle') is not exercised on this puzzle's starting state — the page uses a different example for it.  One additional step from the page narrative remains; not yet added."

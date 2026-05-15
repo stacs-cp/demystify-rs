@@ -1,0 +1,1892 @@
+# Tutorial corpus manifest.  Generated; hand-edit OK afterwards.
+# Cross-reference for paper: text/overleaf/600aea0f61b6de49eeda409c/main.tex Table 1.
+#
+# Status values:
+#   located            = file/dotest exists in repo, target known
+#   needs-source-page  = located but target deduction (paper-counted step) needs identifying
+#   needs-multi-step   = single param contains multiple paper-counted deductions; need per-step targets
+#   not-in-paper       = present in repo but excluded from paper Table 1 (Killer, unique-rectangles, …)
+#   showcase           = full-puzzle solve trace, not a per-step technique
+
+
+[sources]
+brainbashers = { label = "Brainbashers Skyscrapers", url = "https://www.brainbashers.com/skyscrapershelp.asp" }
+conceptispuzzles = { label = "Conceptis Puzzles", url = "https://www.conceptispuzzles.com" }
+cracking-the-cryptic = { label = "Cracking the Cryptic (YouTube)", url = "https://www.youtube.com" }
+fata = { label = "FATAtalk (?)", url = "" }
+futoshikiorg = { label = "Futoshiki.org", url = "https://www.futoshiki.org/how-to-solve" }
+innoludic = { label = "Innoludic", url = "https://www.innoludic.com/2015-04-30-13-56-29/thermometers/56-rules-of-thermometers.html" }
+kakurocom = { label = "Kakuro.com", url = "http://www.kakuro.com/techniques.php" }
+kakurosorg = { label = "Kakuros.com", url = "https://www.kakuros.com/solve" }
+krazydad = { label = "Krazydad Star Battle Tutorial", url = "https://krazydad.com/starbattle/tutorial/tutorial_10x10.php" }
+la-times = { label = "LA Times daily Sudoku", url = "" }
+logicmasters = { label = "Logic Masters India forum", url = "https://logicmastersindia.com/forum/forums/thread-view.asp?tid=140" }
+puzzle-star-battle-com = { label = "puzzle-star-battle.com", url = "" }
+rohanrao = { label = "Rohan Rao blogspot", url = "http://rohanrao.blogspot.com/2011/07/solving-star-battle-solved-example-1.html" }
+sudokuwiki = { label = "SudokuWiki (Andrew Stuart)", url = "https://www.sudokuwiki.org" }
+tectonic = { label = "Tectonic Puzzel", url = "http://www.tectonicpuzzel.eu" }
+
+
+# ============================================================================
+# Sudoku-family (Python source: examples/sudoku-wiki.py)
+# ============================================================================
+
+# --- sudoku ---
+
+[[tutorial]]
+id = "chris-bonus-q-2-alldiff"
+kind = "sudoku"
+source_id = "sudokuwiki"  # probably Chris's own bonus puzzles, not from sudokuwiki
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+name = "Chris Bonus Q (2 AllDiff)"
+target = "[((0,5),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:186"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/chris-bonus-q-2-alldiff.param"  # present
+
+[[tutorial]]
+id = "chris-bonus-2-alldiff"
+kind = "sudoku"
+source_id = "sudokuwiki"  # probably Chris's own bonus puzzles, not from sudokuwiki
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+name = "Chris Bonus (2 AllDiff)"
+target = "[((0,5),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:189"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/chris-bonus-2-alldiff.param"  # present
+
+[[tutorial]]
+id = "chris-bonus-2-2-alldiff"
+kind = "sudoku"
+source_id = "sudokuwiki"  # probably Chris's own bonus puzzles, not from sudokuwiki
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+name = "Chris Bonus 2 (2 AllDiff)"
+target = "[((2,3),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:192"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/chris-bonus-2-2-alldiff.param"  # present
+
+[[tutorial]]
+id = "naked-pairs-example-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Naked Pairs, example 1"
+target = "[((0,3),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:219"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 5, subset of cells (but these are the only ones needed for this eliminination)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/naked-pairs-example-1.param"  # present
+
+[[tutorial]]
+id = "naked-pairs-example-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Naked Pairs, example 2"
+target = "[((0,3),7)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:223"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 5, subset of cells (but these are the only ones needed for this eliminination)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/naked-pairs-example-2.param"  # present
+
+[[tutorial]]
+id = "naked-triples-example-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Naked Triples, example 1"
+target = "[((4,0),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:229"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 4, the same as theirs"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/naked-triples-example-1.param"  # present
+
+[[tutorial]]
+id = "naked-triples-example-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Naked Triples, example 2"
+target = "[((3,1),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:233"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 4, subset (but those are the only ones that matter)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/naked-triples-example-2.param"  # present
+
+[[tutorial]]
+id = "naked-quad-example"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Naked Quad example"
+target = "[((0,1),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:239"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 9, we are overlapping, but using cells in a different block. (same number of cells)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/naked-quad-example.param"  # present
+
+[[tutorial]]
+id = "hidden-pair-example"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Hidden Pair example"
+target = "[((0,7),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:245"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 5, in agreement with wiki"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/hidden-pair-example.param"  # present
+
+[[tutorial]]
+id = "three-hidden-pairs"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Three hidden pairs"
+target = "[((3,2),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:249"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 5, in agreement with wiki (last approach overcomplicates things)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/three-hidden-pairs.param"  # present
+
+[[tutorial]]
+id = "two-hidden-triples"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Two Hidden Triples"
+target = "[((0,3),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:254"
+python_active = false  # whether reachable under default if-flags
+source_comment = "Found MUS 7, with an extra cell (last approach)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/two-hidden-triples.param"  # present
+
+[[tutorial]]
+id = "hidden-quad-1-identifying-h7-6-only"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Hidden Quad 1 (identifying H7,6 only)"
+target = "[((7,6),6)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:258"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 9, we are using different cells, and one more than them"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/hidden-quad-1-identifying-h7-6-only.param"  # present
+
+[[tutorial]]
+id = "hidden-quad-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Hidden Quad 2"
+target = "[((3,3),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:262"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 13, we agree with them"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/hidden-quad-2.param"  # present
+
+[[tutorial]]
+id = "pointing-pairs-example-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Pointing Pairs example 1"
+target = "[((1,0),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:268"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 3, first 2 approaches use different pointing pair, last one uses the same"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/pointing-pairs-example-1.param"  # present
+
+[[tutorial]]
+id = "pointing-pairs-example-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Pointing Pairs example 2"
+target = "[((0,7),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:272"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 3, first and last approach use different pair, second uses the same"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/pointing-pairs-example-2.param"  # present
+
+[[tutorial]]
+id = "pointing-triple"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Pointing Triple"
+target = "[((4,5),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:276"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 3, we use a pointing pair which is simpler (or a box line reduction?)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/pointing-triple.param"  # present
+
+[[tutorial]]
+id = "box-line-reduction-example-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Box/Line Reduction example 2"
+target = "[((1,6),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:282"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 3, same as wiki"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/box-line-reduction-example-2.param"  # present
+
+[[tutorial]]
+id = "triple-blr-only-one-of-those-is-considered-by-us"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Triple BLR (only one of those is considered by us)"
+target = "[((3,2),6)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:286"
+python_active = false  # whether reachable under default if-flags
+source_comment = "MUS size 4, same as wiki"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/triple-blr-only-one-of-those-is-considered-by-us.param"  # present
+
+[[tutorial]]
+id = "x-wing-strategy-1a"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X_Wing_Strategy 1A"
+target = "[((0,3),7)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:292"
+python_active = false  # whether reachable under default if-flags
+source_comment = "X wing"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-wing-strategy-1a.param"  # present
+
+[[tutorial]]
+id = "x-wing-strategy-1b"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X_Wing_Strategy 1B"
+target = "[((0,3),7)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:296"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-wing-strategy-1b.param"  # present
+
+[[tutorial]]
+id = "x-wing-strategy-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X_Wing_Strategy 2"
+target = "[((4,2),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:299"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-wing-strategy-2.param"  # present
+
+[[tutorial]]
+id = "x-wing-strategy-3"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X_Wing_Strategy 3"
+target = "[((4,0),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:303"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-wing-strategy-3.param"  # present
+
+[[tutorial]]
+id = "simple-colouring-single-chains-twice-in-a-unit-pre"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Simple Colouring (single chains) - Twice in a unit (Pre)"
+target = "[((4,2),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:309"
+python_active = false  # whether reachable under default if-flags
+source_comment = "Simple colouring"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/simple-colouring-single-chains-twice-in-a-unit-pre.param"  # present
+
+[[tutorial]]
+id = "simple-colouring-single-chains-two-colours-elsewhere"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Simple Colouring (single chains) - Two colours 'elsewhere'"
+target = "[((1,4),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:313"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/simple-colouring-single-chains-two-colours-elsewhere.param"  # present
+
+[[tutorial]]
+id = "simple-colouring-single-chains-two-colours-elsewhere-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Simple Colouring (single chains) - Two colours 'elsewhere' - 2"
+target = "[((2,3),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:318"
+python_active = false  # whether reachable under default if-flags
+source_comment = "Can find (3,4) is not 8, (2,3) it not 8"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/simple-colouring-single-chains-two-colours-elsewhere-2.param"  # present
+
+[[tutorial]]
+id = "y-wing-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Y-Wing 1"
+target = "[((7,2),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:325"
+python_active = false  # whether reachable under default if-flags
+source_comment = "Somtimes we find a different reasoning of size 7"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/y-wing-1.param"  # present
+
+[[tutorial]]
+id = "y-wing-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Y-Wing 2"
+target = "[((2,0),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:329"
+python_active = true  # whether reachable under default if-flags
+source_comment = "2 values to remove - getting something else without a name, and possibly equal complexity"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/y-wing-2.param"  # present
+
+[[tutorial]]
+id = "swordfish-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Swordfish 1"
+target = "[((1,1),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:336"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 10: Swordfish (3 columns or 3 8s)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/swordfish-1.param"  # present
+
+[[tutorial]]
+id = "swordfish-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Swordfish 2"
+target = "[((6,6),9)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:347"
+python_active = true  # whether reachable under default if-flags
+source_comment = "(7, 7) and (9, 8) cannot both be 9 as they are both the cage starting at top-left position (6,6)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/swordfish-2.param"  # present
+
+[[tutorial]]
+id = "swordfish-3"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Swordfish 3"
+target = "[((1,8),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:350"
+python_active = true  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/swordfish-3.param"  # present
+
+[[tutorial]]
+id = "xyz-wing-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "XYZ Wing 1"
+target = "[((5,6),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:355"
+python_active = true  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/xyz-wing-1.param"  # present
+
+[[tutorial]]
+id = "xyz-wing-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "XYZ Wing 2"
+target = "[((4,8),6)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:359"
+python_active = true  # whether reachable under default if-flags
+legacy_param = "eprime/sudoku/sudokuwiki-domains/xyz-wing-2.param"  # present
+
+[[tutorial]]
+id = "x-cycle-part-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X-Cycle (part 1)"
+target = "[((2,2),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:365"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 5"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-cycle-part-1.param"  # present
+
+[[tutorial]]
+id = "x-cycle-part-2-fig-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X-Cycle (part 2) - fig 1"
+target = "[((8,0),9)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:369"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 6"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-cycle-part-2-fig-1.param"  # present
+
+[[tutorial]]
+id = "x-cycle-part-2-fig-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X-Cycle (part 2) - fig 2"
+target = "[((4,6),7)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:373"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 6"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-cycle-part-2-fig-2.param"  # present
+
+[[tutorial]]
+id = "x-cycle-part-2-fig-3"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "X-Cycle (part 2) - fig 3"
+target = "[((1,6),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:377"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 5"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/x-cycle-part-2-fig-3.param"  # present
+
+[[tutorial]]
+id = "xy-chains-example-1-detected-as-wxyz-wing"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "XY-Chains example 1 (detected as WXYZ-Wing)"
+target = "[((0,2),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:383"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7 smaller than the example"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/xy-chains-example-1-detected-as-wxyz-wing.param"  # present
+
+[[tutorial]]
+id = "xy-chains-example-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "XY-Chains example 2"
+target = "[((1,0),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:387"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 9"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/xy-chains-example-2.param"  # present
+
+[[tutorial]]
+id = "same-cells-different-xy-chain"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Same cells - different XY-Chain"
+target = "[((2,2),6)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:391"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 9, last run over complicates the deduction"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/same-cells-different-xy-chain.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 1"
+target = "[((2,1),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:397"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-1.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 2"
+target = "[((1,2),6)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:401"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-2.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-4-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 4 1"
+target = "[((1,0),6)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:405"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-4-1.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-4-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 4 2"
+target = "[((1,5),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:409"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-4-2.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-5"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 5"
+target = "[((2,4),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:413"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-5.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-6-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 6 1"
+target = "[((1,1),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:417"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-6-1.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-rule-6-2-using-3-candidates-in-a-cell"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa Rule 6 2, using 3 candidates in a cell"
+target = "[((0,1),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:421"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 9, some cells are different"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-rule-6-2-using-3-candidates-in-a-cell.param"  # present
+
+[[tutorial]]
+id = "3d-medusa-37-eliminations-by-rule-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "3D Medusa 37 Eliminations by Rule 1"
+target = "[((0,0),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:425"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/3d-medusa-37-eliminations-by-rule-1.param"  # present
+
+[[tutorial]]
+id = "example-jellyfish"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Example Jellyfish"
+target = "[((1,7),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:431"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 10, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/example-jellyfish.param"  # present
+
+[[tutorial]]
+id = "18-elimination-jellyfish"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "18 elimination Jellyfish"
+target = "[((0,0),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:435"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 8, a lot smaller than what they have"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/18-elimination-jellyfish.param"  # present
+
+[[tutorial]]
+id = "perfect-jellyfish"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Perfect Jellyfish"
+target = "[((1,0),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:439"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, not the perfect jellyfish and smaller"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/perfect-jellyfish.param"  # present
+
+[[tutorial]]
+id = "jellyfish-20-eliminations"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Jellyfish, 20 eliminations"
+target = "[((0,0),9)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:443"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 10, not fully jellyfish, and smaller"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/jellyfish-20-eliminations.param"  # present
+
+[[tutorial]]
+id = "sk-loop-easter-monster"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "SK Loop, Easter Monster"
+target = "[((0,2),7)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:449"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 56, we have more cells, stopped the last run as it got ridiculous, did not finish after 2hours"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/sk-loop-easter-monster.param"  # present
+
+[[tutorial]]
+id = "type-3-1-3-1-3-1-3-1-sk-loop"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Type 3-1-3-1-3-1-3-1- SK Loop"
+target = "[((0,3),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:453"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 31, we use additional cells, again stopping because of the MUS size"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/type-3-1-3-1-3-1-3-1-sk-loop.param"  # present
+
+[[tutorial]]
+id = "sk-loop-with-solved-cells"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "SK Loop with Solved Cells"
+target = "[((1,4),9)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:457"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 14, fewer cells but not all the ones used in SK Loop"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/sk-loop-with-solved-cells.param"  # present
+
+[[tutorial]]
+id = "wxyz-wing-example-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "WXYZ-Wing example 1"
+target = "[((3,1),9)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:463"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 8, first solution is more similar to what they have but not the same cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/wxyz-wing-example-1.param"  # present
+
+[[tutorial]]
+id = "wxyz-wing-example-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "WXYZ-Wing example 2"
+target = "[((5,5),5)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:467"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, similar cells some addtional ones in our solution"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/wxyz-wing-example-2.param"  # present
+
+[[tutorial]]
+id = "wxyz-wing-example-3-detected-as-y-wing"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "WXYZ-Wing example 3 (detected as Y-Wing)"
+target = "[((1,6),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:471"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, one less cell used in our solution"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/wxyz-wing-example-3-detected-as-y-wing.param"  # present
+
+[[tutorial]]
+id = "wxyz-wing-example-4"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "WXYZ-Wing example 4"
+target = "[((3,3),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:475"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 10, mostly different cells and one more than in their solution"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/wxyz-wing-example-4.param"  # present
+
+[[tutorial]]
+id = "ape-example-1-simpler-y-wing"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "APE example 1 (simpler Y-Wing)"
+target = "[((6,2),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:481"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, we agree with them (except for our last strategy which uses one more cell)"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/ape-example-1-simpler-y-wing.param"  # present
+
+[[tutorial]]
+id = "ape-example-2-detected-as-wxyz-wing"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "APE example 2 (detected as WXYZ-Wing)"
+target = "[((2,2),3)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:485"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 10, subset of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/ape-example-2-detected-as-wxyz-wing.param"  # present
+
+[[tutorial]]
+id = "ape-example-5"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "APE example 5"
+target = "[((1,0),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:489"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 13, we are on the money with those cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/ape-example-5.param"  # present
+
+[[tutorial]]
+id = "an-eight-cell-aligned-pair"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "An Eight-Cell Aligned Pair"
+target = "[((4,4),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:493"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 12, some overlapping cells, we use fewer"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/an-eight-cell-aligned-pair.param"  # present
+
+[[tutorial]]
+id = "exocet-rule-1"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Exocet Rule 1"
+target = "[((1,3),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:499"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 24, we're not following what they are doing"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/exocet-rule-1.param"  # present
+
+[[tutorial]]
+id = "grouped-x-cycles-nice-loops-1-4-cycle-with-grouped-cells-detected-as-swordfish"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Grouped X-Cycles, Nice Loops 1, 4-Cycle with Grouped Cells (detected as Swordfish)"
+target = "[((2,3),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:505"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, We are detecting most of the involved cycle, except the one value that has already been removed"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/grouped-x-cycles-nice-loops-1-4-cycle-with-grouped-cells-detected-as-swordfish.param"  # present
+
+[[tutorial]]
+id = "grouped-x-cycles-nice-loops-1-grouped-8-cycle-different-to-the-example"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Grouped X-Cycles, Nice Loops 1, Grouped 8-Cycle, different to the example"
+target = "[((4,2),8)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:509"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 9, some overlap, some new cells, same number of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/grouped-x-cycles-nice-loops-1-grouped-8-cycle-different-to-the-example.param"  # present
+
+[[tutorial]]
+id = "grouped-x-cycles-nice-loops-2-grouped-8-cycle"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Grouped X-Cycles, Nice Loops 2, Grouped 8-Cycle"
+target = "[((6,8),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:513"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 7, same value deduction, nearly all cells different, we use fewer"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/grouped-x-cycles-nice-loops-2-grouped-8-cycle.param"  # present
+
+[[tutorial]]
+id = "grouped-x-cycles-nice-loops-3-2-cycle-with-grouped-cells"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Grouped X-Cycles, Nice Loops 3, 2-Cycle with Grouped Cells"
+target = "[((7,7),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:517"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 6, same value, mostly different cells, same number of cells"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/grouped-x-cycles-nice-loops-3-2-cycle-with-grouped-cells.param"  # present
+
+[[tutorial]]
+id = "grouped-x-cycles-consecutive-grouped-cells-x-cycle-on-2"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Grouped X-Cycles, Consecutive Grouped Cells, X-Cycle on 2"
+target = "[((7,1),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:521"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, same value, mostly same cells, we use one fewer"
+legacy_param = "eprime/sudoku/sudokuwiki-domains/grouped-x-cycles-consecutive-grouped-cells-x-cycle-on-2.param"  # present
+
+[[tutorial]]
+id = "grouped-x-cycles-consecutive-grouped-cells-grouped-x-cycle-with-8-nodes-a-lot-more-involved-than-shown"
+kind = "sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "sudoku-sudoku"
+status = "located"
+name = "Grouped X-Cycles, Consecutive Grouped Cells, Grouped X-Cycle with 8 nodes, a lot more involved than shown"
+target = "[((5,6),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:525"
+python_active = true  # whether reachable under default if-flags
+source_comment = "MUS size 11, we do not agree with the X-Cycles in explanation and actual run through, we use ALOT fewer cells."
+legacy_param = "eprime/sudoku/sudokuwiki-domains/grouped-x-cycles-consecutive-grouped-cells-grouped-x-cycle-with-8-nodes-a-lot-more-involved-than-shown.param"  # present
+
+# --- jigsaw-sudoku ---
+
+[[tutorial]]
+id = "jigsaw-double-pointing-pair-1"
+kind = "jigsaw-sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "jigsaw-sudoku"
+status = "located"
+name = "Jigsaw - double pointing pair 1"
+target = "[((8,0),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:207"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/jigsaw/sudokuwiki/jigsaw-double-pointing-pair-1.param"  # present
+
+[[tutorial]]
+id = "jigsaw-double-pointing-pair-2"
+kind = "jigsaw-sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "jigsaw-sudoku"
+status = "located"
+name = "Jigsaw - double pointing pair 2"
+target = "[((0,0),4)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:210"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/jigsaw/sudokuwiki/jigsaw-double-pointing-pair-2.param"  # present
+
+[[tutorial]]
+id = "jigsaw-double-pointing-pair-3"
+kind = "jigsaw-sudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "jigsaw-sudoku"
+status = "located"
+name = "Jigsaw - double pointing pair 3"
+target = "[((4,4),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:213"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/jigsaw/sudokuwiki/jigsaw-double-pointing-pair-3.param"  # present
+
+# --- xsudoku ---
+
+[[tutorial]]
+id = "xsudoku-pointing-pair"
+kind = "xsudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "xsudoku"
+status = "located"
+name = "XSudoku - Pointing Pair"
+target = "[((8,0),2)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:196"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/xsudoku/sudokuwiki/xsudoku-pointing-pair.param"  # present
+
+[[tutorial]]
+id = "xsudoku-pointing-pair-2"
+kind = "xsudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "xsudoku"
+status = "located"
+name = "XSudoku - Pointing Pair 2"
+target = "[((0,1),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:199"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/xsudoku/sudokuwiki/xsudoku-pointing-pair-2.param"  # present
+
+[[tutorial]]
+id = "xsudoku-pointing-pair-3"
+kind = "xsudoku"
+source_id = "sudokuwiki"  
+paper_table_row = "xsudoku"
+status = "located"
+name = "XSudoku - Pointing Pair 3"
+target = "[((3,0),1)]"  # 0-indexed (row, col), value
+python_source = "examples/sudoku-wiki.py:202"
+python_active = false  # whether reachable under default if-flags
+legacy_param = "eprime/xsudoku/sudokuwiki/xsudoku-pointing-pair-3.param"  # present
+
+# ============================================================================
+# Non-sudoku puzzles (eprime/<kind>/solving_techniques/<source>/*.param)
+# ============================================================================
+
+# --- binairo/conceptispuzzles (paper expects 7 steps; repo has 7 files) ---
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-1-avoiding-triples-1"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/1_Avoiding_Triples_1.param"
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-2-avoiding-triples-2"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/2_Avoiding_Triples_2.param"
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-3-avoiding-triples-3"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/3_Avoiding_Triples_3.param"
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-4-completing-a-row-of-a-column"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/4_Completing_a_row_of_a_column.param"
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-5-avoiding-row-or-column-dup"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/5_Avoiding_Row_or_column_dup.param"
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-6-advanced-technique-1"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/6_Advanced_Technique_1.param"
+
+[[tutorial]]
+id = "binairo-conceptispuzzles-7-advanced-technique-2"
+kind = "binairo"
+source_id = "conceptispuzzles"
+paper_table_row = "binairo-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/conceptispuzzles/7_Advanced_Technique_2.param"
+
+# --- binairo/tectonic (paper expects 6 steps; repo has 6 files) ---
+
+[[tutorial]]
+id = "binairo-tectonic-1-look-for-a-duo"
+kind = "binairo"
+source_id = "tectonic"
+paper_table_row = "binairo-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/tectonicpuzzel/1_look_for_a_duo.param"
+
+[[tutorial]]
+id = "binairo-tectonic-2-avoid-trios"
+kind = "binairo"
+source_id = "tectonic"
+paper_table_row = "binairo-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/tectonicpuzzel/2_avoid_trios.param"
+
+[[tutorial]]
+id = "binairo-tectonic-3-completing-rows-or-columns"
+kind = "binairo"
+source_id = "tectonic"
+paper_table_row = "binairo-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/tectonicpuzzel/3_completing_rows_or_columns.param"
+
+[[tutorial]]
+id = "binairo-tectonic-4-avoid-identical-rows-or-columns"
+kind = "binairo"
+source_id = "tectonic"
+paper_table_row = "binairo-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/tectonicpuzzel/4_avoid_identical_rows_or_columns.param"
+
+[[tutorial]]
+id = "binairo-tectonic-5-avoid-impossible-combinations"
+kind = "binairo"
+source_id = "tectonic"
+paper_table_row = "binairo-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/tectonicpuzzel/5_avoid_impossible_combinations.param"
+
+[[tutorial]]
+id = "binairo-tectonic-6-2-empty-boxes-between-0-and-1"
+kind = "binairo"
+source_id = "tectonic"
+paper_table_row = "binairo-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/binairo/solving_techniques/tectonicpuzzel/6_2_empty_boxes_between_0_and_1.param"
+
+# --- futoshiki/futoshikiorg (paper expects 6 steps; repo has 6 files) ---
+
+[[tutorial]]
+id = "futoshiki-futoshikiorg-1-col-and-row-exclusion"
+kind = "futoshiki"
+source_id = "futoshikiorg"
+paper_table_row = "futoshiki-futoshikiorg"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/futoshikiorg/1-col-and-row-exclusion.param"
+
+[[tutorial]]
+id = "futoshiki-futoshikiorg-2-chain-of-inequalities"
+kind = "futoshiki"
+source_id = "futoshikiorg"
+paper_table_row = "futoshiki-futoshikiorg"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/futoshikiorg/2-chain-of-inequalities.param"
+
+[[tutorial]]
+id = "futoshiki-futoshikiorg-3-forced-min-and-max-vals"
+kind = "futoshiki"
+source_id = "futoshikiorg"
+paper_table_row = "futoshiki-futoshikiorg"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/futoshikiorg/3-forced-min-and-max-vals.param"
+
+[[tutorial]]
+id = "futoshiki-futoshikiorg-4-exclusion-min-and-max-vals"
+kind = "futoshiki"
+source_id = "futoshikiorg"
+paper_table_row = "futoshiki-futoshikiorg"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/futoshikiorg/4-exclusion-min-and-max-vals.param"
+
+[[tutorial]]
+id = "futoshiki-futoshikiorg-5-combining-rules"
+kind = "futoshiki"
+source_id = "futoshikiorg"
+paper_table_row = "futoshiki-futoshikiorg"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/futoshikiorg/5-combining-rules.param"
+
+[[tutorial]]
+id = "futoshiki-futoshikiorg-6-iterating-possibilities"
+kind = "futoshiki"
+source_id = "futoshikiorg"
+paper_table_row = "futoshiki-futoshikiorg"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/futoshikiorg/6-iterating-possibilities.param"
+
+# --- futoshiki/tectonic (paper expects 7 steps; repo has 7 files) ---
+
+[[tutorial]]
+id = "futoshiki-tectonic-1-col-row-exclusion"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/1-col-row-exclusion.param"
+
+[[tutorial]]
+id = "futoshiki-tectonic-2-chain-asc-desc-symbs"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/2-chain-asc-desc-symbs.param"
+
+[[tutorial]]
+id = "futoshiki-tectonic-3-forced-min-max"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/3-forced-min-max.param"
+
+[[tutorial]]
+id = "futoshiki-tectonic-4-exclusion-max-min"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/4-exclusion-max-min.param"
+
+[[tutorial]]
+id = "futoshiki-tectonic-5-chain-2-asc-2-desc-symbs"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/5-chain-2-asc-2-desc-symbs.param"
+
+[[tutorial]]
+id = "futoshiki-tectonic-6-ab-elimination"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/6-AB-elimination.param"
+
+[[tutorial]]
+id = "futoshiki-tectonic-7-opposite-symbs"
+kind = "futoshiki"
+source_id = "tectonic"
+paper_table_row = "futoshiki-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/futoshiki/solving_techniques/tectonicpuzzleeu/7-opposite-symbs.param"
+
+# --- kakuro/kakurocom (paper expects 2 steps; repo has 2 files) ---
+
+[[tutorial]]
+id = "kakuro-kakurocom-1-combo-ref"
+kind = "kakuro"
+source_id = "kakurocom"
+paper_table_row = "kakuro-kakurocom"
+status = "needs-source-page"
+legacy_param = "eprime/kakuro/solving_techniques/kakurocom/1-combo-ref.param"
+
+[[tutorial]]
+id = "kakuro-kakurocom-2-filled-areas"
+kind = "kakuro"
+source_id = "kakurocom"
+paper_table_row = "kakuro-kakurocom"
+status = "needs-source-page"
+legacy_param = "eprime/kakuro/solving_techniques/kakurocom/2-filled-areas.param"
+
+# --- kakuro/kakurosorg (paper expects 3 steps; repo has 3 files) ---
+
+[[tutorial]]
+id = "kakuro-kakurosorg-1-row-col-restrictions"
+kind = "kakuro"
+source_id = "kakurosorg"
+paper_table_row = "kakuro-kakurosorg"
+status = "needs-source-page"
+legacy_param = "eprime/kakuro/solving_techniques/kakurosorg/1-row-col-restrictions.param"
+
+[[tutorial]]
+id = "kakuro-kakurosorg-2-definitions-intersection"
+kind = "kakuro"
+source_id = "kakurosorg"
+paper_table_row = "kakuro-kakurosorg"
+status = "needs-source-page"
+legacy_param = "eprime/kakuro/solving_techniques/kakurosorg/2-definitions-intersection.param"
+
+[[tutorial]]
+id = "kakuro-kakurosorg-3-min-max-vals-sum-grp"
+kind = "kakuro"
+source_id = "kakurosorg"
+paper_table_row = "kakuro-kakurosorg"
+status = "needs-source-page"
+legacy_param = "eprime/kakuro/solving_techniques/kakurosorg/3-min-max-vals-sum-grp.param"
+
+# --- skyscrapers/conceptispuzzles (paper expects 14 steps; repo has 14 files) ---
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-1-clues-of-1-n"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/1-clues-of-1-N.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-10-adv-tech-2"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/10-adv-tech-2.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-11-adv-tech-3"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/11-adv-tech-3.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-12-adv-tech-4"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/12-adv-tech-4.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-13-adv-tech-5"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/13-adv-tech-5.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-14-adv-tech-6"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/14-adv-tech-6.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-2-high-skyscrapers-no-1"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/2-high-skyscrapers-no-1.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-3-high-skyscrapers-no-2"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/3-high-skyscrapers-no-2.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-4-unique-skyscraper-seq"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/4-unique-skyscraper-seq.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-5-alldiff"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/5-alldiff.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-6-highest-skyscraper-in-far-opposite"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/6-highest-skyscraper-in-far-opposite.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-7-lowest-skyscraper-adjacent"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/7-lowest-skyscraper-adjacent.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-8-second-highest-second-square"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/8-second-highest-second-square.param"
+
+[[tutorial]]
+id = "skyscrapers-conceptispuzzles-9-adv-tech-1"
+kind = "skyscrapers"
+source_id = "conceptispuzzles"
+paper_table_row = "skyscrapers-conceptispuzzles"
+status = "needs-source-page"
+legacy_param = "eprime/skyscrapers/solving_techniques/conceptispuzzlescom/9-adv-tech-1.param"
+
+# --- thermometer/innoludic (paper expects 2 steps; repo has 1 files) ---
+
+[[tutorial]]
+id = "thermometer-innoludic-1-some-tips"
+kind = "thermometer"
+source_id = "innoludic"
+paper_table_row = "thermometer-innoludic"
+status = "needs-multi-step"
+legacy_param = "eprime/thermometer/solving_techniques/innoludic/1-some-tips.param"
+source_url_in_file = "https://www.innoludic.com/2015-04-30-13-56-29/thermometers/56-rules-of-thermometers.html"
+source_comments = """\
+https://www.innoludic.com/2015-04-30-13-56-29/thermometers/56-rules-of-thermometers.html"""
+paper_steps_in_this_file = 2
+# TODO: identify per-step target deductions from source page
+
+# --- tents/tectonic (paper expects 9 steps; repo has 3 files) ---
+
+[[tutorial]]
+id = "tents-tectonic-tectonic-1-2-3-4-5-6-7"
+kind = "tents"
+source_id = "tectonic"
+paper_table_row = "tents-tectonic"
+status = "needs-multi-step"
+legacy_param = "eprime/tents/tectonic-1-2-3-4-5-6-7.param"
+paper_steps_in_this_file = 9
+# TODO: identify per-step target deductions from source page
+
+[[tutorial]]
+id = "tents-tectonic-tectonic-8"
+kind = "tents"
+source_id = "tectonic"
+paper_table_row = "tents-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/tents/tectonic-8.param"
+
+[[tutorial]]
+id = "tents-tectonic-tectonic-9"
+kind = "tents"
+source_id = "tectonic"
+paper_table_row = "tents-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/tents/tectonic-9.param"
+
+# --- starbattle/tectonic (paper expects 2 steps; repo has 2 files) ---
+
+[[tutorial]]
+id = "starbattle-tectonic-tectonic-grouping-of-rows-or-columns"
+kind = "starbattle"
+source_id = "tectonic"
+paper_table_row = "starbattle-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/star-battle/tectonic-grouping-of-rows-or-columns.param"
+source_url_in_file = "http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html"
+source_comments = """\
+http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html\nGROUPING OF ROWS OR COLUMNSa: http://www.tectonicpuzzel.eu/star-battle-puzzel-strategy.jpg"""
+
+[[tutorial]]
+id = "starbattle-tectonic-tectonic-row-or-col-elimination"
+kind = "starbattle"
+source_id = "tectonic"
+paper_table_row = "starbattle-tectonic"
+status = "needs-source-page"
+legacy_param = "eprime/star-battle/tectonic-row-or-col-elimination.param"
+source_url_in_file = "http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html"
+source_comments = """\
+http://www.tectonicpuzzel.eu/star-battle-puzzle-techniques.html\nROW OR COLUMN ELIMINATION: http://www.tectonicpuzzel.eu/star-battle-puzzle-solver.jpg"""
+
+# --- kakuro/conceptispuzzles (single file, 11 paper steps) ---
+
+[[tutorial]]
+id = "kakuro-conceptispuzzles"
+kind = "kakuro"
+source_id = "conceptispuzzles"
+paper_table_row = "kakuro-conceptispuzzles"
+status = "needs-multi-step"
+legacy_param = "eprime/kakuro/solving_techniques/conceptispuzzles.param"
+paper_steps_in_this_file = 11
+# TODO: identify per-step target deductions from
+#   https://www.conceptispuzzles.com/index.aspx?uri=puzzle/kakuro/techniques
+
+# --- starbattle multi-step files ---
+
+[[tutorial]]
+id = "starbattle-krazydad"
+kind = "starbattle"
+source_id = "krazydad"
+paper_table_row = "starbattle-krazydad"
+status = "needs-multi-step"
+legacy_param = "eprime/star-battle/krazydad-tutorial.param"
+source_url_in_file = "https://krazydad.com/starbattle/tutorial/tutorial_10x10.php"
+source_comments = """\
+https://krazydad.com/starbattle/tutorial/tutorial_10x10.php\nbasically one grid, with many \"tutorial\" steps"""
+paper_steps_in_this_file = 4
+
+[[tutorial]]
+id = "starbattle-rohanrao"
+kind = "starbattle"
+source_id = "rohanrao"
+paper_table_row = "starbattle-rohanrao"
+status = "needs-multi-step"
+legacy_param = "eprime/star-battle/rohanrao-blogspot-example.param"
+source_url_in_file = "http://rohanrao.blogspot.com/2011/07/solving-star-battle-solved-example-1.html"
+source_comments = """\
+http://rohanrao.blogspot.com/2011/07/solving-star-battle-solved-example-1.html\nbasically one grid, with many \"tutorial\" steps"""
+paper_steps_in_this_file = 14
+
+[[tutorial]]
+id = "starbattle-logicmasters"
+kind = "starbattle"
+source_id = "logicmasters"
+paper_table_row = "starbattle-logicmasters"
+status = "needs-multi-step"
+legacy_param = "eprime/star-battle/logicmastersindia-example.param"
+source_url_in_file = "https://logicmastersindia.com/forum/forums/thread-view.asp?tid=140"
+source_comments = """\
+https://logicmastersindia.com/forum/forums/thread-view.asp?tid=140\nbasically one grid, with \"tutorial\" steps"""
+paper_steps_in_this_file = 4
+
+# --- thermometer/tectonic (all-techniques.eprime — actually a param) ---
+
+[[tutorial]]
+id = "thermometer-tectonic-all-techniques"
+kind = "thermometer"
+source_id = "tectonic"
+paper_table_row = "thermometer-tectonic"
+status = "needs-multi-step"
+legacy_param = "eprime/thermometer/solving_techniques/tectonicpuzzel/all-techniques.eprime"
+# Mis-named .eprime — actually a param data file (uses `letting`).
+# Source URL in file: http://www.tectonicpuzzel.eu/thermometer-sudoku-puzzle-solving-strategy.html
+paper_steps_in_this_file = 5
+
+# ============================================================================
+# Showcase scripts (not in paper Table 1) — full-puzzle solve traces
+# ============================================================================
+
+[[tutorial]]
+id = "miracle-cracking-the-cryptic"
+kind = "miracle"
+source_id = "cracking-the-cryptic"
+paper_table_row = "not-in-paper"
+status = "showcase"
+python_source = "examples/miracle-cascade.py"
+description = "Miracle Sudoku full solve"
+
+[[tutorial]]
+id = "thermo-no-digits"
+kind = "thermometer"
+source_id = "cracking-the-cryptic"
+paper_table_row = "not-in-paper"
+status = "showcase"
+python_source = "examples/thermo-no-digits-cascade.py"
+source_url_in_file = "https://www.youtube.com/watch?v=KTth49YrQVU"
+description = "Thermometer Sudoku full solve"
+
+[[tutorial]]
+id = "thermo-250000-subscriptions"
+kind = "thermometer"
+source_id = "cracking-the-cryptic"
+paper_table_row = "not-in-paper"
+status = "showcase"
+python_source = "examples/thermo-250000-subscriptions-cascade.py"
+source_url_in_file = "https://www.youtube.com/watch?v=U99ZFz_X4TU"
+description = "Thermometer Sudoku full solve"
+
+[[tutorial]]
+id = "wizard-cascade"
+kind = "sudoku-knights"
+source_id = "cracking-the-cryptic"
+paper_table_row = "not-in-paper"
+status = "showcase"
+python_source = "examples/wizard-cascade.py"
+source_url_in_file = "https://www.youtube.com/watch?v=QNzltTzv0fc&t=79s"
+description = "Wizard / Knight's-move Sudoku full solve"
+
+[[tutorial]]
+id = "latimes-driver"
+kind = "sudoku"
+source_id = "la-times"
+paper_table_row = "not-in-paper"
+status = "showcase"
+python_source = "examples/latimes.py"
+description = "CLI driver for daily LA Times Sudokus"
+
+# ============================================================================
+# Repo-only extras (not in paper Table 1)
+# ============================================================================
+
+# --- killersudoku (10 files) — paper explicitly excludes Killer Sudoku ---
+# Reason: "we found we were unable to represent them … problems with implicit arithmetic reasoning"
+
+[[tutorial]]
+id = "killersudoku-1-1-innies-and-outies"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/1-1-innies-and-outies.param"
+
+[[tutorial]]
+id = "killersudoku-10-3-cage-unit-overlap"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/10-3-cage-unit-overlap.param"
+
+[[tutorial]]
+id = "killersudoku-2-3-innies-and-outies"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/2-3-innies-and-outies.param"
+
+[[tutorial]]
+id = "killersudoku-3-4-innies-and-outies"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/3-4-innies-and-outies.param"
+
+[[tutorial]]
+id = "killersudoku-4-5-innies-and-outies"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/4-5-innies-and-outies.param"
+
+[[tutorial]]
+id = "killersudoku-5-6-innies-and-outies"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/5-6-innies-and-outies.param"
+
+[[tutorial]]
+id = "killersudoku-6-7-innies-and-outies"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/6-7-innies-and-outies.param"
+
+[[tutorial]]
+id = "killersudoku-7-1-cage-splitting"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/7-1-cage-splitting.param"
+
+[[tutorial]]
+id = "killersudoku-8-1-cage-unit-overlap"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/8-1-cage-unit-overlap.param"
+
+[[tutorial]]
+id = "killersudoku-9-2-cage-unit-overlap"
+kind = "killersudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/killersudoku/solving_techniques/9-2-cage-unit-overlap.param"
+
+# --- sudoku unique-rectangle family — paper Table 1 footnote † excludes these ---
+
+[[tutorial]]
+id = "sudoku-BUG-bug-1"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/BUG/BUG-1.param"
+technique_family = "BUG"
+
+[[tutorial]]
+id = "sudoku-BUG-bug-2"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/BUG/BUG-2.param"
+technique_family = "BUG"
+
+[[tutorial]]
+id = "sudoku-extuniqrectangles-extuniqrectangles-1"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/extuniqrectangles/extuniqrectangles-1.param"
+technique_family = "extuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-extuniqrectangles-extuniqrectangles-2"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/extuniqrectangles/extuniqrectangles-2.param"
+technique_family = "extuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-extuniqrectangles-extuniqrectangles-3"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/extuniqrectangles/extuniqrectangles-3.param"
+technique_family = "extuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-hiddenuniqrectangles-hiddenuniqrectangles-1"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/hiddenuniqrectangles/hiddenuniqrectangles-1.param"
+technique_family = "hiddenuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-hiddenuniqrectangles-hiddenuniqrectangles-2"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/hiddenuniqrectangles/hiddenuniqrectangles-2.param"
+technique_family = "hiddenuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-hiddenuniqrectangles-hiddenuniqrectangles-3"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/hiddenuniqrectangles/hiddenuniqrectangles-3.param"
+technique_family = "hiddenuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-hiddenuniqrectangles-hiddenuniqrectangles-4"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/hiddenuniqrectangles/hiddenuniqrectangles-4.param"
+technique_family = "hiddenuniqrectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-1"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-1.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-10"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-10.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-11"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-11.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-2"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-2.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-3"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-3.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-4"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-4.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-5"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-5.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-6"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-6.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-7"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-7.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-8"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-8.param"
+technique_family = "uniquerectangles"
+
+[[tutorial]]
+id = "sudoku-uniquerectangles-uniquerectangles-9"
+kind = "sudoku"
+source_id = "sudokuwiki"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/sudoku/sudokuwiki/uniquerectangles/uniquerectangles-9.param"
+technique_family = "uniquerectangles"
+
+# --- skyscrapers extras (in repo + ListOfTutorials.txt, not in final paper Table 1) ---
+
+[[tutorial]]
+id = "skyscrapers-brainbashers-brainbashers-walkthrough"
+kind = "skyscrapers"
+source_id = "brainbashers"
+paper_table_row = "not-in-paper"  # appeared in ListOfTutorials.txt but not final Table 1
+status = "not-in-paper"
+legacy_param = "eprime/skyscrapers/solving_techniques/brainbashers-walkthrough.param"
+
+# --- skyscrapers/tectonic (in repo, not in final paper Table 1) ---
+
+[[tutorial]]
+id = "skyscrapers-tectonic-1-clues-of-1"
+kind = "skyscrapers"
+source_id = "tectonic"
+paper_table_row = "not-in-paper"  # in repo + ListOfTutorials.txt but not final Table 1
+status = "not-in-paper"
+legacy_param = "eprime/skyscrapers/solving_techniques/tectonicpuzzel/1-clues-of-1.param"
+
+[[tutorial]]
+id = "skyscrapers-tectonic-2-high-numbers"
+kind = "skyscrapers"
+source_id = "tectonic"
+paper_table_row = "not-in-paper"  # in repo + ListOfTutorials.txt but not final Table 1
+status = "not-in-paper"
+legacy_param = "eprime/skyscrapers/solving_techniques/tectonicpuzzel/2-high-numbers.param"
+
+# --- starbattle extras (in repo, not in paper Table 1) ---
+
+[[tutorial]]
+id = "starbattle-extra-fatatalkexample"
+kind = "starbattle"
+source_id = "fata"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/star-battle/FATAtalkexample.param"
+
+[[tutorial]]
+id = "starbattle-extra-star-battle-1"
+kind = "starbattle"
+source_id = ""
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+legacy_param = "eprime/star-battle/star-battle-1.param"
+
+# --- garam (in repo, NOT in paper Table 1) ---
+
+[[tutorial-group]]
+kind = "garam"
+location = "eprime/garam"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+note = "Present in repo but not part of paper benchmark; status to be decided"
+
+# --- solitairebattleship (in repo, NOT in paper Table 1) ---
+
+[[tutorial-group]]
+kind = "solitairebattleship"
+location = "eprime/solitairebattleship"
+paper_table_row = "not-in-paper"
+status = "not-in-paper"
+note = "Present in repo but not part of paper benchmark; status to be decided"
+

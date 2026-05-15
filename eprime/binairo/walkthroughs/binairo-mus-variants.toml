@@ -1,0 +1,24 @@
+model = "eprime/binairo.essence"
+param = "eprime/binairo/binairo-1.param"
+title = "Binairo: alternative explanations for a single deduction"
+
+# Demonstrates the three rendering ops side by side:
+#   - show_mus: the smallest MUS that explains the deduction.
+#   - show_smallest_muses: every minimum-sized alternative MUS.
+#   - show_all_size_muses: every MUS up to a size cap, including non-minimum.
+
+[[step]]
+op = "show_mus"
+lit = "grid[3,3]=0"
+title = "Smallest MUS for grid[3,3]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,3]=0"
+title = "All minimum-sized MUSes for grid[3,3]=0"
+
+[[step]]
+op = "show_all_size_muses"
+lit = "grid[3,3]=0"
+max_size = 8
+title = "MUSes up to size 8"

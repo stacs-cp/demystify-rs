@@ -1,0 +1,49 @@
+# Source: http://www.tectonicpuzzel.eu/tents-and-trees-solver-tips-rules.html
+# Local mirror: doc/tutorial-source-pages/tectonicpuzzel/_html/tents-and-trees-solver-tips-rules.html
+#
+# Demonstrates Rule 9 from the tectonicpuzzel "Tents and Trees" page:
+#   "EXCLUDING A CELL AS A PLACE FOR A TENT
+#    Sometimes a tree has several options for placing a tent, but all
+#    the options make it impossible for a particular cell to contain a
+#    tent and so we can place a cross there.
+#    The tree at the bottom left has only 2 free places for a tent.
+#    We put a question mark there.  As a result, we find a cell where
+#    certainly no tent can be."
+#
+# Trees in tectonic-9.param:
+#   (1,5), (2,1), (3,5), (4,3), (5,1), (5,4)
+#
+# The "bottom left" tree is at (5,1).  Its orthogonal neighbours are
+# (4,1) and (5,2) (the third would be (5,0), off-grid).  So tree (5,1)'s
+# tent must be either (4,1) or (5,2).
+#
+# Now consider (4,2): it is 8-adjacent to both (4,1) (orthogonally) and
+# (5,2) (orthogonally).  So whichever of {(4,1), (5,2)} ends up being
+# tree (5,1)'s tent, (4,2) cannot also be a tent (no two tents may be
+# 8-adjacent).  Hence (4,2) must be empty.
+#
+# MUS size 3: `treeadjtent[5,1]` + the two `adj` atoms for the (4,1)/(4,2)
+# and (5,2)/(4,2) pairs.
+
+model = "eprime/tents-binary.eprime"
+param = "eprime/tents/tectonic-9.param"
+title = "tents — tectonic — Rule 9 (excluding a cell from being a tent)"
+hide_untouched_candidates = true
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,2]=0"
+title = "Rule 9: grid[4,2]=0 — tree at (5,1) must place its tent at (4,1) or (5,2); either choice makes (4,2) impossible (8-adjacency)"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,2]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 9: (4,2) excluded as a tent location"
+commentary = "Rule 9 only excludes the one cell — the tree's actual tent placement is left for later steps once more constraints rule out (4,1) or (5,2)."

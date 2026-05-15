@@ -1,0 +1,242 @@
+# Source: https://logicmastersindia.com/forum/forums/thread-view.asp?tid=140
+# Local mirror: doc/tutorial-source-pages/logicmasters/_html/thread-140.html
+# Source image (the actual hint content, embedded in rakesh_rai's reply):
+#   doc/tutorial-source-pages/M201009P/StarBattle.jpg
+#
+# The forum thread "Star Battle In EG2 - Solution Steps" by rakesh_rai
+# is a 9x9 Star Battle (2 stars per row/col/region, 9 regions A..J).
+# The whole walkthrough is in a single image with 6 panels:
+#
+#   Panel 1: naming conventions (regions A..J = cages 1..9).
+#   Panel 2: row 7 outside G+H+J is X — rows 7-9 hold exactly 6 stars
+#            (3 rows × 2), and regions G, H, J between them already
+#            require 6 stars and are fully contained in rows 7-9, so
+#            no other row-7-9 cell can host a star.
+#   Panel 3: a central cell in each of E, F, G, H, J is X — placing
+#            a star at the central cell forbids enough region cells
+#            that the region can no longer hold 2 stars.
+#   Panel 4: R5C3 and R7C5 are X — each would leave region F (cage 6)
+#            without 2 valid star placements.
+#   Panel 5: row 7's remaining cells (7,2) and (7,8) are forced stars;
+#            their neighbours are all eliminated.
+#   Panel 6: row 6, row 8, region E (cage 5) stars are obvious; the
+#            rest falls easily.
+#
+# Region/cage mapping:
+#   1=A   2=B   3=C   4=D   5=E   6=F   7=G   8=H   9=J
+# (the forum image skips letter 'I' to avoid confusion with '1').
+
+model = "eprime/star-battle-cellforbids.eprime"
+param = "eprime/star-battle/logicmastersindia-example.param"
+title = "starbattle — logicmasters — rakesh_rai's 6-panel solution steps"
+hide_untouched_candidates = true
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+# =====================================================================
+# Panel 2 — row 7 outside G+H+J is X.
+# Regions G, H, J = cages 7, 8, 9, all in rows 7-9.  Each needs 2
+# stars → 6 stars across rows 7-9.  Those rows can hold at most 6
+# stars (3 rows × 2).  So every star in rows 7-9 belongs to G/H/J,
+# and any row-7-9 cell outside those three cages is X.
+# Row 7 cells in cage 5/6 (i.e. NOT in G/H/J): (7,1), (7,3), (7,4),
+# (7,6), (7,7), (7,9).  All X.
+# Each MUS combines `rowdown[7,8,9]` + `blockup[7,8,9]` — six atoms.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,1]=0"
+title = "Panel 2.1: stars[7,1]=0 — rows 7-9 saturated by G+H+J stars"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,1]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,3]=0"
+title = "Panel 2.2: stars[7,3]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,3]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,4]=0"
+title = "Panel 2.3: stars[7,4]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,4]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,6]=0"
+title = "Panel 2.4: stars[7,6]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,6]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,7]=0"
+title = "Panel 2.5: stars[7,7]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,7]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,9]=0"
+title = "Panel 2.6: stars[7,9]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,9]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Panel 2: row 7 outside G+H+J cleared"
+
+# =====================================================================
+# Panel 3 — central cell in each of E, F, G, H, J is X.
+# A star at the central cell of a region forbids enough other cells
+# of that region (via cellforbids[i,j]) to leave the region unable
+# to host 2 stars.
+# Central cells: E=(5,2), F=(5,5), G=(8,2), H=(8,5), J=(8,8).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,2]=0"
+title = "Panel 3.1: stars[5,2]=0 — central cell of region E forbids enough E cells to leave fewer than 2 candidates"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,5]=0"
+title = "Panel 3.2: stars[5,5]=0 — central cell of region F"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[8,2]=0"
+title = "Panel 3.3: stars[8,2]=0 — central cell of region G"
+
+[[step]]
+op = "deduce"
+lit = "stars[8,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[8,5]=0"
+title = "Panel 3.4: stars[8,5]=0 — central cell of region H"
+
+[[step]]
+op = "deduce"
+lit = "stars[8,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[8,8]=0"
+title = "Panel 3.5: stars[8,8]=0 — central cell of region J"
+
+[[step]]
+op = "deduce"
+lit = "stars[8,8]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Panel 3: central cells of E/F/G/H/J cleared"
+
+# =====================================================================
+# Panel 4 — R5C3 and R7C5 are X via region-F argument.
+# Region F (cage 6) cells: (4,4), (5,4), (5,5 — already X), (6,4),
+# (6,5), (6,6).  A star at (5,3) forbids (4,4), (5,4), (6,4) (region
+# F cells), leaving F's surviving candidates as (6,5)/(6,6) — they're
+# adjacent to each other, so at most 1 can be a star.  F needs 2 →
+# contradiction.  (7,5) follows by the symmetric argument.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,3]=0"
+title = "Panel 4.1: stars[5,3]=0 — would leave region F without 2 valid star placements"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,3]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,5]=0"
+title = "Panel 4.2: stars[7,5]=0 — symmetric region-F argument"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,5]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Panel 4"
+
+# =====================================================================
+# Panel 5 — row 7 has only (7,2) and (7,8) left; both must be stars,
+# their neighbours all become X.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,2]=1"
+title = "Panel 5.1: stars[7,2]=1 — row 7's only candidate in region G"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,2]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,8]=1"
+title = "Panel 5.2: stars[7,8]=1 — row 7's only candidate in region J"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,8]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Panel 5 cleanup: cells adjacent to (7,2) and (7,8) become X"
+
+[[step]]
+op = "heatmap"
+title = "After Panel 5: stars (7,2) and (7,8) placed"
+
+# =====================================================================
+# Panel 6 — "Row 6 and 8: the two stars are obvious.  Region 5: the
+# two stars are obvious.  The rest is easy."
+#
+# Sweep size-1/2 deductions to mop up.
+# =====================================================================
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 2
+title = "Panel 6: rest of the puzzle (the source page does not give the steps in detail — 'the rest is easy', so we sweep size-1/2 deductions)"
+
+[[step]]
+op = "heatmap"
+title = "Solved"
+commentary = "All 9 regions filled with 2 stars each. The source's Panel 6 says 'Row 6 and 8: the two stars are obvious. Region 5: the two stars are obvious. The rest is easy' — the steps are not given in detail, so we sweep them as size-1/2 trivial deductions."

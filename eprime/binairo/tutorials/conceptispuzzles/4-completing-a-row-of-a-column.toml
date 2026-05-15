@@ -1,0 +1,35 @@
+# Source: (look up in source page)
+# Kind: binairo    Source ID: conceptispuzzles
+# Original tutorial filename hints at the technique: 4_Completing_a_row_of_a_column.param
+
+model = "eprime/binairo.essence"
+param = "eprime/binairo/solving_techniques/conceptispuzzles/4_Completing_a_row_of_a_column.param"
+title = "binairo — conceptispuzzles — 4 Completing a row of a column"
+
+# Default first step: heatmap to show what is deducible at the start.
+# Look at the rendered HTML, identify the cell + value the source
+# tutorial demonstrates, then uncomment a `[[step]]` below.
+[[step]]
+op = "heatmap"
+title = "Initial state — pick a target deduction from this"
+
+# [[step]]
+# op = "show_mus"
+# lit = "<var>[r,c]=v"  # OR <var>[r,c]!=v for an elimination
+# title = "<technique name from source>"
+
+
+# Auto-filled from planner step 1.  Each [[step]] below shows the
+# smallest MUS for one of the cells deducible at the initial state.
+# Cross-reference with the source page to identify which deduction
+# matches the technique being demonstrated.
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[7,2]=0"
+title = "Auto-target 1/2: grid[7,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,7]=0"
+title = "Auto-target 2/2: grid[2,7]=0"

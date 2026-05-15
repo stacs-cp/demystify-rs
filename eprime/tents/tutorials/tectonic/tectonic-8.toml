@@ -1,0 +1,39 @@
+# Source: http://www.tectonicpuzzel.eu/tents-and-trees-solver-tips-rules.html
+# Local mirror: doc/tutorial-source-pages/tectonicpuzzel/_html/tents-and-trees-solver-tips-rules.html
+#
+# Demonstrates Rule 8 from the tectonicpuzzel "Tents and Trees" page:
+#   "A TREE HAS ONLY 1 FREE CELL FOR A TENT
+#    Look at trees that are enclosed.  If there is a tree with only one
+#    free horizontal or vertical side, then that should be the place to
+#    put a tent for that tree."
+#
+# Trees in tectonic-8.param:
+#   (1,5), (2,1), (3,1), (3,3), (4,1), (4,5), (5,4)
+#
+# The tree at (3,1) is enclosed by other trees: (2,1) and (4,1) are both
+# trees (so cannot host (3,1)'s tent); (3,0) is off-grid.  The only
+# orthogonal neighbour that could be a tent is (3,2).
+# MUS: just `treeadjtent[3,1]`.
+
+model = "eprime/tents-binary.eprime"
+param = "eprime/tents/tectonic-8.param"
+title = "tents — tectonic — Rule 8 (tree with one free neighbour)"
+hide_untouched_candidates = true
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,2]=1"
+title = "Rule 8: grid[3,2]=tent — tree at (3,1) is enclosed by other trees, so its only possible tent location is (3,2)"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,2]=1"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 8: tree at (3,1) paired with tent at (3,2)"
+commentary = "The page continues with further deductions on this puzzle, but the Rule 8 technique itself only places this one tent."

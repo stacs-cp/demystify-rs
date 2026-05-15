@@ -1,0 +1,36 @@
+# Source: http://www.tectonicpuzzel.eu/thermometer-sudoku-puzzle-solving-strategy.html
+# Local mirror: doc/tutorial-source-pages/tectonicpuzzel/_html/thermometer-sudoku-puzzle-solving-strategy.html
+#
+# Demonstrates Rule 4 ("Combine rows or columns") in isolation.
+#
+# Rationale: in the full puzzle (all-techniques.eprime), grid[2,6]=1 is
+# also derivable via Rule 1 (row 2 has sum=10, forcing every cell of
+# row 2 to mercury), and the smallest-MUS planner picks the size-1
+# Rule-1 proof instead of the page's intended Rule-4 reasoning.  This
+# variant hides every clue except the last five column sums (cols 6..10
+# = [6,1,4,3,4]) so the only relevant constraints in the MUS are the
+# ones the page actually uses.
+
+model = "eprime/thermometer.eprime"
+param = "eprime/thermometer/solving_techniques/tectonicpuzzel/rule-4-isolated.eprime"
+title = "thermometer — tectonic — Rule 4 (combine rows/cols), isolated"
+hide_untouched_candidates = true
+repeats = 200
+strategy = "cake"
+
+[[step]]
+op = "heatmap"
+title = "Initial state — only the last five column clues are visible"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,6]=1"
+title = "Rule 4 (Combine rows/cols): grid[2,6]=1 — col 6 (clue 6) and col 7 (clue 1) combine to force therm 13's circle"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,6]=1"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 4"

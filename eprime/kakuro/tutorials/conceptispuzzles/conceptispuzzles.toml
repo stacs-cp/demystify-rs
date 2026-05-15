@@ -1,0 +1,358 @@
+# Source: https://www.conceptispuzzles.com/index.aspx?uri=puzzle/kakuro/techniques
+# Kind: kakuro    Source ID: conceptispuzzles
+#
+# 11 paper-counted Kakuro solving steps from the Conceptis Puzzles
+# techniques walkthrough.  The puzzle is a 5x7 playable grid (sum-headers
+# around the edge); coordinates use the param's grid[X, Y] where X is the
+# 1-indexed row (2..6 are playable rows) and Y is the 1-indexed column
+# (2..8 are playable columns).
+#
+# Conceptis labels rows 1..5 and columns a..g.  Translation:
+#   conceptis row 1..5  →  param X = 2..6
+#   conceptis col a..g  →  param Y = 2..8
+#   so e.g. conceptis a1 = grid[2,2], conceptis e5 = grid[6,6]
+#
+# Each [[step]] block below corresponds to one numbered step from the
+# source page.  The verbatim prose from the page is preserved as a
+# leading comment block so we can later cross-reference each MUS we
+# generate against the human explanation.
+
+model = "eprime/kakuro.eprime"
+param = "eprime/kakuro/solving_techniques/conceptispuzzles.param"
+title = "Kakuro — Conceptis Puzzles solving guide (11 techniques)"
+
+# ------------------------------------------------------------------
+# Step 1 — a1=5, then a2=1
+# Source prose:
+#   "The only possible combinations are 5+8+9 and 6+7+9. However, square
+#    a1 must be smaller than 6 because of the 6-in-two block in column a.
+#    Therefore the only number possible in square a1 is 5."
+# Evidence: 22-in-three block in row 1; 6-in-two block in column a.
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,2]=5"
+title = "Step 1 — a1 must be 5 (from 22-in-three ∩ 6-in-two)"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,2]=5"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,2]=1"
+title = "Step 1 (cont) — therefore a2 = 6 − 5 = 1"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,2]=1"
+
+
+# ------------------------------------------------------------------
+# Step 2 — c1=8, b1=9
+# Source prose:
+#   "If the 9 is in square c1 then squares c2 and c3 must both contain 1,
+#    which is not allowed."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,4]=8"
+title = "Step 2 — c1 cannot be 9 (would force c2=c3=1) ⇒ c1=8"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,4]=8"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,3]=9"
+title = "Step 2 (cont) — therefore b1 = 22 − 5 − 8 = 9"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,3]=9"
+
+
+# ------------------------------------------------------------------
+# Step 3 — c2=2
+# Source prose:
+#   "square a2 already contains 1 so the number in square c2 must be 2."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,4]=2"
+title = "Step 3 — c2 = 2 (since c2+c3 sum constrains, and 1 used in row 2)"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,4]=2"
+
+
+# ------------------------------------------------------------------
+# Between Step 3 and Step 4 — trivial sum completions the page omits.
+# Both follow directly from the just-completed cells filling out their
+# blocks; conceptis assumes the solver does these in passing before
+# moving on to the magic-block reasoning of Step 4.
+#   c3 = 1 (column c 11-in-three: 11 − 8 − 2 = 1)
+#   b2 = 7 (row 3 10-in-three:    10 − 1 − 2 = 7)
+# ------------------------------------------------------------------
+[[step]]
+op = "deduce"
+lit = "grid[4,4]=1"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,3]=7"
+
+
+# ------------------------------------------------------------------
+# Step 4 — f3=6, g3=9
+# Source prose:
+#   "The 16-in-five block in column f is a magic block because the only
+#    five-number combination that sums up to 16 is 1+2+3+4+6."
+#   ⇒ f3 = 6 (the only value the 15-in-two crossing 16-in-five permits).
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,7]=6"
+title = "Step 4 — f3 = 6 (16-in-five magic block 1+2+3+4+6)"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,7]=6"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,8]=9"
+title = "Step 4 (cont) — therefore g3 = 15 − 6 = 9"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,8]=9"
+
+
+# ------------------------------------------------------------------
+# Step 5 — f1=4, e1=9, e2=3
+# Source prose:
+#   "the only common number for square f1 is 4" — from intersecting the
+#   13-in-two block (row 1 right) with the 16-in-five block (column f).
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,7]=4"
+title = "Step 5 — f1 = 4 (13-in-two ∩ 16-in-five)"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,7]=4"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,6]=9"
+title = "Step 5 (cont) — e1 = 13 − 4 = 9"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,6]=9"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,6]=3"
+title = "Step 5 (cont) — e2 = 12 − 9 = 3 (12-in-two column e)"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,6]=3"
+
+
+# ------------------------------------------------------------------
+# Step 6 — f2=1, g2=4
+# Source prose:
+#   "2+3 is not allowed because this block already contains 3.  In
+#    addition, 4 can't be in square f2 because the 16-in-five block in
+#    column f already contains 4."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,7]=1"
+title = "Step 6 — f2 = 1 (2+3 disallowed by row-3, 4 used in col f)"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,7]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,8]=4"
+title = "Step 6 (cont) — g2 = 5 − 1 = 4"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,8]=4"
+
+
+# ------------------------------------------------------------------
+# Step 7 — f5=3, f4=2
+# Source prose:
+#   "If square f5 contained 2, the remaining three squares must add up
+#    to 25.  But this is not possible because the largest sum of three
+#    squares is 7+8+9=24."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,7]=3"
+title = "Step 7 — f5 = 3 (f5≠2 since 27 − 2 = 25 > 7+8+9)"
+
+[[step]]
+op = "deduce"
+lit = "grid[6,7]=3"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,7]=2"
+title = "Step 7 (cont) — f4 = 2 (consequence in 16-in-five magic block)"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,7]=2"
+
+
+# ------------------------------------------------------------------
+# Step 8 — d3=9, b3=3
+# Source prose:
+#   Vertical sum totals 84; horizontal sum (excluding d3) totals 75;
+#   "This means square d3 is responsible for the difference and therefore
+#    must be 84 − 75 = 9."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,5]=9"
+title = "Step 8 — d3 = 9 (column-vs-row sum difference 84 − 75)"
+note = "Produces a smaller MUS, making use of 'The horizontal block in row 6 from column 5 to column 8 is all-different'."
+
+[[step]]
+op = "deduce"
+lit = "grid[4,5]=9"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,3]=3"
+title = "Step 8 (cont) — b3 = 3 (consequence)"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,3]=3"
+
+
+# ------------------------------------------------------------------
+# Step 9 — e5=9, e4=4
+# Source prose:
+#   "the only possible combination is 7+8+9 in some order.  However, the
+#    9 can't be in square d5 or g5 because each of those vertical blocks
+#    already has 9."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,6]=9"
+title = "Step 9 — e5 = 9 (only column without an existing 9)"
+note = "Avoids the need to know the sum of the bottom row by using 'The vertical block starting at [2, 8] sums to 21' instead of an all-different."
+
+[[step]]
+op = "deduce"
+lit = "grid[6,6]=9"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,6]=4"
+title = "Step 9 (cont) — e4 = 4"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,6]=4"
+
+
+# ------------------------------------------------------------------
+# Step 10 — d4=5, g4=1, d5=8, g5=7
+# Source prose:
+#   "If we try to place 1 in square d4 we immediately see square d5 will
+#    be larger than 9.  Therefore square d4 must be 5."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,5]=5"
+title = "Step 10 — d4 = 5 (d4≠1 since 12 − 1 > 9 in d5)"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,5]=5"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,8]=1"
+title = "Step 10 (cont) — g4 = 1"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,8]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,5]=8"
+title = "Step 10 (cont) — d5 = 8"
+
+[[step]]
+op = "deduce"
+lit = "grid[6,5]=8"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,8]=7"
+title = "Step 10 (cont) — g5 = 7"
+
+[[step]]
+op = "deduce"
+lit = "grid[6,8]=7"
+
+
+# ------------------------------------------------------------------
+# Step 11 — b5=8, a5=6, b4=6, a4=8
+# Source prose:
+#   "9 is already used in column b so we're left with 6+8.  If we choose
+#    6 for square b5 then square a5 would also have to be 6 leaving 8
+#    as the only possible candidate for square b5."
+# ------------------------------------------------------------------
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,3]=8"
+title = "Step 11 — b5 = 8 (b5=6 would force a5=6, forbidden)"
+
+[[step]]
+op = "deduce"
+lit = "grid[6,3]=8"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,2]=6"
+title = "Step 11 (cont) — a5 = 6"
+
+[[step]]
+op = "deduce"
+lit = "grid[6,2]=6"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,3]=6"
+title = "Step 11 (cont) — b4 = 6"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,3]=6"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,2]=8"
+title = "Step 11 (cont) — a4 = 8 (final cell)"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,2]=8"

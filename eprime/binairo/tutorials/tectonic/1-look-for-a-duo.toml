@@ -1,0 +1,45 @@
+# Source: (look up in source page)
+# Kind: binairo    Source ID: tectonic
+# Original tutorial filename hints at the technique: 1_look_for_a_duo.param
+
+model = "eprime/binairo.essence"
+param = "eprime/binairo/solving_techniques/tectonicpuzzel/1_look_for_a_duo.param"
+title = "binairo — tectonic — 1 look for a duo"
+
+# Default first step: heatmap to show what is deducible at the start.
+# Look at the rendered HTML, identify the cell + value the source
+# tutorial demonstrates, then uncomment a `[[step]]` below.
+[[step]]
+op = "heatmap"
+title = "Initial state — pick a target deduction from this"
+
+# [[step]]
+# op = "show_mus"
+# lit = "<var>[r,c]=v"  # OR <var>[r,c]!=v for an elimination
+# title = "<technique name from source>"
+
+
+# Auto-filled from planner step 1.  Each [[step]] below shows the
+# smallest MUS for one of the cells deducible at the initial state.
+# Cross-reference with the source page to identify which deduction
+# matches the technique being demonstrated.
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,1]=1"
+title = "Auto-target 1/4: grid[1,1]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,4]=1"
+title = "Auto-target 2/4: grid[1,4]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,4]=0"
+title = "Auto-target 3/4: grid[3,4]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[6,4]=0"
+title = "Auto-target 4/4: grid[6,4]=0"

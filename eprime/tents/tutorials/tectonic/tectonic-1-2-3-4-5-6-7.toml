@@ -1,0 +1,271 @@
+# Source: http://www.tectonicpuzzel.eu/tents-and-trees-solver-tips-rules.html
+# Local mirror: doc/tutorial-source-pages/tectonicpuzzel/_html/tents-and-trees-solver-tips-rules.html
+#
+# Hand-authored from the tectonicpuzzel "Tents and Trees Strategy and Tips"
+# page.  The page lists 9 numbered rules and works one 5x5 example
+# illustrating each.  Our param matches that example.
+#
+# 5x5, 5 trees, row_sums = [1,1,1,1,1], col_sums = [1,0,1,1,2].
+# Trees:
+#   (3,1)   (3,3)   (3,4)   (2,5)   (5,3)
+# Solution tents at:
+#   (1,5)   (2,3)   (3,5)   (4,1)   (5,4)
+#
+# Each cell's deduction has its own show_smallest_muses + deduce pair —
+# *no* `deduce_trivial` mass-cleanups.  The puzzle is small enough that
+# every step deserves a picture so the MUS can be checked against the
+# page's stated reasoning.
+
+model = "eprime/tents-binary.eprime"
+param = "eprime/tents/tectonic-1-2-3-4-5-6-7.param"
+title = "tents — tectonic — 9-rule walkthrough"
+hide_untouched_candidates = true
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+# =====================================================================
+# Rule 1: rows / columns with digit 0 — column 2 has 0 tents.
+# Each cell's MUS is just `coldown[2]` (size 1).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,2]=0"
+title = "Rule 1.1: grid[1,2]=0 — col 2 has 0 tents"
+
+[[step]]
+op = "deduce"
+lit = "grid[1,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,2]=0"
+title = "Rule 1.2: grid[2,2]=0 — same col-2 reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,2]=0"
+title = "Rule 1.3: grid[3,2]=0 — same col-2 reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,2]=0"
+title = "Rule 1.4: grid[4,2]=0 — same col-2 reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,2]=0"
+title = "Rule 1.5: grid[5,2]=0 — same col-2 reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,2]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 1: column 2 cleared"
+
+# =====================================================================
+# Rule 2: cells with no orthogonal AND no diagonal tree connection.
+# Each MUS is a single `tentadjtree[i,j]` atom (size 1).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,1]=0"
+title = "Rule 2.1: grid[1,1]=0 — corner cell, no tree near"
+
+[[step]]
+op = "deduce"
+lit = "grid[1,1]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,3]=0"
+title = "Rule 2.2: grid[1,3]=0 — same far-from-tree reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[1,3]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,1]=0"
+title = "Rule 2.3: grid[5,1]=0 — same far-from-tree reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,1]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,5]=0"
+title = "Rule 2.4: grid[5,5]=0 — same far-from-tree reasoning"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,5]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 2: 4 'far' cells cleared"
+
+# =====================================================================
+# Rule 3: cells only diagonally connected to a tree.
+# Same MUS shape as Rule 2 — one `tentadjtree[i,j]` atom.  The
+# constraint engine doesn't see the diagonal connection as different
+# from "no connection at all", so the MUS is identical to Rule 2.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,4]=0"
+title = "Rule 3.1: grid[1,4]=0 — diagonal-only neighbour of tree at (2,5)"
+
+[[step]]
+op = "deduce"
+lit = "grid[1,4]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,5]=0"
+title = "Rule 3.2: grid[4,5]=0 — diagonal-only neighbour of tree at (3,4)"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,5]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 3: all initial X-cells placed"
+
+# =====================================================================
+# Rule 4: row / column where free-cell count = tent count.
+# After Rules 1–3, rows 1, 3, 5 each have a single non-tree free cell
+# left.  rowup[i] forces that cell to be a tent.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[1,5]=1"
+title = "Rule 4.1: grid[1,5]=tent — row 1's only free cell"
+
+[[step]]
+op = "deduce"
+lit = "grid[1,5]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[3,5]=1"
+title = "Rule 4.2: grid[3,5]=tent — row 3's only free cell"
+
+[[step]]
+op = "deduce"
+lit = "grid[3,5]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[5,4]=1"
+title = "Rule 4.3: grid[5,4]=tent — row 5's only free cell"
+
+[[step]]
+op = "deduce"
+lit = "grid[5,4]=1"
+
+[[step]]
+op = "heatmap"
+title = "After Rule 4: 3 row-fill placements"
+
+# =====================================================================
+# Rule 5 / Rule 7: tent adjacency rules out neighbours; column 4 is now
+# complete (only 1 tent allowed).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,4]=0"
+title = "Rule 7.1: grid[2,4]=0 — col 4 complete (1 tent allowed, already at (5,4))"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,4]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,4]=0"
+title = "Rule 7.2: grid[4,4]=0 — col 4 complete"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,4]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,3]=0"
+title = "Rule 5: grid[4,3]=0 — diagonally adjacent to (5,4) tent"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,3]=0"
+
+[[step]]
+op = "heatmap"
+title = "After Rules 5/7: col-4 cleanup and adjacency around (5,4)"
+
+# =====================================================================
+# Rule 6 (re-apply Rule 4): row 4 now has only (4,1) free.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[4,1]=1"
+title = "Rule 6.1: grid[4,1]=tent — row 4's only free cell"
+
+[[step]]
+op = "deduce"
+lit = "grid[4,1]=1"
+
+# =====================================================================
+# Rule 7 again: column 1 now has its single tent at (4,1).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,1]=0"
+title = "Rule 7.3: grid[2,1]=0 — col 1 complete (tent already placed at (4,1))"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,1]=0"
+
+# =====================================================================
+# Rule 6 once more: row 2 now has only (2,3) free.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "grid[2,3]=1"
+title = "Rule 6.2: grid[2,3]=tent — row 2's only free cell"
+
+[[step]]
+op = "deduce"
+lit = "grid[2,3]=1"
+
+[[step]]
+op = "heatmap"
+title = "Solved"
+commentary = "All 5 tents placed using only Rules 1–7. Page Rules 8 and 9 use different example puzzles (`tectonic-8.param`, `tectonic-9.param`) and are covered by their own walkthrough scripts."

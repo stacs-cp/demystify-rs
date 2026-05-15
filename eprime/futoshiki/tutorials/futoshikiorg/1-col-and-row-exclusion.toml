@@ -1,0 +1,45 @@
+# Source: (look up in source page)
+# Kind: futoshiki    Source ID: futoshikiorg
+# Original tutorial filename hints at the technique: 1-col-and-row-exclusion.param
+
+model = "eprime/futoshiki.eprime"
+param = "eprime/futoshiki/solving_techniques/futoshikiorg/1-col-and-row-exclusion.param"
+title = "futoshiki — futoshikiorg — 1-col-and-row-exclusion"
+
+# Default first step: heatmap to show what is deducible at the start.
+# Look at the rendered HTML, identify the cell + value the source
+# tutorial demonstrates, then uncomment a `[[step]]` below.
+[[step]]
+op = "heatmap"
+title = "Initial state — pick a target deduction from this"
+
+# [[step]]
+# op = "show_mus"
+# lit = "<var>[r,c]=v"  # OR <var>[r,c]!=v for an elimination
+# title = "<technique name from source>"
+
+
+# Auto-filled from planner step 1.  Each [[step]] below shows the
+# smallest MUS for one of the cells deducible at the initial state.
+# Cross-reference with the source page to identify which deduction
+# matches the technique being demonstrated.
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[2,1]!=2"
+title = "Auto-target 1/4: field[2,1]!=2"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[2,2]!=2"
+title = "Auto-target 2/4: field[2,2]!=2"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[2,4]!=2"
+title = "Auto-target 3/4: field[2,4]!=2"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "field[3,1]!=3"
+title = "Auto-target 4/4: field[3,1]!=3"

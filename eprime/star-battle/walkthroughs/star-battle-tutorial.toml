@@ -1,0 +1,16 @@
+model = "eprime/star-battle.eprime"
+param = "eprime/star-battle/krazydad-tutorial.param"
+title = "Star Battle: a single deduction with alternative explanations"
+
+# Demonstrates the executor on a non-sudoku puzzle and shows that
+# show_smallest_muses generalises across puzzle families.
+
+[[step]]
+op = "show_mus"
+lit = "stars[1,1]!=1"
+title = "Why stars[1,1] cannot hold a star — smallest MUS"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[1,1]!=1"
+title = "All minimum-sized MUSes for stars[1,1]!=1"

@@ -1,0 +1,361 @@
+# Source: https://krazydad.com/starbattle/tutorial/tutorial_10x10.php
+# Hand-authored from the krazydad 10x10 Star Battle tutorial.
+#
+# Phase 1 of the page: cage 4 in the param is a 3-cell horizontal region
+# (row 9 cols 1-3 — the "freebie" the page calls out).  With 2 stars
+# required and no two adjacent, the only valid placement is at the two
+# ends, (9,1) and (9,3).  The page then "marks the surrounding (touching)
+# cells, as well as the remaining cells in the row" — those are all
+# size-1 MUS deductions, captured here in a single deduce_trivial step
+# rather than spelled out one cell at a time.
+
+model = "eprime/star-battle-cellforbids.eprime"
+param = "eprime/star-battle/krazydad-tutorial.param"
+title = "starbattle — krazydad — 10x10 tutorial"
+# Uses the per-cell `cellforbids` adjacency model (one atom per cell)
+# rather than the default pairwise `adj` model.  Lines up with the page's
+# "a star here would touch every cell in this cage" reasoning, which
+# previously needed size-5/6 MUSes (one adj atom per touched neighbour).
+# See the model file's header for the trade-off.
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+# ----- Step 1a: place the left star of cage 4 -----
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[9,1]=1"
+title = "Step 1a: stars[9,1]=1 — left end of the 3-cell freebie cage"
+
+[[step]]
+op = "deduce"
+lit = "stars[9,1]=1"
+
+# ----- Step 1b: place the right star of cage 4 -----
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[9,3]=1"
+title = "Step 1b: stars[9,3]=1 — right end of the same cage"
+
+[[step]]
+op = "deduce"
+lit = "stars[9,3]=1"
+
+# ----- Step 2: trivial cleanup (size-1 MUSes only) -----
+# Mark all cells made impossible by the two placements:
+#   - middle of cage 4: (9,2)
+#   - rest of row 9: (9,4)..(9,10) (row already has its 2 stars)
+#   - cells touching (9,1): (8,1), (8,2), (10,1), (10,2)
+#   - cells touching (9,3): (8,3), (8,4), (10,3), (10,4)
+# All follow from a single forbidding constraint each — size-1 MUSes.
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 2: forbid row 9 and the cells adjacent to both stars (size-1 MUSes)"
+# Defer size-1 deductions that we want to demonstrate explicitly later.
+# Without this skip list, the cleanup would grab e.g. (4,3)=1 / (8,6)=1 /
+# (8,10)=1 / (1,8)=1 here, and the corresponding `show_smallest_muses`
+# steps below would find nothing left to explain.
+skip = [
+    "stars[4,3]=1",
+    "stars[8,6]=1",
+    "stars[8,10]=1",
+    "stars[1,8]=1",
+    "stars[5,9]=1",
+    "stars[7,8]=1",
+]
+
+# ----- Step 3: cage 2 (the small cage at top-left, rows 4-5) -----
+# Cage 2 = (4,1), (4,2), (4,3), (5,1).  Two cells can't be stars:
+#   - (4,2) is *internal*: a star there would touch (4,1), (4,3), (5,1)
+#     — every other cage cell — leaving no room for the cage's 2nd star.
+#   - (5,2) is *external*: a star there would also touch all 4 cage cells.
+# After eliminating those, the cage splits into a lone cell (4,3) and a
+# pair {(4,1), (5,1)}.  Each part must contain a star, so (4,3) is forced.
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[4,2]=0"
+title = "Step 3a: stars[4,2]=0 — internal cell of cage 2"
+
+[[step]]
+op = "deduce"
+lit = "stars[4,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[4,3]=1"
+title = "Step 3b: stars[4,3]=1 — the lone cell after the cage splits"
+
+[[step]]
+op = "deduce"
+lit = "stars[4,3]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 3c: trivial cleanup after placing the cage 2 star"
+skip = [
+    "stars[8,6]=1",
+    "stars[8,10]=1",
+    "stars[1,8]=1",
+    "stars[5,9]=1",
+    "stars[7,8]=1",
+]
+
+# ----- Step 4: cage 6 (centre 2x3 box, rows 4-6 cols 5-6) -----
+# Cells (5,5) and (5,6) are internal — each touches 5 of the 6 cage cells.
+# Either as a star would force the cage's 2nd star into a single cell,
+# but star adjacency forbids that.
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,5]=0"
+title = "Step 4a: stars[5,5]=0 — internal cell of cage 6"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,6]=0"
+title = "Step 4b: stars[5,6]=0 — internal cell of cage 6 (other side)"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,6]=0"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 4c: trivial cleanup"
+skip = [
+    "stars[8,6]=1",
+    "stars[8,10]=1",
+    "stars[1,8]=1",
+    "stars[5,9]=1",
+    "stars[7,8]=1",
+]
+
+# ----- Step 5: cage 8 (top-right, rows 1-2 cols 8-10) -----
+# Eliminating (1,9) and (2,9) reduces cage 8 to its three corner-ish cells
+# (1,8), (1,10), (2,10).  (1,10) and (2,10) are adjacent — only one can be
+# a star, leaving (1,8) as the forced 2nd star for cage 8.
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[1,9]=0"
+title = "Step 5a: stars[1,9]=0"
+
+[[step]]
+op = "deduce"
+lit = "stars[1,9]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[2,9]=0"
+title = "Step 5b: stars[2,9]=0"
+
+[[step]]
+op = "deduce"
+lit = "stars[2,9]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[1,8]=1"
+title = "Step 5c: stars[1,8]=1 — forced star in cage 8"
+
+[[step]]
+op = "deduce"
+lit = "stars[1,8]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 5d: trivial cleanup"
+skip = [
+    "stars[8,6]=1",
+    "stars[8,10]=1",
+    "stars[5,9]=1",
+    "stars[7,8]=1",
+]
+
+[[step]]
+op = "heatmap"
+title = "State after Phase 2"
+
+# ----- Step 6: external cells around cage 6 -----
+# (5,5)=0 and (5,6)=0 are already known from Phase 2.  Cage 6 must place
+# its 2 stars among the four corners {(4,5),(4,6),(6,5),(6,6)}.
+# A star at (3,5) would touch (4,5) and (4,6), forcing both cage 6 stars
+# into the adjacent pair (6,5),(6,6) — impossible.  Symmetric arguments
+# apply to (3,6), (7,5), (7,6).
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[3,5]=0"
+title = "Step 6a: stars[3,5]=0 — would push cage 6 stars into the adjacent (6,5)/(6,6)"
+
+[[step]]
+op = "deduce"
+lit = "stars[3,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[3,6]=0"
+title = "Step 6b: stars[3,6]=0 — symmetric to Step 6a"
+
+[[step]]
+op = "deduce"
+lit = "stars[3,6]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,5]=0"
+title = "Step 6c: stars[7,5]=0 — symmetric below cage 6"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,6]=0"
+title = "Step 6d: stars[7,6]=0 — symmetric"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,6]=0"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 6e: trivial cleanup"
+skip = [
+    "stars[8,6]=1",
+    "stars[8,10]=1",
+    "stars[5,9]=1",
+    "stars[7,8]=1",
+]
+
+# ----- Step 7: cage 5 reduced to (8,6) and (8,10) — both forced -----
+# Cage 5 spans (8,6), (8,10), all of (9,4)..(9,10) (except cage-4 stars),
+# and (10,1)..(10,4).  Phase 1+2 zeroed everything in row 9 and the
+# (10,1)..(10,4) span, leaving only (8,6) and (8,10) — both must be stars.
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[8,6]=1"
+title = "Step 7a: stars[8,6]=1 — only cage 5 cell left in the row 8 area"
+
+[[step]]
+op = "deduce"
+lit = "stars[8,6]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[8,10]=1"
+title = "Step 7b: stars[8,10]=1 — the other forced cage 5 cell"
+
+[[step]]
+op = "deduce"
+lit = "stars[8,10]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 7c: trivial cleanup (row 8 fills, neighbours of new stars)"
+skip = [
+    "stars[5,9]=1",
+    "stars[7,8]=1",
+]
+
+# ----- Step 8: column 10 — eliminate (3,10)..(6,10) -----
+# Column 10 needs 2 stars; we just placed (8,10).  Cage 8 (top-right)
+# also needs 2 stars; (1,8) is already placed and (1,9), (2,9) are zero,
+# so cage 8's 2nd star must come from {(1,10), (2,10)}.  Therefore the
+# remaining column 10 cells (3,10)..(6,10) cannot host the column's
+# second star — same size-2 MUS each time: coldown[10] + blockup[8].
+# Note: (7,10) is already zero from Step 7c (cellforbids[8,10] adjacency).
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[3,10]=0"
+title = "Step 8a: stars[3,10]=0 — col 10's second star must be in (1,10)/(2,10)"
+
+[[step]]
+op = "deduce"
+lit = "stars[3,10]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[4,10]=0"
+title = "Step 8b: stars[4,10]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[4,10]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,10]=0"
+title = "Step 8c: stars[5,10]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,10]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,10]=0"
+title = "Step 8d: stars[6,10]=0 — same reasoning"
+
+[[step]]
+op = "deduce"
+lit = "stars[6,10]=0"
+
+# ----- Step 9: cage 9 — zero (6,8) and (6,9), then place (5,9), (7,8) -----
+# Cage 9's still-live cells are (5,9), (6,8), (6,9), (7,8).  Once we rule
+# out (6,8) and (6,9), the lone candidates left for cage 9's two stars
+# are (5,9) and (7,8) — they're not adjacent so both must be stars.
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,8]=0"
+title = "Step 9a: stars[6,8]=0"
+
+[[step]]
+op = "deduce"
+lit = "stars[6,8]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,9]=0"
+title = "Step 9b: stars[6,9]=0"
+
+[[step]]
+op = "deduce"
+lit = "stars[6,9]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,9]=1"
+title = "Step 9c: stars[5,9]=1 — forced star in cage 9"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,9]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,8]=1"
+title = "Step 9d: stars[7,8]=1 — the other forced cage 9 star"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,8]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 9e: trivial cleanup"
+
+[[step]]
+op = "heatmap"
+title = "State after Phase 3"
+commentary = "From here the guide says 'The rest of the puzzle is easy', so we stop here."

@@ -1,0 +1,258 @@
+# Source: http://rohanrao.blogspot.com/2011/07/solving-star-battle-solved-example-1.html
+# Local mirror: doc/tutorial-source-pages/rohanrao/_html/solved-example-1.html
+#
+# Hand-authored following Rohan Rao's narrative on Puzzle No. 189
+# (8x8 Star Battle with 2 stars per row/column/region).  The blog
+# post labels regions A..H — our cage indices 1..8 map to A..H.
+# Region E = 5, F = 6, G = 7, H = 8.
+#
+# Page steps (paraphrased):
+#   1. Region E: R5C7 eliminated.
+#   2-4. Region F: R6C5, R6C6, R8C5 eliminated.
+#   5-6. Region H: R7C2, R6C3 eliminated.
+#   7. Combined G/F/H argument: R6C8 eliminated.
+#   8. Region E: R4C7 eliminated.
+#   9-10. R4C6 or R5C6 must be a star → R4C5, R5C5 eliminated.
+#   11. Region F: forces a star at R7C6.
+#   12-13. Column 7: stars at R1C7 and R3C7.
+#   14-15. Row 5: stars at R5C6 and R5C8.
+#   16. Row 5 cleanup; finishes.
+#
+# Uses `star-battle-cellforbids.eprime` (per-cell adjacency atom) so the
+# region-based "single cell forbids many region cells" arguments produce
+# size-2 MUSes (one cellforbids atom + one blockup atom) rather than
+# 5-7 atoms under the default pairwise-adjacency model.
+
+model = "eprime/star-battle-cellforbids.eprime"
+param = "eprime/star-battle/rohanrao-blogspot-example.param"
+title = "starbattle — rohanrao — 14-step blogspot walkthrough"
+hide_untouched_candidates = true
+
+[[step]]
+op = "heatmap"
+title = "Initial state"
+
+# =====================================================================
+# Phase 1 — region-E single-cell argument.
+# Region E (cage 5) cells: (4,6), (4,7), (4,8), (5,6), (5,8), (6,6), (6,8).
+# (5,7) is adjacent to all 7 of them; a star at (5,7) leaves 0 candidates
+# for region E's 2 stars.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,7]=0"
+title = "Step 1: stars[5,7]=0 — adjacent to all 7 region-E cells, would leave region E with 0 candidates"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,7]=0"
+
+# =====================================================================
+# Phase 2 — region-F single-cell arguments.
+# Region F (cage 6) cells: (5,5), (6,4), (6,5), (7,4), (7,5), (7,6).
+# Each of (6,5), (6,6), (8,5) eliminates enough F cells (or pairs of F
+# cells via diagonal) that F can't hold 2 stars.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,5]=0"
+title = "Step 2: stars[6,5]=0 — region F: (6,5) is adjacent to 5 other F cells, leaving only itself"
+
+[[step]]
+op = "deduce"
+lit = "stars[6,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,6]=0"
+title = "Step 3: stars[6,6]=0 — region F: (6,6) blocks 4 F cells; remaining (6,4)/(7,4) are mutually adjacent"
+
+[[step]]
+op = "deduce"
+lit = "stars[6,6]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[8,5]=0"
+title = "Step 4: stars[8,5]=0 — region F: (8,5) blocks (7,4)/(7,5)/(7,6); remaining 3 F cells all mutually adjacent"
+
+[[step]]
+op = "deduce"
+lit = "stars[8,5]=0"
+
+# =====================================================================
+# Phase 3 — region-H single-cell arguments.
+# Region H (cage 8) cells: (6,2), (7,1), (7,2), (7,3), (8,1), (8,2).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,2]=0"
+title = "Step 5: stars[7,2]=0 — region H: (7,2) is adjacent to all 5 other H cells"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,2]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,3]=0"
+title = "Step 6: stars[6,3]=0 — region H: (6,3) blocks enough H cells to leave H without 2 candidates"
+
+[[step]]
+op = "deduce"
+lit = "stars[6,3]=0"
+
+# =====================================================================
+# Phase 4 — combined G/F/H argument: stars[6,8]=0.
+# If (6,8) is a star, region G (cage 7) loses (5,7), (7,7), (7,8) (all
+# adjacent), leaving G's two stars in row 8.  That means H cannot use
+# (8,1)/(8,2) and must place stars at (7,1) and (7,3); but those then
+# block enough F cells that F has no place for its two stars.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[6,8]=0"
+title = "Step 7: stars[6,8]=0 — combined G/F/H argument (page's longest chain of reasoning)"
+note = "Planner finds a tighter proof: same chain as the page (G's stars forced into row 8 → H must use (7,1) and (7,3)), but the contradiction lands on `rowup[6]` (row 6 can no longer reach 2 stars after (7,1)/(7,3) forbid all the remaining row-6 cells) rather than the page's `blockup[6]` (region F runs out of star locations).  Both arguments work; the planner's is one atom shorter (no need for `blockup[6]`)."
+
+[[step]]
+op = "deduce"
+lit = "stars[6,8]=0"
+
+# =====================================================================
+# Phase 5 — Region E again: (4,7) eliminated.
+# After Phase 1's (5,7)=0, region E's surviving cells are (4,6), (4,7),
+# (4,8), (5,6), (5,8), (6,6 — already X), (6,8 — already X).  (4,7)
+# being a star blocks enough remaining E cells to leave E short.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[4,7]=0"
+title = "Step 8: stars[4,7]=0 — region E (after step 1): (4,7) blocks too many E cells"
+
+[[step]]
+op = "deduce"
+lit = "stars[4,7]=0"
+
+# =====================================================================
+# Phase 6 — "R4C6 or R5C6 must be a star" → (4,5)/(5,5) eliminated.
+# Region E's surviving cells: {(4,6), (4,8), (5,6), (5,8)}.  (4,8) and
+# (5,8) are diagonally adjacent (at most 1 star); E needs 2 → at least
+# one of {(4,6), (5,6)} is a star.  Both are adjacent to (4,5) and to
+# (5,5), so those cells are empty regardless of which one is the star.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[4,5]=0"
+title = "Step 9: stars[4,5]=0 — region E forces a star in (4,6)/(5,6); (4,5) is adjacent to both"
+
+[[step]]
+op = "deduce"
+lit = "stars[4,5]=0"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,5]=0"
+title = "Step 10: stars[5,5]=0 — same (4,6)/(5,6) argument"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,5]=0"
+
+# =====================================================================
+# Phase 7 — Region F now forces a star at (7,6).
+# After Phase 2 + step 10, F's live cells are {(6,4), (7,4), (7,5),
+# (7,6)}.  (6,4)/(7,4) diagonally adjacent, (7,4)/(7,5) orthogonally
+# adjacent, (7,5)/(7,6) orthogonally adjacent.  The only pair of
+# non-mutually-adjacent F cells is {(6,4), (7,6)}, so both must be
+# stars — but the page just notes that (7,6) is forced.
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[7,6]=1"
+title = "Step 11: stars[7,6]=1 — region F's only remaining feasible-2nd-star location"
+
+[[step]]
+op = "deduce"
+lit = "stars[7,6]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 11b: cleanup — cells adjacent to (7,6) and other size-1 follow-ons"
+skip = [
+    "stars[1,7]=1",
+    "stars[3,7]=1",
+    "stars[5,6]=1",
+    "stars[5,8]=1",
+]
+
+# =====================================================================
+# Phase 8 — Column 7: stars at (1,7) and (3,7).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[1,7]=1"
+title = "Step 12: stars[1,7]=1 — col 7 has only (1,7)/(3,7) as candidates"
+
+[[step]]
+op = "deduce"
+lit = "stars[1,7]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[3,7]=1"
+title = "Step 13: stars[3,7]=1 — col 7's other forced star"
+
+[[step]]
+op = "deduce"
+lit = "stars[3,7]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Step 13b: cleanup — adjacency around (1,7)/(3,7) plus row-1 / row-3 fills"
+skip = [
+    "stars[5,6]=1",
+    "stars[5,8]=1",
+]
+
+# =====================================================================
+# Phase 9 — Row 5: stars at (5,6) and (5,8).
+# =====================================================================
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,6]=1"
+title = "Step 14: stars[5,6]=1 — region E forces a star at (5,6) once right-side options are pruned"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,6]=1"
+
+[[step]]
+op = "show_smallest_muses"
+lit = "stars[5,8]=1"
+title = "Step 15: stars[5,8]=1 — row 5's other forced star"
+
+[[step]]
+op = "deduce"
+lit = "stars[5,8]=1"
+
+[[step]]
+op = "deduce_trivial"
+max_mus_size = 1
+title = "Final cleanup — remaining row 5 cells empty plus all knock-on adjacency"
+
+[[step]]
+op = "heatmap"
+title = "Solved"
+commentary = "Page narrative followed verbatim. 15 explicit show steps map to the page's 14 numbered deductions; size-1 deduce_trivial cleanups handle 'all adjacent cells eliminated' kind of step the page glosses over."
