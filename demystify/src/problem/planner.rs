@@ -697,65 +697,11 @@ impl PuzzlePlanner {
         self.quick_display_html_step(Some(base_muses))
     }
 
-    pub fn quick_generate_html_difficulties(&mut self) -> String {
-        let base_muses = self.all_muses_with_larger();
-
-        let base_difficulties: BTreeMap<Lit, usize> = base_muses
-            .muses()
-            .iter()
-            .filter_map(|(k, v)| v.iter().map(MusContext::mus_len).min().map(|m| (*k, m)))
-            .collect();
-
-        self.quick_display_difficulty_step(base_difficulties)
-    }
-
-    pub fn quick_solve_html_step_for_literal(&mut self, lit_def: Vec<i64>) -> (String, Vec<Lit>) {
-        let muses = self.filtered_muses(Box::new(move |lit, planner| {
-            let puzlit_list = planner.solver().lit_to_puzlit(lit);
-            for puzlit in puzlit_list {
-                let mut indices = puzlit.var().indices().clone();
-                indices.push(puzlit.val());
-                if indices == lit_def {
-                    return true;
-                }
-            }
-            false
-        }));
-
-        // TEMP CODE
-        let min = muses.min();
-
-        if min.is_none() {
-            return self.quick_display_html_step_impl(None, "There are no more values to deduce");
-        }
-
-        let min = min.unwrap();
-
-        let mut vec = vec![];
-
-        for v in muses.muses().values() {
-            if let Some(m) = v.iter().next()
-                && m.mus_len() == min
-            {
-                vec.push(m.clone());
-            }
-        }
-
-        //
-
-        self.quick_display_html_step(Some(vec))
-    }
-
     pub fn quick_display_html_step(
         &mut self,
         base_muses: Option<Vec<MusContext>>,
     ) -> (String, Vec<Lit>) {
         self.quick_display_html_step_impl(base_muses, "The initial puzzle state")
-    }
-
-    /// Like `quick_display_html_step(None)` but with a description suitable for a refresh.
-    pub fn refresh_html_step(&mut self) -> (String, Vec<Lit>) {
-        self.quick_display_html_step_impl(None, "Current puzzle state")
     }
 
     fn build_step_problem(
@@ -1058,49 +1004,6 @@ impl PuzzlePlanner {
             hide_untouched_candidates,
         )
         .expect("Cannot make puzzle json")
-    }
-
-    pub fn quick_display_difficulty_step(
-        &mut self,
-        base_difficulties: BTreeMap<Lit, usize>,
-    ) -> String {
-        // Make a nicer map
-
-        let mut vvpmap: BTreeMap<VarValPair, usize> = BTreeMap::new();
-
-        for (lit, &val) in &base_difficulties {
-            for puzlit in self.psolve.puzzleparse().lit_to_vars(lit) {
-                let vvp = puzlit.varval();
-                vvpmap.insert(vvp, val);
-            }
-        }
-
-        let varlits = self.psolve.get_provable_varlits().clone();
-
-        let tosolve_varvals: BTreeSet<_> = varlits
-            .iter()
-            .flat_map(|x| self.psolve.lit_to_puzlit(x))
-            .map(super::PuzLit::varval)
-            .collect();
-
-        let known_puzlits: BTreeSet<PuzLit> = self
-            .get_all_known_lits()
-            .iter()
-            .flat_map(|x| self.psolve.lit_to_puzlit(x))
-            .cloned()
-            .collect();
-
-        let problem = Problem::new_from_puzzle_and_difficulty(
-            &self.psolve,
-            &tosolve_varvals,
-            &known_puzlits,
-            &vvpmap,
-            "The difficulty of the problem",
-            false,
-        )
-        .expect("Cannot make puzzle json");
-
-        create_html(&problem)
     }
 
     /// Returns a reference to the puzzle being solved.
