@@ -126,27 +126,8 @@ async fn main() {
 
     let tera = build_templates();
 
-    // Load named-strategy DB.  Looks for `demystify/named-strategies` first
-    // (when running from the workspace root), then `named-strategies`, then
-    // gives up with an empty DB.
-    let strategy_db = {
-        use std::path::PathBuf;
-        let mut found: Option<PathBuf> = None;
-        for candidate in ["demystify/named-strategies", "named-strategies"] {
-            let p = PathBuf::from(candidate);
-            if p.exists() {
-                found = Some(p);
-                break;
-            }
-        }
-        match found {
-            Some(dir) => Arc::new(
-                demystify::named_strategy::Database::load_from_dir(&dir)
-                    .expect("failed to load strategy DB"),
-            ),
-            None => Arc::new(demystify::named_strategy::Database::empty()),
-        }
-    };
+    let strategy_db =
+        demystify::named_strategy::load_or_discover(None).expect("failed to load strategy DB");
 
     let app_state = AppState {
         tera: Arc::new(tera),

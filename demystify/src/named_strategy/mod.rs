@@ -16,6 +16,37 @@ pub use database::{Database, Strategy, display_name};
 pub use family::FamilyMap;
 pub use fingerprint::{MusFingerprint, fingerprint};
 
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+/// Standard relative paths to look for a named-strategy directory when no
+/// explicit one is given.  Covers running from the workspace root, from
+/// inside the `demystify` crate, and from a sibling crate (the wasm and
+/// web crates).
+const DEFAULT_DB_SEARCH_PATHS: &[&str] = &[
+    "demystify/named-strategies",
+    "named-strategies",
+    "../demystify/named-strategies",
+];
+
+/// Load a named-strategy [`Database`], falling back to the standard search
+/// paths when `explicit` is `None`.  If no explicit path is given and none
+/// of the search paths exist, an empty database is returned — callers get
+/// no labels but everything else keeps working.  Loading errors from an
+/// existing directory are propagated.
+pub fn load_or_discover(explicit: Option<&Path>) -> anyhow::Result<Arc<Database>> {
+    let dir: Option<PathBuf> = explicit.map(PathBuf::from).or_else(|| {
+        DEFAULT_DB_SEARCH_PATHS
+            .iter()
+            .map(PathBuf::from)
+            .find(|p| p.exists())
+    });
+    match dir {
+        Some(d) => Ok(Arc::new(Database::load_from_dir(&d)?)),
+        None => Ok(Arc::new(Database::empty())),
+    }
+}
+
 #[cfg(test)]
 mod integration_tests {
     //! End-to-end tests: real .eprime + .param + the shipped Sudoku DB,

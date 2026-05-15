@@ -13,7 +13,7 @@
 
 use clap::Parser;
 use demystify::{
-    named_strategy::Database,
+    named_strategy::{self, Database},
     problem::{
         self,
         musdict::MusContext,
@@ -125,23 +125,7 @@ fn main() -> anyhow::Result<()> {
         },
     )?;
 
-    let db_dir = opt.strategy_db.clone().or_else(|| {
-        for candidate in [
-            "demystify/named-strategies",
-            "named-strategies",
-            "../demystify/named-strategies",
-        ] {
-            let p = PathBuf::from(candidate);
-            if p.exists() {
-                return Some(p);
-            }
-        }
-        None
-    });
-    let strategy_db = match db_dir {
-        Some(dir) => Arc::new(Database::load_from_dir(&dir)?),
-        None => Arc::new(Database::empty()),
-    };
+    let strategy_db = named_strategy::load_or_discover(opt.strategy_db.as_deref())?;
 
     if opt.alternatives {
         run_with_alternatives(solver, strategy_db)

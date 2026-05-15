@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 
 use demystify::{
+    named_strategy,
     problem::{
         self,
         planner::PuzzlePlanner,
@@ -45,6 +46,12 @@ struct Opt {
     /// scripts that reference paths from a project root.
     #[arg(long)]
     base_dir: Option<PathBuf>,
+
+    /// Path to the named-strategy database directory.  Defaults to a search
+    /// of standard locations relative to the current directory; absent that,
+    /// runs with an empty database (MUSes render without strategy labels).
+    #[arg(long)]
+    strategy_db: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -103,7 +110,8 @@ fn main() -> Result<()> {
             only_assignments: script.only_assignments.unwrap_or(false),
         },
     )?;
-    let mut planner = PuzzlePlanner::new(solver);
+    let strategy_db = named_strategy::load_or_discover(opt.strategy_db.as_deref())?;
+    let mut planner = PuzzlePlanner::new(solver).with_database(strategy_db);
 
     let mut executor = walkthrough::Executor::new(&mut planner);
     executor.run(&script)?;
