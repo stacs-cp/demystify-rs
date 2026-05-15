@@ -38,19 +38,22 @@ function applyHighlightFunctions() {
   }
 }
 
+// Constraint-preview hover applies to every cell in the document with the
+// matching id, not just the first.  In single-section pages there's only
+// one match per id; in multi-section walkthroughs every section's copy of
+// the cell lights up together — the section being viewed always reacts,
+// the others flicker harmlessly off-screen.
 function applyConstraintPreview(element) {
   const cells = element.dataset.cells ? element.dataset.cells.split(" ") : [];
   cells.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add("con-preview");
+    document.querySelectorAll(`[id="${id}"]`).forEach(el => el.classList.add("con-preview"));
   });
 }
 
 function removeConstraintPreview(element) {
   const cells = element.dataset.cells ? element.dataset.cells.split(" ") : [];
   cells.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove("con-preview");
+    document.querySelectorAll(`[id="${id}"]`).forEach(el => el.classList.remove("con-preview"));
   });
 }
 
