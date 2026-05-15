@@ -11,23 +11,10 @@ use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 
 use demystify::problem::{
-    PuzLit, PuzVar, VarValPair, planner::PuzzlePlanner, solver::PuzzleSolver,
+    PuzLit, PuzVar, VarValPair, format_puzlit, planner::PuzzlePlanner, solver::PuzzleSolver,
 };
 
 use crate::puzzle::WasmPuzzle;
-
-/// Format a `PuzLit` as `"grid[1, 2]=5"` (or `"!="` for negations).
-/// Matches the formatting used by `demystify-lua`.
-fn format_puzlit(lit: &PuzLit) -> String {
-    let var = lit.var();
-    let val = lit.val();
-    let sign = if lit.sign() { "=" } else { "!=" };
-    if var.indices().is_empty() {
-        format!("{}{}{}", var.name(), sign, val)
-    } else {
-        format!("{}{:?}{}{}", var.name(), var.indices(), sign, val)
-    }
-}
 
 #[derive(Serialize)]
 struct StepPayload {

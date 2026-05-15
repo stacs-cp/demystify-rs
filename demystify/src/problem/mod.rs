@@ -327,6 +327,78 @@ impl ConID {
     }
 }
 
+/// Format a [`PuzLit`] for the FFI surfaces (`demystify-lua`,
+/// `demystify-wasm`).  Differs from [`PuzLit`]'s `Display` impl in
+/// one place: scalar variables (no indices) are rendered as `"x=5"`
+/// rather than `"x[]=5"`.  The HTML-output Display path retains the
+/// trailing `[]` for backwards compatibility with snapshot tests.
+#[must_use]
+pub fn format_puzlit(lit: &PuzLit) -> String {
+    let var = lit.var();
+    let val = lit.val();
+    let sign = if lit.sign() { "=" } else { "!=" };
+    if var.indices().is_empty() {
+        format!("{}{}{}", var.name(), sign, val)
+    } else {
+        format!("{}{:?}{}{}", var.name(), var.indices(), sign, val)
+    }
+}
+
+/// Format a [`PuzVar`] for the FFI surfaces.  Scalar variables (no
+/// indices) render as just the name; indexed ones as
+/// `"grid[1, 2]"` — the inverse of [`parse_var_string`].
+#[must_use]
+pub fn format_puzvar(var: &PuzVar) -> String {
+    if var.indices().is_empty() {
+        var.name().clone()
+    } else {
+        format!(
+            "{}[{}]",
+            var.name(),
+            var.indices()
+                .iter()
+                .map(i64::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+/// Parse a string emitted by [`format_puzvar`] back into a [`PuzVar`].
+/// Returns `None` when the input doesn't match `name` or `name[i, j, ...]`,
+/// or when any index isn't a valid `i64`.
+#[must_use]
+pub fn parse_var_string(s: &str) -> Option<PuzVar> {
+    let s = s.trim();
+
+    if let Some(bracket_pos) = s.find('[') {
+        let name = s[..bracket_pos].trim();
+        if name.is_empty() {
+            return None;
+        }
+        let close_bracket = s.rfind(']')?;
+        if close_bracket <= bracket_pos {
+            return None;
+        }
+        let indices_str = &s[bracket_pos + 1..close_bracket];
+        let mut indices = Vec::new();
+        for part in indices_str.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let idx: i64 = part.parse().ok()?;
+            indices.push(idx);
+        }
+        Some(PuzVar::new(name, indices))
+    } else {
+        if s.is_empty() || !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            return None;
+        }
+        Some(PuzVar::new(s, vec![]))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::problem::VarValPair;

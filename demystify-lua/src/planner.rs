@@ -47,7 +47,7 @@ use std::sync::{Arc, Mutex};
 use mlua::prelude::*;
 
 use demystify::problem::{
-    PuzLit, PuzVar, VarValPair, planner::PuzzlePlanner, solver::PuzzleSolver,
+    PuzLit, PuzVar, VarValPair, format_puzlit, planner::PuzzlePlanner, solver::PuzzleSolver,
 };
 
 use crate::puzzle::LuaPuzzle;
@@ -395,19 +395,6 @@ impl LuaUserData for LuaPlanner {
 
             Ok(result)
         });
-    }
-}
-
-/// Format a PuzLit as a human-readable string
-fn format_puzlit(lit: &PuzLit) -> String {
-    let var = lit.var();
-    let val = lit.val();
-    let sign = if lit.sign() { "=" } else { "!=" };
-
-    if var.indices().is_empty() {
-        format!("{}{}{}", var.name(), sign, val)
-    } else {
-        format!("{}{:?}{}{}", var.name(), var.indices(), sign, val)
     }
 }
 

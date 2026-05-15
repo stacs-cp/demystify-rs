@@ -11,57 +11,8 @@ use serde::Serialize;
 use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 
-use demystify::problem::PuzVar;
 use demystify::problem::parse::PuzzleParse;
-
-/// Parse a variable string like `"grid[1, 2]"` or `"x"` into a `PuzVar`.
-fn parse_var_string(s: &str) -> Option<PuzVar> {
-    let s = s.trim();
-
-    if let Some(bracket_pos) = s.find('[') {
-        let name = s[..bracket_pos].trim();
-        if name.is_empty() {
-            return None;
-        }
-        let close_bracket = s.rfind(']')?;
-        if close_bracket <= bracket_pos {
-            return None;
-        }
-        let indices_str = &s[bracket_pos + 1..close_bracket];
-        let mut indices = Vec::new();
-        for part in indices_str.split(',') {
-            let part = part.trim();
-            if part.is_empty() {
-                continue;
-            }
-            let idx: i64 = part.parse().ok()?;
-            indices.push(idx);
-        }
-        Some(PuzVar::new(name, indices))
-    } else {
-        if s.is_empty() || !s.chars().all(|c| c.is_alphanumeric() || c == '_') {
-            return None;
-        }
-        Some(PuzVar::new(s, vec![]))
-    }
-}
-
-/// Format a `PuzVar` as `"grid[1, 2]"` or `"x"`.
-pub(crate) fn format_puzvar(var: &PuzVar) -> String {
-    if var.indices().is_empty() {
-        var.name().clone()
-    } else {
-        format!(
-            "{}[{}]",
-            var.name(),
-            var.indices()
-                .iter()
-                .map(|i| i.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    }
-}
+use demystify::problem::{format_puzvar, parse_var_string};
 
 /// JS-facing puzzle handle. Wraps a parsed puzzle behind an `Arc` so it can
 /// be cheaply shared with the planner.
