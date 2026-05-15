@@ -124,4 +124,5 @@ pub mod problem;
 pub mod satcore;
 pub mod snapshot;
 pub mod stats;
+pub mod walkthrough;
 pub mod web;
