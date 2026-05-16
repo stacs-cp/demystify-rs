@@ -27,7 +27,7 @@ use tracing_subscriber::prelude::*;
                               --mus-method, --max-steps\n  \
                   Performance: --searches, --conflict-limit, --conjure\n  \
                   Persistence: --save-parsed, --load-parsed, --pin-assignment\n  \
-                  Logging:     --trace, --log, --quiet\n  \
+                  Logging:     --trace, --log, --quiet, --verbose\n  \
                   Database:    --strategy-db"
 )]
 struct Opt {
@@ -152,6 +152,12 @@ struct Opt {
         help = "Path to the named-strategy database directory. Each <KIND>.toml file inside defines named techniques for that puzzle kind. Defaults to <crate>/named-strategies."
     )]
     strategy_db: Option<PathBuf>,
+
+    #[arg(
+        long,
+        help = "Attach diagnostic sections (e.g. current $#VAR domains) to every rendered step. Visible in --html output as a collapsible 'Verbose diagnostics' block."
+    )]
+    verbose: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -290,6 +296,7 @@ fn main() -> anyhow::Result<()> {
         expand_to_all_deductions: !opt.no_expand,
         max_steps: opt.max_steps,
         mus_method: opt.mus_method,
+        verbose: opt.verbose,
     };
 
     // Resolve the strategy DB directory: explicit --strategy-db wins, then a

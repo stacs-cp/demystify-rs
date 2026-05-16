@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::{
-    json::{DescriptionStatement, Problem},
+    json::{DescriptionStatement, Problem, VerboseSection},
     named_strategy::{Database, FamilyMap, display_name, fingerprint},
     problem::{
-        VarValPair,
+        VarValPair, format_puzvar,
         musdict::{MusContext, merge_muscontexts},
     },
     satcore::get_solver_calls,
@@ -47,6 +47,13 @@ pub struct PlannerConfig {
     pub max_steps: Option<usize>,
     /// Which MUS generation algorithm to use.
     pub mus_method: MusMethod,
+    /// Attach diagnostic [`crate::json::VerboseSection`]s to every
+    /// rendered step.  Off by default; CLI: `--verbose`.  When true,
+    /// each step's `Problem.state.verbose` is populated with at least
+    /// a "$#VAR domains" section (and future entries — strategy
+    /// chosen, per-step timing, etc. — slot in alongside without new
+    /// flags).
+    pub verbose: bool,
 }
 
 impl Default for PlannerConfig {
@@ -58,6 +65,7 @@ impl Default for PlannerConfig {
             expand_to_all_deductions: true,
             max_steps: None,
             mus_method: MusMethod::default(),
+            verbose: false,
         }
     }
 }
@@ -704,7 +712,112 @@ impl PuzzlePlanner {
         self.quick_display_html_step_impl(base_muses, "The initial puzzle state")
     }
 
+    /// Diagnostic sections to attach to a step's `State.verbose`.  Called
+    /// from each Problem-building site when `PlannerConfig::verbose` is on.
+    ///
+    /// Returns `None` when verbose mode is off — the call site assigns
+    /// straight through to `state.verbose`, so the JSON field stays
+    /// absent for non-verbose runs.
+    ///
+    /// First (and currently only) section is `"Variable domains"`: every
+    /// instance of every `$#VAR` with its current set of still-possible
+    /// values.  Reads from the solver's `direct.domainmap` (the initial
+    /// domain) and prunes values whose `!=` lit is already known.
+    fn build_verbose_sections(&self) -> Option<Vec<VerboseSection>> {
+        if !self.config.verbose {
+            return None;
+        }
+
+        let pp = self.psolve.puzzleparse();
+
+        // Collect known PuzLits once — we'll classify each (var, val)
+        // pair below.
+        let known_puzlits: BTreeSet<PuzLit> = self
+            .get_all_known_lits()
+            .iter()
+            .flat_map(|l| self.psolve.lit_to_puzlit(l))
+            .cloned()
+            .collect();
+
+        // Group PuzVar instances by their `$#VAR` name so the output
+        // sections track the model's variable structure.  Variables not
+        // declared as `$#VAR` (auxiliaries, framework `puz_*`, constraint
+        // bools) are skipped; they're rarely useful for "what's going
+        // on with this variable" debugging.
+        let mut by_name: BTreeMap<&str, Vec<&super::PuzVar>> = BTreeMap::new();
+        for var in pp.direct.domainmap.keys() {
+            if pp.eprime.vars.contains(var.name()) {
+                by_name.entry(var.name().as_str()).or_default().push(var);
+            }
+        }
+
+        let mut body = String::new();
+        for (name, vars) in &by_name {
+            body.push_str(&format!("$#VAR {name}:\n"));
+            for var in vars {
+                let initial = &pp.direct.domainmap[var];
+                let var_str = format_puzvar(var);
+
+                // Partition the initial domain by current knowledge.
+                let mut pinned: Option<i64> = None;
+                let mut still_possible: Vec<i64> = Vec::new();
+                for &val in initial {
+                    let vvp = VarValPair::new(var, val);
+                    if known_puzlits.contains(&PuzLit::new_eq(vvp.clone())) {
+                        pinned = Some(val);
+                        break;
+                    }
+                    if !known_puzlits.contains(&PuzLit::new_neq(vvp)) {
+                        still_possible.push(val);
+                    }
+                }
+
+                if let Some(v) = pinned {
+                    body.push_str(&format!("  {var_str} = {v}\n"));
+                } else if still_possible.len() == initial.len() {
+                    body.push_str(&format!(
+                        "  {var_str} ∈ {{{}}} (untouched)\n",
+                        still_possible
+                            .iter()
+                            .map(i64::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                } else {
+                    body.push_str(&format!(
+                        "  {var_str} ∈ {{{}}}\n",
+                        still_possible
+                            .iter()
+                            .map(i64::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ));
+                }
+            }
+            body.push('\n');
+        }
+
+        Some(vec![VerboseSection {
+            title: "Variable domains".to_owned(),
+            body,
+        }])
+    }
+
     fn build_step_problem(
+        &mut self,
+        base_muses: Option<Vec<MusContext>>,
+        fallback_description: &str,
+    ) -> (Problem, Vec<Lit>) {
+        let (mut problem, lits) = self.build_step_problem_inner(base_muses, fallback_description);
+        if let Some(verbose) = self.build_verbose_sections()
+            && let Some(state) = problem.state.as_mut()
+        {
+            state.verbose = Some(verbose);
+        }
+        (problem, lits)
+    }
+
+    fn build_step_problem_inner(
         &mut self,
         base_muses: Option<Vec<MusContext>>,
         fallback_description: &str,
@@ -995,7 +1108,7 @@ impl PuzzlePlanner {
             .cloned()
             .collect();
 
-        Problem::new_from_puzzle_and_difficulty(
+        let mut problem = Problem::new_from_puzzle_and_difficulty(
             &self.psolve,
             &tosolve_varvals,
             &known_puzlits,
@@ -1003,7 +1116,13 @@ impl PuzzlePlanner {
             "The difficulty of the problem",
             hide_untouched_candidates,
         )
-        .expect("Cannot make puzzle json")
+        .expect("Cannot make puzzle json");
+        if let Some(verbose) = self.build_verbose_sections()
+            && let Some(state) = problem.state.as_mut()
+        {
+            state.verbose = Some(verbose);
+        }
+        problem
     }
 
     /// Returns a reference to the puzzle being solved.

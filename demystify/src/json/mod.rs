@@ -652,6 +652,23 @@ pub struct State {
     /// `highlight_conN` class on the cells.
     #[serde(default)]
     pub constraint_shapes: Option<Vec<ConstraintShape>>,
+    /// Free-form diagnostic sections, populated when the caller has
+    /// requested verbose output (CLI: `--verbose`).  Each section is a
+    /// titled block of plain text that downstream renderers can display
+    /// alongside the per-step view — used today to dump every `$#VAR`
+    /// instance's current domain, intended to grow with timing / strategy
+    /// / MUS-search internals as needs arise.  `None` (rather than
+    /// `Some(vec![])`) when verbose output is off.
+    #[serde(default)]
+    pub verbose: Option<Vec<VerboseSection>>,
+}
+
+/// One titled block of diagnostic text in [`State::verbose`].  Body is
+/// rendered as preformatted text (preserves newlines and indentation).
+#[derive(Clone, PartialOrd, Ord, Hash, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub struct VerboseSection {
+    pub title: String,
+    pub body: String,
 }
 
 /// How the renderer should draw a constraint's scope on the grid.  Detected
@@ -944,6 +961,7 @@ impl Problem {
             } else {
                 Some(constraint_shapes)
             },
+            verbose: None,
         };
 
         Ok(Problem {
@@ -1091,6 +1109,7 @@ impl Problem {
             description: Some(description.to_owned()),
             blocked_cells,
             constraint_shapes: None,
+            verbose: None,
         };
 
         Ok(Problem {

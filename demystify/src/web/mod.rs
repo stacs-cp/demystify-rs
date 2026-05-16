@@ -52,7 +52,40 @@ pub fn create_html(puzjson: &Problem) -> String {
     let main =
         tera::Tera::one_off(two_div_template, &context, false).expect("IE: Failed templating");
     let overview = render_overview(&puzjson.puzzle);
-    main + &overview
+    let verbose = puzjson
+        .state
+        .as_ref()
+        .and_then(|s| s.verbose.as_ref())
+        .map(|v| render_verbose_sections(v))
+        .unwrap_or_default();
+    main + &overview + &verbose
+}
+
+/// Render the per-step `state.verbose` block (populated by `--verbose`)
+/// as a collapsible `<details>` containing one `<pre>` per section.  The
+/// `<details>` starts closed so verbose output doesn't dominate the
+/// rendered page; the user can expand the sections they care about.
+fn render_verbose_sections(sections: &[crate::json::VerboseSection]) -> String {
+    if sections.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        r#"<details style="margin-top:0.5em;border:1px solid #ccc;padding:0.25em 0.5em;">
+<summary style="cursor:pointer;font-weight:600;">Verbose diagnostics</summary>
+"#,
+    );
+    for s in sections {
+        out.push_str(&format!(
+            "<details style=\"margin-left:1em;margin-top:0.25em;\">\
+             <summary style=\"cursor:pointer;\">{}</summary>\
+             <pre style=\"margin:0.25em 0 0.5em 1em;font-size:0.9em;\">{}</pre>\
+             </details>",
+            tera::escape_html(&s.title),
+            tera::escape_html(&s.body),
+        ));
+    }
+    out.push_str("</details>\n");
+    out
 }
 
 /// Renders a collapsible overview panel showing `$#INFO` text and all constraint instances

@@ -207,6 +207,7 @@ impl SolveTree {
             expand_to_all_deductions: false,
             max_steps: None,
             mus_method: Default::default(),
+            verbose: false,
         };
 
         let root_solver = PuzzleSolver::new_with_config(puzzleparse.clone(), config.solver_config)?;
