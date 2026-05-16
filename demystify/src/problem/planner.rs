@@ -445,6 +445,26 @@ impl PuzzlePlanner {
             .flat_map(|l| parse.lit_to_vars(l))
             .cloned()
             .collect();
+
+        // Mystify uses the `puz_` prefix to mark design variables — the
+        // clue cells, colour layout, etc. that the generator chose.  These
+        // are meant to be pinned via `--pin-assignment` (see
+        // `PuzzleSolver::pin_assignment`); demystify deducing one of them
+        // means the user forgot to supply the assignment and the resulting
+        // MUS would be a meaningless statement about how the generator
+        // could have made a different choice.  Crash with a pointed
+        // message rather than emit it.
+        for lit in &lits {
+            if lit.var().name().starts_with("puz_") {
+                panic!(
+                    "MUS produced a deduction on `{lit}`, but variables starting \
+                     with `puz_` are mystify model design variables — they must be \
+                     pinned, not deduced.  Use `--pin-assignment <FILE>` to set \
+                     these variables from a mystify output JSON."
+                );
+            }
+        }
+
         let constraints: Vec<String> = mc
             .mus
             .iter()
