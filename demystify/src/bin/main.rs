@@ -15,11 +15,29 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::prelude::*;
 
 #[derive(clap::Parser, Debug)]
+#[command(
+    about = "Explain a constraint puzzle step by step.",
+    long_about = "Reads an Essence Prime model + parameter file, computes minimal \
+                  explanations (MUSes) for each deduction, and emits HTML, JSON, or a \
+                  debug-formatted trace.\n\n\
+                  Flag categories (see `--help` for full descriptions):\n  \
+                  Required:    --model, --param (or --load-parsed instead)\n  \
+                  Output:      --html, --json\n  \
+                  MUS tuning:  --merge, --skip, --no-expand, --all-muses,\n               \
+                              --mus-method, --max-steps\n  \
+                  Performance: --searches, --conflict-limit, --conjure\n  \
+                  Persistence: --save-parsed, --load-parsed, --pin-assignment\n  \
+                  Logging:     --trace, --log, --quiet\n  \
+                  Database:    --strategy-db"
+)]
 struct Opt {
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Path to the Essence Prime model (`.eprime` / `.essence`)"
+    )]
     model: String,
 
-    #[arg(long)]
+    #[arg(long, help = "Path to the parameter file (`.param`)")]
     param: String,
 
     #[arg(
@@ -36,16 +54,25 @@ struct Opt {
     )]
     skip: i64,
 
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Write a full trace log to `demystify.trace` (all targets, all levels)"
+    )]
     trace: bool,
 
-    #[arg(long)]
+    #[arg(long, help = "Emit a single self-contained HTML page on stdout")]
     html: bool,
 
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Only target positive value-assignment lits; never individual `!=` lits"
+    )]
     only_assign: bool,
 
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Cap parallel MUS searches per round (advanced; usually leave unset)"
+    )]
     searches: Option<i64>,
 
     #[arg(long, help = "Stop after this many solve steps")]
@@ -129,6 +156,18 @@ struct Opt {
 
 fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
+
+    // Quick nudge for anyone reading the stderr stream: every other flag
+    // has a reasonable default, so "demystify --model X --param Y" just
+    // works — but the user (or an LLM) won't realise --html / --json /
+    // --max-steps / --mus-method / --strategy-db etc. exist.  One line,
+    // suppressible with --quiet.
+    if !opt.quiet {
+        eprintln!(
+            "[demystify] running with defaults; use --help for output, MUS-tuning, \
+             logging, and database flags."
+        );
+    }
 
     let (non_block, _guard) = tracing_appender::non_blocking(File::create("demystify.trace")?);
 
