@@ -455,8 +455,6 @@ impl PuzzleSolver {
         rng: &mut ChaCha20Rng,
         mut steps: Option<usize>,
     ) -> Option<BTreeSet<Lit>> {
-        let mut solution = vec![];
-
         let mut litorig: Vec<Lit> = self
             .puzzleparse
             .constraints
@@ -490,6 +488,12 @@ impl PuzzleSolver {
         lits_to_read.extend(self.puzzleparse.var_lits.special().iter().copied());
 
         for &l in &lits_to_check {
+            // `Some(0)` means we've made enough random commits; fall through
+            // to the SAT readout below.
+            if steps == Some(0) {
+                break;
+            }
+
             let mut lits = litorig.clone();
             let test_lit = if rng.random_bool(0.5) { l } else { l.neg() };
 
@@ -502,7 +506,6 @@ impl PuzzleSolver {
                 .get_satcore()
                 .assumption_solve_no_limit(self.get_known_lits(), &lits)
             {
-                solution.push(test_lit);
                 litorig.push(test_lit);
             } else {
                 // Try the opposite polarity.
@@ -513,7 +516,6 @@ impl PuzzleSolver {
                     .get_satcore()
                     .assumption_solve_no_limit(self.get_known_lits(), &lits)
                 {
-                    solution.push(test_lit);
                     litorig.push(test_lit);
                 } else {
                     // Neither polarity is feasible given the committed
@@ -525,27 +527,27 @@ impl PuzzleSolver {
                 }
             }
 
-            if steps == Some(0) {
-                let sol = self
-                    .get_satcore()
-                    .assumption_solve_solution_no_limit(self.get_known_lits(), &litorig)
-                    .expect("Must be a solution, from previous call");
-
-                for &l in &lits_to_read {
-                    match sol.lit_value(l) {
-                        rustsat::types::TernaryVal::True => {
-                            solution.push(l);
-                        }
-                        rustsat::types::TernaryVal::False => {}
-                        rustsat::types::TernaryVal::DontCare => panic!("Missing assignment??!?"),
-                    }
-                }
-                return Some(solution.into_iter().collect());
-            }
             steps = steps.map(|x| x - 1);
         }
 
-        Some(solution.into_iter().collect())
+        // Read the complete SAT solution so every entry in `lits_to_read`
+        // gets a signed lit in the returned set — including the special
+        // AUX vars the random loop above never touches.
+        let sol = self
+            .get_satcore()
+            .assumption_solve_solution_no_limit(self.get_known_lits(), &litorig)
+            .expect("Must be a solution, from previous call");
+
+        let solution: BTreeSet<Lit> = lits_to_read
+            .iter()
+            .map(|&l| match sol.lit_value(l) {
+                rustsat::types::TernaryVal::True => l,
+                rustsat::types::TernaryVal::False => !l,
+                rustsat::types::TernaryVal::DontCare => panic!("Missing assignment??!?"),
+            })
+            .collect();
+
+        Some(solution)
     }
 
     /// Returns the set of literals which we should still try solving (may be true, or false)
