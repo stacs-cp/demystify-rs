@@ -9,6 +9,15 @@ pub enum BuildError {
     UnknownFamily(String),
 
     #[error(
+        "guard atom does not belong to family '{expected}' \
+         (atom's actual family: {actual:?})"
+    )]
+    GuardFromWrongFamily {
+        expected: String,
+        actual: Option<String>,
+    },
+
+    #[error(
         "constraint description '{0}' was used for two different constraints — \
          each $#CON description must be unique"
     )]

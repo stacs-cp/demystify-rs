@@ -13,7 +13,7 @@ use demystify::problem::{PuzLit, PuzVar, VarValPair};
 use rustsat::instances::SatInstance;
 use rustsat::types::Lit;
 
-use crate::cardinality::{encode_sum_ge, encode_sum_le};
+use crate::cardinality::{encode_sum_eq, encode_sum_ge, encode_sum_le};
 use crate::error::BuildError;
 
 /// A single boolean atom in the puzzle.  Wraps a raw SAT literal; `+atom`
@@ -234,6 +234,11 @@ pub struct PuzzleBuilder {
     var_names: BTreeSet<String>,
     aux_names: BTreeSet<String>,
     con_families: BTreeMap<String, String>,
+    /// `lit → family name` for every `$#CON` activation atom.  Both the
+    /// positive and negative orientation of each lit map to the same
+    /// family (the activation sense is "lit positive").  Used to reject
+    /// `sum_*` calls whose guard atom didn't come from the named family.
+    con_atom_family: BTreeMap<Lit, String>,
     used_con_families: BTreeSet<String>,
     referenced_vars: BTreeSet<String>,
 
@@ -268,6 +273,7 @@ impl PuzzleBuilder {
             var_names: BTreeSet::new(),
             aux_names: BTreeSet::new(),
             con_families: BTreeMap::new(),
+            con_atom_family: BTreeMap::new(),
             used_con_families: BTreeSet::new(),
             referenced_vars: BTreeSet::new(),
             litmap: BTreeMap::new(),
@@ -400,7 +406,12 @@ impl PuzzleBuilder {
                         self.var_lits_special.insert(!lit);
                     }
                 }
-                AtomRole::Con => {}
+                AtomRole::Con => {
+                    // Track lit → family so register_con can verify that
+                    // a sum_* caller passes a guard from the right family.
+                    self.con_atom_family.insert(lit, name.to_string());
+                    self.con_atom_family.insert(!lit, name.to_string());
+                }
             }
         }
 
@@ -501,6 +512,33 @@ impl PuzzleBuilder {
         Ok(ConstraintHandle { lit: guard.lit })
     }
 
+    /// Post `guard -> (sum(signed) == k)` and register a `$#CON` entry.
+    /// Same contract as [`Self::sum_ge`].
+    pub fn sum_eq(
+        &mut self,
+        guard: Atom,
+        signed: &[Signed],
+        k: i64,
+        family: &str,
+        description: impl Into<String>,
+    ) -> Result<ConstraintHandle, BuildError> {
+        let description = description.into();
+        self.register_con(family, &description, guard, signed)?;
+        let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
+        encode_sum_eq(&mut self.sat, &raw_lits, k, Some(guard.lit))?;
+        Ok(ConstraintHandle { lit: guard.lit })
+    }
+
+    /// Post `sum(signed) == k` unconditionally as plain CNF, with no
+    /// `$#CON` entry.  Use for structural/setup constraints (one-hot
+    /// encodings, fixed givens) that demystify shouldn't surface as
+    /// individual deduction steps.
+    pub fn sum_eq_unguarded(&mut self, signed: &[Signed], k: i64) -> Result<(), BuildError> {
+        let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
+        encode_sum_eq(&mut self.sat, &raw_lits, k, None)?;
+        Ok(())
+    }
+
     fn register_con(
         &mut self,
         family: &str,
@@ -510,6 +548,18 @@ impl PuzzleBuilder {
     ) -> Result<(), BuildError> {
         if !self.con_families.contains_key(family) {
             return Err(BuildError::UnknownFamily(family.to_string()));
+        }
+        // Validate that the guard atom was declared as part of the named
+        // family.  A guard from a different family (or no family at all)
+        // would silently corrupt the constraint store's family tracking.
+        match self.con_atom_family.get(&guard.lit) {
+            Some(actual) if actual == family => {}
+            other => {
+                return Err(BuildError::GuardFromWrongFamily {
+                    expected: family.to_string(),
+                    actual: other.cloned(),
+                });
+            }
         }
         if !self.used_descriptions.insert(description.to_string()) {
             return Err(BuildError::DuplicateConstraintDescription(
@@ -758,5 +808,184 @@ mod tests {
         // No constraints reference g.
         let err = b.build().unwrap_err();
         assert!(matches!(err, BuildError::UnusedVar(name) if name == "g"));
+    }
+
+    #[test]
+    fn guard_from_other_family_rejected() {
+        let mut b = PuzzleBuilder::new();
+        let v = b.var_bool_matrix("g", &[1..=2]);
+        let foo = b.con_bool_matrix("foo", &[1..=2]);
+        let _bar = b.con_bool_matrix("bar", &[1..=2]);
+        // foo[1] does not belong to family "bar".
+        let err = b
+            .sum_ge(foo.get(&[1]), &[v.get(&[1]).pos()], 1, "bar", "desc")
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            BuildError::GuardFromWrongFamily { expected, actual: Some(a) }
+                if expected == "bar" && a == "foo"
+        ));
+    }
+
+    #[test]
+    fn guard_from_var_atom_rejected() {
+        let mut b = PuzzleBuilder::new();
+        let v = b.var_bool_matrix("g", &[1..=2]);
+        let _rule = b.con_bool_matrix("rule", &[1..=2]);
+        // v[1] is a $#VAR atom, not a constraint activation lit at all.
+        let err = b
+            .sum_ge(v.get(&[1]), &[v.get(&[2]).pos()], 1, "rule", "desc")
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            BuildError::GuardFromWrongFamily { actual: None, .. }
+        ));
+    }
+
+    /// Build a tiny puzzle that uses sum_ge with one positive and one
+    /// negated literal — equivalent to `a ∨ ¬b ≥ 1`, i.e. `b → a` — and
+    /// verify via the SAT solver that the resulting CNF behaves like
+    /// that implication.
+    #[test]
+    fn sum_ge_with_negated_literal_encodes_implication() {
+        use rustsat::solvers::{Solve, SolveIncremental, SolverResult};
+        let mut b = PuzzleBuilder::new();
+        let v = b.var_bool_matrix("g", &[1..=2]);
+        let rule = b.con_bool("rule");
+        b.sum_ge(
+            rule,
+            &[v.get(&[1]).pos(), v.get(&[2]).neg()],
+            1,
+            "rule",
+            "g[1] or not g[2]",
+        )
+        .unwrap();
+        let puzzle = b.build().unwrap();
+        let cnf = puzzle.cnf.as_ref().unwrap().as_ref().clone();
+        let g1_lit = puzzle
+            .direct
+            .litmap
+            .get(&PuzLit::new_eq(VarValPair::new(
+                &PuzVar::new("g", vec![1]),
+                1,
+            )))
+            .copied()
+            .unwrap();
+        let g2_lit = puzzle
+            .direct
+            .litmap
+            .get(&PuzLit::new_eq(VarValPair::new(
+                &PuzVar::new("g", vec![2]),
+                1,
+            )))
+            .copied()
+            .unwrap();
+        let rule_lit = rule.lit();
+
+        // For each of the 4 (g1, g2) assignments under "rule = true",
+        // confirm the encoding is satisfiable iff g1 ∨ ¬g2 holds.
+        for g1_val in [true, false] {
+            for g2_val in [true, false] {
+                let mut solver = rustsat_batsat::BasicSolver::default();
+                for cl in cnf.iter() {
+                    solver.add_clause(cl.clone()).unwrap();
+                }
+                let assumps = vec![
+                    rule_lit,
+                    if g1_val { g1_lit } else { !g1_lit },
+                    if g2_val { g2_lit } else { !g2_lit },
+                ];
+                let res = solver.solve_assumps(&assumps).unwrap();
+                let expected_sat = g1_val || !g2_val;
+                assert_eq!(
+                    res == SolverResult::Sat,
+                    expected_sat,
+                    "rule=true, g1={g1_val}, g2={g2_val}: expected sat={expected_sat}"
+                );
+            }
+        }
+    }
+
+    /// `add_clause` should pin a literal: building a puzzle whose only
+    /// constraint is "guard → sum(stars) ≥ 1" together with a unit
+    /// `add_clause([stars[1].neg().as_lit_for_test()])` should be UNSAT
+    /// once we assume `guard` true.
+    #[test]
+    fn add_clause_pins_literal() {
+        use rustsat::solvers::{Solve, SolveIncremental, SolverResult};
+        let mut b = PuzzleBuilder::new();
+        let stars = b.var_bool_matrix("stars", &[1..=1]);
+        let must = b.con_bool("must");
+        b.sum_ge(
+            must,
+            &[stars.get(&[1]).pos()],
+            1,
+            "must",
+            "at least one star",
+        )
+        .unwrap();
+        // Pin stars[1] = false via a raw unit clause.
+        b.add_clause([!stars.get(&[1]).lit()]);
+        let puzzle = b.build().unwrap();
+        let cnf = puzzle.cnf.as_ref().unwrap().as_ref().clone();
+        let mut solver = rustsat_batsat::BasicSolver::default();
+        for cl in cnf.iter() {
+            solver.add_clause(cl.clone()).unwrap();
+        }
+        // With must=true, the puzzle should be UNSAT (we need a star
+        // but the unit clause forbids the only one).
+        let res = solver.solve_assumps(&[must.lit()]).unwrap();
+        assert_eq!(res, SolverResult::Unsat);
+        // With must=false, satisfiable.
+        let res2 = solver.solve_assumps(&[!must.lit()]).unwrap();
+        assert_eq!(res2, SolverResult::Sat);
+    }
+
+    #[test]
+    fn aux_bool_builds_and_solves() {
+        // An $#AUX atom should be encodable, end up in the right
+        // annotation set, and let demystify build/solve through.
+        let mut b = PuzzleBuilder::new();
+        let v = b.var_bool_matrix("g", &[1..=2]);
+        let helper = b.aux_bool_matrix("helper", &[1..=2]);
+        let rule = b.con_bool_matrix("rule", &[1..=2]);
+        // Two constraints, each referencing the aux atom on the same side
+        // as a star: rule[i] → (helper[i] ∨ g[i]) ≥ 1.
+        for i in 1..=2 {
+            b.sum_ge(
+                rule.get(&[i]),
+                &[helper.get(&[i]).pos(), v.get(&[i]).pos()],
+                1,
+                "rule",
+                format!("helper[{i}] or g[{i}]"),
+            )
+            .unwrap();
+        }
+        let puzzle = b.build().unwrap();
+        assert!(puzzle.eprime.auxvars.contains("helper"));
+        assert!(puzzle.eprime.vars.contains("g"));
+        assert!(puzzle.eprime.cons.contains_key("rule"));
+    }
+
+    #[test]
+    fn sum_eq_unguarded_emits_no_constraint_entry() {
+        let mut b = PuzzleBuilder::new();
+        let v = b.var_bool_matrix("g", &[1..=2]);
+        let force = b.con_bool("force");
+        // One real $#CON so the builder still has something registered.
+        b.sum_ge(
+            force,
+            &[v.get(&[1]).pos(), v.get(&[2]).pos()],
+            1,
+            "force",
+            "at least one g is true",
+        )
+        .unwrap();
+        // Unguarded sum_eq for setup: exactly one of g[1], g[2] is true.
+        b.sum_eq_unguarded(&[v.get(&[1]).pos(), v.get(&[2]).pos()], 1)
+            .unwrap();
+        let puzzle = b.build().unwrap();
+        // Only one $#CON entry — the unguarded constraint does not appear.
+        assert_eq!(puzzle.constraints.len(), 1);
     }
 }

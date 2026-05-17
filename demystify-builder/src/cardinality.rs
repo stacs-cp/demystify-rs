@@ -55,6 +55,27 @@ pub(crate) fn encode_sum_ge(
     encode_via_totalizer(sat, lits, k, guard, Bound::Lower)
 }
 
+/// Encode `sum(lits) = k`.  Same guard semantics as [`encode_sum_ge`].
+///
+/// Implemented as `encode_sum_ge(..., k)` plus `encode_sum_le(..., k)`,
+/// short-circuiting the two cases (`k < 0`, `k > n`) where both halves
+/// would individually emit an unsat clause — we only want one.
+pub(crate) fn encode_sum_eq(
+    sat: &mut SatInstance,
+    lits: &[Lit],
+    k: i64,
+    guard: Option<Lit>,
+) -> Result<(), rustsat::OutOfMemory> {
+    let n = lits.len();
+    if k < 0 || (k as usize) > n {
+        emit_under_guard(sat, &[], guard);
+        return Ok(());
+    }
+    encode_sum_ge(sat, lits, k, guard)?;
+    encode_sum_le(sat, lits, k, guard)?;
+    Ok(())
+}
+
 /// Encode `sum(lits) ≤ k`.  Same guard semantics as [`encode_sum_ge`].
 pub(crate) fn encode_sum_le(
     sat: &mut SatInstance,
@@ -261,5 +282,89 @@ mod tests {
         encode_sum_le(&mut sat, &lits, 3, None).unwrap();
         encode_sum_le(&mut sat, &lits, 10, None).unwrap();
         assert!(clauses(&sat).is_empty());
+    }
+
+    #[test]
+    fn sum_eq_too_big_emits_single_unsat_clause() {
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        encode_sum_eq(&mut sat, &lits, 4, None).unwrap();
+        assert_eq!(clauses(&sat), vec![Vec::<i32>::new()]);
+    }
+
+    #[test]
+    fn sum_eq_negative_emits_single_unsat_clause() {
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        encode_sum_eq(&mut sat, &lits, -1, None).unwrap();
+        assert_eq!(clauses(&sat), vec![Vec::<i32>::new()]);
+    }
+
+    #[test]
+    fn sum_eq_zero_forces_all_false() {
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        encode_sum_eq(&mut sat, &lits, 0, None).unwrap();
+        let c = clauses(&sat);
+        assert_eq!(c.len(), 3);
+        for (clause, lit) in c.iter().zip(&lits) {
+            assert_eq!(clause, &vec![(!*lit).to_ipasir()]);
+        }
+    }
+
+    #[test]
+    fn sum_eq_n_forces_all_true() {
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        encode_sum_eq(&mut sat, &lits, 3, None).unwrap();
+        let c = clauses(&sat);
+        assert_eq!(c.len(), 3);
+        for (clause, lit) in c.iter().zip(&lits) {
+            assert_eq!(clause, &vec![lit.to_ipasir()]);
+        }
+    }
+
+    #[test]
+    fn sum_eq_one_is_at_least_one_plus_at_most_one() {
+        // sum=1 over 3 lits ⟹ one big disjunction (sum_ge=1) plus
+        // pairwise-at-most-one expressed via the totalizer (sum_le=1).
+        // We just check that the encoding is satisfiable iff exactly one
+        // lit is true by feeding it to BatSat.
+        use rustsat::solvers::Solve;
+        use rustsat::solvers::SolveIncremental;
+        use rustsat::types::TernaryVal;
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        encode_sum_eq(&mut sat, &lits, 1, None).unwrap();
+        let cnf = sat.cnf().clone();
+        // For each of the 8 assignments, check satisfiability with the
+        // unit-clause assumptions of that assignment.
+        for mask in 0u32..8 {
+            let mut solver = rustsat_batsat::BasicSolver::default();
+            for clause in cnf.iter() {
+                solver
+                    .add_clause(clause.clone())
+                    .expect("add_clause batsat");
+            }
+            let assumps: Vec<Lit> = (0..3)
+                .map(|i| {
+                    if (mask >> i) & 1 == 1 {
+                        lits[i]
+                    } else {
+                        !lits[i]
+                    }
+                })
+                .collect();
+            let res = solver
+                .solve_assumps(&assumps)
+                .expect("batsat solve_assumps");
+            let expected_sat = mask.count_ones() == 1;
+            assert_eq!(
+                res == rustsat::solvers::SolverResult::Sat,
+                expected_sat,
+                "mask {mask:03b}: expected sat={expected_sat}, got {res:?}"
+            );
+            let _ = TernaryVal::True; // silence unused-import warning if any
+        }
     }
 }
