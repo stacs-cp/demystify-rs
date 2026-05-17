@@ -865,6 +865,14 @@ impl PuzzleParse {
         Ok(())
     }
 
+    /// Replace the cached `PuzVar → constraint lits` index.  Public so
+    /// out-of-crate builders (like `demystify-builder`) can assemble a
+    /// `PuzzleParse` directly after computing this map with
+    /// [`Self::build_var_to_cons`].
+    pub fn set_var_to_cons(&mut self, var_to_cons: BTreeMap<PuzVar, BTreeSet<Lit>>) {
+        self.var_to_cons = var_to_cons;
+    }
+
     pub fn build_var_to_cons(
         constraints: &ConstraintStore,
         direct: &DirectEncoding,

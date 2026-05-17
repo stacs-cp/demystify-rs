@@ -684,6 +684,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "demystify-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "demystify",
+ "rand 0.10.0",
+ "rand_chacha 0.10.0",
+ "rustsat",
+ "rustsat-batsat",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "demystify-lua"
 version = "0.1.0"
 dependencies = [
