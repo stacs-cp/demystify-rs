@@ -126,6 +126,38 @@ LUA_PATH="$TEST_DIR/?.lua;;" luajit test_helpers.lua
 
 echo
 
+# Run builder tests (need the native library, but no Conjure / puzzle JSON).
+echo "Running builder tests..."
+echo
+if LUA_CPATH="$TEMP_DIR/?.so;;" LUA_PATH="$TEST_DIR/?.lua;;" luajit test_builder.lua; then
+    echo -e "${GREEN}PASS: builder${NC}"
+else
+    echo -e "${RED}FAIL: builder${NC}"
+    exit 1
+fi
+
+echo
+echo "Running builder sudoku-4x4 test..."
+echo
+if LUA_CPATH="$TEMP_DIR/?.so;;" LUA_PATH="$TEST_DIR/?.lua;;" luajit test_builder_sudoku.lua; then
+    echo -e "${GREEN}PASS: builder sudoku-4x4${NC}"
+else
+    echo -e "${RED}FAIL: builder sudoku-4x4${NC}"
+    exit 1
+fi
+
+echo
+echo "Running builder minesweeper-via-REVEAL test..."
+echo
+if LUA_CPATH="$TEMP_DIR/?.so;;" LUA_PATH="$TEST_DIR/?.lua;;" luajit test_builder_minesweeper.lua; then
+    echo -e "${GREEN}PASS: builder minesweeper${NC}"
+else
+    echo -e "${RED}FAIL: builder minesweeper${NC}"
+    exit 1
+fi
+
+echo
+
 # Run the demystify library tests with each puzzle type
 echo "Running demystify library tests..."
 echo

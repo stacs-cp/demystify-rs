@@ -7,9 +7,11 @@
 
 use wasm_bindgen::prelude::*;
 
+mod builder;
 mod planner;
 mod puzzle;
 
+pub use builder::*;
 pub use planner::*;
 pub use puzzle::*;
 

@@ -222,6 +222,7 @@
 //! end
 //! ```
 
+mod builder;
 mod planner;
 mod puzzle;
 
@@ -250,6 +251,9 @@ fn demystify(lua: &Lua) -> LuaResult<LuaTable> {
 
     // Add the Planner class
     exports.set("Planner", planner::create_planner_class(lua)?)?;
+
+    // Add the Builder class
+    exports.set("Builder", builder::create_builder_class(lua)?)?;
 
     // Add version info
     exports.set("version", env!("CARGO_PKG_VERSION"))?;

@@ -25,6 +25,12 @@ impl WasmPuzzle {
     pub(crate) fn arc(&self) -> Arc<PuzzleParse> {
         self.inner.clone()
     }
+
+    pub(crate) fn from_parse(parse: PuzzleParse) -> WasmPuzzle {
+        WasmPuzzle {
+            inner: Arc::new(parse),
+        }
+    }
 }
 
 /// Load a pre-parsed puzzle from a JSON string.

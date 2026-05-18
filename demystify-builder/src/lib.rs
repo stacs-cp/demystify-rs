@@ -16,9 +16,12 @@
 //! - Guarded versions of the above: `guard -> (sum >= k)` /
 //!   `guard -> (sum <= k)`.  The guard mirrors the eprime `$#CON` activation
 //!   pattern.
+//! - `$#REVEAL` cascades — `reveal_bool_matrix` + `set_reveal` give
+//!   minesweeper-style "deduce `grid[i,j]=v` ⇒ also mark `facts[i,j,v]`
+//!   known" without a separate deduction step.
 //!
 //! Out of scope (cleanly addable later): `sum = k`, integer-domain
-//! variables, `$#REVEAL`.
+//! variables.
 //!
 //! # Example
 //!

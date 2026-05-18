@@ -71,13 +71,14 @@ impl Signed {
 }
 
 /// Whether atoms in a declared matrix are user-deducible puzzle variables
-/// (`$#VAR`), constraint-family activation lits (`$#CON`), or auxiliary
-/// deducible atoms (`$#AUX`).
+/// (`$#VAR`), constraint-family activation lits (`$#CON`), auxiliary
+/// deducible atoms (`$#AUX`), or the target of a `$#REVEAL` cascade.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum AtomRole {
     Var,
     Con,
     Aux,
+    RevealTarget,
 }
 
 /// A declared matrix of boolean atoms.  Stored row-major over the
@@ -234,6 +235,9 @@ pub struct PuzzleBuilder {
     var_names: BTreeSet<String>,
     aux_names: BTreeSet<String>,
     con_families: BTreeMap<String, String>,
+    reveal_target_names: BTreeSet<String>,
+    /// `src $#VAR name → reveal-target name`.  Populated by `set_reveal`.
+    reveal_decl: BTreeMap<String, String>,
     /// `lit → family name` for every `$#CON` activation atom.  Both the
     /// positive and negative orientation of each lit map to the same
     /// family (the activation sense is "lit positive").  Used to reject
@@ -273,6 +277,8 @@ impl PuzzleBuilder {
             var_names: BTreeSet::new(),
             aux_names: BTreeSet::new(),
             con_families: BTreeMap::new(),
+            reveal_target_names: BTreeSet::new(),
+            reveal_decl: BTreeMap::new(),
             con_atom_family: BTreeMap::new(),
             used_con_families: BTreeSet::new(),
             referenced_vars: BTreeSet::new(),
@@ -333,6 +339,45 @@ impl PuzzleBuilder {
         m.atoms[0]
     }
 
+    /// Declare a `$#REVEAL`-target boolean matrix.  The returned atoms are
+    /// regular boolean SAT variables — use them in `sum_*` constraints
+    /// just like any other matrix.  Their special status comes from a
+    /// subsequent [`Self::set_reveal`] call: when a `$#VAR` atom registered
+    /// as the reveal source is deduced true with value `v`, the
+    /// corresponding `target[…src.indices, v]` atom is also marked known.
+    ///
+    /// For a boolean source variable `src` declared with dims `[d0, d1,
+    /// …]`, declare the matching reveal target with dims
+    /// `[d0, d1, …, 0..=1]` — the trailing dimension covers the source's
+    /// `{0, 1}` value domain.
+    pub fn reveal_bool_matrix(&mut self, name: &str, dims: &[RangeInclusive<i64>]) -> BoolMatrix {
+        self.declare_matrix(name, dims, AtomRole::RevealTarget)
+    }
+
+    /// Register `target` as the `$#REVEAL` target for `src`.  Both names
+    /// must have been declared first (`src` via `var_bool_matrix`, `target`
+    /// via [`Self::reveal_bool_matrix`]).  The target's dims must be
+    /// `src.dims ++ [0..=1]` for boolean sources; this is checked at
+    /// [`Self::build`] time when the target atoms are looked up.
+    pub fn set_reveal(&mut self, src: &str, target: &str) -> Result<(), BuildError> {
+        if !self.var_names.contains(src) {
+            return Err(BuildError::UnknownRevealSource(src.to_string()));
+        }
+        if !self.reveal_target_names.contains(target) {
+            return Err(BuildError::UnknownRevealTarget(target.to_string()));
+        }
+        if self
+            .reveal_decl
+            .insert(src.to_string(), target.to_string())
+            .is_some()
+        {
+            return Err(BuildError::Other(anyhow::anyhow!(
+                "$#REVEAL source '{src}' is already mapped"
+            )));
+        }
+        Ok(())
+    }
+
     fn declare_matrix(
         &mut self,
         name: &str,
@@ -342,6 +387,7 @@ impl PuzzleBuilder {
         if self.var_names.contains(name)
             || self.aux_names.contains(name)
             || self.con_families.contains_key(name)
+            || self.reveal_target_names.contains(name)
         {
             panic!("variable name '{name}' is already declared");
         }
@@ -412,6 +458,15 @@ impl PuzzleBuilder {
                     self.con_atom_family.insert(lit, name.to_string());
                     self.con_atom_family.insert(!lit, name.to_string());
                 }
+                AtomRole::RevealTarget => {
+                    // Reveal-target atoms are regular SAT vars that
+                    // participate in constraints (so they get litmap +
+                    // domainmap entries above), but they do not show up in
+                    // any of the user-facing var_lits buckets — the
+                    // planner learns their values through the reveal
+                    // cascade in `solver::add_known_lit_internal`, not
+                    // through standard deduction.
+                }
             }
         }
 
@@ -429,6 +484,9 @@ impl PuzzleBuilder {
                 // key must be present and the value non-empty.
                 self.con_families
                     .insert(name.to_string(), format!("{{builder:{name}}}"));
+            }
+            AtomRole::RevealTarget => {
+                self.reveal_target_names.insert(name.to_string());
             }
         }
 
@@ -599,7 +657,8 @@ impl PuzzleBuilder {
     /// Finalise the builder into a fully-formed `PuzzleParse`.
     pub fn build(self) -> Result<PuzzleParse, BuildError> {
         // Loud-failure validations: every $#VAR must be mentioned in at
-        // least one constraint; every $#CON family must be used.
+        // least one constraint; every $#CON family must be used; every
+        // declared reveal-target matrix must be wired up via set_reveal.
         for v in &self.var_names {
             if !self.referenced_vars.contains(v) {
                 return Err(BuildError::UnusedVar(v.clone()));
@@ -608,6 +667,44 @@ impl PuzzleBuilder {
         for fam in self.con_families.keys() {
             if !self.used_con_families.contains(fam) {
                 return Err(BuildError::UnusedFamily(fam.clone()));
+            }
+        }
+        {
+            let used_targets: BTreeSet<&String> = self.reveal_decl.values().collect();
+            for t in &self.reveal_target_names {
+                if !used_targets.contains(&t) {
+                    return Err(BuildError::UnusedRevealTarget(t.clone()));
+                }
+            }
+        }
+
+        // Compute the SAT-level reveal_map. Mirrors finalise() in
+        // demystify/src/problem/parse.rs: for every `$#VAR` puzlit with
+        // sign=true (i.e. an `eq` assertion), if the var name is a reveal
+        // source then point its lit at `target[…src.indices, val]=1`.
+        let mut reveal_map: BTreeMap<Lit, Lit> = BTreeMap::new();
+        for (puzlit, &lit) in &self.litmap {
+            if !puzlit.sign() {
+                continue;
+            }
+            let var = puzlit.var();
+            let Some(target_name) = self.reveal_decl.get(var.name()) else {
+                continue;
+            };
+            let mut idx = var.indices().clone();
+            idx.push(puzlit.val());
+            let target_puzvar = PuzVar::new(target_name, idx);
+            let target_puzlit = PuzLit::new_eq(VarValPair::new(&target_puzvar, 1));
+            let Some(&target_lit) = self.litmap.get(&target_puzlit) else {
+                return Err(BuildError::RevealTargetMissing {
+                    src_lit: format!("{puzlit}"),
+                    target_lit: format!("{target_puzlit}"),
+                });
+            };
+            if reveal_map.insert(lit, target_lit).is_some() {
+                return Err(BuildError::Other(anyhow::anyhow!(
+                    "reveal_map double-assignment for lit derived from {puzlit}"
+                )));
             }
         }
 
@@ -639,7 +736,7 @@ impl PuzzleBuilder {
             self.var_names,
             self.aux_names,
             self.con_families,
-            BTreeMap::new(), // reveal
+            self.reveal_decl,
             BTreeMap::new(), // params
             self.kind,
             self.info,
@@ -650,6 +747,7 @@ impl PuzzleBuilder {
         parse.cnf = Some(Arc::new(cnf));
         parse.direct = direct;
         parse.constraints = self.constraints;
+        parse.reveal_map = reveal_map;
         parse.var_lits = var_lits;
         parse.order = order;
         parse.set_var_to_cons(var_to_cons_owned);

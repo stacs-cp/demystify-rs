@@ -53,6 +53,24 @@ pub enum BuildError {
     #[error("$#CON family '{0}' was declared but never used")]
     UnusedFamily(String),
 
+    #[error("$#REVEAL source '{0}' is not a previously declared $#VAR")]
+    UnknownRevealSource(String),
+
+    #[error(
+        "$#REVEAL target '{0}' is not a previously declared reveal target \
+         (call `reveal_bool_matrix` first)"
+    )]
+    UnknownRevealTarget(String),
+
+    #[error("reveal-target matrix '{0}' was declared but never wired up via `set_reveal`")]
+    UnusedRevealTarget(String),
+
+    #[error(
+        "reveal cascade for {src_lit} expects atom {target_lit} but no such atom exists — \
+         check that the reveal-target matrix's dims are `src.dims ++ [0..=1]`"
+    )]
+    RevealTargetMissing { src_lit: String, target_lit: String },
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

@@ -11,5 +11,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 demystify = { path = "../demystify", version = "0.2.0" }
+demystify-builder = { path = "../demystify-builder", version = "0.1.0" }
 mlua = { version = "0.11", features = ["luajit", "module"] }
 anyhow = "1.0"

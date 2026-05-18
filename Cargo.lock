@@ -702,6 +702,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "demystify",
+ "demystify-builder",
  "mlua",
 ]
 
@@ -711,6 +712,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "demystify",
+ "demystify-builder",
  "getrandom 0.4.2",
  "js-sys",
  "serde",
