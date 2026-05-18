@@ -504,7 +504,7 @@ mod tests {
 
         // Test case 1: Single positive literal
         let lit1 = PuzLit::new_eq(VarValPair::new(&v, 2));
-        assert!(PuzLit::nice_puzlit_list_html(&[lit1.clone()]).contains("v[] = 2"));
+        assert!(PuzLit::nice_puzlit_list_html(std::slice::from_ref(&lit1)).contains("v[] = 2"));
 
         // Test case 2: Multiple positive literals for different variables
         let lit2 = PuzLit::new_eq(VarValPair::new(&w, 3));
@@ -513,7 +513,7 @@ mod tests {
 
         // Test case 3: Single negative literal
         let neq1 = PuzLit::new_neq(VarValPair::new(&v, 2));
-        assert!(PuzLit::nice_puzlit_list_html(&[neq1.clone()]).contains("v[] != 2"));
+        assert!(PuzLit::nice_puzlit_list_html(std::slice::from_ref(&neq1)).contains("v[] != 2"));
 
         // Test case 4: Multiple negative literals for same variable
         let neq2 = PuzLit::new_neq(VarValPair::new(&v, 3));

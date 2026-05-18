@@ -1269,9 +1269,10 @@ mod tests {
         let puz = build_puzzleparse("./tst/minesweeper.eprime", "./tst/minesweeperPrinted.param");
         let p = Puzzle::new_from_puzzle(&puz)?;
         // Minesweeper start_grid is None or all-None cells
-        let all_empty = p.start_grid.as_ref().map_or(true, |sg| {
-            sg.iter().all(|row| row.iter().all(|c| c.is_none()))
-        });
+        let all_empty = p
+            .start_grid
+            .as_ref()
+            .is_none_or(|sg| sg.iter().all(|row| row.iter().all(|c| c.is_none())));
         assert!(all_empty, "minesweeper should have no fixed start cells");
         Ok(())
     }
