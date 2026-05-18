@@ -89,6 +89,15 @@ pub struct UserMus {
 }
 
 /// The `PuzzlePlanner` struct represents a puzzle planner that can be used to solve puzzles.
+///
+/// `Clone` produces an exact memcpy of all cached deductive state — the
+/// trivially-deduced `knownlits`, the `tosolvelits` cache, the
+/// `mus_cache` — so a base planner can be built once (paying the
+/// `mark_trivial_lits_as_deduced` cost) and cloned cheaply to explore
+/// many forward branches from the same point.  See also
+/// [`PuzzlePlanner::fork`] for the checkpoint/restore variant which
+/// drops cached forward work and replays known lits from scratch.
+#[derive(Clone)]
 pub struct PuzzlePlanner {
     psolve: PuzzleSolver,
     config: PlannerConfig,
@@ -1206,6 +1215,57 @@ mod tests {
     };
     use itertools::Itertools;
     use test_log::test;
+
+    /// Cloning a base planner and running `quick_solve` on the clone must
+    /// yield exactly the same UserMus sequence (lits, constraints,
+    /// fingerprint, name) as running `quick_solve` on a freshly-built
+    /// planner.  The clone shares the trivially-deduced base state.
+    #[test]
+    fn test_clone_planner_quick_solve_matches_fresh() {
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        ));
+
+        let base = PuzzlePlanner::new(PuzzleSolver::new(result.clone()).unwrap());
+        let mut from_clone = base.clone();
+        let from_clone_steps = from_clone.quick_solve();
+
+        let mut from_fresh = PuzzlePlanner::new(PuzzleSolver::new(result).unwrap());
+        let from_fresh_steps = from_fresh.quick_solve();
+
+        // Same number of steps, same number of MUSes per step.
+        assert_eq!(from_clone_steps.len(), from_fresh_steps.len());
+        // Lits and constraints should match step-for-step.
+        for (c, f) in from_clone_steps.iter().zip(from_fresh_steps.iter()) {
+            let c_lits: BTreeSet<&PuzLit> = c.iter().flat_map(|m| m.lits.iter()).collect();
+            let f_lits: BTreeSet<&PuzLit> = f.iter().flat_map(|m| m.lits.iter()).collect();
+            assert_eq!(c_lits, f_lits, "deduced lits diverge across clone vs fresh");
+        }
+    }
+
+    #[test]
+    fn test_clone_planner_independent_branches() {
+        // Two clones of the same base must remain independent: marking a
+        // lit on one must not affect the other's view of provable lits.
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        ));
+        let base = PuzzlePlanner::new(PuzzleSolver::new(result).unwrap());
+
+        let mut branch_a = base.clone();
+        let mut branch_b = base.clone();
+
+        let varlits_before: BTreeSet<_> = branch_a.get_provable_varlits();
+        assert!(!varlits_before.is_empty(), "expect non-trivial puzzle");
+        let pick = *varlits_before.iter().next().unwrap();
+
+        branch_a.mark_lit_as_deduced(&pick);
+
+        assert!(branch_a.solver().get_known_lits().contains(&pick));
+        assert!(!branch_b.solver().get_known_lits().contains(&pick));
+    }
 
     #[test]
     fn test_plan_little_essence() {

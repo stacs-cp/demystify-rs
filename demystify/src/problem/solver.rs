@@ -123,10 +123,33 @@ fn collect_assignment_leaves(
     }
 }
 
-/// Represents a puzzle solver.
-pub struct PuzzleSolver {
+/// Per-thread `SatCore` cache.  Wrapped so `PuzzleSolver` can derive
+/// `Clone`: `ThreadLocal<T>` doesn't implement `Clone`, and we wouldn't
+/// want it to — each clone needs its own fresh per-thread `SatCore` so
+/// learned-clause state never bleeds between independent branches of a
+/// caller's exploration.
+#[derive(Default)]
+struct SatCoreCache {
     #[cfg(not(feature = "deterministic"))]
-    satcore: ThreadLocal<SatCore>,
+    inner: ThreadLocal<SatCore>,
+}
+
+impl Clone for SatCoreCache {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
+}
+
+/// Represents a puzzle solver.
+///
+/// `Clone` produces an exact memcpy of the deductive state (`knownlits`,
+/// cached `tosolvelits`, `solver_config`) sharing the immutable
+/// `Arc<PuzzleParse>`, but with an **empty** per-thread `SatCore` cache.
+/// First SAT call on each thread of each clone reinitialises its own
+/// solver; the two clones never share solver state.
+#[derive(Clone)]
+pub struct PuzzleSolver {
+    satcore: SatCoreCache,
     puzzleparse: Arc<PuzzleParse>,
 
     knownlits: Vec<Lit>,
@@ -147,8 +170,7 @@ impl PuzzleSolver {
     /// A `PuzzleSolver` instance.
     pub fn new(puzzleparse: Arc<PuzzleParse>) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
-            #[cfg(not(feature = "deterministic"))]
-            satcore: ThreadLocal::new(),
+            satcore: SatCoreCache::default(),
             puzzleparse,
             tosolvelits: None,
             knownlits: Vec::new(),
@@ -171,8 +193,7 @@ impl PuzzleSolver {
         solver_config: SolverConfig,
     ) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
-            #[cfg(not(feature = "deterministic"))]
-            satcore: ThreadLocal::new(),
+            satcore: SatCoreCache::default(),
             puzzleparse,
             tosolvelits: None,
             knownlits: Vec::new(),
@@ -187,6 +208,7 @@ impl PuzzleSolver {
     #[cfg(not(feature = "deterministic"))]
     fn get_satcore(&self) -> &SatCore {
         self.satcore
+            .inner
             .get_or(|| SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap())
     }
     #[cfg(feature = "deterministic")]
@@ -1836,6 +1858,87 @@ mod tests {
 
         insta::assert_debug_snapshot!(puzsol);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_clone_preserves_known_and_tosolve_lits() -> anyhow::Result<()> {
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        ));
+
+        let mut base = PuzzleSolver::new(result)?;
+        // Force the expensive caches to populate.
+        let _ = base.get_provable_varlits().clone();
+        let cloned = base.clone();
+
+        // knownlits + tosolvelits memcpy'd.
+        assert_eq!(cloned.get_known_lits(), base.get_known_lits());
+        assert_eq!(cloned.tosolvelits, base.tosolvelits);
+        // tosolvelits is populated (the whole point of the cheap clone).
+        assert!(cloned.tosolvelits.is_some());
+        // The Arc<PuzzleParse> is shared, not copied.
+        assert!(Arc::ptr_eq(&base.puzzleparse, &cloned.puzzleparse));
+        Ok(())
+    }
+
+    #[test]
+    fn test_clone_does_not_re_run_provable_varlits() -> anyhow::Result<()> {
+        // After Clone, calling get_provable_varlits() must use the cached
+        // tosolvelits — i.e. fire zero SAT calls.  Compared to a fresh
+        // PuzzleSolver, which has to populate the cache from scratch.
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        ));
+
+        let mut base = PuzzleSolver::new(result.clone())?;
+        let base_varlits = base.get_provable_varlits().clone();
+        let mut cloned = base.clone();
+
+        // Reading from the clone should hit the cache: no SAT calls.
+        crate::satcore::reset_solver_calls();
+        let cloned_varlits = cloned.get_provable_varlits().clone();
+        assert_eq!(
+            crate::satcore::get_solver_calls(),
+            0,
+            "cloned planner must not re-run get_provable_varlits"
+        );
+        assert_eq!(cloned_varlits, base_varlits);
+
+        // For comparison: a fresh solver does run SAT calls.
+        let mut fresh = PuzzleSolver::new(result)?;
+        crate::satcore::reset_solver_calls();
+        let fresh_varlits = fresh.get_provable_varlits().clone();
+        assert!(
+            crate::satcore::get_solver_calls() > 0,
+            "fresh planner must run at least one SAT call to populate tosolvelits"
+        );
+        assert_eq!(fresh_varlits, base_varlits);
+        Ok(())
+    }
+
+    #[test]
+    fn test_clone_independence_known_lit_does_not_leak() -> anyhow::Result<()> {
+        // Adding a known lit to one clone must not appear in the other.
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            "./tst/little1.eprime",
+            "./tst/little1.param",
+        ));
+
+        let mut base = PuzzleSolver::new(result)?;
+        let varlits = base.get_provable_varlits().clone();
+        let pick = *varlits.iter().next().expect("non-empty varlits");
+
+        let mut branch = base.clone();
+        branch.add_known_lit(pick);
+
+        assert!(branch.get_known_lits().contains(&pick));
+        assert!(!base.get_known_lits().contains(&pick));
+        // tosolvelits also diverged: branch removed the lit, base still has it.
+        assert!(!branch.get_provable_varlits().contains(&pick));
+        assert!(base.get_provable_varlits().contains(&pick));
         Ok(())
     }
 
