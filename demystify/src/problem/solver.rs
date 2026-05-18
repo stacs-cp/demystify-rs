@@ -11,14 +11,14 @@ use rayon::iter::{IntoParallelRefIterator, ParallelBridge, ParallelIterator};
 use rustsat::types::Lit;
 #[cfg(not(feature = "deterministic"))]
 use thread_local::ThreadLocal;
-use tracing::info;
+use tracing::{info, warn};
 
 use serde::{Deserialize, Serialize};
 
 use crate::problem::musdict::MusContext;
 use crate::{
     problem::{PuzVar, VarValPair},
-    satcore::{SatCore, SearchResult},
+    satcore::{SatCore, SearchError, SearchResult},
 };
 
 use super::{PuzLit, musdict::MusDict, parse::PuzzleParse};
@@ -487,6 +487,42 @@ impl PuzzleSolver {
         let mut lits_to_read = lits_to_check.clone();
         lits_to_read.extend(self.puzzleparse.var_lits.special().iter().copied());
 
+        // When the `random_solution` target is enabled at WARN, time every
+        // SAT call and warn on any that exceed RANDOM_SOLUTION_SLOW_SECS.
+        // Gated so we pay no Instant::now overhead in the common case.
+        const RANDOM_SOLUTION_SLOW_SECS: f64 = 2.0;
+        let timing_on = tracing::enabled!(target: "random_solution", tracing::Level::WARN);
+        let warn_if_slow = |t0: Option<Instant>, phase: &str, lit: Lit| {
+            if let Some(t0) = t0 {
+                let elapsed = t0.elapsed();
+                if elapsed.as_secs_f64() > RANDOM_SOLUTION_SLOW_SECS {
+                    warn!(target: "random_solution",
+                        "slow {phase} SAT call: {:.2?} (lit={:?})", elapsed, lit);
+                }
+            }
+        };
+
+        // Establish the invariant for the rest of the function: at least
+        // one assignment exists under `litorig + known_lits`.  Once that
+        // holds, every random commit preserves it (because we only commit
+        // a polarity that's either confirmed Sat or implied Sat by its
+        // sibling being Unsat), so per-step calls can use a bounded budget
+        // safely — Limit just means "try harder", never "give up".
+        let t0 = timing_on.then(Instant::now);
+        let feasible = self
+            .get_satcore()
+            .assumption_solve_no_limit(self.get_known_lits(), &litorig);
+        if let Some(t0) = t0 {
+            let elapsed = t0.elapsed();
+            if elapsed.as_secs_f64() > RANDOM_SOLUTION_SLOW_SECS {
+                warn!(target: "random_solution",
+                    "slow upfront-feasibility SAT call: {:.2?}", elapsed);
+            }
+        }
+        if !feasible {
+            return None;
+        }
+
         for &l in &lits_to_check {
             // `Some(0)` means we've made enough random commits; fall through
             // to the SAT readout below.
@@ -494,38 +530,59 @@ impl PuzzleSolver {
                 break;
             }
 
-            let mut lits = litorig.clone();
-            let test_lit = if rng.random_bool(0.5) { l } else { l.neg() };
+            let a = if rng.random_bool(0.5) { l } else { l.neg() };
+            let b = a.neg();
 
-            lits.push(test_lit);
+            let mut lits_a = litorig.clone();
+            lits_a.push(a);
+            let mut lits_b = litorig.clone();
+            lits_b.push(b);
 
-            // Random sampling uses unlimited-conflict solves: there is no
-            // useful fall-back when a feasibility check times out here, and
-            // silent timeouts would silently bias the sampled solution.
-            if self
-                .get_satcore()
-                .assumption_solve_no_limit(self.get_known_lits(), &lits)
-            {
-                litorig.push(test_lit);
-            } else {
-                // Try the opposite polarity.
-                let test_lit = test_lit.neg();
-                let mut lits = litorig.clone();
-                lits.push(test_lit);
-                if self
-                    .get_satcore()
-                    .assumption_solve_no_limit(self.get_known_lits(), &lits)
-                {
-                    litorig.push(test_lit);
-                } else {
-                    // Neither polarity is feasible given the committed
-                    // assumptions: the problem is unsatisfiable under the
-                    // caller's current constraints.  Report None so the
-                    // caller can recover (for example, by trying a larger
-                    // neighbourhood).
-                    return None;
+            // Try increasing budgets (×10 each round).  By the invariant
+            // one polarity must be Sat, so the loop is guaranteed to
+            // terminate once the budget is large enough to decide one of
+            // the two SAT calls definitively.  Saturating multiplication
+            // pins the multiplier at f64::INFINITY in the limit, which
+            // SatCore::effective_limit treats as "no limit" — so even an
+            // adversarial puzzle eventually falls through to an unlimited
+            // call rather than spinning forever at f64::MAX.
+            let mut mult: f64 = 1.0;
+            let committed: Lit = loop {
+                let t0 = timing_on.then(Instant::now);
+                let a_res =
+                    self.get_satcore()
+                        .assumption_solve(self.get_known_lits(), &lits_a, mult);
+                warn_if_slow(t0, &format!("forward-polarity mult={mult}"), a);
+                match a_res {
+                    Ok(true) => break a,
+                    Ok(false) => {
+                        debug_assert!(
+                            self.get_satcore()
+                                .assumption_solve_no_limit(self.get_known_lits(), &lits_b),
+                            "invariant violated: both polarities unsat at lit {:?}",
+                            l
+                        );
+                        break b;
+                    }
+                    Err(SearchError::Limit) => {}
                 }
-            }
+                let t0 = timing_on.then(Instant::now);
+                let b_res =
+                    self.get_satcore()
+                        .assumption_solve(self.get_known_lits(), &lits_b, mult);
+                warn_if_slow(t0, &format!("opposite-polarity mult={mult}"), b);
+                match b_res {
+                    Ok(true) => break b,
+                    Ok(false) => break a,
+                    Err(SearchError::Limit) => {}
+                }
+                let next = mult * 10.0;
+                warn!(target: "random_solution",
+                    "both polarities timed out at mult={mult}; escalating to mult={next} (lit={:?})",
+                    l);
+                mult = next;
+            };
+            litorig.push(committed);
 
             steps = steps.map(|x| x - 1);
         }
@@ -533,10 +590,18 @@ impl PuzzleSolver {
         // Read the complete SAT solution so every entry in `lits_to_read`
         // gets a signed lit in the returned set — including the special
         // AUX vars the random loop above never touches.
+        let t0 = timing_on.then(Instant::now);
         let sol = self
             .get_satcore()
             .assumption_solve_solution_no_limit(self.get_known_lits(), &litorig)
             .expect("Must be a solution, from previous call");
+        if let Some(t0) = t0 {
+            let elapsed = t0.elapsed();
+            if elapsed.as_secs_f64() > RANDOM_SOLUTION_SLOW_SECS {
+                warn!(target: "random_solution",
+                    "slow final-readout SAT call: {:.2?}", elapsed);
+            }
+        }
 
         let solution: BTreeSet<Lit> = lits_to_read
             .iter()
@@ -784,9 +849,11 @@ impl PuzzleSolver {
                 // constraint even when !lit alone suffices (size-0 MUS). Do one
                 // final cheap check to find out which case we're in.
                 let just_neg_lit = vec![!lit];
-                let size0 = self
-                    .get_satcore()
-                    .assumption_solve(self.get_known_lits(), &just_neg_lit)?;
+                let size0 = self.get_satcore().assumption_solve(
+                    self.get_known_lits(),
+                    &just_neg_lit,
+                    1.0,
+                )?;
                 if size0 {
                     muses.insert(lits.to_vec()); // constraint is needed: size-1 MUS
                 } else {
@@ -865,7 +932,7 @@ impl PuzzleSolver {
 
         let solvable = self
             .get_satcore()
-            .assumption_solve(self.get_known_lits(), &just_lit);
+            .assumption_solve(self.get_known_lits(), &just_lit, 1.0);
 
         if let Ok(solvable) = solvable {
             !solvable

@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Instant;
 
 use rustsat::instances::Cnf;
 #[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
 use rustsat::solvers::{GetInternalStats, Solve, SolveIncremental, SolverResult};
 use rustsat::types::{Assignment, Lit};
-use tracing::info;
+use tracing::{info, warn};
 
 use std::sync::atomic::Ordering::Relaxed;
 
@@ -296,8 +297,45 @@ impl SatCore {
     ///
     /// A `SatCore` instance.
     pub fn new(cnf: Arc<Cnf>) -> anyhow::Result<SatCore> {
+        let timing_on = tracing::enabled!(target: "satcore_build", tracing::Level::INFO);
+        let t_total = timing_on.then(Instant::now);
+
+        let t_solver = timing_on.then(Instant::now);
         let mut solver = Solver::default();
-        solver.add_cnf(cnf.as_ref().clone())?;
+        if let Some(t) = t_solver {
+            let e = t.elapsed();
+            info!(target: "satcore_build", "SatCore::new: Solver::default() took {:?}", e);
+        }
+
+        let t_clone = timing_on.then(Instant::now);
+        let cnf_clone = cnf.as_ref().clone();
+        let n_clauses = cnf_clone.len();
+        if let Some(t) = t_clone {
+            let e = t.elapsed();
+            info!(target: "satcore_build",
+                "SatCore::new: cnf.clone() took {:?} ({} clauses)", e, n_clauses);
+        }
+
+        let t_addcnf = timing_on.then(Instant::now);
+        solver.add_cnf(cnf_clone)?;
+        if let Some(t) = t_addcnf {
+            let e = t.elapsed();
+            info!(target: "satcore_build",
+                "SatCore::new: solver.add_cnf({} clauses) took {:?}", n_clauses, e);
+        }
+
+        if let Some(t) = t_total {
+            let e = t.elapsed();
+            // Warn if total construction was unusually long so it surfaces even
+            // when only `satcore_build=warn` is set.
+            if e.as_secs_f64() > 0.5 {
+                warn!(target: "satcore_build",
+                    "SatCore::new: total {:?} ({} clauses)", e, n_clauses);
+            } else {
+                info!(target: "satcore_build",
+                    "SatCore::new: total {:?} ({} clauses)", e, n_clauses);
+            }
+        }
 
         Ok(SatCore {
             solver: Arc::new(Mutex::new(solver)),
@@ -312,7 +350,10 @@ impl SatCore {
     /// we discover that we need to fix less literals than the already fixed list
     /// (stored in fixed)
     fn fix_values(&self, lits: &[Lit]) {
+        let timing_on = tracing::enabled!(target: "satcore_build", tracing::Level::INFO);
+        let t_total = timing_on.then(Instant::now);
         let mut fixed = self.fixed.borrow_mut();
+        let fixed_before = fixed.len();
 
         {
             let mut solver = self.solver.lock().unwrap();
@@ -332,7 +373,9 @@ impl SatCore {
             lits.iter().all(|l| fixed.contains(l)),
             "fix_values: lits contains entries not in fixed (should be impossible after the loop above)"
         );
-        if fixed.len() > lits.len() {
+        let rebooted = fixed.len() > lits.len();
+        if rebooted {
+            let t_reboot = timing_on.then(Instant::now);
             let mut solver = Solver::default();
             solver
                 .add_cnf(self.cnf.as_ref().clone())
@@ -346,6 +389,23 @@ impl SatCore {
             }
             let mut mutex_solver = self.solver.lock().unwrap();
             *mutex_solver = solver;
+            if let Some(t) = t_reboot {
+                let e = t.elapsed();
+                warn!(target: "satcore_build",
+                    "fix_values: REBOOTED solver — fixed_before={}, lits={}, rebuild took {:?}",
+                    fixed_before, lits.len(), e);
+            }
+        }
+
+        if let Some(t) = t_total {
+            let e = t.elapsed();
+            // Only chatter at info level when something interesting happened
+            // or the call was non-trivial.
+            if rebooted || e.as_secs_f64() > 0.05 {
+                info!(target: "satcore_build",
+                    "fix_values: total {:?} (fixed_before={}, lits={}, rebooted={})",
+                    e, fixed_before, lits.len(), rebooted);
+            }
         }
     }
 
@@ -366,10 +426,28 @@ impl SatCore {
         solve
     }
 
-    fn do_solve_assumps(solver: &mut MutexGuard<Solver>, lits: &[Lit]) -> SolverResult {
-        // A non-positive CONFLICT_LIMIT means "no limit": go straight to
-        // clear_conflict_limit so the caller does not receive Interrupted.
-        let limit = CONFLICT_LIMIT.load(Relaxed);
+    /// Compute the per-call conflict limit for a given work multiplier.
+    /// Returns 0 to mean "no limit" (matching the convention used by
+    /// solver.set_conflict_limit / clear_conflict_limit downstream).
+    fn effective_limit(work_mult: f64) -> i64 {
+        let base = CONFLICT_LIMIT.load(Relaxed);
+        if base <= 0 || work_mult <= 0.0 || !work_mult.is_finite() {
+            return 0;
+        }
+        let scaled = (base as f64) * work_mult;
+        if scaled >= i64::MAX as f64 {
+            i64::MAX
+        } else {
+            (scaled as i64).max(1)
+        }
+    }
+
+    fn do_solve_assumps(
+        solver: &mut MutexGuard<Solver>,
+        lits: &[Lit],
+        work_mult: f64,
+    ) -> SolverResult {
+        let limit = Self::effective_limit(work_mult);
         if limit > 0 {
             solver.set_conflict_limit(limit);
         } else {
@@ -386,25 +464,32 @@ impl SatCore {
         crate::stats::record_sat_call(call_duration, conflicts_delta, solve);
         Self::warn_long_call(call_duration, conflicts_delta, &solve, lits, "limited");
 
-        if matches!(solve, SolverResult::Interrupted) {
-            LIMITED_INTERRUPTED.fetch_add(1, Relaxed);
-        }
-        let total = LIMITED_CALLS.fetch_add(1, Relaxed) + 1;
-        if total >= RAMP_WARMUP {
-            let interrupted = LIMITED_INTERRUPTED.load(Relaxed);
-            let ratio = interrupted as f64 / total as f64;
-            if ratio >= RAMP_THRESHOLD {
-                let limit = CONFLICT_LIMIT.load(Relaxed);
-                let new_limit = (limit * 10).min(MAX_CONFLICT_LIMIT);
-                if new_limit > limit {
-                    eprintln!(
-                        "Auto-ramp: {interrupted}/{total} calls interrupted ({:.0}%), increasing conflict limit from {limit} to {new_limit}",
-                        ratio * 100.0,
-                    );
-                    CONFLICT_LIMIT.store(new_limit, Relaxed);
+        // Only feed the auto-ramp from default-budget calls.  Callers that
+        // pass a non-unit multiplier are deliberately picking a custom
+        // budget (e.g. random_solution's escalation chain); their
+        // interruptions shouldn't push the global limit up for unrelated
+        // MUS work happening in other threads.
+        if (work_mult - 1.0).abs() < f64::EPSILON {
+            if matches!(solve, SolverResult::Interrupted) {
+                LIMITED_INTERRUPTED.fetch_add(1, Relaxed);
+            }
+            let total = LIMITED_CALLS.fetch_add(1, Relaxed) + 1;
+            if total >= RAMP_WARMUP {
+                let interrupted = LIMITED_INTERRUPTED.load(Relaxed);
+                let ratio = interrupted as f64 / total as f64;
+                if ratio >= RAMP_THRESHOLD {
+                    let limit = CONFLICT_LIMIT.load(Relaxed);
+                    let new_limit = (limit * 10).min(MAX_CONFLICT_LIMIT);
+                    if new_limit > limit {
+                        eprintln!(
+                            "Auto-ramp: {interrupted}/{total} calls interrupted ({:.0}%), increasing conflict limit from {limit} to {new_limit}",
+                            ratio * 100.0,
+                        );
+                        CONFLICT_LIMIT.store(new_limit, Relaxed);
+                    }
+                    LIMITED_CALLS.store(0, Relaxed);
+                    LIMITED_INTERRUPTED.store(0, Relaxed);
                 }
-                LIMITED_CALLS.store(0, Relaxed);
-                LIMITED_INTERRUPTED.store(0, Relaxed);
             }
         }
 
@@ -429,13 +514,23 @@ impl SatCore {
         }
     }
 
-    pub fn assumption_solve(&self, known: &[Lit], lits: &[Lit]) -> SearchResult<bool> {
+    /// Solve under the global conflict limit, scaled by `work_mult`.
+    /// `work_mult == 1.0` keeps the current default behaviour; larger
+    /// values grant the solver more conflicts; `<= 0` or non-finite is
+    /// treated as "no limit".  Returns `Err(SearchError::Limit)` when the
+    /// solver hits the chosen budget without deciding.
+    pub fn assumption_solve(
+        &self,
+        known: &[Lit],
+        lits: &[Lit],
+        work_mult: f64,
+    ) -> SearchResult<bool> {
         let t0 = web_time::Instant::now();
         self.fix_values(known);
         let t1 = web_time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
         let t2 = web_time::Instant::now();
-        let solve = SatCore::do_solve_assumps(&mut solver, lits);
+        let solve = SatCore::do_solve_assumps(&mut solver, lits, work_mult);
         let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(true),
@@ -466,13 +561,14 @@ impl SatCore {
         &self,
         known: &[Lit],
         lits: &[Lit],
+        work_mult: f64,
     ) -> SearchResult<Option<Assignment>> {
         let t0 = web_time::Instant::now();
         self.fix_values(known);
         let t1 = web_time::Instant::now();
         let mut solver = self.solver.lock().unwrap();
         let t2 = web_time::Instant::now();
-        let solve = SatCore::do_solve_assumps(&mut solver, lits);
+        let solve = SatCore::do_solve_assumps(&mut solver, lits, work_mult);
         let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(Some(solver.full_solution().unwrap())),
@@ -581,7 +677,7 @@ impl SatCore {
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
         let t2 = web_time::Instant::now();
-        let solve = SatCore::do_solve_assumps(&mut solver, lits);
+        let solve = SatCore::do_solve_assumps(&mut solver, lits, 1.0);
         let t3 = web_time::Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(None),
@@ -741,11 +837,11 @@ mod tests {
     #[test]
     fn test_assumption_solve_solution() -> anyhow::Result<()> {
         let solver = SatCore::new(create_cnf())?;
-        let result = solver.assumption_solve_solution(&[], &[lit![1], lit![2]])?;
+        let result = solver.assumption_solve_solution(&[], &[lit![1], lit![2]], 1.0)?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[], &[lit![0]])?;
+        let result = solver.assumption_solve_solution(&[], &[lit![0]], 1.0)?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[], &[!lit![0]])?;
+        let result = solver.assumption_solve_solution(&[], &[!lit![0]], 1.0)?;
         assert!(result.is_none());
         Ok(())
     }
@@ -753,11 +849,11 @@ mod tests {
     #[test]
     fn test_assumption_solve_core() -> anyhow::Result<()> {
         let solver = SatCore::new(create_cnf())?;
-        let result = solver.assumption_solve_solution(&[], &[lit![1], lit![2]])?;
+        let result = solver.assumption_solve_solution(&[], &[lit![1], lit![2]], 1.0)?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[], &[lit![0]])?;
+        let result = solver.assumption_solve_solution(&[], &[lit![0]], 1.0)?;
         assert!(result.is_some());
-        let result = solver.assumption_solve_solution(&[], &[!lit![0]])?;
+        let result = solver.assumption_solve_solution(&[], &[!lit![0]], 1.0)?;
         assert!(result.is_none());
         Ok(())
     }
