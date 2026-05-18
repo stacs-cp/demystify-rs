@@ -86,13 +86,16 @@ const g = b.varBoolMatrix("g", [[1, 2], [1, 2]]);
 // belongs to exactly one family.
 const rule = b.conBool("rule");
 
-// "rule -> sum of (g[1,1] + g[1,2] + g[2,1] + g[2,2]) >= 2".  Pass each
-// literal in the sum via `.pos()` or `.neg()`; the array is consumed.
+// Attach family + description to the atom to form a single-use guard.
+const guard = b.guard(rule, "rule", "at least two of g are true");
+
+// "rule -> sum of (g[1,1] + g[1,2] + g[2,1] + g[2,2]) >= 2".  Each
+// literal in the sum is built via .pos() / .neg(); the array is consumed.
 b.sumGe(
-  rule,
+  guard,
   [g.get([1, 1]).pos(), g.get([1, 2]).pos(),
    g.get([2, 1]).pos(), g.get([2, 2]).pos()],
-  2, "rule", "at least two of g are true");
+  2);
 
 const puzzle = b.build();      // consumes the builder
 const planner = new WasmPlanner(puzzle);
@@ -116,9 +119,11 @@ Constructor: `new WasmBuilder()`.
 | `revealBoolMatrix(name, dims)` | Declare a `$#REVEAL`-target matrix (see below) |
 | `reveal(srcName, targetName)` | Wire up a reveal cascade |
 | `show(varName, role)` | `$#SHOW` directive; role is `"main"`, `"givens"`, `"cages"`, `"region_tint"`, `"cage_sums"`, `"less_than"`, `"side_labels"` |
-| `sumGe(guard, signed, k, family, description)` | Post `guard → sum(signed) ≥ k` and a `$#CON` entry |
-| `sumLe(guard, signed, k, family, description)` | Post `guard → sum(signed) ≤ k` |
-| `sumEq(guard, signed, k, family, description)` | Post `guard → sum(signed) = k` |
+| `andAtom(signed)` | Fresh atom equal to `AND(inputs)`; useful for multi-gate constraints |
+| `guard(atom, family, description)` | Pair an atom with a `$#CON` family + description; returns a single-use `WasmGuard` |
+| `sumGe(guard, signed, k)` | Post `guard.atom → sum(signed) ≥ k`; consumes `guard` |
+| `sumLe(guard, signed, k)` | Post `guard.atom → sum(signed) ≤ k` |
+| `sumEq(guard, signed, k)` | Post `guard.atom → sum(signed) = k` |
 | `sumEqUnguarded(signed, k)` | Post `sum(signed) = k` unconditionally (no `$#CON` entry — for one-hot encodings, givens, exclusions) |
 | `build()` | Finalise → `WasmPuzzle`. Throws on a second call. |
 
@@ -130,19 +135,38 @@ arrays passed to `sumGe` / `sumLe` / `sumEq` / `sumEqUnguarded`. Each `WasmAtom`
 takes `&self` in pos/neg, so a single atom can produce as many `WasmSigned`
 handles as you need.
 
-**Important marshalling note**: `WasmSigned` handles are *consumed* when the
-sum-array is read on the wasm side. Build each sum's array inline rather than
-holding `WasmSigned` values across calls.
+**Important marshalling note**: `WasmSigned` handles and `WasmGuard` are
+*consumed* when the sum_* method is called on the wasm side. Build them
+inline rather than holding the JS handles across calls.
 
 ```js
 // OK — fresh handles each call.
-b.sumGe(rule, [a.pos(), b.neg()], 1, "rule", "...");
+b.sumGe(b.guard(rule, "rule", "..."), [a.pos(), b.neg()], 1);
 
-// NOT OK — `s` is invalidated after the first sumGe.
-const s = a.pos();
-b.sumGe(rule, [s], 1, "rule", "...");
-b.sumGe(rule2, [s], 1, "rule", "...");   // error: handle consumed
+// NOT OK — `g` is invalidated after the first sumGe.
+const g = b.guard(rule, "rule", "...");
+b.sumGe(g, [a.pos()], 1);
+b.sumGe(g, [b.pos()], 1);   // error: handle consumed
 ```
+
+### Multi-gate constraints with `andAtom`
+
+To express `g1 ∧ g2 ∧ ... → constraint`, fold the gates into a fresh atom with
+`andAtom` and pass that atom to `guard`:
+
+```js
+const gate = b.andAtom([
+  sumcheck.get([i, j]).pos(),
+  facts.get([i, j, 0]).pos(),
+]);
+const g = b.guard(gate, "sumcheck", "...");
+b.sumEq(g, neighbours, nMines);
+```
+
+`andAtom` creates a fresh anonymous SAT atom `c` such that `c ↔ AND(inputs)`.
+The atom is not classified as `$#VAR` / `$#AUX` / `$#CON` / `$#REVEAL` — it's
+purely a SAT-level helper. When passed to `guard()`, it gets registered into
+the named `$#CON` family.
 
 ### Build-time validation
 
@@ -152,9 +176,10 @@ b.sumGe(rule2, [s], 1, "rule", "...");   // error: handle consumed
 - A `$#CON` family declared but never used (`UnusedFamily`).
 - A reveal target declared without a matching `reveal(...)` call
   (`UnusedRevealTarget`).
-- Duplicate constraint descriptions (each `description` argument to `sum_*`
+- Duplicate constraint descriptions (each `description` passed to `guard()`
   must be unique across the whole puzzle).
-- A `sum_*` guard atom from the wrong `$#CON` family.
+- A `guard()` call whose atom is already registered in a *different* `$#CON`
+  family.
 
 These surface as `JsError` exceptions on the JS side.
 

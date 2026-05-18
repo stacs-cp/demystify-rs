@@ -193,6 +193,41 @@ pub struct ConstraintHandle {
     pub lit: Lit,
 }
 
+/// Pairs an activation atom with the `$#CON` family it belongs to and a
+/// human-readable description.  Produced by [`PuzzleBuilder::guard`] and
+/// consumed by the `sum_*` constraint posts.
+///
+/// `Guard` is not `Copy`: each `guard()` call sets up a fresh constraint
+/// instance with its own description, so passing the same `Guard` to two
+/// `sum_*` calls would violate the "every description must be unique"
+/// invariant.  The type system reflects that.
+#[derive(Debug)]
+pub struct Guard {
+    pub(crate) atom: Atom,
+    pub(crate) family: String,
+    pub(crate) description: String,
+}
+
+impl Guard {
+    /// The activation atom — true when the constraint should fire.
+    #[must_use]
+    pub fn atom(&self) -> Atom {
+        self.atom
+    }
+
+    /// The `$#CON` family name this constraint belongs to.
+    #[must_use]
+    pub fn family(&self) -> &str {
+        &self.family
+    }
+
+    /// The human-readable description.
+    #[must_use]
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+}
+
 /// Mutable handle for adding members to an in-progress `$#FAMILY` group.
 pub struct FamilyMut<'a> {
     group_id: String,
@@ -530,61 +565,125 @@ impl PuzzleBuilder {
         self.sat.add_nary(&clause);
     }
 
-    /// Post `guard -> (sum(signed) >= k)` and register a `$#CON` entry.
+    /// Create a fresh anonymous atom `c` such that
+    /// `c ↔ AND(inputs)` holds in CNF.  The returned atom is *not*
+    /// classified as `$#VAR` / `$#AUX` / `$#CON` / `$#REVEAL` — it is
+    /// purely a SAT-level helper.  Pass it to [`Self::guard`] (or use
+    /// it directly inside a `sum_*` literal list) as needed.
     ///
-    /// `family` must be the name of a previously-declared
-    /// `con_bool_matrix` (or `con_bool`); the activation lit `guard`
-    /// must be one of that family's atoms (or any [`Atom`] whose
-    /// `=true` lit you want to act as the guard).  `description` is
-    /// the human-readable label demystify shows in explanations and
-    /// must be unique across all constraints in the puzzle.
+    /// # Panics
+    ///
+    /// Panics if `inputs` is empty.  `AND()` over zero inputs is
+    /// trivially `true`, which makes the call meaningless — use the
+    /// input lit directly.
+    pub fn and_atom(&mut self, inputs: &[Signed]) -> Atom {
+        assert!(
+            !inputs.is_empty(),
+            "and_atom called with empty inputs — use the input lit directly"
+        );
+        let c = self.sat.new_lit();
+        // c → input_i: clause (¬c, input_i)
+        for s in inputs {
+            self.sat.add_nary(&[!c, s.as_lit()]);
+        }
+        // AND(inputs) → c: clause (c, ¬input_1, …, ¬input_n)
+        let mut tail: Vec<Lit> = Vec::with_capacity(inputs.len() + 1);
+        tail.push(c);
+        for s in inputs {
+            tail.push(!s.as_lit());
+        }
+        self.sat.add_nary(&tail);
+        Atom { lit: c }
+    }
+
+    /// Pair an activation atom with the `$#CON` family it belongs to
+    /// and a human-readable description, producing a [`Guard`] ready
+    /// to feed into `sum_ge` / `sum_le` / `sum_eq`.
+    ///
+    /// `atom` may be either:
+    /// - an atom declared via [`Self::con_bool`] / [`Self::con_bool_matrix`]
+    ///   for the named family (its family membership is already known),
+    /// - or any other atom — including a fresh one returned by
+    ///   [`Self::and_atom`] — in which case it is registered into the
+    ///   named family by this call.
+    ///
+    /// Errors if `family` is unknown, if `atom` is already registered in
+    /// a *different* `$#CON` family, or if `description` has already
+    /// been used in this puzzle (descriptions must be unique).
+    pub fn guard(
+        &mut self,
+        atom: Atom,
+        family: &str,
+        description: impl Into<String>,
+    ) -> Result<Guard, BuildError> {
+        if !self.con_families.contains_key(family) {
+            return Err(BuildError::UnknownFamily(family.to_string()));
+        }
+        match self.con_atom_family.get(&atom.lit).cloned() {
+            Some(actual) if actual == family => {}
+            Some(other) => {
+                return Err(BuildError::GuardFromWrongFamily {
+                    expected: family.to_string(),
+                    actual: Some(other),
+                });
+            }
+            None => {
+                self.con_atom_family.insert(atom.lit, family.to_string());
+                self.con_atom_family.insert(!atom.lit, family.to_string());
+            }
+        }
+        let description = description.into();
+        if !self.used_descriptions.insert(description.clone()) {
+            return Err(BuildError::DuplicateConstraintDescription(description));
+        }
+        Ok(Guard {
+            atom,
+            family: family.to_string(),
+            description,
+        })
+    }
+
+    /// Post `guard.atom() -> (sum(signed) >= k)` and register a `$#CON`
+    /// entry using the family + description carried by `guard`.
     pub fn sum_ge(
         &mut self,
-        guard: Atom,
+        guard: Guard,
         signed: &[Signed],
         k: i64,
-        family: &str,
-        description: impl Into<String>,
     ) -> Result<ConstraintHandle, BuildError> {
-        let description = description.into();
-        self.register_con(family, &description, guard, signed)?;
+        let lit = guard.atom.lit;
+        self.register_con_from_guard(guard, signed)?;
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_ge(&mut self.sat, &raw_lits, k, Some(guard.lit))?;
-        Ok(ConstraintHandle { lit: guard.lit })
+        encode_sum_ge(&mut self.sat, &raw_lits, k, Some(lit))?;
+        Ok(ConstraintHandle { lit })
     }
 
-    /// Post `guard -> (sum(signed) <= k)` and register a `$#CON` entry.
-    /// See [`Self::sum_ge`] for the full contract.
+    /// Post `guard.atom() -> (sum(signed) <= k)`.  See [`Self::sum_ge`].
     pub fn sum_le(
         &mut self,
-        guard: Atom,
+        guard: Guard,
         signed: &[Signed],
         k: i64,
-        family: &str,
-        description: impl Into<String>,
     ) -> Result<ConstraintHandle, BuildError> {
-        let description = description.into();
-        self.register_con(family, &description, guard, signed)?;
+        let lit = guard.atom.lit;
+        self.register_con_from_guard(guard, signed)?;
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_le(&mut self.sat, &raw_lits, k, Some(guard.lit))?;
-        Ok(ConstraintHandle { lit: guard.lit })
+        encode_sum_le(&mut self.sat, &raw_lits, k, Some(lit))?;
+        Ok(ConstraintHandle { lit })
     }
 
-    /// Post `guard -> (sum(signed) == k)` and register a `$#CON` entry.
-    /// Same contract as [`Self::sum_ge`].
+    /// Post `guard.atom() -> (sum(signed) == k)`.  See [`Self::sum_ge`].
     pub fn sum_eq(
         &mut self,
-        guard: Atom,
+        guard: Guard,
         signed: &[Signed],
         k: i64,
-        family: &str,
-        description: impl Into<String>,
     ) -> Result<ConstraintHandle, BuildError> {
-        let description = description.into();
-        self.register_con(family, &description, guard, signed)?;
+        let lit = guard.atom.lit;
+        self.register_con_from_guard(guard, signed)?;
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_eq(&mut self.sat, &raw_lits, k, Some(guard.lit))?;
-        Ok(ConstraintHandle { lit: guard.lit })
+        encode_sum_eq(&mut self.sat, &raw_lits, k, Some(lit))?;
+        Ok(ConstraintHandle { lit })
     }
 
     /// Post `sum(signed) == k` unconditionally as plain CNF, with no
@@ -597,33 +696,19 @@ impl PuzzleBuilder {
         Ok(())
     }
 
-    fn register_con(
+    /// Common post-guard work: track referenced vars and insert the
+    /// constraint into the constraint store.  Family + description have
+    /// already been validated when the `Guard` was built.
+    fn register_con_from_guard(
         &mut self,
-        family: &str,
-        description: &str,
-        guard: Atom,
+        guard: Guard,
         signed: &[Signed],
     ) -> Result<(), BuildError> {
-        if !self.con_families.contains_key(family) {
-            return Err(BuildError::UnknownFamily(family.to_string()));
-        }
-        // Validate that the guard atom was declared as part of the named
-        // family.  A guard from a different family (or no family at all)
-        // would silently corrupt the constraint store's family tracking.
-        match self.con_atom_family.get(&guard.lit) {
-            Some(actual) if actual == family => {}
-            other => {
-                return Err(BuildError::GuardFromWrongFamily {
-                    expected: family.to_string(),
-                    actual: other.cloned(),
-                });
-            }
-        }
-        if !self.used_descriptions.insert(description.to_string()) {
-            return Err(BuildError::DuplicateConstraintDescription(
-                description.to_string(),
-            ));
-        }
+        let Guard {
+            atom,
+            family,
+            description,
+        } = guard;
         // Collect both orientations of each user-facing atom in the sum,
         // mirroring how Conjure-built models populate `varlits_in_con`.
         let mut var_lits: Vec<Lit> = Vec::with_capacity(signed.len() * 2);
@@ -638,18 +723,12 @@ impl PuzzleBuilder {
                 }
             }
         }
-        // Sort & dedupe so the stored varlits list is canonical.
         var_lits.sort_by_key(|l| l.to_ipasir());
         var_lits.dedup();
 
-        self.used_con_families.insert(family.to_string());
+        self.used_con_families.insert(family.clone());
         self.constraints
-            .insert(
-                guard.lit,
-                family.to_string(),
-                description.to_string(),
-                var_lits,
-            )
+            .insert(atom.lit, family, description, var_lits)
             .map_err(|e| BuildError::Other(e.context("ConstraintStore::insert failed")))?;
         Ok(())
     }
@@ -891,11 +970,9 @@ mod tests {
         let mut b = PuzzleBuilder::new();
         let v = b.var_bool_matrix("g", &[1..=2]);
         let act = b.con_bool_matrix("rule", &[1..=2]);
-        b.sum_ge(act.get(&[1]), &[v.get(&[1]).pos()], 1, "rule", "desc")
-            .unwrap();
-        let err = b
-            .sum_ge(act.get(&[2]), &[v.get(&[2]).pos()], 1, "rule", "desc")
-            .unwrap_err();
+        let g1 = b.guard(act.get(&[1]), "rule", "desc").unwrap();
+        b.sum_ge(g1, &[v.get(&[1]).pos()], 1).unwrap();
+        let err = b.guard(act.get(&[2]), "rule", "desc").unwrap_err();
         assert!(matches!(err, BuildError::DuplicateConstraintDescription(_)));
     }
 
@@ -911,13 +988,11 @@ mod tests {
     #[test]
     fn guard_from_other_family_rejected() {
         let mut b = PuzzleBuilder::new();
-        let v = b.var_bool_matrix("g", &[1..=2]);
+        let _v = b.var_bool_matrix("g", &[1..=2]);
         let foo = b.con_bool_matrix("foo", &[1..=2]);
         let _bar = b.con_bool_matrix("bar", &[1..=2]);
         // foo[1] does not belong to family "bar".
-        let err = b
-            .sum_ge(foo.get(&[1]), &[v.get(&[1]).pos()], 1, "bar", "desc")
-            .unwrap_err();
+        let err = b.guard(foo.get(&[1]), "bar", "desc").unwrap_err();
         assert!(matches!(
             err,
             BuildError::GuardFromWrongFamily { expected, actual: Some(a) }
@@ -926,18 +1001,16 @@ mod tests {
     }
 
     #[test]
-    fn guard_from_var_atom_rejected() {
+    fn fresh_atom_can_be_guard_in_any_family() {
+        // After the Guard refactor, atoms not already in any $#CON family
+        // (e.g. a $#VAR atom or a fresh and_atom) can be registered into
+        // a family at `guard()` time. Family validation only rejects
+        // atoms already mapped to a *different* family.
         let mut b = PuzzleBuilder::new();
         let v = b.var_bool_matrix("g", &[1..=2]);
         let _rule = b.con_bool_matrix("rule", &[1..=2]);
-        // v[1] is a $#VAR atom, not a constraint activation lit at all.
-        let err = b
-            .sum_ge(v.get(&[1]), &[v.get(&[2]).pos()], 1, "rule", "desc")
-            .unwrap_err();
-        assert!(matches!(
-            err,
-            BuildError::GuardFromWrongFamily { actual: None, .. }
-        ));
+        let g = b.guard(v.get(&[1]), "rule", "desc").unwrap();
+        b.sum_ge(g, &[v.get(&[2]).pos()], 1).unwrap();
     }
 
     /// Build a tiny puzzle that uses sum_ge with one positive and one
@@ -950,14 +1023,9 @@ mod tests {
         let mut b = PuzzleBuilder::new();
         let v = b.var_bool_matrix("g", &[1..=2]);
         let rule = b.con_bool("rule");
-        b.sum_ge(
-            rule,
-            &[v.get(&[1]).pos(), v.get(&[2]).neg()],
-            1,
-            "rule",
-            "g[1] or not g[2]",
-        )
-        .unwrap();
+        let g = b.guard(rule, "rule", "g[1] or not g[2]").unwrap();
+        b.sum_ge(g, &[v.get(&[1]).pos(), v.get(&[2]).neg()], 1)
+            .unwrap();
         let puzzle = b.build().unwrap();
         let cnf = puzzle.cnf.as_ref().unwrap().as_ref().clone();
         let g1_lit = puzzle
@@ -1014,14 +1082,8 @@ mod tests {
         let mut b = PuzzleBuilder::new();
         let stars = b.var_bool_matrix("stars", &[1..=1]);
         let must = b.con_bool("must");
-        b.sum_ge(
-            must,
-            &[stars.get(&[1]).pos()],
-            1,
-            "must",
-            "at least one star",
-        )
-        .unwrap();
+        let g = b.guard(must, "must", "at least one star").unwrap();
+        b.sum_ge(g, &[stars.get(&[1]).pos()], 1).unwrap();
         // Pin stars[1] = false via a raw unit clause.
         b.add_clause([!stars.get(&[1]).lit()]);
         let puzzle = b.build().unwrap();
@@ -1050,14 +1112,11 @@ mod tests {
         // Two constraints, each referencing the aux atom on the same side
         // as a star: rule[i] → (helper[i] ∨ g[i]) ≥ 1.
         for i in 1..=2 {
-            b.sum_ge(
-                rule.get(&[i]),
-                &[helper.get(&[i]).pos(), v.get(&[i]).pos()],
-                1,
-                "rule",
-                format!("helper[{i}] or g[{i}]"),
-            )
-            .unwrap();
+            let g = b
+                .guard(rule.get(&[i]), "rule", format!("helper[{i}] or g[{i}]"))
+                .unwrap();
+            b.sum_ge(g, &[helper.get(&[i]).pos(), v.get(&[i]).pos()], 1)
+                .unwrap();
         }
         let puzzle = b.build().unwrap();
         assert!(puzzle.eprime.auxvars.contains("helper"));
@@ -1071,14 +1130,9 @@ mod tests {
         let v = b.var_bool_matrix("g", &[1..=2]);
         let force = b.con_bool("force");
         // One real $#CON so the builder still has something registered.
-        b.sum_ge(
-            force,
-            &[v.get(&[1]).pos(), v.get(&[2]).pos()],
-            1,
-            "force",
-            "at least one g is true",
-        )
-        .unwrap();
+        let g = b.guard(force, "force", "at least one g is true").unwrap();
+        b.sum_ge(g, &[v.get(&[1]).pos(), v.get(&[2]).pos()], 1)
+            .unwrap();
         // Unguarded sum_eq for setup: exactly one of g[1], g[2] is true.
         b.sum_eq_unguarded(&[v.get(&[1]).pos(), v.get(&[2]).pos()], 1)
             .unwrap();

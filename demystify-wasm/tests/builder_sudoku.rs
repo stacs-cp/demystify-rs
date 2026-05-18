@@ -72,14 +72,14 @@ fn build_sudoku_4x4() -> WasmPuzzle {
             let lits: Vec<_> = (1..=N)
                 .map(|c| cell.get(vec![r, c, v]).expect("cell").pos())
                 .collect();
-            b.sum_eq(
-                &row_uniq.get(vec![r, v]).expect("row_uniq atom"),
-                lits,
-                1,
-                "row_uniq",
-                &format!("value {v} appears exactly once in row {r}"),
-            )
-            .expect("row_uniq sum_eq");
+            let g = b
+                .guard(
+                    &row_uniq.get(vec![r, v]).expect("row_uniq atom"),
+                    "row_uniq",
+                    &format!("value {v} appears exactly once in row {r}"),
+                )
+                .expect("row_uniq guard");
+            b.sum_eq(g, lits, 1).expect("row_uniq sum_eq");
         }
     }
 
@@ -92,14 +92,14 @@ fn build_sudoku_4x4() -> WasmPuzzle {
             let lits: Vec<_> = (1..=N)
                 .map(|r| cell.get(vec![r, c, v]).expect("cell").pos())
                 .collect();
-            b.sum_eq(
-                &col_uniq.get(vec![c, v]).expect("col_uniq atom"),
-                lits,
-                1,
-                "col_uniq",
-                &format!("value {v} appears exactly once in column {c}"),
-            )
-            .expect("col_uniq sum_eq");
+            let g = b
+                .guard(
+                    &col_uniq.get(vec![c, v]).expect("col_uniq atom"),
+                    "col_uniq",
+                    &format!("value {v} appears exactly once in column {c}"),
+                )
+                .expect("col_uniq guard");
+            b.sum_eq(g, lits, 1).expect("col_uniq sum_eq");
         }
     }
 
@@ -113,14 +113,14 @@ fn build_sudoku_4x4() -> WasmPuzzle {
                 .into_iter()
                 .map(|(r, c)| cell.get(vec![r, c, v]).expect("cell").pos())
                 .collect();
-            b.sum_eq(
-                &box_uniq.get(vec![bi, v]).expect("box_uniq atom"),
-                lits,
-                1,
-                "box_uniq",
-                &format!("value {v} appears exactly once in box {bi}"),
-            )
-            .expect("box_uniq sum_eq");
+            let g = b
+                .guard(
+                    &box_uniq.get(vec![bi, v]).expect("box_uniq atom"),
+                    "box_uniq",
+                    &format!("value {v} appears exactly once in box {bi}"),
+                )
+                .expect("box_uniq guard");
+            b.sum_eq(g, lits, 1).expect("box_uniq sum_eq");
         }
     }
 

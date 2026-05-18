@@ -40,43 +40,43 @@ fn build_star_battle_1() -> PuzzleParse {
     // Row sums.
     for i in 1..=grid_size {
         let row: Vec<_> = (1..=grid_size).map(|j| stars.get(&[i, j]).pos()).collect();
-        b.sum_ge(
-            rowup.get(&[i]),
-            &row,
-            starcount,
-            "rowup",
-            format!("at least {starcount} star(s) in row ({i})"),
-        )
-        .unwrap();
-        b.sum_le(
-            rowdown.get(&[i]),
-            &row,
-            starcount,
-            "rowdown",
-            format!("at most {starcount} star(s) in row ({i})"),
-        )
-        .unwrap();
+        let gu = b
+            .guard(
+                rowup.get(&[i]),
+                "rowup",
+                format!("at least {starcount} star(s) in row ({i})"),
+            )
+            .unwrap();
+        b.sum_ge(gu, &row, starcount).unwrap();
+        let gd = b
+            .guard(
+                rowdown.get(&[i]),
+                "rowdown",
+                format!("at most {starcount} star(s) in row ({i})"),
+            )
+            .unwrap();
+        b.sum_le(gd, &row, starcount).unwrap();
     }
 
     // Column sums.
     for j in 1..=grid_size {
         let col: Vec<_> = (1..=grid_size).map(|i| stars.get(&[i, j]).pos()).collect();
-        b.sum_ge(
-            colup.get(&[j]),
-            &col,
-            starcount,
-            "colup",
-            format!("at least {starcount} star(s) in column ({j})"),
-        )
-        .unwrap();
-        b.sum_le(
-            coldown.get(&[j]),
-            &col,
-            starcount,
-            "coldown",
-            format!("at most {starcount} star(s) in column ({j})"),
-        )
-        .unwrap();
+        let gu = b
+            .guard(
+                colup.get(&[j]),
+                "colup",
+                format!("at least {starcount} star(s) in column ({j})"),
+            )
+            .unwrap();
+        b.sum_ge(gu, &col, starcount).unwrap();
+        let gd = b
+            .guard(
+                coldown.get(&[j]),
+                "coldown",
+                format!("at most {starcount} star(s) in column ({j})"),
+            )
+            .unwrap();
+        b.sum_le(gd, &col, starcount).unwrap();
     }
 
     // Block sums.
@@ -89,22 +89,22 @@ fn build_star_battle_1() -> PuzzleParse {
                 }
             }
         }
-        b.sum_ge(
-            blockup.get(&[block]),
-            &cells,
-            starcount,
-            "blockup",
-            format!("at least {starcount} star(s) in box ({block})"),
-        )
-        .unwrap();
-        b.sum_le(
-            blockdown.get(&[block]),
-            &cells,
-            starcount,
-            "blockdown",
-            format!("at most {starcount} star(s) in box ({block})"),
-        )
-        .unwrap();
+        let gu = b
+            .guard(
+                blockup.get(&[block]),
+                "blockup",
+                format!("at least {starcount} star(s) in box ({block})"),
+            )
+            .unwrap();
+        b.sum_ge(gu, &cells, starcount).unwrap();
+        let gd = b
+            .guard(
+                blockdown.get(&[block]),
+                "blockdown",
+                format!("at most {starcount} star(s) in box ({block})"),
+            )
+            .unwrap();
+        b.sum_le(gd, &cells, starcount).unwrap();
     }
 
     // Adjacency: for each (i, j) and each (k, l) ≠ (0, 0)/(0, 1), if both
@@ -128,12 +128,17 @@ fn build_star_battle_1() -> PuzzleParse {
                         // we don't post an empty-sum constraint.
                         continue;
                     }
+                    let g = b
+                        .guard(
+                            adj.get(&[i, j, k, l]),
+                            "adj",
+                            format!("({i}, {j}) and ({i2}, {j2}) are adjacent"),
+                        )
+                        .unwrap();
                     b.sum_le(
-                        adj.get(&[i, j, k, l]),
+                        g,
                         &[stars.get(&[i, j]).pos(), stars.get(&[i2, j2]).pos()],
                         1,
-                        "adj",
-                        format!("({i}, {j}) and ({i2}, {j2}) are adjacent"),
                     )
                     .unwrap();
                 }

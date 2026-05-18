@@ -13,12 +13,26 @@
 //! b:kind("toy")
 //! local g = b:var_bool_matrix("g", {{1, 2}, {1, 2}})
 //! local rule = b:con_bool("rule")
-//! b:sum_ge(rule,
+//! local guard = b:guard(rule, "rule", "at least two cells are true")
+//! b:sum_ge(guard,
 //!   { g:get({1, 1}):pos(), g:get({1, 2}):pos(),
 //!     g:get({2, 1}):pos(), g:get({2, 2}):pos() },
-//!   2, "rule", "at least two cells are true")
+//!   2)
 //! local puzzle = b:build()
 //! local planner = d.Planner.new(puzzle)
+//! ```
+//!
+//! Multi-gate (e.g. `$#REVEAL`-driven) constraints use `b:and_atom` to
+//! combine the gates into a fresh atom, then `b:guard` to attach the
+//! family and description:
+//!
+//! ```lua
+//! local gate = b:and_atom({
+//!     sumcheck:get({i, j}):pos(),
+//!     facts:get({i, j, 0}):pos(),
+//! })
+//! local g = b:guard(gate, "sumcheck", "...")
+//! b:sum_eq(g, neighbours, n_mines)
 //! ```
 //!
 //! # Lua surface
@@ -38,9 +52,11 @@
 //! | `b:reveal_bool_matrix(name, dims)` | Declare a `$#REVEAL`-target matrix |
 //! | `b:reveal(src, target)` | Register `target` as `src`'s reveal target |
 //! | `b:show(var, role)` | Register a `$#SHOW` directive — `role` is a lowercase string |
-//! | `b:sum_ge(guard, signed, k, family, description)` | Post `guard → sum ≥ k` |
-//! | `b:sum_le(guard, signed, k, family, description)` | Post `guard → sum ≤ k` |
-//! | `b:sum_eq(guard, signed, k, family, description)` | Post `guard → sum = k` |
+//! | `b:and_atom({signed, ...})` | Fresh atom equal to AND of the input signed lits |
+//! | `b:guard(atom, family, description)` | Wrap an atom with a family + description, returns a single-use `Guard` |
+//! | `b:sum_ge(guard, signed, k)` | Post `guard.atom → sum ≥ k` (consumes guard) |
+//! | `b:sum_le(guard, signed, k)` | Post `guard.atom → sum ≤ k` (consumes guard) |
+//! | `b:sum_eq(guard, signed, k)` | Post `guard.atom → sum = k` (consumes guard) |
 //! | `b:sum_eq_unguarded(signed, k)` | Post `sum = k` unconditionally, no `$#CON` entry |
 //! | `b:build()` | Finalise into a Puzzle (consumes the builder) |
 //!
@@ -68,7 +84,7 @@ use std::sync::{Arc, Mutex};
 use mlua::FromLua;
 use mlua::prelude::*;
 
-use demystify_builder::{Atom, BoolMatrix, PuzzleBuilder, ShowRole, Signed};
+use demystify_builder::{Atom, BoolMatrix, Guard, PuzzleBuilder, ShowRole, Signed};
 
 use crate::puzzle::LuaPuzzle;
 
@@ -173,6 +189,38 @@ impl LuaUserData for LuaBoolMatrix {
         });
     }
 }
+
+/// Single-use guard handle.  Returned by `b:guard(atom, family, description)`
+/// and consumed by the first `sum_*` call that uses it.  All Lua handles
+/// share the same inner `Option<Guard>` via `Arc<Mutex<…>>`, so passing the
+/// same Lua-side value to two `sum_*` calls errors on the second attempt.
+#[derive(Clone)]
+pub struct LuaGuard {
+    inner: Arc<Mutex<Option<Guard>>>,
+}
+
+impl LuaGuard {
+    fn take(&self) -> LuaResult<Guard> {
+        self.inner.lock().unwrap().take().ok_or_else(|| {
+            LuaError::RuntimeError("Guard has already been consumed by a sum_* call".to_string())
+        })
+    }
+}
+
+impl FromLua for LuaGuard {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::UserData(ud) => ud.borrow::<LuaGuard>().map(|g| g.clone()),
+            _ => Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "Guard".to_string(),
+                message: Some("expected a Guard userdata (from b:guard(...))".to_string()),
+            }),
+        }
+    }
+}
+
+impl LuaUserData for LuaGuard {}
 
 /// The Lua-facing builder.  Wraps an `Option<PuzzleBuilder>` so `build()`
 /// can consume the inner builder; subsequent calls error rather than panic.
@@ -285,12 +333,40 @@ impl LuaUserData for LuaBuilder {
             })
         });
 
+        methods.add_method("and_atom", |_, this, inputs: LuaTable| {
+            let inputs = lua_signed_list(&inputs)?;
+            if inputs.is_empty() {
+                return Err(LuaError::RuntimeError(
+                    "and_atom requires at least one input".to_string(),
+                ));
+            }
+            this.with_mut(|b| {
+                Ok(LuaAtom {
+                    inner: b.and_atom(&inputs),
+                })
+            })
+        });
+
+        methods.add_method(
+            "guard",
+            |_, this, (atom, family, description): (LuaAtom, String, String)| {
+                this.with_mut(|b| {
+                    b.guard(atom.inner, &family, description)
+                        .map(|g| LuaGuard {
+                            inner: Arc::new(Mutex::new(Some(g))),
+                        })
+                        .map_err(|e| LuaError::RuntimeError(e.to_string()))
+                })
+            },
+        );
+
         methods.add_method(
             "sum_ge",
-            |_, this, (guard, signed, k, family, description): (LuaAtom, LuaTable, i64, String, String)| {
+            |_, this, (guard, signed, k): (LuaGuard, LuaTable, i64)| {
                 let signed = lua_signed_list(&signed)?;
+                let g = guard.take()?;
                 this.with_mut(|b| {
-                    b.sum_ge(guard.inner, &signed, k, &family, description)
+                    b.sum_ge(g, &signed, k)
                         .map(|_| ())
                         .map_err(|e| LuaError::RuntimeError(e.to_string()))
                 })
@@ -299,10 +375,11 @@ impl LuaUserData for LuaBuilder {
 
         methods.add_method(
             "sum_le",
-            |_, this, (guard, signed, k, family, description): (LuaAtom, LuaTable, i64, String, String)| {
+            |_, this, (guard, signed, k): (LuaGuard, LuaTable, i64)| {
                 let signed = lua_signed_list(&signed)?;
+                let g = guard.take()?;
                 this.with_mut(|b| {
-                    b.sum_le(guard.inner, &signed, k, &family, description)
+                    b.sum_le(g, &signed, k)
                         .map(|_| ())
                         .map_err(|e| LuaError::RuntimeError(e.to_string()))
                 })
@@ -311,10 +388,11 @@ impl LuaUserData for LuaBuilder {
 
         methods.add_method(
             "sum_eq",
-            |_, this, (guard, signed, k, family, description): (LuaAtom, LuaTable, i64, String, String)| {
+            |_, this, (guard, signed, k): (LuaGuard, LuaTable, i64)| {
                 let signed = lua_signed_list(&signed)?;
+                let g = guard.take()?;
                 this.with_mut(|b| {
-                    b.sum_eq(guard.inner, &signed, k, &family, description)
+                    b.sum_eq(g, &signed, k)
                         .map(|_| ())
                         .map_err(|e| LuaError::RuntimeError(e.to_string()))
                 })

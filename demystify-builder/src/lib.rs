@@ -32,10 +32,11 @@
 //! b.kind("toy");
 //! let g = b.var_bool_matrix("g", &[1..=2, 1..=2]);
 //! b.show("g", ShowRole::Main);
-//! let act = b.aux_bool("rule");
+//! let rule = b.con_bool("rule");
 //! // "at least 2 of g[1,1], g[1,2], g[2,1], g[2,2]"
+//! let guard = b.guard(rule, "rule", "at least 2 cells are true").unwrap();
 //! b.sum_ge(
-//!     act,
+//!     guard,
 //!     &[
 //!         g.get(&[1, 1]).pos(),
 //!         g.get(&[1, 2]).pos(),
@@ -43,17 +44,29 @@
 //!         g.get(&[2, 2]).pos(),
 //!     ],
 //!     2,
-//!     "rule",
-//!     "at least 2 cells are true",
 //! );
 //! let _puzzle = b.build().expect("build");
+//! ```
+//!
+//! For multi-gate constraints (e.g. minesweeper's
+//! `sumcheck[i,j] ∧ facts[i,j,d] → ...`), use [`PuzzleBuilder::and_atom`]
+//! to fold the extra preconditions into a single fresh atom and pass
+//! that atom to [`PuzzleBuilder::guard`]:
+//!
+//! ```ignore
+//! let gate = b.and_atom(&[
+//!     sumcheck.get(&[i, j]).pos(),
+//!     facts.get(&[i, j, d]).pos(),
+//! ]);
+//! let g = b.guard(gate, "sumcheck", "...")?;
+//! b.sum_eq(g, &neighbours, n_mines)?;
 //! ```
 
 mod builder;
 mod cardinality;
 mod error;
 
-pub use builder::{Atom, BoolMatrix, ConstraintHandle, FamilyMut, PuzzleBuilder, Signed};
+pub use builder::{Atom, BoolMatrix, ConstraintHandle, FamilyMut, Guard, PuzzleBuilder, Signed};
 pub use demystify::problem::parse::{PuzzleParse, ShowRole};
 pub use error::BuildError;
 pub use rustsat::types::Lit;

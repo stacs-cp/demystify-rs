@@ -59,14 +59,14 @@ fn build_minesweeper_3x3() -> PuzzleParse {
                 }
             }
         }
-        b.sum_eq(
-            sumcheck.get(&[r, c]),
-            &neighbours,
-            n_mines,
-            "sumcheck",
-            format!("exactly {n_mines} mines around ({r}, {c})"),
-        )
-        .unwrap();
+        let g = b
+            .guard(
+                sumcheck.get(&[r, c]),
+                "sumcheck",
+                format!("exactly {n_mines} mines around ({r}, {c})"),
+            )
+            .unwrap();
+        b.sum_eq(g, &neighbours, n_mines).unwrap();
     }
 
     b.build().unwrap()

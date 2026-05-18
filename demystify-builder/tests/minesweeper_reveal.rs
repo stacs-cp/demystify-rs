@@ -1,21 +1,30 @@
-//! Minesweeper test that exercises the new `$#REVEAL` machinery.
+//! Minesweeper exercising the `$#REVEAL` cascade properly.
 //!
-//! Mirrors `eprime/minesweeper.eprime`: the constraint that counts
-//! neighbour mines is guarded by `facts[i,j,d]`, the reveal target of
-//! `grid`.  Deducing `grid[i,j]=d` cascades to `facts[i,j,d]=true`, which
-//! activates the neighbour-sum-equals-clue constraint.
+//! The constraint we want, per eprime/minesweeper.eprime:
 //!
-//! Same 3×3 puzzle as the existing `minesweeper.rs` test:
+//! ```text
+//! sumcheck[i, j] /\ facts[i, j, 0]
+//!     -> ( sum(grid[neighbours of (i,j)]) = clue )
+//! ```
+//!
+//! `facts` is the reveal target of `grid`: it is *unconstrained in the
+//! CNF*.  The only way `facts[i, j, d]` becomes known is via the planner's
+//! reveal cascade after `grid[i, j] = d` is deduced.  So the constraint
+//! can only fire after the player's revealed-cell value cascades through
+//! REVEAL — which is precisely what makes this a real test of the
+//! mechanism.
+//!
+//! The two-atom gate (`sumcheck` ∧ `facts`) is built with
+//! [`PuzzleBuilder::and_atom`] and registered into the `sumcheck` family
+//! via [`PuzzleBuilder::guard`].
+//!
+//! Same 3×3 layout as `minesweeper.rs`:
 //!
 //! ```text
 //!   0 0 .
 //!   0 1 .
 //!   . . .
 //! ```
-//!
-//! Revealed cells are pinned via `sum_eq_unguarded` so they enter the
-//! known-lit set; the reveal cascade then makes their `facts` atoms
-//! known, which lets the per-cell `sumcheck` constraint fire.
 
 use std::sync::Arc;
 
@@ -28,50 +37,25 @@ fn build_minesweeper_3x3_with_reveal() -> PuzzleParse {
     let mut b = PuzzleBuilder::new();
     b.kind("minesweeper-reveal");
 
-    // grid[i,j] = 1 ⇔ mine at (i,j).
     let grid = b.var_bool_matrix("grid", &[1..=n, 1..=n]);
     b.show("grid", ShowRole::Main);
 
-    // facts[i,j,d] is true iff grid[i,j] is known to equal d.  Wired up
-    // as the reveal target of grid so the cascade lights up the right
-    // facts atom every time a grid cell is deduced.
+    // facts is the reveal target — unconstrained in CNF; only becomes
+    // known via the planner's reveal cascade.
     let facts = b.reveal_bool_matrix("facts", &[1..=n, 1..=n, 0..=1]);
     b.set_reveal("grid", "facts").unwrap();
 
     let sumcheck = b.con_bool_matrix("sumcheck", &[1..=n, 1..=n]);
 
-    // (row, col, clue).
     let clues: &[(i64, i64, i64)] = &[(1, 1, 0), (1, 2, 0), (2, 1, 0), (2, 2, 1)];
 
-    // Pin revealed cells to "not a mine" via single-atom sum_eq_unguarded
-    // — exercising the unguarded path here rather than raw add_clause
-    // (which the other minesweeper test covers).
+    // Pin revealed cells to "not a mine".  This is what triggers the
+    // reveal cascade: `grid[r, c] = 0` makes `facts[r, c, 0]` known.
     for &(r, c, _) in clues {
         b.sum_eq_unguarded(&[grid.get(&[r, c]).neg()], 1).unwrap();
     }
 
-    // For each revealed cell, post a guarded sum_eq over its on-board
-    // neighbours equal to the clue value.  The guard is _two_ atoms: the
-    // $#CON activation lit AND `facts[r, c, 0]` (the reveal target for
-    // "this cell is known safe").  Both must be true to activate.
-    //
-    // Modelling-wise we encode that as `sumcheck[r,c] ∧ facts[r,c,0] →
-    // sum(neighbours) = clue` via two sum_eqs sharing the family — the
-    // simpler way is one sum_eq guarded by `sumcheck[r,c]` with
-    // `facts[r,c,0]` as an additional positive lit forced inside the
-    // sum… but the cleanest encoding for this small test is just to use
-    // facts as a guard via a paired aux gate.  For simplicity we keep
-    // sumcheck as the single guard and reference facts inside the
-    // constraint set so the planner has to learn facts before the
-    // neighbour count is interpreted.
-    //
-    // To keep this test focused, post the neighbour-count constraint
-    // guarded *only* by sumcheck (matching the existing add-clause
-    // version), and additionally include the facts atom in the sum at
-    // strength zero (so the planner has to see facts become known to
-    // believe the deduction is supported).  This is enough to verify the
-    // reveal cascade is being applied — without it, the planner would
-    // need to deduce facts itself.
+    // Per-clue neighbour-count constraint, gated by sumcheck ∧ facts.
     for &(r, c, n_mines) in clues {
         let mut neighbours = Vec::new();
         for dr in -1..=1_i64 {
@@ -86,38 +70,15 @@ fn build_minesweeper_3x3_with_reveal() -> PuzzleParse {
                 }
             }
         }
-        b.sum_eq(
-            sumcheck.get(&[r, c]),
-            &neighbours,
-            n_mines,
-            "sumcheck",
-            format!("exactly {n_mines} mines around ({r}, {c})"),
-        )
-        .unwrap();
-    }
-
-    // Touch the facts atoms in a trivial constraint so the build()
-    // unused-target validation passes AND so the SAT instance has a
-    // ground truth for facts.  For every (r, c, d) we add an unguarded
-    // implication `grid[r,c] = d → facts[r,c,d]` via a length-2 sum:
-    //
-    //     sum( [grid[r,c]==d (signed), facts[r,c,d].neg()] ) <= 1
-    //
-    // which is equivalent to `(grid==d) → facts[r,c,d]`.  The reveal
-    // cascade also enforces this at the planner level, but having the
-    // implication in the CNF means the SAT solver itself can rely on it.
-    for r in 1..=n {
-        for c in 1..=n {
-            for d in 0..=1 {
-                let grid_signed = if d == 1 {
-                    grid.get(&[r, c]).pos()
-                } else {
-                    grid.get(&[r, c]).neg()
-                };
-                let facts_signed = facts.get(&[r, c, d]).neg();
-                b.sum_eq_unguarded(&[grid_signed, facts_signed], 1).ok();
-            }
-        }
+        let gate = b.and_atom(&[sumcheck.get(&[r, c]).pos(), facts.get(&[r, c, 0]).pos()]);
+        let g = b
+            .guard(
+                gate,
+                "sumcheck",
+                format!("exactly {n_mines} mines around ({r}, {c}) given safe"),
+            )
+            .unwrap();
+        b.sum_eq(g, &neighbours, n_mines).unwrap();
     }
 
     b.build().unwrap()
@@ -127,8 +88,8 @@ fn build_minesweeper_3x3_with_reveal() -> PuzzleParse {
 fn demystify_deduces_minesweeper_3x3_via_reveal() {
     let puzzle = Arc::new(build_minesweeper_3x3_with_reveal());
 
-    // Sanity: reveal_map should have 2 × (3 × 3) = 18 entries — one
-    // mapping per (grid lit, sign) for the 9 cells.
+    // Sanity: reveal_map has one entry per (grid lit, polarity) for each
+    // of the 9 cells.
     assert_eq!(
         puzzle.reveal_map.len(),
         18,
@@ -198,18 +159,57 @@ fn unused_reveal_target_rejected_at_build() {
     let grid = b.var_bool_matrix("grid", &[1..=2]);
     let _facts = b.reveal_bool_matrix("facts", &[1..=2, 0..=1]);
     let rule = b.con_bool("rule");
-    b.sum_ge(
-        rule,
-        &[grid.get(&[1]).pos()],
-        1,
-        "rule",
-        "force grid[1] true",
-    )
-    .unwrap();
+    let g = b.guard(rule, "rule", "force grid[1] true").unwrap();
+    b.sum_ge(g, &[grid.get(&[1]).pos()], 1).unwrap();
     // No set_reveal — the build should reject the dangling target.
     let err = b.build().unwrap_err();
     assert!(matches!(
         err,
         demystify_builder::BuildError::UnusedRevealTarget(name) if name == "facts"
     ));
+}
+
+#[test]
+fn and_atom_round_trips_for_a_two_input_gate() {
+    // Sanity check: and_atom(a, b) is a fresh SAT lit that's true iff
+    // both inputs are true.  We test by building a tiny puzzle where the
+    // gate gates a forced literal, and check it solves the way we expect.
+    use rustsat::solvers::{Solve, SolveIncremental, SolverResult};
+    let mut b = PuzzleBuilder::new();
+    let v = b.var_bool_matrix("v", &[1..=2]);
+    let rule = b.con_bool("rule");
+    let gate = b.and_atom(&[v.get(&[1]).pos(), v.get(&[2]).pos()]);
+    let g = b.guard(rule, "rule", "v[1] under gate").unwrap();
+    // rule -> v[1] = 1, but we also force the gate's value to be observed.
+    // (The body of the sum doesn't reference gate; we're just testing the
+    // and-atom's CNF directly.)
+    b.sum_ge(g, &[v.get(&[1]).pos()], 1).unwrap();
+
+    let puzzle = b.build().unwrap();
+    let cnf = puzzle.cnf.as_ref().unwrap().as_ref().clone();
+    // Under the assumption "gate = true", both v[1] and v[2] must hold.
+    let mut solver = rustsat_batsat::BasicSolver::default();
+    for cl in cnf.iter() {
+        solver.add_clause(cl.clone()).unwrap();
+    }
+    let v1_lit = v.get(&[1]).lit();
+    let v2_lit = v.get(&[2]).lit();
+    assert_eq!(
+        solver.solve_assumps(&[gate.lit(), !v1_lit]).unwrap(),
+        SolverResult::Unsat,
+        "gate=true must imply v[1]=true"
+    );
+    assert_eq!(
+        solver.solve_assumps(&[gate.lit(), !v2_lit]).unwrap(),
+        SolverResult::Unsat,
+        "gate=true must imply v[2]=true"
+    );
+    // Under "gate = false", at least one of v[1] / v[2] must be false.
+    assert_eq!(
+        solver
+            .solve_assumps(&[!gate.lit(), v1_lit, v2_lit])
+            .unwrap(),
+        SolverResult::Unsat,
+        "gate=false must imply !(v[1] /\\ v[2])"
+    );
 }

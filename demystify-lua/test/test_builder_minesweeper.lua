@@ -1,16 +1,14 @@
 -- Lua port of demystify-builder/tests/minesweeper_reveal.rs.
 --
--- Builds a 3x3 minesweeper via the Builder bindings, wires up grid -> facts
--- via $#REVEAL, and checks that the planner deduces every cell.
+-- Properly exercises the $#REVEAL cascade: the neighbour-count constraint
+-- is gated by sumcheck AND facts (built via b:and_atom).  `facts` is
+-- *unconstrained in CNF* — the planner only learns it via the reveal
+-- cascade once grid[r,c] is deduced.
 
 local demystify = require("demystify")
 
 local N = 3
 
--- (row, col, clue) for revealed cells; the same layout as the Rust test:
---   0 0 .
---   0 1 .
---   . . .
 local CLUES = {
     {1, 1, 0},
     {1, 2, 0},
@@ -38,13 +36,14 @@ local function build_minesweeper()
 
     local sumcheck = b:con_bool_matrix("sumcheck", {{1, N}, {1, N}})
 
-    -- Pin revealed cells to "not a mine".
+    -- Pin revealed cells to "not a mine".  Deducing grid[r,c] = 0 triggers
+    -- the REVEAL cascade that makes facts[r, c, 0] known.
     for _, clue in ipairs(CLUES) do
         local r, c = clue[1], clue[2]
         b:sum_eq_unguarded({ grid:get({r, c}):neg() }, 1)
     end
 
-    -- Per-clue neighbour-count constraint, guarded by sumcheck[r,c].
+    -- Per-clue neighbour-count constraint, gated by sumcheck ∧ facts.
     for _, clue in ipairs(CLUES) do
         local r, c, n_mines = clue[1], clue[2], clue[3]
         local neighbours = {}
@@ -58,26 +57,13 @@ local function build_minesweeper()
                 end
             end
         end
-        b:sum_eq(
-            sumcheck:get({r, c}),
-            neighbours,
-            n_mines,
-            "sumcheck",
-            string.format("exactly %d mines around (%d, %d)", n_mines, r, c)
-        )
-    end
-
-    -- Tie facts to grid in CNF so the SAT instance has a ground truth.
-    --   (grid[r,c] == d) → facts[r,c,d]
-    -- encoded as `sum_eq_unguarded([grid_signed, facts.neg()]) = 1`.
-    for r = 1, N do
-        for c = 1, N do
-            for d = 0, 1 do
-                local grid_signed = (d == 1) and grid:get({r, c}):pos() or grid:get({r, c}):neg()
-                local facts_signed = facts:get({r, c, d}):neg()
-                b:sum_eq_unguarded({ grid_signed, facts_signed }, 1)
-            end
-        end
+        local gate = b:and_atom({
+            sumcheck:get({r, c}):pos(),
+            facts:get({r, c, 0}):pos(),
+        })
+        local g = b:guard(gate, "sumcheck",
+            string.format("exactly %d mines around (%d, %d) given safe", n_mines, r, c))
+        b:sum_eq(g, neighbours, n_mines)
     end
 
     return b:build()

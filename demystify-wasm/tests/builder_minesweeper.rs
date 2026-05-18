@@ -1,6 +1,8 @@
-//! WASM port of the minesweeper-via-REVEAL test.  Mirrors the Lua and
-//! Rust versions: 3x3 minesweeper, `grid` source / `facts` reveal target,
-//! the planner should deduce every cell.
+//! WASM port of the minesweeper-via-REVEAL test.  3x3 minesweeper,
+//! `grid` source / `facts` reveal target, neighbour-count constraint
+//! gated by `sumcheck ∧ facts` via `andAtom`.  `facts` is unconstrained
+//! in CNF — the planner only learns it via the reveal cascade after
+//! `grid[r, c]` is deduced.
 
 use serde_wasm_bindgen::{from_value, to_value};
 use wasm_bindgen::JsValue;
@@ -45,13 +47,14 @@ fn build_minesweeper() -> WasmPuzzle {
         .con_bool_matrix("sumcheck", dims_2d())
         .expect("sumcheck $#CON");
 
-    // Pin revealed cells to "not a mine".
+    // Pin revealed cells to "not a mine" — these deductions trigger the
+    // reveal cascade.
     for &(r, c, _) in CLUES {
         let signed = vec![grid.get(vec![r, c]).expect("grid clue cell").neg()];
         b.sum_eq_unguarded(signed, 1).expect("pin clue safe");
     }
 
-    // Per-clue neighbour-count constraint, guarded by sumcheck[r,c].
+    // Per-clue neighbour-count constraint, gated by sumcheck ∧ facts.
     for &(r, c, n_mines) in CLUES {
         let mut neighbours = Vec::new();
         for dr in -1..=1_i64 {
@@ -66,30 +69,20 @@ fn build_minesweeper() -> WasmPuzzle {
                 }
             }
         }
-        b.sum_eq(
-            &sumcheck.get(vec![r, c]).expect("sumcheck atom"),
-            neighbours,
-            n_mines,
-            "sumcheck",
-            &format!("exactly {n_mines} mines around ({r}, {c})"),
-        )
-        .expect("sumcheck sum_eq");
-    }
-
-    // Tie facts to grid in CNF: (grid==d) → facts[r,c,d].
-    for r in 1..=N {
-        for c in 1..=N {
-            for d in 0..=1_i64 {
-                let grid_signed = if d == 1 {
-                    grid.get(vec![r, c]).expect("grid").pos()
-                } else {
-                    grid.get(vec![r, c]).expect("grid").neg()
-                };
-                let facts_signed = facts.get(vec![r, c, d]).expect("facts").neg();
-                b.sum_eq_unguarded(vec![grid_signed, facts_signed], 1)
-                    .expect("facts implication");
-            }
-        }
+        let gate = b
+            .and_atom(vec![
+                sumcheck.get(vec![r, c]).expect("sumcheck atom").pos(),
+                facts.get(vec![r, c, 0]).expect("facts atom").pos(),
+            ])
+            .expect("and_atom gate");
+        let g = b
+            .guard(
+                &gate,
+                "sumcheck",
+                &format!("exactly {n_mines} mines around ({r}, {c}) given safe"),
+            )
+            .expect("guard");
+        b.sum_eq(g, neighbours, n_mines).expect("sumcheck sum_eq");
     }
 
     b.build().expect("build minesweeper")

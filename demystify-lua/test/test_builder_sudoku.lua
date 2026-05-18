@@ -68,8 +68,9 @@ local function build_sudoku_4x4()
             for c = 1, N do
                 table.insert(lits, cell:get({r, c, v}):pos())
             end
-            b:sum_eq(row_uniq:get({r, v}), lits, 1, "row_uniq",
+            local g = b:guard(row_uniq:get({r, v}), "row_uniq",
                 string.format("value %d appears exactly once in row %d", v, r))
+            b:sum_eq(g, lits, 1)
         end
     end
 
@@ -81,8 +82,9 @@ local function build_sudoku_4x4()
             for r = 1, N do
                 table.insert(lits, cell:get({r, c, v}):pos())
             end
-            b:sum_eq(col_uniq:get({c, v}), lits, 1, "col_uniq",
+            local g = b:guard(col_uniq:get({c, v}), "col_uniq",
                 string.format("value %d appears exactly once in column %d", v, c))
+            b:sum_eq(g, lits, 1)
         end
     end
 
@@ -94,8 +96,9 @@ local function build_sudoku_4x4()
             for _, rc in ipairs(cells_in_box(bi)) do
                 table.insert(lits, cell:get({rc[1], rc[2], v}):pos())
             end
-            b:sum_eq(box_uniq:get({bi, v}), lits, 1, "box_uniq",
+            local g = b:guard(box_uniq:get({bi, v}), "box_uniq",
                 string.format("value %d appears exactly once in box %d", v, bi))
+            b:sum_eq(g, lits, 1)
         end
     end
 

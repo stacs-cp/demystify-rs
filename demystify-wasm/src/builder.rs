@@ -13,35 +13,49 @@
 //! b.kind("toy");
 //! const g = b.varBoolMatrix("g", [[1, 2], [1, 2]]);
 //! const rule = b.conBool("rule");
-//! b.sumGe(rule,
+//! const guard = b.guard(rule, "rule", "at least two cells are true");
+//! b.sumGe(guard,
 //!   [g.get([1, 1]).pos(), g.get([1, 2]).pos(),
 //!    g.get([2, 1]).pos(), g.get([2, 2]).pos()],
-//!   2, "rule", "at least two cells are true");
+//!   2);
 //! const puzzle = b.build();
 //! ```
 //!
 //! # Marshalling notes
 //!
-//! `WasmAtom`, `WasmSigned`, and `WasmBoolMatrix` are exposed as opaque
-//! handles. Method calls that take `&self` (most of them) leave the JS
-//! handle valid for reuse; method calls that take `self` consume it.
+//! `WasmAtom`, `WasmSigned`, `WasmBoolMatrix`, and `WasmGuard` are
+//! exposed as opaque handles.  Method calls that take `&self` leave the
+//! JS handle valid for reuse; method calls that take `self` consume it.
 //!
-//! Cardinality constraint lists are passed as JS arrays of `WasmSigned`
-//! handles. Each handle is consumed when the array is read, so the
-//! ergonomic pattern is to build the list inline:
+//! `WasmSigned` lists and `WasmGuard` are *consumed* when passed to a
+//! sum_* call.  Build them inline:
 //!
 //! ```js
-//! b.sumGe(rule, [a.pos(), b.neg()], 1, ...);   // OK
+//! b.sumGe(b.guard(rule, "rule", "..."),  // fresh guard, consumed
+//!   [a.pos(), b.neg()], 1);              // fresh signed handles
 //! ```
 //!
-//! rather than holding `WasmSigned`s in JS variables across multiple calls.
+//! rather than holding the values in JS variables across multiple calls.
+//!
+//! # Multi-gate constraints (e.g. `$#REVEAL`)
+//!
+//! To express `gate1 ∧ gate2 ∧ ... → constraint`, fold the gates with
+//! [`WasmBuilder::and_atom`] into a fresh atom and use that atom as the
+//! `guard()` activation:
+//!
+//! ```js
+//! const gate = b.andAtom([sumcheck.get([i, j]).pos(),
+//!                         facts.get([i, j, 0]).pos()]);
+//! const g = b.guard(gate, "sumcheck", "...");
+//! b.sumEq(g, neighbours, n_mines);
+//! ```
 
 use std::ops::RangeInclusive;
 use std::sync::{Arc, Mutex};
 
 use wasm_bindgen::prelude::*;
 
-use demystify_builder::{Atom, BoolMatrix, PuzzleBuilder, ShowRole, Signed};
+use demystify_builder::{Atom, BoolMatrix, Guard, PuzzleBuilder, ShowRole, Signed};
 
 use crate::puzzle::WasmPuzzle;
 
@@ -120,6 +134,15 @@ impl WasmBoolMatrix {
             .map(|a| WasmAtom { inner: *a })
             .collect()
     }
+}
+
+/// Single-use guard handle.  Produced by `WasmBuilder.guard(...)` and
+/// consumed by the first `sumGe`/`sumLe`/`sumEq` it is passed to (the
+/// JS-side handle is invalidated by wasm-bindgen on by-value transfer,
+/// matching the "each $#CON description must be unique" invariant).
+#[wasm_bindgen]
+pub struct WasmGuard {
+    pub(crate) inner: Guard,
 }
 
 /// JS-facing builder.  Wraps `Option<PuzzleBuilder>` so `build()` can
@@ -259,55 +282,71 @@ impl WasmBuilder {
         })
     }
 
-    /// Post `guard -> (sum(signed) >= k)` and register a `$#CON` entry.
+    /// Create a fresh anonymous atom `c` such that `c ↔ AND(inputs)`.
+    /// Pass the result to [`Self::guard`] (or use it in further sums) as
+    /// needed.  Throws if `inputs` is empty.
+    #[wasm_bindgen(js_name = andAtom)]
+    pub fn and_atom(&self, inputs: Vec<WasmSigned>) -> Result<WasmAtom, JsError> {
+        if inputs.is_empty() {
+            return Err(JsError::new("andAtom requires at least one input"));
+        }
+        let inputs: Vec<Signed> = inputs.into_iter().map(|s| s.inner).collect();
+        self.with_mut(|b| {
+            Ok(WasmAtom {
+                inner: b.and_atom(&inputs),
+            })
+        })
+    }
+
+    /// Pair an atom with the `$#CON` family it belongs to and a
+    /// description.  Atoms returned by [`Self::con_bool`] /
+    /// [`Self::con_bool_matrix`] are already labelled with their
+    /// family; atoms returned by [`Self::and_atom`] (or other future
+    /// fresh-atom primitives) are registered into the named family by
+    /// this call.  Rejects atoms already in a *different* family.
+    pub fn guard(
+        &self,
+        atom: &WasmAtom,
+        family: &str,
+        description: &str,
+    ) -> Result<WasmGuard, JsError> {
+        self.with_mut(|b| {
+            b.guard(atom.inner, family, description.to_string())
+                .map(|g| WasmGuard { inner: g })
+                .map_err(|e| JsError::new(&e.to_string()))
+        })
+    }
+
+    /// Post `guard.atom -> (sum(signed) >= k)` and register a `$#CON`
+    /// entry using the family + description carried by `guard`.
+    /// Consumes `guard`.
     #[wasm_bindgen(js_name = sumGe)]
-    pub fn sum_ge(
-        &self,
-        guard: &WasmAtom,
-        signed: Vec<WasmSigned>,
-        k: i64,
-        family: &str,
-        description: &str,
-    ) -> Result<(), JsError> {
+    pub fn sum_ge(&self, guard: WasmGuard, signed: Vec<WasmSigned>, k: i64) -> Result<(), JsError> {
         let signed: Vec<Signed> = signed.into_iter().map(|s| s.inner).collect();
         self.with_mut(|b| {
-            b.sum_ge(guard.inner, &signed, k, family, description.to_string())
+            b.sum_ge(guard.inner, &signed, k)
                 .map(|_| ())
                 .map_err(|e| JsError::new(&e.to_string()))
         })
     }
 
-    /// Post `guard -> (sum(signed) <= k)` and register a `$#CON` entry.
+    /// Post `guard.atom -> (sum(signed) <= k)`.  See [`Self::sum_ge`].
     #[wasm_bindgen(js_name = sumLe)]
-    pub fn sum_le(
-        &self,
-        guard: &WasmAtom,
-        signed: Vec<WasmSigned>,
-        k: i64,
-        family: &str,
-        description: &str,
-    ) -> Result<(), JsError> {
+    pub fn sum_le(&self, guard: WasmGuard, signed: Vec<WasmSigned>, k: i64) -> Result<(), JsError> {
         let signed: Vec<Signed> = signed.into_iter().map(|s| s.inner).collect();
         self.with_mut(|b| {
-            b.sum_le(guard.inner, &signed, k, family, description.to_string())
+            b.sum_le(guard.inner, &signed, k)
                 .map(|_| ())
                 .map_err(|e| JsError::new(&e.to_string()))
         })
     }
 
-    /// Post `guard -> (sum(signed) == k)` and register a `$#CON` entry.
+    /// Post `guard.atom -> (sum(signed) == k)`.  See [`Self::sum_ge`].
     #[wasm_bindgen(js_name = sumEq)]
-    pub fn sum_eq(
-        &self,
-        guard: &WasmAtom,
-        signed: Vec<WasmSigned>,
-        k: i64,
-        family: &str,
-        description: &str,
-    ) -> Result<(), JsError> {
+    pub fn sum_eq(&self, guard: WasmGuard, signed: Vec<WasmSigned>, k: i64) -> Result<(), JsError> {
         let signed: Vec<Signed> = signed.into_iter().map(|s| s.inner).collect();
         self.with_mut(|b| {
-            b.sum_eq(guard.inner, &signed, k, family, description.to_string())
+            b.sum_eq(guard.inner, &signed, k)
                 .map(|_| ())
                 .map_err(|e| JsError::new(&e.to_string()))
         })

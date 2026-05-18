@@ -75,14 +75,14 @@ fn build_sudoku_4x4() -> PuzzleParse {
     for r in 1..=N {
         for v in 1..=N {
             let lits: Vec<_> = (1..=N).map(|c| cell.get(&[r, c, v]).pos()).collect();
-            b.sum_eq(
-                row_uniq.get(&[r, v]),
-                &lits,
-                1,
-                "row_uniq",
-                format!("value {v} appears exactly once in row {r}"),
-            )
-            .unwrap();
+            let g = b
+                .guard(
+                    row_uniq.get(&[r, v]),
+                    "row_uniq",
+                    format!("value {v} appears exactly once in row {r}"),
+                )
+                .unwrap();
+            b.sum_eq(g, &lits, 1).unwrap();
         }
     }
 
@@ -91,14 +91,14 @@ fn build_sudoku_4x4() -> PuzzleParse {
     for c in 1..=N {
         for v in 1..=N {
             let lits: Vec<_> = (1..=N).map(|r| cell.get(&[r, c, v]).pos()).collect();
-            b.sum_eq(
-                col_uniq.get(&[c, v]),
-                &lits,
-                1,
-                "col_uniq",
-                format!("value {v} appears exactly once in column {c}"),
-            )
-            .unwrap();
+            let g = b
+                .guard(
+                    col_uniq.get(&[c, v]),
+                    "col_uniq",
+                    format!("value {v} appears exactly once in column {c}"),
+                )
+                .unwrap();
+            b.sum_eq(g, &lits, 1).unwrap();
         }
     }
 
@@ -110,14 +110,14 @@ fn build_sudoku_4x4() -> PuzzleParse {
                 .iter()
                 .map(|&(r, c)| cell.get(&[r, c, v]).pos())
                 .collect();
-            b.sum_eq(
-                box_uniq.get(&[b_idx, v]),
-                &lits,
-                1,
-                "box_uniq",
-                format!("value {v} appears exactly once in box {b_idx}"),
-            )
-            .unwrap();
+            let g = b
+                .guard(
+                    box_uniq.get(&[b_idx, v]),
+                    "box_uniq",
+                    format!("value {v} appears exactly once in box {b_idx}"),
+                )
+                .unwrap();
+            b.sum_eq(g, &lits, 1).unwrap();
         }
     }
 

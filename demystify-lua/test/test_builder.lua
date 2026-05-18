@@ -24,17 +24,16 @@ local function test_build_and_solve_tiny_puzzle()
     local rule = b:con_bool("rule")
 
     -- rule -> (g[1,1] + g[1,2] + g[2,1] + g[2,2] >= 4) forces every cell true.
+    local guard = b:guard(rule, "rule", "all four cells must be true")
     b:sum_ge(
-        rule,
+        guard,
         {
             g:get({1, 1}):pos(),
             g:get({1, 2}):pos(),
             g:get({2, 1}):pos(),
             g:get({2, 2}):pos(),
         },
-        4,
-        "rule",
-        "all four cells must be true"
+        4
     )
 
     local puzzle = b:build()
@@ -85,17 +84,16 @@ local function test_signed_negation()
     local g = b:var_bool_matrix("g", {{1, 2}, {1, 2}})
     local rule = b:con_bool("rule")
 
+    local guard = b:guard(rule, "rule", "no cells false")
     b:sum_le(
-        rule,
+        guard,
         {
             g:get({1, 1}):neg(),
             g:get({1, 2}):neg(),
             g:get({2, 1}):neg(),
             g:get({2, 2}):neg(),
         },
-        0,
-        "rule",
-        "no cells false"
+        0
     )
 
     local puzzle = b:build()
@@ -117,7 +115,8 @@ local function test_build_consumes_builder()
     local b = demystify.Builder.new()
     local g = b:var_bool_matrix("g", {{1, 1}})
     local rule = b:con_bool("rule")
-    b:sum_ge(rule, { g:get({1}):pos() }, 1, "rule", "force g[1] true")
+    local guard = b:guard(rule, "rule", "force g[1] true")
+    b:sum_ge(guard, { g:get({1}):pos() }, 1)
     b:build()
 
     local ok, err = pcall(function() b:build() end)
@@ -143,10 +142,55 @@ local function test_invalid_role_errors()
     print("PASS: invalid_role_errors")
 end
 
+local function test_guard_is_single_use()
+    -- A Guard returned by b:guard() must be consumed by exactly one sum_*
+    -- call.  Reusing the same Guard value should error.
+    local b = demystify.Builder.new()
+    local g = b:var_bool_matrix("g", {{1, 2}})
+    local rule = b:con_bool_matrix("rule", {{1, 2}})
+    local guard = b:guard(rule:get({1}), "rule", "first use")
+    b:sum_ge(guard, { g:get({1}):pos() }, 1)
+    local ok, err = pcall(function() b:sum_ge(guard, { g:get({2}):pos() }, 1) end)
+    assert(not ok, "reusing a Guard should error")
+    local err_str = tostring(err or "")
+    assert(
+        string.find(err_str, "consumed") ~= nil,
+        "error should mention consumed; got: " .. err_str
+    )
+    print("PASS: guard_is_single_use")
+end
+
+local function test_and_atom_gate()
+    -- and_atom produces a fresh atom that's true iff all inputs are true.
+    -- Use it as the guard for a sum_ge to force both inputs to be true.
+    local b = demystify.Builder.new()
+    local v = b:var_bool_matrix("v", {{1, 2}})
+    local rule = b:con_bool("rule")
+    local gate = b:and_atom({ v:get({1}):pos(), v:get({2}):pos() })
+    -- Replace rule with the gate as the family activation; this also
+    -- exercises guard(fresh-atom, family, desc) registering the gate.
+    local _ = rule  -- still in family but unused here
+    local guard = b:guard(gate, "rule", "and-gate forces both v")
+    -- Trivial constraint: sum_ge over v[1] >= 1 — but the gate's CNF
+    -- forces v[1] AND v[2] regardless.
+    b:sum_ge(guard, { v:get({1}):pos() }, 1)
+    -- Add an unguarded constraint to make sure the gate's value is determined.
+    -- (No additional setup needed — the planner will deduce based on CNF.)
+
+    local puzzle = b:build()
+    local planner = demystify.Planner.new(puzzle)
+    planner:fix({ name = "rule", indices = {}, value = 1 })
+    -- We can't easily inspect gate's value from Lua (anonymous atom),
+    -- but the build/solve plumbing should succeed.
+    print("PASS: and_atom_gate")
+end
+
 test_builder_class_present()
 test_build_and_solve_tiny_puzzle()
 test_signed_negation()
 test_build_consumes_builder()
 test_invalid_role_errors()
+test_guard_is_single_use()
+test_and_atom_gate()
 
 print("All builder tests passed")

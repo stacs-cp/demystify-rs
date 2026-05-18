@@ -27,8 +27,10 @@ fn builder_builds_and_solves_tiny_puzzle() {
         g.get(vec![2, 1]).expect("g[2,1]").pos(),
         g.get(vec![2, 2]).expect("g[2,2]").pos(),
     ];
-    b.sum_ge(&rule, signed, 4, "rule", "all four cells must be true")
-        .expect("sum_ge");
+    let guard = b
+        .guard(&rule, "rule", "all four cells must be true")
+        .expect("guard");
+    b.sum_ge(guard, signed, 4).expect("sum_ge");
 
     let puzzle = b.build().expect("build");
     assert_eq!(puzzle.kind().as_deref(), Some("toy-builder-test"));
@@ -45,8 +47,8 @@ fn builder_rejects_repeated_build() {
     let g = b.var_bool_matrix("g", dims).expect("var_bool_matrix");
     let rule = b.con_bool("rule").expect("con_bool");
     let signed = vec![g.get(vec![1]).expect("g[1]").pos()];
-    b.sum_ge(&rule, signed, 1, "rule", "force g[1] true")
-        .expect("sum_ge");
+    let guard = b.guard(&rule, "rule", "force g[1] true").expect("guard");
+    b.sum_ge(guard, signed, 1).expect("sum_ge");
     b.build().expect("first build");
     assert!(b.build().is_err(), "second build() should error");
 }
@@ -66,8 +68,8 @@ fn builder_handles_negated_literals() {
         g.get(vec![2, 1]).expect("g[2,1]").neg(),
         g.get(vec![2, 2]).expect("g[2,2]").neg(),
     ];
-    b.sum_le(&rule, signed, 0, "rule", "no cells false")
-        .expect("sum_le");
+    let guard = b.guard(&rule, "rule", "no cells false").expect("guard");
+    b.sum_le(guard, signed, 0).expect("sum_le");
     let puzzle = b.build().expect("build");
     let planner = WasmPlanner::new(&puzzle).expect("planner");
     let _ = planner.quick_solve().expect("quick_solve");
