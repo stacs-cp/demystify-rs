@@ -2,8 +2,15 @@
 
 WebAssembly bindings for [`demystify`](../demystify), a constraint-solving tool
 that produces step-by-step explanations of puzzle deductions. Mirrors the
-[`demystify-lua`](../demystify-lua) API: load a pre-parsed puzzle JSON, build a
-planner, step through deductions.
+[`demystify-lua`](../demystify-lua) API.
+
+Two entry points:
+
+1. **Load a pre-parsed puzzle** (`load_puzzle` + `WasmPlanner`) — when Conjure
+   has already compiled a `.eprime` / `.param` pair to JSON on the native side.
+2. **Build a puzzle in JS** ([`WasmBuilder`](#building-puzzles-in-js)) — no
+   Conjure needed; for embedders that construct puzzles at runtime (minesweeper,
+   star battle, sudoku, …).
 
 The wasm build uses [`rustsat-batsat`](https://crates.io/crates/rustsat-batsat)
 (pure-Rust SAT) instead of Glucose/CaDiCaL — they're C/C++ FFI and don't reach
@@ -19,7 +26,16 @@ wasm-pack build --target web demystify-wasm
 
 `pkg/` then contains the `.wasm`, JS shim, and TypeScript declarations.
 
-## Quick start
+## Running the test suite
+
+```sh
+wasm-pack test --node demystify-wasm
+```
+
+Drives the planner + builder through node's V8. Tests live in
+`demystify-wasm/tests/`.
+
+## Loading a pre-parsed puzzle
 
 ```js
 import init, { load_puzzle, WasmPlanner } from './pkg/demystify_wasm.js';
@@ -37,9 +53,7 @@ while (!planner.isSolved()) {
 }
 ```
 
-## Producing the JSON
-
-Use the native CLI to pre-parse a puzzle:
+Produce the JSON on the native side:
 
 ```sh
 cargo run --release --bin demystify -- \
@@ -50,8 +64,142 @@ cargo run --release --bin demystify -- \
 
 The wasm side never invokes Conjure or touches the filesystem — only the JSON.
 
-## API
+## Building puzzles in JS
 
-Mirror of [`demystify-lua`](../demystify-lua/src/lib.rs). Methods are camelCase
-in JS where the Lua method was snake_case (`isSolved`, `bestStep`,
-`fixLiteral`, `numClauses`, etc.); other names match the Lua interface.
+`WasmBuilder` exposes a small constraint vocabulary that's enough to build star
+battle, sudoku, minesweeper, and similar puzzles directly in JS — no `.eprime`
+file, no Conjure. See [`demystify-builder`](../demystify-builder) for the
+underlying Rust crate and the constraint vocabulary in detail.
+
+```js
+import init, { WasmBuilder, WasmPlanner } from './pkg/demystify_wasm.js';
+await init();
+
+const b = new WasmBuilder();
+b.kind("toy");
+
+// Declare a 2×2 grid of booleans.  Dims are arrays of [lo, hi] pairs,
+// 1-indexed inclusive.
+const g = b.varBoolMatrix("g", [[1, 2], [1, 2]]);
+
+// Declare a constraint-family activation atom.  Each $#CON guard atom
+// belongs to exactly one family.
+const rule = b.conBool("rule");
+
+// "rule -> sum of (g[1,1] + g[1,2] + g[2,1] + g[2,2]) >= 2".  Pass each
+// literal in the sum via `.pos()` or `.neg()`; the array is consumed.
+b.sumGe(
+  rule,
+  [g.get([1, 1]).pos(), g.get([1, 2]).pos(),
+   g.get([2, 1]).pos(), g.get([2, 2]).pos()],
+  2, "rule", "at least two of g are true");
+
+const puzzle = b.build();      // consumes the builder
+const planner = new WasmPlanner(puzzle);
+planner.quickSolve();
+console.log(planner.currentState());
+```
+
+### `WasmBuilder` API
+
+Constructor: `new WasmBuilder()`.
+
+| Method | Purpose |
+|---|---|
+| `kind(s)` | Set the `$#KIND` tag (puzzle type label) |
+| `info(s)` | Push a `$#INFO` string |
+| `varBoolMatrix(name, dims)` | Declare a `$#VAR` matrix of bool atoms (user-deducible) → `WasmBoolMatrix` |
+| `conBoolMatrix(name, dims)` | Declare a `$#CON` family of guard atoms → `WasmBoolMatrix` |
+| `conBool(name)` | 0-d `$#CON` guard atom → `WasmAtom` |
+| `auxBoolMatrix(name, dims)` | Declare a `$#AUX` matrix (helper deducible atoms) → `WasmBoolMatrix` |
+| `auxBool(name)` | 0-d `$#AUX` atom → `WasmAtom` |
+| `revealBoolMatrix(name, dims)` | Declare a `$#REVEAL`-target matrix (see below) |
+| `reveal(srcName, targetName)` | Wire up a reveal cascade |
+| `show(varName, role)` | `$#SHOW` directive; role is `"main"`, `"givens"`, `"cages"`, `"region_tint"`, `"cage_sums"`, `"less_than"`, `"side_labels"` |
+| `sumGe(guard, signed, k, family, description)` | Post `guard → sum(signed) ≥ k` and a `$#CON` entry |
+| `sumLe(guard, signed, k, family, description)` | Post `guard → sum(signed) ≤ k` |
+| `sumEq(guard, signed, k, family, description)` | Post `guard → sum(signed) = k` |
+| `sumEqUnguarded(signed, k)` | Post `sum(signed) = k` unconditionally (no `$#CON` entry — for one-hot encodings, givens, exclusions) |
+| `build()` | Finalise → `WasmPuzzle`. Throws on a second call. |
+
+`WasmBoolMatrix` methods: `name()`, `get([i, j, …])` → `WasmAtom`,
+`atoms()` → `WasmAtom[]` (row-major).
+
+`WasmAtom` methods: `pos()` and `neg()` return a `WasmSigned` for use in the
+arrays passed to `sumGe` / `sumLe` / `sumEq` / `sumEqUnguarded`. Each `WasmAtom`
+takes `&self` in pos/neg, so a single atom can produce as many `WasmSigned`
+handles as you need.
+
+**Important marshalling note**: `WasmSigned` handles are *consumed* when the
+sum-array is read on the wasm side. Build each sum's array inline rather than
+holding `WasmSigned` values across calls.
+
+```js
+// OK — fresh handles each call.
+b.sumGe(rule, [a.pos(), b.neg()], 1, "rule", "...");
+
+// NOT OK — `s` is invalidated after the first sumGe.
+const s = a.pos();
+b.sumGe(rule, [s], 1, "rule", "...");
+b.sumGe(rule2, [s], 1, "rule", "...");   // error: handle consumed
+```
+
+### Build-time validation
+
+`build()` rejects:
+
+- A `$#VAR` matrix never referenced by any constraint (`UnusedVar`).
+- A `$#CON` family declared but never used (`UnusedFamily`).
+- A reveal target declared without a matching `reveal(...)` call
+  (`UnusedRevealTarget`).
+- Duplicate constraint descriptions (each `description` argument to `sum_*`
+  must be unique across the whole puzzle).
+- A `sum_*` guard atom from the wrong `$#CON` family.
+
+These surface as `JsError` exceptions on the JS side.
+
+### `$#REVEAL` cascades
+
+Minesweeper is the canonical use case: when `grid[i,j]=v` is deduced, you want
+the planner to *also* mark `facts[i,j,v]` known, without that counting as a
+separate user-visible deduction step. The cascade is two steps:
+
+```js
+const grid = b.varBoolMatrix("grid", [[1, h], [1, w]]);
+
+// facts has one extra trailing dim covering the source's {0, 1} domain.
+const facts = b.revealBoolMatrix("facts", [[1, h], [1, w], [0, 1]]);
+
+b.reveal("grid", "facts");
+```
+
+`facts[i,j,d]` becomes a regular boolean atom — you can use it in `sum_*`
+constraints exactly like a `$#VAR` or `$#AUX` atom. The "reveal" part is that
+whenever the planner adds `grid[i,j]=d` to its known set, it also adds
+`facts[i,j,d]=true`, so any constraint guarded by `facts[i,j,d]` activates
+automatically.
+
+The reveal-target matrix's dims must be the source's dims with one trailing
+`[0, 1]` dim appended (since source vars are booleans).
+
+See `demystify-wasm/tests/builder_minesweeper.rs` for a full 3×3 example with
+the standard guard-by-`facts` encoding.
+
+## Examples
+
+Working end-to-end tests in `demystify-wasm/tests/`:
+
+- `smoke.rs` — load a pre-parsed JSON and run the planner.
+- `builder_smoke.rs` — minimal `WasmBuilder` usage.
+- `builder_sudoku.rs` — 4×4 sudoku built and solved in wasm.
+- `builder_minesweeper.rs` — 3×3 minesweeper with `$#REVEAL`.
+
+The Rust integration tests in `demystify-builder/tests/` cover the same shapes
+without the wasm layer; useful when chasing a builder-side issue.
+
+## API mirror
+
+Method names mirror [`demystify-lua`](../demystify-lua/src/lib.rs) but in
+camelCase (`isSolved`, `bestStep`, `fixLiteral`, `numClauses`, `varBoolMatrix`,
+`revealBoolMatrix`, etc.). Struct names keep the `Wasm` prefix (`WasmBuilder`,
+`WasmPlanner`, `WasmPuzzle`, `WasmAtom`, `WasmSigned`, `WasmBoolMatrix`).

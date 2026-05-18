@@ -6,10 +6,10 @@
 //! # Quick start (JS / TypeScript)
 //!
 //! ```js
-//! import init, { Builder } from "./demystify_wasm.js";
+//! import init, { WasmBuilder } from "./demystify_wasm.js";
 //! await init();
 //!
-//! const b = new Builder();
+//! const b = new WasmBuilder();
 //! b.kind("toy");
 //! const g = b.varBoolMatrix("g", [[1, 2], [1, 2]]);
 //! const rule = b.conBool("rule");

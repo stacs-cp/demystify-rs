@@ -1,7 +1,15 @@
 //! WebAssembly bindings for `demystify`.
 //!
-//! Mirrors the API surface of `demystify-lua`: load a pre-parsed puzzle JSON,
-//! build a planner, step through deductions, fix literals manually.
+//! Mirrors the API surface of `demystify-lua`. Two entry points:
+//!
+//! - **Load a pre-parsed puzzle** with [`load_puzzle`], then drive a
+//!   [`WasmPlanner`] through `bestStep` / `quickSolve` / `currentState`.
+//!   Use this when Conjure has already compiled a `.eprime` / `.param` pair
+//!   to JSON on the native side.
+//! - **Build a puzzle in-process** with [`WasmBuilder`] — boolean matrices,
+//!   cardinality constraints, `$#REVEAL` cascades.  No Conjure required;
+//!   this is the path for embedders that need to construct puzzles at
+//!   runtime in the browser (minesweeper, star battle, sudoku, …).
 //!
 //! Build with `wasm-pack build --target web demystify-wasm`.
 
