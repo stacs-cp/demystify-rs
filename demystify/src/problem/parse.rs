@@ -36,6 +36,8 @@ use crate::problem::solver::{PuzzleSolver, SolverConfig};
 use crate::problem::util::exec::ProgramRunner;
 use crate::problem::util::parsing;
 use crate::problem::{PuzLit, PuzVar};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::time::Instant;
 
 use super::VarValPair;
 use super::util::{FindVarConnections, safe_insert};
@@ -1717,7 +1719,7 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Result<PuzzleParse> {
-    let t_total = web_time::Instant::now();
+    let t_total = Instant::now();
 
     let tdir = tempfile::Builder::new()
         .prefix(".demystify-")
@@ -1806,7 +1808,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
 
     let conjure_secs = t_total.elapsed().as_secs_f64();
     info!(target: "progress", "conjure/savilerow completed in {conjure_secs:.2}s");
-    let t_setup = web_time::Instant::now();
+    let t_setup = Instant::now();
 
     let original_input_path = PathBuf::from(&eprime);
 

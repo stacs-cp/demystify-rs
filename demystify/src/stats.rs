@@ -7,8 +7,8 @@
 /// All statistics are stored as pre-aggregated bucket counts so that memory
 /// usage is O(1) regardless of how many solves are performed in a process.
 use std::sync::Mutex;
-use std::time::Duration;
-use web_time::Instant;
+
+use crate::time::{Duration, Instant};
 
 /// Which MUS-finding function was called.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

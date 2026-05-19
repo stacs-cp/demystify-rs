@@ -2,7 +2,8 @@ use std::collections::{BTreeSet, HashMap};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{IsTerminal, Write};
 use std::sync::Arc;
-use web_time::Instant;
+
+use crate::time::Instant;
 
 use rustsat::types::Lit;
 use serde::Serialize;

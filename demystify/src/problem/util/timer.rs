@@ -1,4 +1,4 @@
-use web_time::Instant;
+use crate::time::Instant;
 
 pub struct QuickTimer {
     pub(crate) start: Instant,
@@ -31,7 +31,8 @@ mod tests {
     use super::*;
 
     use std::thread;
-    use std::time::Duration;
+
+    use crate::time::Duration;
 
     #[test]
     fn cpu_timer_instantiates() {

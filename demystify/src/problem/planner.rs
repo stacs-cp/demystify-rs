@@ -15,6 +15,7 @@ use crate::{
         musdict::{MusContext, merge_muscontexts},
     },
     satcore::get_solver_calls,
+    time::Instant,
     web::create_html,
 };
 
@@ -268,7 +269,7 @@ impl PuzzlePlanner {
             .iter()
             .par_bridge()
             .filter_map(|&lit| {
-                let t0 = web_time::Instant::now();
+                let t0 = Instant::now();
                 let ret = self.psolve.get_var_mus_size_1(lit, Some(1));
                 let elapsed = t0.elapsed();
                 let outcome = match &ret {

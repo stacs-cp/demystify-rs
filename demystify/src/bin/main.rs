@@ -305,7 +305,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut planner =
         PuzzlePlanner::new_with_config(solver, planner_config).with_database(strategy_db);
-    let t_solve = std::time::Instant::now();
+    let t_solve = demystify::time::Instant::now();
 
     if opt.html {
         let html = planner.quick_solve_html();

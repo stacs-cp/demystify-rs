@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+
+use crate::time::{Duration, Instant};
 
 use rustsat::instances::Cnf;
 #[cfg_attr(target_arch = "wasm32", allow(unused_imports))]
@@ -416,7 +417,7 @@ impl SatCore {
         solver.clear_conflict_limit();
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
-        let call_start = web_time::Instant::now();
+        let call_start = Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
         let call_duration = call_start.elapsed();
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
@@ -455,7 +456,7 @@ impl SatCore {
         }
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
-        let call_start = web_time::Instant::now();
+        let call_start = Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
         let call_duration = call_start.elapsed();
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
@@ -496,10 +497,10 @@ impl SatCore {
         solve
     }
 
-    const LONG_CALL_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(10);
+    const LONG_CALL_THRESHOLD: Duration = Duration::from_secs(10);
 
     fn warn_long_call(
-        duration: std::time::Duration,
+        duration: Duration,
         conflicts: usize,
         result: &SolverResult,
         lits: &[Lit],
@@ -525,19 +526,19 @@ impl SatCore {
         lits: &[Lit],
         work_mult: f64,
     ) -> SearchResult<bool> {
-        let t0 = web_time::Instant::now();
+        let t0 = Instant::now();
         self.fix_values(known);
-        let t1 = web_time::Instant::now();
+        let t1 = Instant::now();
         let mut solver = self.solver.lock().unwrap();
-        let t2 = web_time::Instant::now();
+        let t2 = Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits, work_mult);
-        let t3 = web_time::Instant::now();
+        let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(true),
             rustsat::solvers::SolverResult::Unsat => Ok(false),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
-        let t4 = web_time::Instant::now();
+        let t4 = Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
         PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
@@ -563,19 +564,19 @@ impl SatCore {
         lits: &[Lit],
         work_mult: f64,
     ) -> SearchResult<Option<Assignment>> {
-        let t0 = web_time::Instant::now();
+        let t0 = Instant::now();
         self.fix_values(known);
-        let t1 = web_time::Instant::now();
+        let t1 = Instant::now();
         let mut solver = self.solver.lock().unwrap();
-        let t2 = web_time::Instant::now();
+        let t2 = Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits, work_mult);
-        let t3 = web_time::Instant::now();
+        let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(Some(solver.full_solution().unwrap())),
             rustsat::solvers::SolverResult::Unsat => Ok(None),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
-        let t4 = web_time::Instant::now();
+        let t4 = Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
         PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
@@ -597,13 +598,13 @@ impl SatCore {
     /// [`assumption_solve`] and handle the `Err(SearchError::Limit)` case
     /// explicitly.
     pub fn assumption_solve_no_limit(&self, known: &[Lit], lits: &[Lit]) -> bool {
-        let t0 = web_time::Instant::now();
+        let t0 = Instant::now();
         self.fix_values(known);
-        let t1 = web_time::Instant::now();
+        let t1 = Instant::now();
         let mut solver = self.solver.lock().unwrap();
-        let t2 = web_time::Instant::now();
+        let t2 = Instant::now();
         let solve = SatCore::do_solve_assumps_no_limit(&mut solver, lits);
-        let t3 = web_time::Instant::now();
+        let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => true,
             rustsat::solvers::SolverResult::Unsat => false,
@@ -611,7 +612,7 @@ impl SatCore {
                 unreachable!("assumption_solve_no_limit must not hit a limit")
             }
         };
-        let t4 = web_time::Instant::now();
+        let t4 = Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         PHASE_MUTEX_NS.fetch_add((t2 - t1).as_nanos() as u64, Relaxed);
         PHASE_SOLVE_NS.fetch_add((t3 - t2).as_nanos() as u64, Relaxed);
@@ -654,9 +655,9 @@ impl SatCore {
         known: &[Lit],
         lits: &[Lit],
     ) -> SearchResult<Option<Vec<Lit>>> {
-        let t0 = web_time::Instant::now();
+        let t0 = Instant::now();
         self.fix_values(known);
-        let t1 = web_time::Instant::now();
+        let t1 = Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
         self.raw_assumption_solve_with_core_timed(lits, t1)
     }
@@ -664,7 +665,7 @@ impl SatCore {
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
     /// *Not memoryless*: Uses whatever set of values are already fixed in the solver.
     fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
-        self.raw_assumption_solve_with_core_timed(lits, web_time::Instant::now())
+        self.raw_assumption_solve_with_core_timed(lits, Instant::now())
     }
 
     /// Shared body of the core-returning solve.  Accepts an anchor `Instant`
@@ -673,12 +674,12 @@ impl SatCore {
     fn raw_assumption_solve_with_core_timed(
         &self,
         lits: &[Lit],
-        t_after_fix: web_time::Instant,
+        t_after_fix: Instant,
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
-        let t2 = web_time::Instant::now();
+        let t2 = Instant::now();
         let solve = SatCore::do_solve_assumps(&mut solver, lits, 1.0);
-        let t3 = web_time::Instant::now();
+        let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(None),
             rustsat::solvers::SolverResult::Unsat => Ok(Some(
@@ -686,7 +687,7 @@ impl SatCore {
             )),
             rustsat::solvers::SolverResult::Interrupted => Err(SearchError::Limit),
         };
-        let t4 = web_time::Instant::now();
+        let t4 = Instant::now();
         // The caller recorded fix_values's start; we recover its duration here.
         // When the raw entry point is used without a fix_values step, we still
         // record mutex/solve/post honestly.
