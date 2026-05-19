@@ -303,7 +303,10 @@ impl LuaUserData for LuaPlanner {
         // Get difficulties for every provable lit.  Lits the MUS search
         // couldn't size are reported with a sentinel equal to the
         // puzzle's total constraint count — a strict upper bound on any
-        // real MUS size, so they always sort to the bottom.
+        // real MUS size, so they always sort to the bottom.  One SAT
+        // lit can witness multiple PuzLits via the direct encoding
+        // (cell=0 ⇔ cell!=1 ∧ cell!=2 for a 0..2 domain); we expand all
+        // of them so the result matches provable_literals().
         methods.add_method_mut("difficulties", |lua, this, ()| {
             let mut planner = this.inner.lock().unwrap();
             let muses = planner.all_muses_with_larger();
@@ -312,25 +315,19 @@ impl LuaUserData for LuaPlanner {
             let mut sized: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
             for (lit, mus_set) in muses.muses() {
                 if let Some(min_len) = mus_set.iter().map(|mc| mc.mus_len()).min() {
-                    let lit_str = {
-                        let puzlits = planner.puzzle().lit_to_vars(lit);
-                        if let Some(first) = puzlits.iter().next() {
-                            format_puzlit(first)
-                        } else {
-                            continue;
-                        }
-                    };
-                    result.set(lit_str.clone(), min_len)?;
-                    sized.insert(lit_str);
+                    for puzlit in planner.puzzle().lit_to_vars(lit) {
+                        let lit_str = format_puzlit(puzlit);
+                        result.set(lit_str.clone(), min_len)?;
+                        sized.insert(lit_str);
+                    }
                 }
             }
 
             let sentinel = planner.puzzle().constraints.len();
             let provable = planner.get_provable_varlits().clone();
             for lit in &provable {
-                let puzlits = planner.puzzle().lit_to_vars(lit);
-                if let Some(first) = puzlits.iter().next() {
-                    let lit_str = format_puzlit(first);
+                for puzlit in planner.puzzle().lit_to_vars(lit) {
+                    let lit_str = format_puzlit(puzlit);
                     if !sized.contains(&lit_str) {
                         result.set(lit_str, sentinel)?;
                     }

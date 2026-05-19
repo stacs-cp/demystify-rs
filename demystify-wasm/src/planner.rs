@@ -265,21 +265,24 @@ impl WasmPlanner {
         let mut planner = self.inner.lock().unwrap();
         let muses = planner.all_muses_with_larger();
         let mut out: BTreeMap<String, usize> = BTreeMap::new();
+        // Expand every puzlit each SAT lit can witness, matching the
+        // shape of provableLiterals().  One SAT lit can correspond to
+        // multiple PuzLits via the direct encoding (e.g. cell=0 is
+        // equivalent to cell!=1 and cell!=2 for a 0..2 domain), and
+        // callers expect difficulties() to cover all of them.
         for (lit, mus_set) in muses.muses() {
             let Some(min_len) = mus_set.iter().map(|mc| mc.mus_len()).min() else {
                 continue;
             };
-            let puzlits = planner.puzzle().lit_to_vars(lit);
-            if let Some(first) = puzlits.iter().next() {
-                out.insert(format_puzlit(first), min_len);
+            for puzlit in planner.puzzle().lit_to_vars(lit) {
+                out.insert(format_puzlit(puzlit), min_len);
             }
         }
         let sentinel = planner.puzzle().constraints.len();
         let provable = planner.get_provable_varlits().clone();
         for lit in &provable {
-            let puzlits = planner.puzzle().lit_to_vars(lit);
-            if let Some(first) = puzlits.iter().next() {
-                out.entry(format_puzlit(first)).or_insert(sentinel);
+            for puzlit in planner.puzzle().lit_to_vars(lit) {
+                out.entry(format_puzlit(puzlit)).or_insert(sentinel);
             }
         }
         to_js(&out).map_err(Into::into)
