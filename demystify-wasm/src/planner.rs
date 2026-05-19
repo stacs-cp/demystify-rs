@@ -251,8 +251,16 @@ impl WasmPlanner {
         to_js(&payload).map_err(Into::into)
     }
 
-    /// Difficulty (smallest MUS size) for each provable literal.
+    /// Difficulty (smallest MUS size) for every provable literal.
     /// Returns an object keyed by literal string.
+    ///
+    /// Provable lits that the MUS search couldn't size — e.g. because
+    /// the per-call conflict limit hit, or no MUS was returned — are
+    /// reported with a sentinel value equal to the puzzle's total
+    /// constraint count.  No real MUS can have more constraints than
+    /// exist, so the sentinel sits strictly above every genuine
+    /// difficulty.  In the UI this gives a clean "deducible, but we
+    /// don't know how hard" bucket that always sorts to the bottom.
     pub fn difficulties(&self) -> Result<JsValue, JsError> {
         let mut planner = self.inner.lock().unwrap();
         let muses = planner.all_muses_with_larger();
@@ -264,6 +272,14 @@ impl WasmPlanner {
             let puzlits = planner.puzzle().lit_to_vars(lit);
             if let Some(first) = puzlits.iter().next() {
                 out.insert(format_puzlit(first), min_len);
+            }
+        }
+        let sentinel = planner.puzzle().constraints.len();
+        let provable = planner.get_provable_varlits().clone();
+        for lit in &provable {
+            let puzlits = planner.puzzle().lit_to_vars(lit);
+            if let Some(first) = puzlits.iter().next() {
+                out.entry(format_puzlit(first)).or_insert(sentinel);
             }
         }
         to_js(&out).map_err(Into::into)

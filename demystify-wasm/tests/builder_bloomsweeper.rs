@@ -210,4 +210,30 @@ fn difficulties_populated_on_bloomsweeper_tutorial() {
          (numProvable={provable}). Native control passes — bug is \
          wasm-specific."
     );
+
+    // Contract check on the sentinel: difficulties() must cover every
+    // distinct provable lit, even ones the MUS search couldn't size.
+    // Un-MUSed lits get a sentinel equal to the puzzle's total
+    // constraint count, which is a strict upper bound on any real MUS
+    // size, so the sentinel always sorts above genuine difficulties.
+    let provable_lits: Vec<String> = from_value(
+        planner
+            .provable_literals()
+            .expect("provable_literals after difficulties"),
+    )
+    .expect("decode provable_literals");
+    let provable_set: std::collections::BTreeSet<String> = provable_lits.into_iter().collect();
+    let missing: Vec<&String> = provable_set
+        .iter()
+        .filter(|s| !diffs.contains_key(*s))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "every provable lit must appear in difficulties(); missing: {missing:?}"
+    );
+    let con_count = puzzle.num_con_lits();
+    assert!(
+        diffs.values().all(|&n| n <= con_count),
+        "difficulties() should never exceed total constraint count (sentinel = {con_count})"
+    );
 }

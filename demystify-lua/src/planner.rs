@@ -300,12 +300,16 @@ impl LuaUserData for LuaPlanner {
             Ok(result)
         });
 
-        // Get difficulties for all deductions
+        // Get difficulties for every provable lit.  Lits the MUS search
+        // couldn't size are reported with a sentinel equal to the
+        // puzzle's total constraint count — a strict upper bound on any
+        // real MUS size, so they always sort to the bottom.
         methods.add_method_mut("difficulties", |lua, this, ()| {
             let mut planner = this.inner.lock().unwrap();
             let muses = planner.all_muses_with_larger();
 
             let result = lua.create_table()?;
+            let mut sized: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
             for (lit, mus_set) in muses.muses() {
                 if let Some(min_len) = mus_set.iter().map(|mc| mc.mus_len()).min() {
                     let lit_str = {
@@ -316,7 +320,20 @@ impl LuaUserData for LuaPlanner {
                             continue;
                         }
                     };
-                    result.set(lit_str, min_len)?;
+                    result.set(lit_str.clone(), min_len)?;
+                    sized.insert(lit_str);
+                }
+            }
+
+            let sentinel = planner.puzzle().constraints.len();
+            let provable = planner.get_provable_varlits().clone();
+            for lit in &provable {
+                let puzlits = planner.puzzle().lit_to_vars(lit);
+                if let Some(first) = puzlits.iter().next() {
+                    let lit_str = format_puzlit(first);
+                    if !sized.contains(&lit_str) {
+                        result.set(lit_str, sentinel)?;
+                    }
                 }
             }
 
