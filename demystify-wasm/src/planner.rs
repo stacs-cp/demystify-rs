@@ -6,8 +6,8 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
+use crate::serde_helpers::to_js;
 use serde::Serialize;
-use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 
 use demystify::problem::{
@@ -36,6 +36,43 @@ struct UserMusPayload {
 #[wasm_bindgen]
 pub struct WasmPlanner {
     inner: Arc<Mutex<PuzzlePlanner>>,
+}
+
+/// Install demystify's `tracing` subscriber into the browser console.
+///
+/// Call once early (e.g. right after `await init()` on the JS side); it
+/// pipes every `info!`/`debug!` produced by demystify's solver and
+/// planner into `console.log` / `console.debug`, which is the cleanest
+/// way to see what `difficulties()` is doing in the browser without
+/// rebuilding wasm.  Safe to call multiple times — the second and later
+/// calls are no-ops.
+///
+/// `max_level` is one of `"trace" | "debug" | "info" | "warn" | "error"`.
+/// Defaults to `"info"`.
+#[wasm_bindgen(js_name = enableConsoleLogs)]
+pub fn enable_console_logs(max_level: Option<String>) {
+    use std::sync::Once;
+    static INSTALLED: Once = Once::new();
+    INSTALLED.call_once(|| {
+        let lvl = max_level.as_deref().unwrap_or("info");
+        let level = match lvl {
+            "trace" => tracing::Level::TRACE,
+            "debug" => tracing::Level::DEBUG,
+            "info" => tracing::Level::INFO,
+            "warn" => tracing::Level::WARN,
+            "error" => tracing::Level::ERROR,
+            other => {
+                web_sys::console::warn_1(
+                    &format!("enableConsoleLogs: unknown level {other:?}; using info").into(),
+                );
+                tracing::Level::INFO
+            }
+        };
+        let cfg = tracing_wasm::WASMLayerConfigBuilder::new()
+            .set_max_level(level)
+            .build();
+        tracing_wasm::set_as_global_default_with_config(cfg);
+    });
 }
 
 #[wasm_bindgen]
@@ -77,7 +114,7 @@ impl WasmPlanner {
                 out.push(format_puzlit(puzlit));
             }
         }
-        to_value(&out).map_err(Into::into)
+        to_js(&out).map_err(Into::into)
     }
 
     /// Mark a literal as deduced. Returns true if the literal was found, false
@@ -190,7 +227,7 @@ impl WasmPlanner {
             mus_size: muses.first().map(|m| m.mus_len()).unwrap_or(0),
             num_muses: muses.len(),
         };
-        to_value(&payload).map_err(Into::into)
+        to_js(&payload).map_err(Into::into)
     }
 
     /// Solve the whole puzzle, returning `Vec<Vec<UserMusPayload>>`.
@@ -211,7 +248,7 @@ impl WasmPlanner {
                     .collect()
             })
             .collect();
-        to_value(&payload).map_err(Into::into)
+        to_js(&payload).map_err(Into::into)
     }
 
     /// Difficulty (smallest MUS size) for each provable literal.
@@ -229,7 +266,80 @@ impl WasmPlanner {
                 out.insert(format_puzlit(first), min_len);
             }
         }
-        to_value(&out).map_err(Into::into)
+        to_js(&out).map_err(Into::into)
+    }
+
+    /// Diagnostic wrapper around [`Self::difficulties`].  Logs every
+    /// phase of the underlying `all_muses_with_larger` pass via
+    /// `console.log` and returns a JS object with the same per-phase
+    /// counts so a JS harness can assert on them.
+    ///
+    /// Use only for debugging — it's slower than `difficulties()`
+    /// because it re-walks the dict to surface per-phase stats and
+    /// it also drives the dict-walk twice (once for the summary, once
+    /// for the returned mapping).
+    ///
+    /// Companion to [`enable_console_logs`]: call that once to get
+    /// demystify's own tracing logs as well.
+    ///
+    /// The returned object has the shape:
+    /// `{ provable: number, dict_entries: number, lits_with_sized_mus: number,
+    ///    min_mus_size: number | null, difficulties: { lit: size, ... } }`
+    #[wasm_bindgen(js_name = difficultiesDebug)]
+    pub fn difficulties_debug(&self) -> Result<JsValue, JsError> {
+        use web_sys::console;
+        console::log_1(&"difficultiesDebug: locking planner".into());
+        let mut planner = self.inner.lock().unwrap();
+
+        let provable = planner.get_provable_varlits().len();
+        console::log_1(&format!("difficultiesDebug: provable_varlits = {provable}").into());
+
+        console::log_1(&"difficultiesDebug: calling all_muses_with_larger".into());
+        let muses = planner.all_muses_with_larger();
+        let dict_entries = muses.muses().len();
+        console::log_1(&format!("difficultiesDebug: dict entries = {dict_entries}").into());
+
+        let mut lits_with_sized_mus = 0_usize;
+        let mut min_mus_size: Option<usize> = None;
+        let mut out: BTreeMap<String, usize> = BTreeMap::new();
+        for (lit, mus_set) in muses.muses() {
+            let Some(min_len) = mus_set.iter().map(|mc| mc.mus_len()).min() else {
+                continue;
+            };
+            if min_len >= 1 {
+                lits_with_sized_mus += 1;
+                min_mus_size = Some(min_mus_size.map_or(min_len, |m| m.min(min_len)));
+            }
+            let puzlits = planner.puzzle().lit_to_vars(lit);
+            if let Some(first) = puzlits.iter().next() {
+                out.insert(format_puzlit(first), min_len);
+            }
+        }
+        console::log_1(
+            &format!(
+                "difficultiesDebug: lits_with_sized_mus = {lits_with_sized_mus}, \
+                 min_mus_size = {min_mus_size:?}, difficulties.len() = {}",
+                out.len()
+            )
+            .into(),
+        );
+
+        #[derive(Serialize)]
+        struct DebugPayload {
+            provable: usize,
+            dict_entries: usize,
+            lits_with_sized_mus: usize,
+            min_mus_size: Option<usize>,
+            difficulties: BTreeMap<String, usize>,
+        }
+        to_js(&DebugPayload {
+            provable,
+            dict_entries,
+            lits_with_sized_mus,
+            min_mus_size,
+            difficulties: out,
+        })
+        .map_err(Into::into)
     }
 
     /// All literals currently known (deduced or fixed).
@@ -243,7 +353,7 @@ impl WasmPlanner {
                 out.push(format_puzlit(first));
             }
         }
-        to_value(&out).map_err(Into::into)
+        to_js(&out).map_err(Into::into)
     }
 
     /// Current assignments as a nested object: `{var_name: {idx1: {idx2: val}}}`.
@@ -291,6 +401,6 @@ impl WasmPlanner {
             }
         }
 
-        to_value(&Value::Object(root)).map_err(Into::into)
+        to_js(&Value::Object(root)).map_err(Into::into)
     }
 }

@@ -132,6 +132,53 @@ fn demystify_deduces_minesweeper_3x3_via_reveal() {
 }
 
 #[test]
+fn all_muses_with_larger_populates_on_minesweeper_reveal() {
+    // Repro for an embedder-reported bug: difficulties() in the wasm
+    // bindings returns empty on this puzzle, even though bestStep /
+    // quickSolve solve it.  difficulties() is just a thin wrapper around
+    // PuzzlePlanner::all_muses_with_larger(), so the bug must be visible
+    // here too if it's in the planner / solver layer.
+    let puzzle = Arc::new(build_minesweeper_3x3_with_reveal());
+    let solver = PuzzleSolver::new(puzzle.clone()).unwrap();
+    let mut planner = PuzzlePlanner::new(solver);
+
+    let provable = {
+        // get_provable_varlits requires &mut self; clone the result so
+        // we don't hold the borrow across the all_muses_with_larger call.
+        let mut tmp_solver = PuzzleSolver::new(puzzle.clone()).unwrap();
+        tmp_solver.get_provable_varlits().clone()
+    };
+    assert!(
+        !provable.is_empty(),
+        "minesweeper-via-REVEAL should have provable lits before any deduction"
+    );
+
+    let dict = planner.all_muses_with_larger();
+    let n_lits = dict.muses().len();
+    assert!(
+        n_lits > 0,
+        "all_muses_with_larger returned an empty dict for a puzzle with \
+         {} provable lits — difficulties() relies on this being populated",
+        provable.len()
+    );
+
+    // Mirror what difficulties() does: confirm at least one entry has a
+    // non-zero min MUS size (otherwise the JS-side BTreeMap would be
+    // populated, but every entry would be 0 — still useless for "how
+    // hard is this lit").
+    let n_with_sized_mus = dict
+        .muses()
+        .values()
+        .filter(|mus_set| mus_set.iter().any(|mc| mc.mus_len() >= 1))
+        .count();
+    assert!(
+        n_with_sized_mus > 0,
+        "every dict entry had only size-0 MUSes — difficulties() would \
+         report 0s, which isn't useful",
+    );
+}
+
+#[test]
 fn set_reveal_rejects_unknown_source() {
     let mut b = PuzzleBuilder::new();
     let _facts = b.reveal_bool_matrix("facts", &[1..=2, 0..=1]);

@@ -18,6 +18,7 @@ use wasm_bindgen::prelude::*;
 mod builder;
 mod planner;
 mod puzzle;
+mod serde_helpers;
 
 pub use builder::*;
 pub use planner::*;

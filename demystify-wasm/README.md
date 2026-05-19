@@ -228,3 +228,33 @@ Method names mirror [`demystify-lua`](../demystify-lua/src/lib.rs) but in
 camelCase (`isSolved`, `bestStep`, `fixLiteral`, `numClauses`, `varBoolMatrix`,
 `revealBoolMatrix`, etc.). Struct names keep the `Wasm` prefix (`WasmBuilder`,
 `WasmPlanner`, `WasmPuzzle`, `WasmAtom`, `WasmSigned`, `WasmBoolMatrix`).
+
+## Debugging from the browser
+
+When something behaves differently in the browser than in
+`wasm-pack test --node` or native Rust, two helpers are exposed:
+
+```js
+import init, { enableConsoleLogs, WasmPlanner } from "./pkg/demystify_wasm.js";
+await init();
+
+// Pipe demystify's tracing logs (info!/debug!) to the browser console.
+// Call once at startup.  Levels: "trace" | "debug" | "info" (default) |
+// "warn" | "error".  Idempotent.
+enableConsoleLogs("debug");
+
+const planner = new WasmPlanner(puzzle);
+
+// Console-logs each phase; returns the same difficulties map plus
+// per-phase counts so JS can assert.  The returned object is:
+//   { provable, dict_entries, lits_with_sized_mus, min_mus_size, difficulties }
+const dbg = planner.difficultiesDebug();
+console.log(dbg);
+```
+
+`difficultiesDebug()` emits four lines per call: provable-lit count, the
+size of the dict `all_muses_with_larger` returned, how many entries had
+a size-≥1 MUS, and the final mapping length.  Combined with the tracing
+logs from `enableConsoleLogs`, that's enough to tell whether the search
+ran at all, whether the tiny scan found size-1 MUSes, and whether the
+cores/main-search phases produced anything.

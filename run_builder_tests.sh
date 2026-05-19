@@ -52,10 +52,16 @@ else
     log "[skip] luajit not on PATH"
 fi
 
-# 4. WASM end-to-end (requires wasm-pack + wasm32 target)
+# 4. WASM end-to-end (requires wasm-pack + wasm32 target).  Run both
+#    debug and release: a couple of bugs reported by embedders only
+#    reproduce in release mode (wasm builds for the web/bundler targets
+#    default to release), so we want both passes in CI.
 if command -v wasm-pack >/dev/null 2>&1; then
     if rustup target list --installed 2>/dev/null | grep -q wasm32-unknown-unknown; then
-        run "wasm-pack test demystify-wasm" wasm-pack test --node demystify-wasm || overall=1
+        run "wasm-pack test demystify-wasm (debug)" \
+            wasm-pack test --node demystify-wasm || overall=1
+        run "wasm-pack test demystify-wasm (release)" \
+            wasm-pack test --node --release demystify-wasm || overall=1
     else
         log
         log "=== wasm-pack test demystify-wasm ==="

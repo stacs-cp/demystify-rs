@@ -112,6 +112,42 @@ fn set_reveal_rejects_unknown_target() {
 }
 
 #[wasm_bindgen_test]
+fn difficulties_nonempty_on_minesweeper() {
+    // Reproduces a bug reported by an embedder: on minesweeper-shaped
+    // puzzles, WasmPlanner.difficulties() returns an empty object even
+    // though bestStep / quickSolve find provable lits with size-1 MUSes.
+    // difficulties() should report one entry per provable lit with the
+    // smallest MUS size — at least equal in cardinality to the
+    // bestStep / quickSolve output.
+    let puzzle = build_minesweeper();
+    let planner = WasmPlanner::new(&puzzle).expect("planner");
+
+    let provable_count: usize = {
+        let val = planner
+            .provable_literals()
+            .expect("provable_literals before difficulties");
+        let v: Vec<String> = from_value(val).expect("decode provable_literals");
+        v.len()
+    };
+    assert!(
+        provable_count > 0,
+        "minesweeper should have provable lits before any deduction"
+    );
+
+    let diffs: std::collections::BTreeMap<String, usize> =
+        from_value(planner.difficulties().expect("difficulties")).expect("decode difficulties");
+    assert!(
+        !diffs.is_empty(),
+        "difficulties() must not be empty when there are provable lits \
+         (provable_count={provable_count})"
+    );
+    assert!(
+        diffs.values().all(|&n| n >= 1),
+        "every difficulty entry is a MUS size and so >= 1; got {diffs:?}"
+    );
+}
+
+#[wasm_bindgen_test]
 fn planner_deduces_minesweeper_via_reveal() {
     let puzzle = build_minesweeper();
     let planner = WasmPlanner::new(&puzzle).expect("planner");

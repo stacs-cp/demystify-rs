@@ -7,8 +7,8 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use crate::serde_helpers::to_js;
 use serde::Serialize;
-use serde_wasm_bindgen::to_value;
 use wasm_bindgen::prelude::*;
 
 use demystify::problem::parse::PuzzleParse;
@@ -54,23 +54,23 @@ impl WasmPuzzle {
 
     pub fn info(&self) -> Result<JsValue, JsError> {
         let v: Vec<String> = self.inner.eprime.info.clone();
-        to_value(&v).map_err(Into::into)
+        to_js(&v).map_err(Into::into)
     }
 
     pub fn variables(&self) -> Result<JsValue, JsError> {
         let v: Vec<String> = self.inner.eprime.vars.iter().cloned().collect();
-        to_value(&v).map_err(Into::into)
+        to_js(&v).map_err(Into::into)
     }
 
     #[wasm_bindgen(js_name = auxVariables)]
     pub fn aux_variables(&self) -> Result<JsValue, JsError> {
         let v: Vec<String> = self.inner.eprime.auxvars.iter().cloned().collect();
-        to_value(&v).map_err(Into::into)
+        to_js(&v).map_err(Into::into)
     }
 
     pub fn constraints(&self) -> Result<JsValue, JsError> {
         let v: Vec<String> = self.inner.eprime.cons.keys().cloned().collect();
-        to_value(&v).map_err(Into::into)
+        to_js(&v).map_err(Into::into)
     }
 
     pub fn constraint(&self, name: &str) -> Option<String> {
@@ -122,7 +122,7 @@ impl WasmPuzzle {
         match self.inner.direct.domainmap.get(&puzvar) {
             Some(domain) => {
                 let v: Vec<i64> = domain.iter().copied().collect();
-                to_value(&v).map_err(Into::into)
+                to_js(&v).map_err(Into::into)
             }
             None => Ok(JsValue::NULL),
         }
@@ -138,7 +138,7 @@ impl WasmPuzzle {
             .iter()
             .map(|(v, d)| (format_puzvar(v), d.iter().copied().collect()))
             .collect();
-        to_value(&map).map_err(Into::into)
+        to_js(&map).map_err(Into::into)
     }
 
     /// Variables involved in a named constraint, as an array of strings.
@@ -166,7 +166,7 @@ impl WasmPuzzle {
             }
         }
         let v: Vec<String> = var_names.into_iter().collect();
-        to_value(&v).map_err(Into::into)
+        to_js(&v).map_err(Into::into)
     }
 }
 
@@ -205,5 +205,5 @@ pub fn parse_literal(s: &str) -> Result<JsValue, JsError> {
         value,
         equal,
     };
-    to_value(&parsed).map_err(Into::into)
+    to_js(&parsed).map_err(Into::into)
 }
