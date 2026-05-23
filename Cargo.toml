@@ -10,5 +10,31 @@ resolver = "2"
 
 # Keep optimisation at O3 but retain debug symbols so samply/perf can
 # symbolise stack frames.  Costs some binary size; run-time is unaffected.
+#
+# `panic = "abort"` is workspace-wide: demystify is a "correctness first"
+# tool, so we'd rather terminate than try to recover from a panic, and
+# abort lets the compiler drop all unwinding machinery (panic-format,
+# rustc_demangle, unwind tables) across the whole dependency tree.
+# This applies to release builds only — tests still use dev/test
+# profiles which keep `panic = "unwind"`, so `catch_unwind` in tests
+# continues to work as expected.  NB: `cargo test --release` would
+# compile tests under abort and break any `catch_unwind`-based test.
 [profile.release]
 debug = true
+panic = "abort"
+
+# Wasm doesn't need DWARF symbols (samply/perf can't read them in a
+# browser anyway), and bandwidth matters more than build speed.
+# `opt-level = "s"` is the gentle size optimisation — `"z"` is more
+# aggressive but sometimes pessimises SAT-heavy code; revisit if a
+# measurement shows it's worth it.
+#
+# `lto` and `codegen-units` are only valid at top-level `[profile.*]`,
+# not in per-package overrides, so we don't set them here.  If the
+# size gain from the knobs we *can* set isn't enough, promote
+# `lto = "fat"` to `[profile.release]` — but that slows every release
+# build (CLI included), not just the wasm.
+[profile.release.package.demystify-wasm]
+debug = false
+strip = "symbols"
+opt-level = "s"

@@ -26,6 +26,20 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["r
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
+# wasm-pack ships a wasm-opt that's older than the wasm features modern
+# rustc emits.  Pass the feature flags explicitly so it accepts the
+# input, and ask for `-Oz` (aggressive size) since rustc's `opt-level
+# = "s"` already handled correctness-sensitive optimisations.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+    "-Oz",
+    "--enable-bulk-memory",
+    "--enable-mutable-globals",
+    "--enable-sign-ext",
+    "--enable-nontrapping-float-to-int",
+    "--enable-reference-types",
+]
+
 # Enable WebAssembly randomness for the transitive getrandom dependency
 # pulled in via rand. Without `wasm_js`, getrandom 0.4 refuses to compile
 # on wasm32-unknown-unknown.
