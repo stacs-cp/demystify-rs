@@ -1795,6 +1795,7 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         .arg("-O0")
         .arg("-reduce-domains")
         .arg("-aggregate")
+        .arg("-sat-polarity")
         .output()
         .expect("Failed to find 'savilerow' -- have you installed savilerow and conjure?");
 
