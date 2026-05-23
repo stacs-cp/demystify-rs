@@ -12,16 +12,17 @@
 //! # Supported constraint vocabulary
 //!
 //! - Boolean variables (declared individually or as N-dimensional matrices).
-//! - `sum(lits) >= k` and `sum(lits) <= k`, where each lit may be negated.
-//! - Guarded versions of the above: `guard -> (sum >= k)` /
-//!   `guard -> (sum <= k)`.  The guard mirrors the eprime `$#CON` activation
-//!   pattern.
+//! - Multi-valued (integer-domain) variables via `var_int_matrix`: a one-hot
+//!   direct encoding that renders / explains as `grid[i,j] = 2`.
+//! - `sum(lits) >= k`, `sum(lits) <= k`, and `sum(lits) = k`, where each lit
+//!   may be negated.
+//! - Guarded versions of the above: `guard -> (sum >= k)` etc.  The guard
+//!   mirrors the eprime `$#CON` activation pattern.
+//! - `table`: a forbidden-tuples (negative table) constraint over one-hot
+//!   `IntCell` columns, registered as a single `$#CON`.
 //! - `$#REVEAL` cascades — `reveal_bool_matrix` + `set_reveal` give
 //!   minesweeper-style "deduce `grid[i,j]=v` ⇒ also mark `facts[i,j,v]`
 //!   known" without a separate deduction step.
-//!
-//! Out of scope (cleanly addable later): `sum = k`, integer-domain
-//! variables.
 //!
 //! # Example
 //!
@@ -66,7 +67,9 @@ mod builder;
 mod cardinality;
 mod error;
 
-pub use builder::{Atom, BoolMatrix, ConstraintHandle, FamilyMut, Guard, PuzzleBuilder, Signed};
+pub use builder::{
+    Atom, BoolMatrix, ConstraintHandle, FamilyMut, Guard, IntCell, IntMatrix, PuzzleBuilder, Signed,
+};
 pub use demystify::problem::parse::{PuzzleParse, ShowRole};
 pub use error::BuildError;
 pub use rustsat::types::Lit;

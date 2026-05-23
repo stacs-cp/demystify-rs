@@ -14,9 +14,11 @@
 //! REVEAL — which is precisely what makes this a real test of the
 //! mechanism.
 //!
-//! The two-atom gate (`sumcheck` ∧ `facts`) is built with
-//! [`PuzzleBuilder::and_atom`] and registered into the `sumcheck` family
-//! via [`PuzzleBuilder::guard`].
+//! The constraint is registered into the `sumcheck` family via
+//! [`PuzzleBuilder::guard`], with `facts[r,c,0]` attached as an extra
+//! gate via [`Guard::gated_by`].  (The earlier and_atom-based encoding
+//! was bidirectional, so assuming `c=true` forced `facts=true` and
+//! silently bypassed the reveal cascade.)
 //!
 //! Same 3×3 layout as `minesweeper.rs`:
 //!
@@ -70,14 +72,14 @@ fn build_minesweeper_3x3_with_reveal() -> PuzzleParse {
                 }
             }
         }
-        let gate = b.and_atom(&[sumcheck.get(&[r, c]).pos(), facts.get(&[r, c, 0]).pos()]);
         let g = b
             .guard(
-                gate,
+                sumcheck.get(&[r, c]),
                 "sumcheck",
                 format!("exactly {n_mines} mines around ({r}, {c}) given safe"),
             )
-            .unwrap();
+            .unwrap()
+            .gated_by(&facts.get(&[r, c, 0]));
         b.sum_eq(g, &neighbours, n_mines).unwrap();
     }
 

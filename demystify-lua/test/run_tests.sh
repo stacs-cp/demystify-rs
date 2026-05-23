@@ -157,6 +157,16 @@ else
 fi
 
 echo
+echo "Running builder binairo-tricolor test..."
+echo
+if LUA_CPATH="$TEMP_DIR/?.so;;" LUA_PATH="$TEST_DIR/?.lua;;" luajit test_builder_binairo_tricolor.lua; then
+    echo -e "${GREEN}PASS: builder binairo-tricolor${NC}"
+else
+    echo -e "${RED}FAIL: builder binairo-tricolor${NC}"
+    exit 1
+fi
+
+echo
 
 # Run the demystify library tests with each puzzle type
 echo "Running demystify library tests..."

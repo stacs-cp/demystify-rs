@@ -110,15 +110,14 @@ fn build_puzzle() -> WasmPuzzle {
                     }
                     atoms.push(cell.get(vec![nr, nc, h]).expect("nbr").pos());
                 }
-                let gate = b
-                    .and_atom(vec![
-                        sumcheck.get(vec![r, c, h]).expect("sumcheck atom").pos(),
-                        facts.get(vec![r, c, 0, 1]).expect("facts atom").pos(),
-                    ])
-                    .expect("and_atom");
                 let g = b
-                    .guard(&gate, "sumcheck", &format!("sumcheck[{r},{c}] herb={h}"))
-                    .expect("guard");
+                    .guard(
+                        &sumcheck.get(vec![r, c, h]).expect("sumcheck atom"),
+                        "sumcheck",
+                        &format!("sumcheck[{r},{c}] herb={h}"),
+                    )
+                    .expect("guard")
+                    .gated_by(&facts.get(vec![r, c, 0, 1]).expect("facts atom"));
                 b.sum_eq(g, atoms, count).expect("sumcheck sum_eq");
             }
         }

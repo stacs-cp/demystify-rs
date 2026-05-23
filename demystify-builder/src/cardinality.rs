@@ -1,27 +1,32 @@
-//! CNF encoding of `sum(lits) ≥ k` / `sum(lits) ≤ k`, optionally guarded
-//! by a single literal `g` so that the constraint reads `g -> (sum … k)`.
+//! CNF encoding of `sum(lits) ≥ k` / `sum(lits) ≤ k`, optionally
+//! guarded by a *conjunction* of literals — i.e. the encoded constraint
+//! reads `(g₁ ∧ … ∧ gₙ) -> (sum … k)`.
 //!
 //! Uses `rustsat::encodings::card::Totalizer` for `n ≥ 2`.  Small cases
 //! are hand-rolled so the resulting CNF is human-readable when reasoned
 //! about (and to avoid pulling the totalizer machinery for trivial 1- and
 //! 2-literal constraints).
 //!
-//! The guard is applied by emitting every clause `(c₁ ∨ … ∨ cₖ)` as
-//! `(¬g ∨ c₁ ∨ … ∨ cₖ)`, which is exactly `g -> (c₁ ∨ … ∨ cₖ)`.
+//! The gates are applied by emitting every clause `(c₁ ∨ … ∨ cₖ)` as
+//! `(¬g₁ ∨ … ∨ ¬gₙ ∨ c₁ ∨ … ∨ cₖ)`, which is exactly
+//! `(g₁ ∧ … ∧ gₙ) -> (c₁ ∨ … ∨ cₖ)`.  An empty `gates` slice means
+//! the constraint is unconditional.  A single-element slice recovers
+//! the previous "guarded by one literal" behaviour.
 
 use rustsat::encodings::card::{BoundLower, BoundUpper, Totalizer};
 use rustsat::instances::{Cnf, SatInstance};
 use rustsat::types::{Clause, Lit};
 
-/// Encode `sum(lits) ≥ k`.  If `guard` is `Some(g)`, the encoded
-/// constraint is `g -> (sum ≥ k)`; otherwise it is unconditional.
+/// Encode `sum(lits) ≥ k`.  If `gates` is non-empty, the encoded
+/// constraint is `(g₁ ∧ … ∧ gₙ) -> (sum ≥ k)`; otherwise it is
+/// unconditional.
 ///
 /// Returns an error only if the encoder runs out of memory.
 pub(crate) fn encode_sum_ge(
     sat: &mut SatInstance,
     lits: &[Lit],
     k: i64,
-    guard: Option<Lit>,
+    gates: &[Lit],
 ) -> Result<(), rustsat::OutOfMemory> {
     let n = lits.len();
     // Normalise k against the bounds of the sum.
@@ -30,8 +35,10 @@ pub(crate) fn encode_sum_ge(
         return Ok(());
     }
     if (k as usize) > n {
-        // Unsatisfiable.  Emit (¬g) under a guard, an empty clause without.
-        emit_under_guard(sat, &[], guard);
+        // Unsatisfiable.  Under gates, emit the disjunction of negated
+        // gates (i.e. assert at least one gate is false); with no gates,
+        // emit an empty clause.
+        emit_under_gates(sat, &[], gates);
         return Ok(());
     }
     let k = k as usize;
@@ -42,20 +49,20 @@ pub(crate) fn encode_sum_ge(
     if k == n {
         // All literals must be true: one unit per literal.
         for &l in lits {
-            emit_under_guard(sat, &[l], guard);
+            emit_under_gates(sat, &[l], gates);
         }
         return Ok(());
     }
     if k == 1 {
         // At least one literal must be true: a single clause.
-        emit_under_guard(sat, lits, guard);
+        emit_under_gates(sat, lits, gates);
         return Ok(());
     }
 
-    encode_via_totalizer(sat, lits, k, guard, Bound::Lower)
+    encode_via_totalizer(sat, lits, k, gates, Bound::Lower)
 }
 
-/// Encode `sum(lits) = k`.  Same guard semantics as [`encode_sum_ge`].
+/// Encode `sum(lits) = k`.  Same gate semantics as [`encode_sum_ge`].
 ///
 /// Implemented as `encode_sum_ge(..., k)` plus `encode_sum_le(..., k)`,
 /// short-circuiting the two cases (`k < 0`, `k > n`) where both halves
@@ -64,29 +71,29 @@ pub(crate) fn encode_sum_eq(
     sat: &mut SatInstance,
     lits: &[Lit],
     k: i64,
-    guard: Option<Lit>,
+    gates: &[Lit],
 ) -> Result<(), rustsat::OutOfMemory> {
     let n = lits.len();
     if k < 0 || (k as usize) > n {
-        emit_under_guard(sat, &[], guard);
+        emit_under_gates(sat, &[], gates);
         return Ok(());
     }
-    encode_sum_ge(sat, lits, k, guard)?;
-    encode_sum_le(sat, lits, k, guard)?;
+    encode_sum_ge(sat, lits, k, gates)?;
+    encode_sum_le(sat, lits, k, gates)?;
     Ok(())
 }
 
-/// Encode `sum(lits) ≤ k`.  Same guard semantics as [`encode_sum_ge`].
+/// Encode `sum(lits) ≤ k`.  Same gate semantics as [`encode_sum_ge`].
 pub(crate) fn encode_sum_le(
     sat: &mut SatInstance,
     lits: &[Lit],
     k: i64,
-    guard: Option<Lit>,
+    gates: &[Lit],
 ) -> Result<(), rustsat::OutOfMemory> {
     let n = lits.len();
     if k < 0 {
         // Unsatisfiable.
-        emit_under_guard(sat, &[], guard);
+        emit_under_gates(sat, &[], gates);
         return Ok(());
     }
     if (k as usize) >= n {
@@ -99,18 +106,18 @@ pub(crate) fn encode_sum_le(
     if k == 0 {
         // All literals must be false: one unit clause per literal.
         for &l in lits {
-            emit_under_guard(sat, &[!l], guard);
+            emit_under_gates(sat, &[!l], gates);
         }
         return Ok(());
     }
     if k + 1 == n {
         // At most n-1 true ⟺ at least one false ⟺ disjunction of negations.
         let neg: Vec<Lit> = lits.iter().map(|&l| !l).collect();
-        emit_under_guard(sat, &neg, guard);
+        emit_under_gates(sat, &neg, gates);
         return Ok(());
     }
 
-    encode_via_totalizer(sat, lits, k, guard, Bound::Upper)
+    encode_via_totalizer(sat, lits, k, gates, Bound::Upper)
 }
 
 #[derive(Copy, Clone)]
@@ -123,7 +130,7 @@ fn encode_via_totalizer(
     sat: &mut SatInstance,
     lits: &[Lit],
     k: usize,
-    guard: Option<Lit>,
+    gates: &[Lit],
     bound: Bound,
 ) -> Result<(), rustsat::OutOfMemory> {
     let mut scratch = Cnf::new();
@@ -140,33 +147,44 @@ fn encode_via_totalizer(
         }
     };
 
-    // Move scratch clauses into the SatInstance under the guard.
+    // Move scratch clauses into the SatInstance under the gates.
     for clause in scratch.iter() {
         let body: Vec<Lit> = clause.iter().copied().collect();
-        emit_under_guard(sat, &body, guard);
+        emit_under_gates(sat, &body, gates);
     }
     for unit in units {
-        emit_under_guard(sat, &[unit], guard);
+        emit_under_gates(sat, &[unit], gates);
     }
     Ok(())
 }
 
-/// Emit `(¬g ∨ body...)` into `sat` if guarded, or `(body...)` otherwise.
-/// An empty `body` with no guard produces an empty (unsat) clause.
-fn emit_under_guard(sat: &mut SatInstance, body: &[Lit], guard: Option<Lit>) {
-    match guard {
-        None => {
-            sat.add_clause(Clause::from_iter(body.iter().copied()));
-        }
-        Some(g) => {
-            let mut clause = Clause::with_capacity(body.len() + 1);
-            clause.add(!g);
-            for &l in body {
-                clause.add(l);
-            }
-            sat.add_clause(clause);
-        }
+/// Emit `(¬g₁ ∨ … ∨ ¬gₙ ∨ body...)` into `sat`.  With empty `gates`,
+/// emits the bare `body` clause; with a single gate, recovers the
+/// previous `(¬g ∨ body...)` shape.  An empty `body` with no gates
+/// produces an empty (unsat) clause; an empty `body` *with* gates
+/// produces `(¬g₁ ∨ … ∨ ¬gₙ)` (i.e. asserts at least one gate is
+/// false), which is the right CNF for "this conjunction can never be
+/// fully active".
+/// Forbid one tuple of a table constraint: emit
+/// `(g₁ ∧ … ∧ gₙ) -> ¬(l₁ ∧ … ∧ lₘ)`, i.e. the clause
+/// `(¬g₁ ∨ … ∨ ¬gₙ ∨ ¬l₁ ∨ … ∨ ¬lₘ)`.  `tuple_lits` are the literals
+/// (typically one-hot value-lits) whose simultaneous truth is disallowed.
+/// An empty `tuple_lits` with no gates yields the empty (unsat) clause; with
+/// gates it asserts the gates can't all hold.
+pub(crate) fn encode_forbidden_tuple(sat: &mut SatInstance, tuple_lits: &[Lit], gates: &[Lit]) {
+    let body: Vec<Lit> = tuple_lits.iter().map(|&l| !l).collect();
+    emit_under_gates(sat, &body, gates);
+}
+
+fn emit_under_gates(sat: &mut SatInstance, body: &[Lit], gates: &[Lit]) {
+    let mut clause = Clause::with_capacity(body.len() + gates.len());
+    for &g in gates {
+        clause.add(!g);
     }
+    for &l in body {
+        clause.add(l);
+    }
+    sat.add_clause(clause);
 }
 
 #[cfg(test)]
@@ -189,8 +207,8 @@ mod tests {
     fn sum_ge_zero_is_noop() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_ge(&mut sat, &lits, 0, None).unwrap();
-        encode_sum_ge(&mut sat, &lits, -5, None).unwrap();
+        encode_sum_ge(&mut sat, &lits, 0, &[]).unwrap();
+        encode_sum_ge(&mut sat, &lits, -5, &[]).unwrap();
         assert!(clauses(&sat).is_empty());
     }
 
@@ -198,7 +216,7 @@ mod tests {
     fn sum_ge_too_big_is_unsat() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_ge(&mut sat, &lits, 4, None).unwrap();
+        encode_sum_ge(&mut sat, &lits, 4, &[]).unwrap();
         assert_eq!(clauses(&sat), vec![Vec::<i32>::new()]);
     }
 
@@ -207,15 +225,31 @@ mod tests {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
         let g = sat.new_lit();
-        encode_sum_ge(&mut sat, &lits, 4, Some(g)).unwrap();
+        encode_sum_ge(&mut sat, &lits, 4, &[g]).unwrap();
         assert_eq!(clauses(&sat), vec![vec![(!g).to_ipasir()]]);
+    }
+
+    #[test]
+    fn sum_ge_too_big_two_gates_emits_neg_disjunction() {
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        let g1 = sat.new_lit();
+        let g2 = sat.new_lit();
+        encode_sum_ge(&mut sat, &lits, 4, &[g1, g2]).unwrap();
+        // With two gates, "unsat under the gates' conjunction" means
+        // "at least one gate is false": (¬g₁ ∨ ¬g₂).
+        let c = clauses(&sat);
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0].len(), 2);
+        assert!(c[0].contains(&(!g1).to_ipasir()));
+        assert!(c[0].contains(&(!g2).to_ipasir()));
     }
 
     #[test]
     fn sum_ge_one_is_disjunction() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_ge(&mut sat, &lits, 1, None).unwrap();
+        encode_sum_ge(&mut sat, &lits, 1, &[]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 1);
         assert_eq!(c[0].len(), 3);
@@ -226,7 +260,7 @@ mod tests {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
         let g = sat.new_lit();
-        encode_sum_ge(&mut sat, &lits, 1, Some(g)).unwrap();
+        encode_sum_ge(&mut sat, &lits, 1, &[g]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 1);
         assert_eq!(c[0].len(), 4);
@@ -234,10 +268,24 @@ mod tests {
     }
 
     #[test]
+    fn sum_ge_one_two_gates_prepends_both_neg_gates() {
+        let mut sat = SatInstance::new();
+        let lits = fresh_lits(&mut sat, 3);
+        let g1 = sat.new_lit();
+        let g2 = sat.new_lit();
+        encode_sum_ge(&mut sat, &lits, 1, &[g1, g2]).unwrap();
+        let c = clauses(&sat);
+        assert_eq!(c.len(), 1);
+        assert_eq!(c[0].len(), 5);
+        assert!(c[0].contains(&(!g1).to_ipasir()));
+        assert!(c[0].contains(&(!g2).to_ipasir()));
+    }
+
+    #[test]
     fn sum_ge_all_is_units() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_ge(&mut sat, &lits, 3, None).unwrap();
+        encode_sum_ge(&mut sat, &lits, 3, &[]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 3);
         for clause in &c {
@@ -249,7 +297,7 @@ mod tests {
     fn sum_le_zero_is_units_of_negation() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_le(&mut sat, &lits, 0, None).unwrap();
+        encode_sum_le(&mut sat, &lits, 0, &[]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 3);
         for (clause, lit) in c.iter().zip(&lits) {
@@ -261,7 +309,7 @@ mod tests {
     fn sum_le_nm1_is_disjunction_of_negations() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_le(&mut sat, &lits, 2, None).unwrap();
+        encode_sum_le(&mut sat, &lits, 2, &[]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 1);
         assert_eq!(c[0].len(), 3);
@@ -271,7 +319,7 @@ mod tests {
     fn sum_le_negative_is_unsat() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_le(&mut sat, &lits, -1, None).unwrap();
+        encode_sum_le(&mut sat, &lits, -1, &[]).unwrap();
         assert_eq!(clauses(&sat), vec![Vec::<i32>::new()]);
     }
 
@@ -279,8 +327,8 @@ mod tests {
     fn sum_le_n_or_more_is_noop() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_le(&mut sat, &lits, 3, None).unwrap();
-        encode_sum_le(&mut sat, &lits, 10, None).unwrap();
+        encode_sum_le(&mut sat, &lits, 3, &[]).unwrap();
+        encode_sum_le(&mut sat, &lits, 10, &[]).unwrap();
         assert!(clauses(&sat).is_empty());
     }
 
@@ -288,7 +336,7 @@ mod tests {
     fn sum_eq_too_big_emits_single_unsat_clause() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_eq(&mut sat, &lits, 4, None).unwrap();
+        encode_sum_eq(&mut sat, &lits, 4, &[]).unwrap();
         assert_eq!(clauses(&sat), vec![Vec::<i32>::new()]);
     }
 
@@ -296,7 +344,7 @@ mod tests {
     fn sum_eq_negative_emits_single_unsat_clause() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_eq(&mut sat, &lits, -1, None).unwrap();
+        encode_sum_eq(&mut sat, &lits, -1, &[]).unwrap();
         assert_eq!(clauses(&sat), vec![Vec::<i32>::new()]);
     }
 
@@ -304,7 +352,7 @@ mod tests {
     fn sum_eq_zero_forces_all_false() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_eq(&mut sat, &lits, 0, None).unwrap();
+        encode_sum_eq(&mut sat, &lits, 0, &[]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 3);
         for (clause, lit) in c.iter().zip(&lits) {
@@ -316,7 +364,7 @@ mod tests {
     fn sum_eq_n_forces_all_true() {
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_eq(&mut sat, &lits, 3, None).unwrap();
+        encode_sum_eq(&mut sat, &lits, 3, &[]).unwrap();
         let c = clauses(&sat);
         assert_eq!(c.len(), 3);
         for (clause, lit) in c.iter().zip(&lits) {
@@ -335,7 +383,7 @@ mod tests {
         use rustsat::types::TernaryVal;
         let mut sat = SatInstance::new();
         let lits = fresh_lits(&mut sat, 3);
-        encode_sum_eq(&mut sat, &lits, 1, None).unwrap();
+        encode_sum_eq(&mut sat, &lits, 1, &[]).unwrap();
         let cnf = sat.cnf().clone();
         // For each of the 8 assignments, check satisfiability with the
         // unit-clause assumptions of that assignment.

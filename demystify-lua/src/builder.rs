@@ -22,16 +22,17 @@
 //! local planner = d.Planner.new(puzzle)
 //! ```
 //!
-//! Multi-gate (e.g. `$#REVEAL`-driven) constraints use `b:and_atom` to
-//! combine the gates into a fresh atom, then `b:guard` to attach the
-//! family and description:
+//! Reveal-shaped constraints (minesweeper-style, where a clue only
+//! fires after the cell is revealed safe) use `b:guard` for the
+//! `$#CON` sentinel and `Guard:gated_by(...)` to attach the reveal
+//! atom.  The CNF antecedent becomes
+//! `(guard.atom ∧ gate_1 ∧ … ∧ gate_n) → constraint`, and unlike
+//! `b:and_atom`, gates are *not* forced true by enabling the `$#CON`
+//! atom — so the cascade actually gates.
 //!
 //! ```lua
-//! local gate = b:and_atom({
-//!     sumcheck:get({i, j}):pos(),
-//!     facts:get({i, j, 0}):pos(),
-//! })
-//! local g = b:guard(gate, "sumcheck", "...")
+//! local g = b:guard(sumcheck:get({i, j}), "sumcheck", "...")
+//!     :gated_by(facts:get({i, j, 0}))
 //! b:sum_eq(g, neighbours, n_mines)
 //! ```
 //!
@@ -45,6 +46,7 @@
 //! | `b:kind(s)` | Set the puzzle's `$#KIND` tag |
 //! | `b:info(s)` | Push a `$#INFO` string |
 //! | `b:var_bool_matrix(name, dims)` | Declare a `$#VAR` matrix, returns a `BoolMatrix` |
+//! | `b:var_int_matrix(name, dims, domain)` | Declare a `$#VAR` multi-valued matrix (one-hot), returns an `IntMatrix`.  `domain` is a list of values, e.g. `{0, 1, 2}` |
 //! | `b:con_bool_matrix(name, dims)` | Declare a `$#CON` family, returns a `BoolMatrix` of activation atoms |
 //! | `b:con_bool(name)` | Declare a 0-d `$#CON` activation atom |
 //! | `b:aux_bool_matrix(name, dims)` | Declare a `$#AUX` matrix |
@@ -52,12 +54,14 @@
 //! | `b:reveal_bool_matrix(name, dims)` | Declare a `$#REVEAL`-target matrix |
 //! | `b:reveal(src, target)` | Register `target` as `src`'s reveal target |
 //! | `b:show(var, role)` | Register a `$#SHOW` directive — `role` is a lowercase string |
-//! | `b:and_atom({signed, ...})` | Fresh atom equal to AND of the input signed lits |
+//! | `b:and_atom({signed, ...})` | Fresh atom equal to AND of the input signed lits.  Bidirectional, so don't use it for reveal-gating — use `Guard:gated_by` instead |
 //! | `b:guard(atom, family, description)` | Wrap an atom with a family + description, returns a single-use `Guard` |
-//! | `b:sum_ge(guard, signed, k)` | Post `guard.atom → sum ≥ k` (consumes guard) |
-//! | `b:sum_le(guard, signed, k)` | Post `guard.atom → sum ≤ k` (consumes guard) |
-//! | `b:sum_eq(guard, signed, k)` | Post `guard.atom → sum = k` (consumes guard) |
+//! | `g:gated_by(atom)` | Add an extra atom to the guard's antecedent conjunction; chainable.  Consumes the receiver, returns a new `Guard` |
+//! | `b:sum_ge(guard, signed, k)` | Post `(guard.atom ∧ gates...) → sum ≥ k` (consumes guard) |
+//! | `b:sum_le(guard, signed, k)` | Post `(guard.atom ∧ gates...) → sum ≤ k` (consumes guard) |
+//! | `b:sum_eq(guard, signed, k)` | Post `(guard.atom ∧ gates...) → sum = k` (consumes guard) |
 //! | `b:sum_eq_unguarded(signed, k)` | Post `sum = k` unconditionally, no `$#CON` entry |
+//! | `b:table(guard, cells, forbidden)` | Post a forbidden-tuples table over `IntCell` columns as one `$#CON` (consumes guard).  `cells` is a list of `IntCell`; `forbidden` a list of value tuples, e.g. `{{0, 2}, {1, 0}, {2, 1}}` |
 //! | `b:build()` | Finalise into a Puzzle (consumes the builder) |
 //!
 //! Dimension lists are tables of `{first, last}` pairs (1-indexed inclusive),
@@ -72,6 +76,12 @@
 //! | `m:get({i, j, ...})` | The `Atom` at the given (1-indexed) indices |
 //! | `m:atoms()` | Flat list of every `Atom`, row-major |
 //!
+//! ## `IntMatrix` / `IntCell`
+//!
+//! `IntMatrix` (from `var_int_matrix`) has `:name()`, `:domain()`, and
+//! `:cell({i, j, ...})` which returns an `IntCell`.  `IntCell` has
+//! `:eq(v)` and `:neq(v)`, each returning a `Signed` for the value `v`.
+//!
 //! ## `Atom` / `Signed`
 //!
 //! `Atom` has `:pos()` (the atom must be true) and `:neg()` (the atom must
@@ -84,7 +94,9 @@ use std::sync::{Arc, Mutex};
 use mlua::FromLua;
 use mlua::prelude::*;
 
-use demystify_builder::{Atom, BoolMatrix, Guard, PuzzleBuilder, ShowRole, Signed};
+use demystify_builder::{
+    Atom, BoolMatrix, Guard, IntCell, IntMatrix, PuzzleBuilder, ShowRole, Signed,
+};
 
 use crate::puzzle::LuaPuzzle;
 
@@ -190,6 +202,85 @@ impl LuaUserData for LuaBoolMatrix {
     }
 }
 
+/// A matrix of multi-valued one-hot cells declared via `var_int_matrix`.
+/// Cloning is cheap — the underlying `IntMatrix` stores `Atom` handles.
+#[derive(Clone)]
+pub struct LuaIntMatrix {
+    pub(crate) inner: IntMatrix,
+}
+
+impl FromLua for LuaIntMatrix {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::UserData(ud) => ud.borrow::<LuaIntMatrix>().map(|m| m.clone()),
+            _ => Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "IntMatrix".to_string(),
+                message: Some("expected an IntMatrix userdata".to_string()),
+            }),
+        }
+    }
+}
+
+impl LuaUserData for LuaIntMatrix {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("name", |_, this, ()| Ok(this.inner.name().to_string()));
+
+        methods.add_method("cell", |_, this, indices: LuaTable| {
+            let idx = lua_indices(&indices)?;
+            this.inner
+                .try_cell(&idx)
+                .map(|c| LuaIntCell { inner: c })
+                .map_err(|e| LuaError::RuntimeError(e.to_string()))
+        });
+
+        methods.add_method("domain", |lua, this, ()| {
+            let t = lua.create_table()?;
+            for (i, &v) in this.inner.domain().iter().enumerate() {
+                t.set(i + 1, v)?;
+            }
+            Ok(t)
+        });
+    }
+}
+
+/// One cell of an [`LuaIntMatrix`].  Use `cell:eq(v)` / `cell:neq(v)` to make
+/// a `Signed` literal, or pass a list of cells to `b:table(...)`.
+#[derive(Clone)]
+pub struct LuaIntCell {
+    pub(crate) inner: IntCell,
+}
+
+impl FromLua for LuaIntCell {
+    fn from_lua(value: LuaValue, _lua: &Lua) -> LuaResult<Self> {
+        match value {
+            LuaValue::UserData(ud) => ud.borrow::<LuaIntCell>().map(|c| c.clone()),
+            _ => Err(LuaError::FromLuaConversionError {
+                from: value.type_name(),
+                to: "IntCell".to_string(),
+                message: Some("expected an IntCell userdata (from matrix:cell(...))".to_string()),
+            }),
+        }
+    }
+}
+
+impl LuaUserData for LuaIntCell {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("eq", |_, this, v: i64| {
+            this.inner
+                .try_atom_for(v)
+                .map(|a| LuaSigned { inner: a.pos() })
+                .map_err(|e| LuaError::RuntimeError(e.to_string()))
+        });
+        methods.add_method("neq", |_, this, v: i64| {
+            this.inner
+                .try_atom_for(v)
+                .map(|a| LuaSigned { inner: a.neg() })
+                .map_err(|e| LuaError::RuntimeError(e.to_string()))
+        });
+    }
+}
+
 /// Single-use guard handle.  Returned by `b:guard(atom, family, description)`
 /// and consumed by the first `sum_*` call that uses it.  All Lua handles
 /// share the same inner `Option<Guard>` via `Arc<Mutex<…>>`, so passing the
@@ -220,7 +311,22 @@ impl FromLua for LuaGuard {
     }
 }
 
-impl LuaUserData for LuaGuard {}
+impl LuaUserData for LuaGuard {
+    fn add_methods<M: LuaUserDataMethods<Self>>(methods: &mut M) {
+        // Add an extra atom that must also be true for the guarded
+        // constraint to fire.  Builder-style: chain `:gated_by(...)`
+        // to add multiple gates.  Consumes the receiving Guard and
+        // returns a new one — calling `:gated_by` on the original
+        // again will error.
+        methods.add_method("gated_by", |_, this, atom: LuaAtom| {
+            let g = this.take()?;
+            let g = g.gated_by(&atom.inner);
+            Ok(LuaGuard {
+                inner: Arc::new(Mutex::new(Some(g))),
+            })
+        });
+    }
+}
 
 /// The Lua-facing builder.  Wraps an `Option<PuzzleBuilder>` so `build()`
 /// can consume the inner builder; subsequent calls error rather than panic.
@@ -261,6 +367,19 @@ impl LuaUserData for LuaBuilder {
                 this.with_mut(|b| {
                     Ok(LuaBoolMatrix {
                         inner: b.var_bool_matrix(&name, &dims),
+                    })
+                })
+            },
+        );
+
+        methods.add_method(
+            "var_int_matrix",
+            |_, this, (name, dims, domain): (String, LuaTable, LuaTable)| {
+                let dims = lua_dims(&dims)?;
+                let domain = lua_indices(&domain)?;
+                this.with_mut(|b| {
+                    Ok(LuaIntMatrix {
+                        inner: b.var_int_matrix(&name, &dims, &domain),
                     })
                 })
             },
@@ -410,6 +529,20 @@ impl LuaUserData for LuaBuilder {
             },
         );
 
+        methods.add_method(
+            "table",
+            |_, this, (guard, cells, forbidden): (LuaGuard, LuaTable, LuaTable)| {
+                let cells = lua_int_cell_list(&cells)?;
+                let forbidden = lua_tuple_list(&forbidden)?;
+                let g = guard.take()?;
+                this.with_mut(|b| {
+                    b.table(g, &cells, &forbidden)
+                        .map(|_| ())
+                        .map_err(|e| LuaError::RuntimeError(e.to_string()))
+                })
+            },
+        );
+
         methods.add_method("build", |_, this, ()| {
             let mut guard = this.inner.lock().unwrap();
             let b = guard
@@ -457,6 +590,23 @@ fn lua_signed_list(t: &LuaTable) -> LuaResult<Vec<Signed>> {
     let mut out = Vec::with_capacity(t.len()? as usize);
     for v in t.clone().sequence_values::<LuaSigned>() {
         out.push(v?.inner);
+    }
+    Ok(out)
+}
+
+fn lua_int_cell_list(t: &LuaTable) -> LuaResult<Vec<IntCell>> {
+    let mut out = Vec::with_capacity(t.len()? as usize);
+    for v in t.clone().sequence_values::<LuaIntCell>() {
+        out.push(v?.inner);
+    }
+    Ok(out)
+}
+
+/// A Lua list-of-lists of integers — the forbidden tuples for `b:table`.
+fn lua_tuple_list(t: &LuaTable) -> LuaResult<Vec<Vec<i64>>> {
+    let mut out = Vec::with_capacity(t.len()? as usize);
+    for tuple in t.clone().sequence_values::<LuaTable>() {
+        out.push(lua_indices(&tuple?)?);
     }
     Ok(out)
 }

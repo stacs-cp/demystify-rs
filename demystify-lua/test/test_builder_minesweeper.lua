@@ -1,9 +1,10 @@
 -- Lua port of demystify-builder/tests/minesweeper_reveal.rs.
 --
--- Properly exercises the $#REVEAL cascade: the neighbour-count constraint
--- is gated by sumcheck AND facts (built via b:and_atom).  `facts` is
--- *unconstrained in CNF* — the planner only learns it via the reveal
--- cascade once grid[r,c] is deduced.
+-- Properly exercises the $#REVEAL cascade: the neighbour-count
+-- constraint uses sumcheck as the $#CON atom and attaches facts as an
+-- extra gate via Guard:gated_by(...).  `facts` is *unconstrained in
+-- CNF* — the planner only learns it via the reveal cascade once
+-- grid[r,c] is deduced.
 
 local demystify = require("demystify")
 
@@ -43,7 +44,8 @@ local function build_minesweeper()
         b:sum_eq_unguarded({ grid:get({r, c}):neg() }, 1)
     end
 
-    -- Per-clue neighbour-count constraint, gated by sumcheck ∧ facts.
+    -- Per-clue neighbour-count constraint: sumcheck is the $#CON atom,
+    -- facts is the reveal gate added via Guard:gated_by(...).
     for _, clue in ipairs(CLUES) do
         local r, c, n_mines = clue[1], clue[2], clue[3]
         local neighbours = {}
@@ -57,12 +59,9 @@ local function build_minesweeper()
                 end
             end
         end
-        local gate = b:and_atom({
-            sumcheck:get({r, c}):pos(),
-            facts:get({r, c, 0}):pos(),
-        })
-        local g = b:guard(gate, "sumcheck",
-            string.format("exactly %d mines around (%d, %d) given safe", n_mines, r, c))
+        local g = b:guard(sumcheck:get({r, c}), "sumcheck",
+                string.format("exactly %d mines around (%d, %d) given safe", n_mines, r, c))
+            :gated_by(facts:get({r, c, 0}))
         b:sum_eq(g, neighbours, n_mines)
     end
 

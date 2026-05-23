@@ -13,7 +13,7 @@ use demystify::problem::{PuzLit, PuzVar, VarValPair};
 use rustsat::instances::SatInstance;
 use rustsat::types::Lit;
 
-use crate::cardinality::{encode_sum_eq, encode_sum_ge, encode_sum_le};
+use crate::cardinality::{encode_forbidden_tuple, encode_sum_eq, encode_sum_ge, encode_sum_le};
 use crate::error::BuildError;
 
 /// A single boolean atom in the puzzle.  Wraps a raw SAT literal; `+atom`
@@ -186,6 +186,158 @@ impl<'a> Iterator for BoolMatrixIter<'a> {
     }
 }
 
+/// A declared matrix of *multi-valued* (integer-domain) cells, stored as a
+/// one-hot direct encoding: each cell has one boolean atom per domain value,
+/// and exactly one of them is true.  Declared via
+/// [`PuzzleBuilder::var_int_matrix`].
+///
+/// Unlike [`BoolMatrix`], a cell here is not a single atom but a small group
+/// of value-atoms; access one with [`Self::cell`], which returns an
+/// [`IntCell`].  The cells render and explain as proper multi-valued
+/// variables (`grid[i,j] = 2`), exactly like a Conjure-compiled
+/// `int(0..2)` matrix.
+#[derive(Clone, Debug)]
+pub struct IntMatrix {
+    name: String,
+    dims: Vec<RangeInclusive<i64>>,
+    domain: Vec<i64>,
+    /// Flat, row-major over `dims`, with the domain index varying fastest:
+    /// cell `c` owns `atoms[c*domain.len() .. (c+1)*domain.len()]`.
+    atoms: Vec<Atom>,
+}
+
+impl IntMatrix {
+    /// Variable name as it appears in `PuzVar`.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The declared index ranges (one per matrix dimension).
+    #[must_use]
+    pub fn dims(&self) -> &[RangeInclusive<i64>] {
+        &self.dims
+    }
+
+    /// The cell's value domain, in declaration order.
+    #[must_use]
+    pub fn domain(&self) -> &[i64] {
+        &self.domain
+    }
+
+    /// The [`IntCell`] at the given (1-indexed) tuple of indices.  Panics if
+    /// the arity is wrong or any index is out of range — use [`Self::try_cell`]
+    /// for non-panicking access.
+    #[must_use]
+    pub fn cell(&self, indices: &[i64]) -> IntCell {
+        self.try_cell(indices)
+            .expect("IntMatrix::cell: bad indices — use try_cell for non-panicking access")
+    }
+
+    /// Same as [`Self::cell`] but returns an error rather than panicking.
+    pub fn try_cell(&self, indices: &[i64]) -> Result<IntCell, BuildError> {
+        if indices.len() != self.dims.len() {
+            return Err(BuildError::IndexArityMismatch {
+                name: self.name.clone(),
+                expected: self.dims.len(),
+                got: indices.len(),
+            });
+        }
+        let mut flat = 0_usize;
+        for (axis, (&idx, range)) in indices.iter().zip(self.dims.iter()).enumerate() {
+            if !range.contains(&idx) {
+                return Err(BuildError::IndexOutOfRange {
+                    name: self.name.clone(),
+                    axis,
+                    got: idx,
+                    range: format!("{}..={}", range.start(), range.end()),
+                });
+            }
+            let span = (range.end() - range.start() + 1) as usize;
+            let offset = (idx - range.start()) as usize;
+            flat = flat * span + offset;
+        }
+        let d = self.domain.len();
+        let base = flat * d;
+        let entries = self
+            .domain
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (v, self.atoms[base + i]))
+            .collect();
+        Ok(IntCell {
+            name: self.name.clone(),
+            indices: indices.to_vec(),
+            entries,
+        })
+    }
+}
+
+/// One cell of an [`IntMatrix`] — a value→atom map for a single grid
+/// position.  Use [`Self::eq`] / [`Self::neq`] to turn a value into a
+/// [`Signed`] literal for `sum_*`, or pass a slice of cells to
+/// [`PuzzleBuilder::table`].
+#[derive(Clone, Debug)]
+pub struct IntCell {
+    name: String,
+    indices: Vec<i64>,
+    entries: Vec<(i64, Atom)>,
+}
+
+impl IntCell {
+    /// "this cell equals `v`" — for use in `sum_*` literal lists.  Panics if
+    /// `v` is not in the cell's domain.
+    #[must_use]
+    pub fn eq(&self, v: i64) -> Signed {
+        self.atom_for(v).pos()
+    }
+
+    /// "this cell does not equal `v`".  Panics if `v` is not in the domain.
+    #[must_use]
+    pub fn neq(&self, v: i64) -> Signed {
+        self.atom_for(v).neg()
+    }
+
+    /// The one-hot atom for value `v` (true ⟺ the cell equals `v`).  Panics
+    /// if `v` is not in the cell's domain.
+    #[must_use]
+    pub fn atom_for(&self, v: i64) -> Atom {
+        self.try_atom_for(v)
+            .expect("IntCell::atom_for: value not in domain — use try_atom_for")
+    }
+
+    /// Same as [`Self::atom_for`] but returns an error rather than panicking.
+    pub fn try_atom_for(&self, v: i64) -> Result<Atom, BuildError> {
+        self.entries
+            .iter()
+            .find_map(|&(val, atom)| (val == v).then_some(atom))
+            .ok_or_else(|| BuildError::TableValueNotInDomain {
+                value: v,
+                cell: self.label(),
+                domain: format!(
+                    "{:?}",
+                    self.entries.iter().map(|&(v, _)| v).collect::<Vec<_>>()
+                ),
+            })
+    }
+
+    /// The cell's value domain, in declaration order.
+    #[must_use]
+    pub fn domain(&self) -> Vec<i64> {
+        self.entries.iter().map(|&(v, _)| v).collect()
+    }
+
+    fn label(&self) -> String {
+        let idx = self
+            .indices
+            .iter()
+            .map(i64::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("{}[{idx}]", self.name)
+    }
+}
+
 /// Handle returned by `sum_ge` / `sum_le`.  Exposes the activation literal
 /// so callers can correlate the constraint with downstream solver output.
 #[derive(Copy, Clone, Debug)]
@@ -201,11 +353,22 @@ pub struct ConstraintHandle {
 /// instance with its own description, so passing the same `Guard` to two
 /// `sum_*` calls would violate the "every description must be unique"
 /// invariant.  The type system reflects that.
+///
+/// In addition to the primary activation atom (the `$#CON` sentinel),
+/// a `Guard` carries an optional list of *extra gates* added via
+/// [`Self::gated_by`].  The CNF antecedent of the resulting `sum_*`
+/// constraint becomes `(atom ∧ gate_1 ∧ … ∧ gate_n)`; gates are
+/// ordinary variables (e.g. reveal-target atoms like `facts[r,c,0]`),
+/// not `$#CON` atoms, so `provable_varlits`' "every $#CON true"
+/// enumeration leaves them free and SAT can satisfy the gated
+/// constraint vacuously by setting any gate false.  This is what
+/// makes reveal-cascade gating actually gate.
 #[derive(Debug)]
 pub struct Guard {
     pub(crate) atom: Atom,
     pub(crate) family: String,
     pub(crate) description: String,
+    pub(crate) gates: Vec<Lit>,
 }
 
 impl Guard {
@@ -225,6 +388,23 @@ impl Guard {
     #[must_use]
     pub fn description(&self) -> &str {
         &self.description
+    }
+
+    /// Add an extra atom that must also be true for the guarded
+    /// constraint to fire.  Composes via chaining — each call appends
+    /// one more atom to the conjunction.
+    ///
+    /// Use this for reveal-shaped puzzles (minesweeper, bloomsweeper,
+    /// …) where the user-facing `$#CON` atom names the *constraint*
+    /// and the extra gate names the *reveal*: only when both are true
+    /// does the sum fire.  Don't use `and_atom` for this — its
+    /// bidirectional `c ↔ AND(...)` encoding forces every input true
+    /// whenever `c` is assumed true, which silently disables the
+    /// gating you wanted in the first place.
+    #[must_use]
+    pub fn gated_by(mut self, atom: &Atom) -> Self {
+        self.gates.push(atom.lit);
+        self
     }
 }
 
@@ -348,6 +528,22 @@ impl PuzzleBuilder {
         self.declare_matrix(name, dims, AtomRole::Var)
     }
 
+    /// Declare a `$#VAR` *multi-valued* matrix over `domain` — the one-hot
+    /// generalisation of [`Self::var_bool_matrix`].  Each cell gets one
+    /// boolean atom per value plus an exactly-one constraint, and renders /
+    /// explains as a proper integer variable (`grid[i,j] = 2`).
+    ///
+    /// `dims` is a slice of 1-based inclusive ranges (empty for a scalar);
+    /// `domain` is the list of cell values (must be non-empty and distinct).
+    pub fn var_int_matrix(
+        &mut self,
+        name: &str,
+        dims: &[RangeInclusive<i64>],
+        domain: &[i64],
+    ) -> IntMatrix {
+        self.declare_int_matrix(name, dims, domain)
+    }
+
     /// Declare a `$#CON` constraint family.  Each atom in the returned
     /// matrix acts as an activation literal for one constraint instance —
     /// pass it as the `guard` argument to `sum_ge` / `sum_le`.
@@ -413,12 +609,7 @@ impl PuzzleBuilder {
         Ok(())
     }
 
-    fn declare_matrix(
-        &mut self,
-        name: &str,
-        dims: &[RangeInclusive<i64>],
-        role: AtomRole,
-    ) -> BoolMatrix {
+    fn assert_name_free(&self, name: &str) {
         if self.var_names.contains(name)
             || self.aux_names.contains(name)
             || self.con_families.contains_key(name)
@@ -426,6 +617,15 @@ impl PuzzleBuilder {
         {
             panic!("variable name '{name}' is already declared");
         }
+    }
+
+    fn declare_matrix(
+        &mut self,
+        name: &str,
+        dims: &[RangeInclusive<i64>],
+        role: AtomRole,
+    ) -> BoolMatrix {
+        self.assert_name_free(name);
         for r in dims {
             assert!(
                 r.start() <= r.end(),
@@ -530,6 +730,91 @@ impl PuzzleBuilder {
             dims: dims.to_vec(),
             atoms,
             role,
+        }
+    }
+
+    /// One-hot declaration of a `$#VAR` multi-valued matrix.  Mirrors the
+    /// `$#VAR` branch of `finalise()` in `demystify/src/problem/parse.rs`
+    /// for a general (non-boolean) direct encoding: one lit per (cell,
+    /// value), `eq`/`neq` litmap entries, full domainmap, the matching
+    /// var_lits classification, and a structural exactly-one per cell.
+    fn declare_int_matrix(
+        &mut self,
+        name: &str,
+        dims: &[RangeInclusive<i64>],
+        domain: &[i64],
+    ) -> IntMatrix {
+        self.assert_name_free(name);
+        assert!(
+            !domain.is_empty(),
+            "var_int_matrix '{name}': domain must be non-empty"
+        );
+        {
+            let mut seen = BTreeSet::new();
+            for &v in domain {
+                assert!(
+                    seen.insert(v),
+                    "var_int_matrix '{name}': domain has duplicate value {v}"
+                );
+            }
+        }
+        for r in dims {
+            assert!(
+                r.start() <= r.end(),
+                "IntMatrix dim ranges must be non-empty: got {}..={}",
+                r.start(),
+                r.end()
+            );
+        }
+
+        let domain = domain.to_vec();
+        let d = domain.len();
+        let cells = dims
+            .iter()
+            .map(|r| (r.end() - r.start() + 1) as usize)
+            .product::<usize>()
+            .max(1);
+        let mut atoms = Vec::with_capacity(cells * d);
+
+        let mut iter = CartesianProductIter::new(dims);
+        while let Some(indices) = iter.next() {
+            let puzvar = PuzVar::new(name, indices.clone());
+            let mut cell_lits = Vec::with_capacity(d);
+            for &v in &domain {
+                let lit = self.sat.new_lit();
+                atoms.push(Atom { lit });
+                cell_lits.push(lit);
+
+                let vv = VarValPair::new(&puzvar, v);
+                self.litmap.insert(PuzLit::new_eq(vv.clone()), lit);
+                self.litmap.insert(PuzLit::new_neq(vv), !lit);
+
+                // var_lits — the general-domain form of the boolean case in
+                // `declare_matrix`: the `eq` puzlit (sign true) puts `lit`
+                // in positive; the `neq` puzlit (sign false) puts `!lit` in
+                // both positive and negative.
+                self.var_lits_pos.insert(lit);
+                self.var_lits_pos.insert(!lit);
+                self.var_lits_neg.insert(!lit);
+            }
+
+            self.domainmap
+                .entry(puzvar)
+                .or_default()
+                .extend(domain.iter().copied());
+
+            // Structural exactly-one — every cell takes precisely one value.
+            encode_sum_eq(&mut self.sat, &cell_lits, 1, &[])
+                .expect("one-hot exactly-one encoding ran out of memory");
+        }
+
+        self.var_names.insert(name.to_string());
+
+        IntMatrix {
+            name: name.to_string(),
+            dims: dims.to_vec(),
+            domain,
+            atoms,
         }
     }
 
@@ -640,11 +925,13 @@ impl PuzzleBuilder {
             atom,
             family: family.to_string(),
             description,
+            gates: Vec::new(),
         })
     }
 
-    /// Post `guard.atom() -> (sum(signed) >= k)` and register a `$#CON`
-    /// entry using the family + description carried by `guard`.
+    /// Post `(guard.atom() ∧ gates...) -> (sum(signed) >= k)` and
+    /// register a `$#CON` entry using the family + description carried
+    /// by `guard`.
     pub fn sum_ge(
         &mut self,
         guard: Guard,
@@ -652,13 +939,15 @@ impl PuzzleBuilder {
         k: i64,
     ) -> Result<ConstraintHandle, BuildError> {
         let lit = guard.atom.lit;
+        let gates = Self::gates_for_encode(&guard);
         self.register_con_from_guard(guard, signed)?;
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_ge(&mut self.sat, &raw_lits, k, Some(lit))?;
+        encode_sum_ge(&mut self.sat, &raw_lits, k, &gates)?;
         Ok(ConstraintHandle { lit })
     }
 
-    /// Post `guard.atom() -> (sum(signed) <= k)`.  See [`Self::sum_ge`].
+    /// Post `(guard.atom() ∧ gates...) -> (sum(signed) <= k)`.
+    /// See [`Self::sum_ge`].
     pub fn sum_le(
         &mut self,
         guard: Guard,
@@ -666,13 +955,15 @@ impl PuzzleBuilder {
         k: i64,
     ) -> Result<ConstraintHandle, BuildError> {
         let lit = guard.atom.lit;
+        let gates = Self::gates_for_encode(&guard);
         self.register_con_from_guard(guard, signed)?;
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_le(&mut self.sat, &raw_lits, k, Some(lit))?;
+        encode_sum_le(&mut self.sat, &raw_lits, k, &gates)?;
         Ok(ConstraintHandle { lit })
     }
 
-    /// Post `guard.atom() -> (sum(signed) == k)`.  See [`Self::sum_ge`].
+    /// Post `(guard.atom() ∧ gates...) -> (sum(signed) == k)`.
+    /// See [`Self::sum_ge`].
     pub fn sum_eq(
         &mut self,
         guard: Guard,
@@ -680,9 +971,10 @@ impl PuzzleBuilder {
         k: i64,
     ) -> Result<ConstraintHandle, BuildError> {
         let lit = guard.atom.lit;
+        let gates = Self::gates_for_encode(&guard);
         self.register_con_from_guard(guard, signed)?;
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_eq(&mut self.sat, &raw_lits, k, Some(lit))?;
+        encode_sum_eq(&mut self.sat, &raw_lits, k, &gates)?;
         Ok(ConstraintHandle { lit })
     }
 
@@ -692,8 +984,82 @@ impl PuzzleBuilder {
     /// individual deduction steps.
     pub fn sum_eq_unguarded(&mut self, signed: &[Signed], k: i64) -> Result<(), BuildError> {
         let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
-        encode_sum_eq(&mut self.sat, &raw_lits, k, None)?;
+        encode_sum_eq(&mut self.sat, &raw_lits, k, &[])?;
         Ok(())
+    }
+
+    /// Post a forbidden-tuples (negative table) constraint over a list of
+    /// one-hot [`IntCell`] columns, registering it as a single `$#CON` from
+    /// `guard`.  The constraint reads
+    /// `(guard.atom ∧ gates...) -> AND over forbidden tuples of
+    /// ¬(cell₀ = t₀ ∧ … ∧ cellₘ = tₘ)`.
+    ///
+    /// Each `forbidden` tuple lists one value per column (so its length must
+    /// equal `cells.len()`).  Encoded as one clause per tuple (the conflict
+    /// encoding) — no auxiliary variables — which keeps the CNF clean for MUS
+    /// extraction.  This is the natural shape for "local" rules whose
+    /// forbidden set is small: e.g. "no three in a row"
+    /// (`forbidden = [[0,0,0],[1,1,1],[2,2,2]]`) or a `mod`-style transition
+    /// (`forbidden = [[0,2],[1,0],[2,1]]`).
+    pub fn table(
+        &mut self,
+        guard: Guard,
+        cells: &[IntCell],
+        forbidden: &[Vec<i64>],
+    ) -> Result<ConstraintHandle, BuildError> {
+        let lit = guard.atom.lit;
+        let gates = Self::gates_for_encode(&guard);
+
+        // Validate arities and translate each forbidden tuple to its
+        // value-lits up front, so a bad value aborts before any clause or
+        // `$#CON` entry is emitted.
+        let mut tuple_lits: Vec<Vec<Lit>> = Vec::with_capacity(forbidden.len());
+        for tuple in forbidden {
+            if tuple.len() != cells.len() {
+                return Err(BuildError::TableArityMismatch {
+                    expected: cells.len(),
+                    got: tuple.len(),
+                });
+            }
+            let mut lits = Vec::with_capacity(tuple.len());
+            for (cell, &v) in cells.iter().zip(tuple) {
+                lits.push(cell.try_atom_for(v)?.lit());
+            }
+            tuple_lits.push(lits);
+        }
+
+        // The constraint mentions every value-lit of every involved cell —
+        // record both orientations so var_to_cons can reach this rule from
+        // any of those cells.
+        let mut var_lits: Vec<Lit> =
+            Vec::with_capacity(cells.iter().map(|c| c.entries.len()).sum());
+        for cell in cells {
+            for &(_, atom) in &cell.entries {
+                var_lits.push(atom.lit);
+                var_lits.push(!atom.lit);
+                if let Some(puzlits) = lookup_invlitmap(&self.litmap, atom.lit) {
+                    for pl in puzlits {
+                        self.referenced_vars.insert(pl.var().name().clone());
+                    }
+                }
+            }
+        }
+        self.register_con_with_varlits(guard, var_lits)?;
+
+        for lits in &tuple_lits {
+            encode_forbidden_tuple(&mut self.sat, lits, &gates);
+        }
+        Ok(ConstraintHandle { lit })
+    }
+
+    /// Build the full gate list passed to `encode_sum_*`: the guard's
+    /// activation atom followed by every extra atom added via
+    /// `Guard::gated_by`.  Order matches the construction order.
+    fn gates_for_encode(guard: &Guard) -> Vec<Lit> {
+        let mut gates = Vec::with_capacity(1 + guard.gates.len());
+        gates.push(guard.atom.lit);
+        gates.extend(guard.gates.iter().copied());
+        gates
     }
 
     /// Common post-guard work: track referenced vars and insert the
@@ -704,11 +1070,6 @@ impl PuzzleBuilder {
         guard: Guard,
         signed: &[Signed],
     ) -> Result<(), BuildError> {
-        let Guard {
-            atom,
-            family,
-            description,
-        } = guard;
         // Collect both orientations of each user-facing atom in the sum,
         // mirroring how Conjure-built models populate `varlits_in_con`.
         let mut var_lits: Vec<Lit> = Vec::with_capacity(signed.len() * 2);
@@ -718,6 +1079,35 @@ impl PuzzleBuilder {
             // For renderer / var_to_cons lookups, track which $#VAR atoms
             // this constraint mentions.
             if let Some(puzlits) = lookup_invlitmap(&self.litmap, s.atom.lit) {
+                for pl in puzlits {
+                    self.referenced_vars.insert(pl.var().name().clone());
+                }
+            }
+        }
+        self.register_con_with_varlits(guard, var_lits)
+    }
+
+    /// Insert a `$#CON` entry given a guard plus the user-facing literals the
+    /// constraint mentions.  Folds in the guard's extra gate atoms — they're
+    /// variables the constraint depends on (e.g. `facts[r,c,0]` for a
+    /// reveal-gated minesweeper clue), so the renderer's `var_to_cons`
+    /// lookups need to find them too — then dedups and records.  Shared by
+    /// the `sum_*` family and [`Self::table`].
+    fn register_con_with_varlits(
+        &mut self,
+        guard: Guard,
+        mut var_lits: Vec<Lit>,
+    ) -> Result<(), BuildError> {
+        let Guard {
+            atom,
+            family,
+            description,
+            gates,
+        } = guard;
+        for &g in &gates {
+            var_lits.push(g);
+            var_lits.push(!g);
+            if let Some(puzlits) = lookup_invlitmap(&self.litmap, g) {
                 for pl in puzlits {
                     self.referenced_vars.insert(pl.var().name().clone());
                 }

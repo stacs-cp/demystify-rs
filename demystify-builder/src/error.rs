@@ -71,6 +71,19 @@ pub enum BuildError {
     )]
     RevealTargetMissing { src_lit: String, target_lit: String },
 
+    #[error(
+        "table tuple has {got} values but the column list has {expected} cells — \
+         each forbidden tuple must give one value per column"
+    )]
+    TableArityMismatch { expected: usize, got: usize },
+
+    #[error("table references value {value} for cell '{cell}', whose domain is {domain}")]
+    TableValueNotInDomain {
+        value: i64,
+        cell: String,
+        domain: String,
+    },
+
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

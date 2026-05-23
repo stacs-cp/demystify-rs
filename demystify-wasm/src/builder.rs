@@ -21,6 +21,22 @@
 //! const puzzle = b.build();
 //! ```
 //!
+//! # Multi-valued cells and table constraints
+//!
+//! `varIntMatrix(name, dims, domain)` declares one-hot integer cells that
+//! render as values (`grid[i,j] = 2`).  Read a cell with `m.cell([i, j])`,
+//! turn a value into a literal with `cell.eq(v)` / `cell.neq(v)`, and post a
+//! forbidden-tuples constraint with `table(guard, cells, forbidden)`:
+//!
+//! ```js
+//! const grid = b.varIntMatrix("grid", [[1, 3], [1, 3]], [0, 1, 2]);
+//! const seq = b.conBoolMatrix("seq", [[1, 3], [1, 2]]);
+//! // "next colour stays or advances by one" — forbid 0→2, 1→0, 2→1:
+//! b.table(b.guard(seq.get([i, j]), "seq", "..."),
+//!   [grid.cell([i, j]), grid.cell([i, j + 1])],
+//!   [[0, 2], [1, 0], [2, 1]]);
+//! ```
+//!
 //! # Marshalling notes
 //!
 //! `WasmAtom`, `WasmSigned`, `WasmBoolMatrix`, and `WasmGuard` are
@@ -37,25 +53,34 @@
 //!
 //! rather than holding the values in JS variables across multiple calls.
 //!
-//! # Multi-gate constraints (e.g. `$#REVEAL`)
+//! # Reveal-gated constraints (e.g. minesweeper neighbour clues)
 //!
-//! To express `gate1 ∧ gate2 ∧ ... → constraint`, fold the gates with
-//! [`WasmBuilder::and_atom`] into a fresh atom and use that atom as the
-//! `guard()` activation:
+//! Use the named `$#CON` atom as the guard's activation and attach
+//! reveal/extra-condition atoms via [`WasmGuard::gated_by`].  The CNF
+//! antecedent becomes `(guard.atom ∧ gate_1 ∧ … ∧ gate_n) →
+//! constraint`, and gates are *not* forced true by the planner's
+//! "every $#CON true" enumeration, so the cascade actually gates.
 //!
 //! ```js
-//! const gate = b.andAtom([sumcheck.get([i, j]).pos(),
-//!                         facts.get([i, j, 0]).pos()]);
-//! const g = b.guard(gate, "sumcheck", "...");
+//! const g = b.guard(sumcheck.get([i, j]), "sumcheck", "...")
+//!            .gatedBy(facts.get([i, j, 0]));
 //! b.sumEq(g, neighbours, n_mines);
 //! ```
+//!
+//! Don't use [`WasmBuilder::and_atom`] for reveal-gating — its
+//! bidirectional `c ↔ AND(...)` encoding forces every input true
+//! whenever `c` is assumed true, silently disabling the cascade.
+//! `andAtom` remains available for cases where you genuinely want a
+//! bidirectional AND atom (e.g. as a derived $#VAR fact).
 
 use std::ops::RangeInclusive;
 use std::sync::{Arc, Mutex};
 
 use wasm_bindgen::prelude::*;
 
-use demystify_builder::{Atom, BoolMatrix, Guard, PuzzleBuilder, ShowRole, Signed};
+use demystify_builder::{
+    Atom, BoolMatrix, Guard, IntCell, IntMatrix, PuzzleBuilder, ShowRole, Signed,
+};
 
 use crate::puzzle::WasmPuzzle;
 
@@ -136,6 +161,61 @@ impl WasmBoolMatrix {
     }
 }
 
+/// A matrix of multi-valued one-hot cells declared via `varIntMatrix`.
+/// Cheap to keep around; methods take `&self`.
+#[wasm_bindgen]
+pub struct WasmIntMatrix {
+    inner: IntMatrix,
+}
+
+#[wasm_bindgen]
+impl WasmIntMatrix {
+    /// The matrix's declared name.
+    pub fn name(&self) -> String {
+        self.inner.name().to_string()
+    }
+
+    /// The cell at the given (1-indexed) indices.
+    pub fn cell(&self, indices: Vec<i64>) -> Result<WasmIntCell, JsError> {
+        self.inner
+            .try_cell(&indices)
+            .map(|c| WasmIntCell { inner: c })
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// The cell value domain, in declaration order.
+    pub fn domain(&self) -> Vec<i64> {
+        self.inner.domain().to_vec()
+    }
+}
+
+/// One cell of a [`WasmIntMatrix`].  Use `cell.eq(v)` / `cell.neq(v)` to make
+/// a `Signed` literal, or pass an array of cells to `table(...)`.
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct WasmIntCell {
+    inner: IntCell,
+}
+
+#[wasm_bindgen]
+impl WasmIntCell {
+    /// "this cell equals `v`".  Returns a fresh `Signed` handle.
+    pub fn eq(&self, v: i64) -> Result<WasmSigned, JsError> {
+        self.inner
+            .try_atom_for(v)
+            .map(|a| WasmSigned { inner: a.pos() })
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// "this cell does not equal `v`".  Returns a fresh `Signed` handle.
+    pub fn neq(&self, v: i64) -> Result<WasmSigned, JsError> {
+        self.inner
+            .try_atom_for(v)
+            .map(|a| WasmSigned { inner: a.neg() })
+            .map_err(|e| JsError::new(&e.to_string()))
+    }
+}
+
 /// Single-use guard handle.  Produced by `WasmBuilder.guard(...)` and
 /// consumed by the first `sumGe`/`sumLe`/`sumEq` it is passed to (the
 /// JS-side handle is invalidated by wasm-bindgen on by-value transfer,
@@ -143,6 +223,24 @@ impl WasmBoolMatrix {
 #[wasm_bindgen]
 pub struct WasmGuard {
     pub(crate) inner: Guard,
+}
+
+#[wasm_bindgen]
+impl WasmGuard {
+    /// Add an extra atom that must also be true for the guarded
+    /// constraint to fire.  The CNF antecedent becomes
+    /// `(guard.atom ∧ gate_1 ∧ … ∧ gate_n) → constraint`.  Use this
+    /// for reveal-shaped puzzles (minesweeper-style): the `$#CON`
+    /// atom names the constraint and each gate names a reveal that
+    /// must be true for the constraint to fire.  Chains: returns a
+    /// new guard, consumes this one (the JS handle is invalidated).
+    #[wasm_bindgen(js_name = gatedBy)]
+    #[must_use]
+    pub fn gated_by(self, atom: &WasmAtom) -> WasmGuard {
+        WasmGuard {
+            inner: self.inner.gated_by(&atom.inner),
+        }
+    }
 }
 
 /// JS-facing builder.  Wraps `Option<PuzzleBuilder>` so `build()` can
@@ -204,6 +302,23 @@ impl WasmBuilder {
         self.with_mut(|b| {
             Ok(WasmBoolMatrix {
                 inner: b.var_bool_matrix(name, &dims),
+            })
+        })
+    }
+
+    /// Declare a `$#VAR` multi-valued matrix (one-hot).  `domain` is an
+    /// array of cell values, e.g. `[0, 1, 2]`.
+    #[wasm_bindgen(js_name = varIntMatrix)]
+    pub fn var_int_matrix(
+        &self,
+        name: &str,
+        dims: JsValue,
+        domain: Vec<i64>,
+    ) -> Result<WasmIntMatrix, JsError> {
+        let dims = parse_dims(dims)?;
+        self.with_mut(|b| {
+            Ok(WasmIntMatrix {
+                inner: b.var_int_matrix(name, &dims, &domain),
             })
         })
     }
@@ -358,6 +473,27 @@ impl WasmBuilder {
         let signed: Vec<Signed> = signed.into_iter().map(|s| s.inner).collect();
         self.with_mut(|b| {
             b.sum_eq_unguarded(&signed, k)
+                .map_err(|e| JsError::new(&e.to_string()))
+        })
+    }
+
+    /// Post a forbidden-tuples table over one-hot `IntCell` columns as a
+    /// single `$#CON` (consumes `guard`).  `forbidden` is an array of value
+    /// tuples, e.g. `[[0, 2], [1, 0], [2, 1]]`; each tuple gives one value
+    /// per cell.
+    pub fn table(
+        &self,
+        guard: WasmGuard,
+        cells: Vec<WasmIntCell>,
+        forbidden: JsValue,
+    ) -> Result<(), JsError> {
+        let cells: Vec<IntCell> = cells.into_iter().map(|c| c.inner).collect();
+        let forbidden: Vec<Vec<i64>> = serde_wasm_bindgen::from_value(forbidden).map_err(|e| {
+            JsError::new(&format!("forbidden must be an array of value tuples: {e}"))
+        })?;
+        self.with_mut(|b| {
+            b.table(guard.inner, &cells, &forbidden)
+                .map(|_| ())
                 .map_err(|e| JsError::new(&e.to_string()))
         })
     }
