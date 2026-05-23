@@ -1,0 +1,340 @@
+% Benchmark results — core-guided vs standard MUS
+% Generated from bench-results/ directory, 2026-04-30
+
+% =============================================================
+%  TABLE
+% =============================================================
+
+\begin{table*}[t]
+\centering
+\caption{Comparison of two MUS-finding strategies across six puzzle
+  types (mean over 20 instances per row).  \emph{Solve time} is
+  wall-clock time for the solve phase only (excluding Conjure
+  compilation and parse setup).  \emph{Max MUS} is the largest MUS
+  returned in any step of the explanation.  The ``OA'' rows use
+  \texttt{--only-assign}, restricting deductions to cell assignments.}
+\label{tab:mus-comparison}
+\small
+\begin{tabular}{@{}ll rr rr@{}}
+\toprule
+ & & \multicolumn{2}{c}{Solve time (s)}
+ & \multicolumn{2}{c}{Max MUS size} \\
+\cmidrule(lr){3-4} \cmidrule(lr){5-6}
+Puzzle & Difficulty
+ & \textsc{mus} & \textsc{core}
+ & \textsc{mus} & \textsc{core} \\
+\midrule
+% --- Binairo ---
+Binairo
+  & 6$\times$6 easy    & 0.01 & 0.01  &  1.0 &  1.0 \\
+  & 6$\times$6 hard    & 0.01 & 0.01  &  2.2 &  3.1 \\
+  & 10$\times$10 easy  & 0.08 & 0.08  &  1.0 &  1.0 \\
+  & 10$\times$10 hard  & 0.12 & 0.09  &  2.0 &  3.8 \\
+  & 20$\times$20 easy  & 2.50 & 2.22  &  1.1 &  1.1 \\
+  & 20$\times$20 hard  & 3.71 & 2.58  &  2.0 &  6.0 \\
+\addlinespace
+% --- Sudoku ---
+Sudoku
+  & basic              & 1.09 & 1.04  &  1.0 &  1.2 \\
+  & easy               & 1.18 & 1.08  &  1.0 &  1.1 \\
+  & intermediate       & 1.35 & 1.05  &  2.5 &  4.0 \\
+  & advanced           & 1.83 & 1.09  &  2.5 &  7.0 \\
+  & extreme            & 2.37 & 1.04  &  4.6 &  7.5 \\
+  & evil               & 5.99 & 1.15  &  6.0 & 16.3 \\
+\addlinespace
+% --- Futoshiki ---
+Futoshiki
+  & 4$\times$4 easy    & 0.01 & 0.01  &  1.0 &  1.0 \\
+  & 5$\times$5 easy    & 0.03 & 0.03  &  1.0 &  1.0 \\
+  & 5$\times$5 normal  & 0.04 & 0.03  &  2.1 &  4.0 \\
+  & 5$\times$5 hard    & 0.08 & 0.03  &  3.9 &  6.3 \\
+  & 9$\times$9 easy    & 1.94 & 1.22  &  1.0 &  1.0 \\
+  & 9$\times$9 normal  & 3.01 & 1.27  &  2.8 & 10.4 \\
+  & 9$\times$9 hard    & 9.52 & 1.37  &  5.5 & 14.2 \\
+\addlinespace
+% --- Akari ---
+Akari
+  & 7$\times$7 easy    & 0.01 & 0.01  &  1.0 &  1.0 \\
+  & 7$\times$7 normal  & 0.01 & 0.01  &  3.0 &  3.6 \\
+  & 7$\times$7 hard    & 0.02 & 0.01  &  4.7 &  5.2 \\
+  & 10$\times$10 easy  & 0.03 & 0.03  &  1.0 &  1.0 \\
+  & 10$\times$10 normal& 0.05 & 0.04  &  3.0 &  3.5 \\
+  & 10$\times$10 hard  & 0.07 & 0.04  &  5.5 &  8.4 \\
+  & 14$\times$14 easy  & 0.14 & 0.12  &  1.0 &  1.1 \\
+  & 14$\times$14 normal& 0.23 & 0.14  &  3.0 &  3.9 \\
+  & 14$\times$14 hard  & 0.33 & 0.14  &  4.9 &  6.8 \\
+\addlinespace
+% --- Minesweeper ---
+Minesweeper
+  & 5$\times$5 easy    & 0.00 & 0.00  &  1.0 &  1.0 \\
+  & 5$\times$5 hard    & 0.00 & 0.00  &  1.8 &  1.9 \\
+  & 10$\times$10 easy  & 0.02 & 0.02  &  1.0 &  1.1 \\
+  & 10$\times$10 hard  & 0.02 & 0.02  &  2.0 &  3.0 \\
+  & 20$\times$20 easy  & 0.25 & 0.22  &  1.0 &  1.1 \\
+  & 20$\times$20 hard  & 0.46 & 0.28  &  2.0 &  3.6 \\
+\addlinespace
+% --- Tents ---
+Tents
+  & 6$\times$6 easy    & 0.27 & 0.29  &  1.1 &  1.2 \\
+  & 6$\times$6 hard    & 0.29 & 0.28  &  2.5 &  3.8 \\
+  & 10$\times$10 easy  &25.4  &26.0   &  1.4 &  1.9 \\
+  & 10$\times$10 hard  &25.5  &25.9   &  2.5 &  5.8 \\
+\midrule
+% --- Futoshiki OA ---
+Futoshiki (OA)
+  & 4$\times$4 easy    & 0.01 & 0.00  &  3.2 &  3.2 \\
+  & 5$\times$5 easy    & 0.04 & 0.01  &  4.8 &  4.9 \\
+  & 5$\times$5 normal  & 0.04 & 0.01  &  7.8 &  9.8 \\
+  & 5$\times$5 hard    & 0.05 & 0.02  & 10.9 & 13.9 \\
+  & 9$\times$9 easy    & 3.21 & 0.52  & 11.4 & 11.9 \\
+  & 9$\times$9 normal  & 3.63 & 0.54  & 18.5 & 46.2 \\
+  & 9$\times$9 hard    & 4.00 & 0.54  & 25.9 & 60.6 \\
+\addlinespace
+% --- Tents OA ---
+Tents (OA)
+  & 6$\times$6 easy    & 0.06 & 0.05  &  2.8 &  4.5 \\
+  & 6$\times$6 hard    & 0.11 & 0.05  &  4.9 &  7.4 \\
+  & 10$\times$10 easy  & 5.47 & 2.02  &  4.8 &16.5  \\
+  & 10$\times$10 hard  & 9.63 & 2.18  &  5.8 &19.9  \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+
+% =============================================================
+%  EXPERIMENTAL SETUP
+% =============================================================
+
+\subsection{Experimental setup}
+
+We compare two strategies for computing the constraint-based
+explanations produced by Demystify:
+
+\begin{description}
+\item[\textsc{mus}] Standard deletion-based MUS extraction.  For each
+  deduction, we enumerate all constraints that could be relevant, then
+  iteratively remove constraints one at a time, keeping only those
+  whose removal makes the remaining set satisfiable.
+
+\item[\textsc{core}] Core-guided extraction.  We ask the SAT solver
+  for an unsatisfiable core directly and return it without further
+  minimisation.  Cores are not guaranteed to be minimal.
+\end{description}
+
+We also tested a hybrid strategy that primes the deletion-based
+minimisation with a SAT core (rather than starting from the full
+constraint set), but it neither reduced solve time nor MUS size
+beyond \textsc{mus} on any puzzle family above 0.5\,s --- aggregate
+solve time differed by under~2\% and per-row max-MUS sizes were
+indistinguishable.  We omit it from the table.
+
+Both strategies use the same underlying SAT solver (Glucose~4,
+via the \texttt{rustsat-glucose} bindings) with a per-call conflict
+limit of 100, ramped up adaptively when too many calls return
+inconclusive (see Section~\ref{sec:enhancements}).  Explanations are
+generated step-by-step: at each step the solver identifies all forced
+deductions, computes a MUS (or core) justifying each one, then fixes
+the deduced values before proceeding to the next step.  There is no
+step limit.
+
+The benchmark corpus comprises 20 instances at each difficulty level
+for six puzzle types: Binairo, Sudoku, Futoshiki, Akari (Light Up),
+Minesweeper, and Tents.  Instances were sourced from online puzzle
+generators (puzzle-binairo.com, puzzle-sudoku.com, etc.).  Each puzzle
+type is modelled in Essence Prime and compiled to CNF via Conjure and
+Savile Row.  We also test Futoshiki and Tents in ``only-assign'' (OA)
+mode, where deductions are restricted to cell assignments (ignoring
+domain eliminations), producing fewer but harder-to-justify steps.
+
+All experiments ran on an Apple M4 Mac mini (10 cores, 16\,GB RAM)
+running macOS~26.4, compiled with Rust~1.95.0 in release mode.
+Timings are wall-clock time for the solve phase only, excluding the
+Conjure compilation and parse setup (which are identical across
+strategies).  Each value in the table is the mean over 20 instances.
+
+
+% =============================================================
+%  ENHANCEMENTS
+% =============================================================
+
+\subsection{Solver enhancements}
+\label{sec:enhancements}
+
+Two changes to the solve loop materially affect the numbers in
+Table~\ref{tab:mus-comparison}.
+
+\paragraph{Expanding a MUS to all literals it justifies.}
+
+A MUS is computed to explain a single forced deduction, but the same
+constraint set typically rules out other literals as well.  Once a MUS
+$M$ has been minimised, we ask the SAT solver --- under the
+assumptions in $M$ --- which other candidate literals are also forced.
+This costs only a handful of unsatisfiable SAT calls, all of which
+finish well inside the conflict cap.
+
+When several MUSes of the same minimum size are available for the
+same step, we then keep the one that justifies the most deductions.
+This reduces the number of explanation steps without increasing the
+size of any individual step's explanation, and is independent of the
+choice of MUS strategy.
+
+\paragraph{Aggressive conflict cap with auto-ramp.}
+
+A small minority of SAT calls during MUS search hit pathological
+constraint subsets that take seconds (occasionally minutes) to
+resolve.  These tail calls dominated wall-clock time on harder
+instances.  We address this by capping every SAT call at 100
+conflicts and treating the limit hit as ``inconclusive'' rather than
+as ``unsatisfiable'': inconclusive calls cause the surrounding
+deletion-based search to keep the constraint conservatively, exactly
+as if it were known to be required.
+
+To recover correctness on instances where 100 conflicts is genuinely
+too tight, we monitor the rolling fraction of inconclusive calls and
+ramp the cap up by~$10\times$ whenever it exceeds a threshold.  Across
+the 1\,960 \textsc{mus} and \textsc{core} runs in this benchmark,
+ramping triggered on only five instance/method pairs, all going from
+100 to 1\,000 and never further:
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Strategy & Instances ramped & Total ramp events \\
+\midrule
+\textsc{mus}   & 2 & 2 \\
+\textsc{core}  & 3 & 5 \\
+\midrule
+Total          & 5 / 980 & 7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Effect of tightening the cap.}
+
+The previous default was a per-call conflict limit of 1\,000\,000 ---
+effectively no limit, since SAT calls rarely approached it; the limit
+existed only as a safety net against runaway searches.  Tightening it
+to~100 reduced total wall-clock time across the suite to $0.70\times$
+of the old runtime under \textsc{mus} and $0.90\times$ under
+\textsc{core} (which already finished most calls in a handful of
+conflicts).  The benefit concentrates on the families where
+pathological tail calls were most common: Futoshiki~9$\times$9 hard
+drops to $0.61\times$ of its previous runtime under \textsc{mus}, and
+Tents~OA~10$\times$10 hard to $0.29\times$.
+
+The cap is not free: discarding inconclusive calls means we
+occasionally fail to remove a redundant constraint that a longer
+search would have eliminated.  In aggregate this shows up as a small
+shift in mean MUS size --- under the old default, mean MUS size
+across all instances was 1.338 for \textsc{core} and 1.217 for
+\textsc{mus}; under the new default, 1.333 and 1.211 respectively.
+The change is within the noise expected from random tie-breaking
+during MUS search, and the maximum-MUS-size column of
+Table~\ref{tab:mus-comparison} is essentially unchanged.
+
+
+% =============================================================
+%  RESULTS DISCUSSION
+% =============================================================
+
+\subsection{Results}
+
+Table~\ref{tab:mus-comparison} shows solve time and maximum MUS size
+for each strategy.
+
+\paragraph{Core is fast but imprecise.}
+
+\textsc{core} is consistently the fastest strategy, often dramatically
+so.  On hard instances where MUS search is expensive, the speed-up is
+large: Futoshiki~9$\times$9 hard takes 9.52\,s with \textsc{mus} but
+only 1.37\,s with \textsc{core} (6.9$\times$ faster), and
+Sudoku~evil takes 5.99\,s vs.\ 1.15\,s (5.2$\times$).  The
+only-assign variants show similar gaps: Futoshiki~OA 9$\times$9 hard
+takes 4.00\,s with \textsc{mus} vs.\ 0.54\,s with \textsc{core}
+(7.4$\times$), and Tents~OA 10$\times$10 hard takes 9.63\,s vs.\
+2.18\,s (4.4$\times$).
+
+The cost of this speed is explanation quality.  SAT solver cores are
+not minimal and can be substantially larger than true MUSes.  On
+Futoshiki~OA 9$\times$9 hard, \textsc{core} returns explanations with
+a mean maximum size of~60.6 constraints, compared to 25.9 for
+\textsc{mus} --- more than double.  Similar inflation appears across
+all hard difficulty levels.  On easy instances where most MUSes are
+already small (size~1--2), the difference is modest.
+
+\paragraph{Tents is an outlier.}
+
+Tents (without only-assign) shows no speed advantage for \textsc{core}
+at all: 10$\times$10 instances take 25--26\,s regardless of strategy.
+This suggests that for Tents, the bottleneck is not MUS search but
+some other aspect of the solve loop (likely the large number of forced
+deductions per step rather than the difficulty of justifying individual
+deductions).
+
+\paragraph{Summary.}
+
+\textsc{core} offers a substantial speed-up (typically 2--7$\times$
+on hard instances) at the cost of larger explanations
+(1.4--3.4$\times$ more constraints).  For applications where
+explanation size matters, \textsc{mus} remains the best strategy;
+where speed matters and larger explanations are acceptable,
+\textsc{core} is the clear winner.
+
+
+% =============================================================
+%  CASE STUDY: MIRACLE SUDOKU
+% =============================================================
+
+\subsection{Case study: the Miracle Sudoku}
+
+The ``Miracle Sudoku'', popularised by Mitchell Lee on Cracking the
+Cryptic, is a 9$\times$9 grid with only two given digits (a~1 in
+row~5 column~3, a~2 in row~6 column~7) plus three extra restrictions
+on top of standard Sudoku: orthogonally adjacent cells cannot contain
+consecutive digits, no two cells a king's move apart share a digit,
+and no two cells a knight's move apart share a digit.  Despite its
+sparse clues, the puzzle has a unique solution.  It is notorious for
+resisting every standard Sudoku technique --- the chains of
+anti-knight and anti-king interactions are essential to any
+explanation.
+
+We ran the puzzle through Demystify with both strategies; the
+contrast between them is sharper than on any benchmark instance.
+
+\textsc{core} returns an explanation in \textbf{4.48\,s} of solve
+time (10.9\,s wall-clock including Conjure compilation and parse
+setup), built from 100 steps and 398 returned cores across 37\,033
+SAT calls.  382 of the 398 cores (96\%) are unit cores, but the
+remaining sixteen include four at sizes 15, 19, 20, and~38 ---
+unminimised cores that bundle together far more constraints than are
+strictly necessary.
+
+\textsc{mus} takes \textbf{107\,s} of solve time (~25$\times$
+longer), but produces a noticeably better explanation: 79 steps
+(21~fewer than \textsc{core}) with 410 minimised MUSes whose
+\emph{maximum} size is~4, and whose mean is 1.17.  Every individual
+MUS in the explanation is therefore small enough to read at a glance,
+where \textsc{core}'s size-38 cores would require careful unpacking.
+
+The Miracle Sudoku is hard for two unrelated reasons.  Globally, only
+two givens means narrow forced-move chains in the early steps and
+hence many deductions before the explanation gathers momentum.
+Locally, the cross-cutting anti-knight, anti-king and
+non-consecutive constraints generate dense conflict graphs in which
+SAT cores can be much larger than the underlying minimal explanation
+--- exactly the regime where minimisation pays off.
+
+Unlike every other puzzle in the corpus, the Miracle Sudoku is also
+capable of producing genuinely hard \emph{individual} SAT calls.  In
+an earlier run with the conflict cap disabled, 645 SAT calls each
+took longer than two seconds, with the longest single call observed
+at 42.4\,s and 87\,102 conflicts; 479 calls exceeded 10\,000
+conflicts each.  Total solve time in that uncapped run was
+4\,263\,s, against 107\,s under \textsc{mus} with the cap at~100 ---
+a $40\times$ difference attributable almost entirely to the right
+tail of the SAT-call distribution.  This is the case where the cap
+earns its keep most clearly: the cap prevents the search from
+chasing minimality through the worst chains, at the cost (on this
+instance) of nothing visible in the resulting explanation.
