@@ -168,15 +168,36 @@ impl PuzzlePlanner {
     /// A new `PuzzlePlanner` instance with the specified configuration.
     #[must_use]
     pub fn new_with_config(psolve: PuzzleSolver, config: PlannerConfig) -> PuzzlePlanner {
-        let mut pp = PuzzlePlanner {
+        let mut pp = Self::new_with_config_skip_trivial_marking(psolve, config);
+        pp.mark_trivial_lits_as_deduced();
+        pp
+    }
+
+    /// Like [`new_with_config`](Self::new_with_config) but **skips** the one-off
+    /// `mark_trivial_lits_as_deduced` pass.
+    ///
+    /// That pass solves once per `$#VAR` literal to find values forced by the
+    /// model alone, and is only meaningful once a puzzle's givens / design are
+    /// assigned.  Mystify builds its *base* planner with no design assigned (the
+    /// design is pinned later, per evaluation), so the pass finds nothing and is
+    /// pure overhead there -- O(#`$#VAR` lits) no-limit SAT solves, which
+    /// dominate setup at larger sizes.
+    ///
+    /// SPECIAL / FOOTGUN: only valid when the planner's puzzle has no assigned
+    /// givens or design.  If givens *are* present, skipping this silently drops
+    /// genuine structural deductions.  Used by mystify for its base planner.
+    #[must_use]
+    pub fn new_with_config_skip_trivial_marking(
+        psolve: PuzzleSolver,
+        config: PlannerConfig,
+    ) -> PuzzlePlanner {
+        PuzzlePlanner {
             psolve,
             config,
             mus_cache: MusDict::new(),
             strategy_db: Arc::new(Database::empty()),
             family_map: FamilyMap::identity(),
-        };
-        pp.mark_trivial_lits_as_deduced();
-        pp
+        }
     }
 
     /// Attach a named-strategy database for fingerprint-to-name lookup.
