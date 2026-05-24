@@ -261,6 +261,35 @@ impl PuzzlePlanner {
             .get_many_vars_small_mus_quick(&varlits, &conf_clone, None)
     }
 
+    /// Returns every deduction whose smallest MUS is of the globally-minimum
+    /// size, one [`MusContext`] per distinct MUS (deductions sharing a MUS are
+    /// merged via [`merge_muscontexts`]).
+    ///
+    /// This sits between `smallest_muses_with_config` (used by `best_step`,
+    /// which sets `find_one = true` and so races to a single smallest MUS) and
+    /// `all_muses_with_larger` (used by `difficulties`, which sets
+    /// `find_bigger = true` and sizes every literal far beyond the minimum).
+    /// Here `find_one = false` gives the `<=` bound so we keep *all* minimum-size
+    /// MUSes, while `find_bigger = false` avoids the expensive over-search.
+    ///
+    /// Pure query: it never marks anything deduced.
+    pub fn all_minimum_size_muses(&mut self) -> Vec<MusContext> {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let mut conf = self.config.mus_config;
+        conf.find_one = false;
+        conf.find_bigger = false;
+        conf.keep_all_muses = false;
+        let dict = self.psolve.get_many_vars_small_mus_quick(
+            &varlits,
+            &conf,
+            Some(self.mus_cache.clone()),
+        );
+        self.update_mus_cache(&dict);
+        let dict = Self::filter_musdict_to_lits(dict, &varlits);
+        let muses = Self::smallest_muses_from_dict(&dict);
+        merge_muscontexts(&muses)
+    }
+
     /// Core-guided MUS search: get raw SAT cores for all provable lits,
     /// then minimise only the cores of smallest size into true MUSes.
     fn core_guided_muses(&mut self) -> MusDict {

@@ -11,7 +11,8 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use demystify::problem::{
-    PuzLit, PuzVar, VarValPair, format_puzlit, planner::PuzzlePlanner, solver::PuzzleSolver,
+    PuzLit, PuzVar, VarValPair, format_puzlit, format_puzvar, planner::PuzzlePlanner,
+    solver::PuzzleSolver,
 };
 
 use crate::puzzle::WasmPuzzle;
@@ -30,6 +31,32 @@ struct UserMusPayload {
     constraints: Vec<String>,
     fingerprint: String,
     name: Option<String>,
+}
+
+/// One constraint of a MUS: its human-readable description plus the
+/// puzzle literals (`var=val`, via [`format_puzvar`]) it mentions.
+#[derive(Serialize)]
+struct ConstraintPayload {
+    text: String,
+    literals: Vec<String>,
+}
+
+/// A full MUS: the deduced literals, every constraint (text + the
+/// literals it mentions), the MUS size, its fingerprint and any matched
+/// technique name.
+#[derive(Serialize)]
+struct MusPayload {
+    literals: Vec<String>,
+    constraints: Vec<ConstraintPayload>,
+    mus_size: usize,
+    fingerprint: String,
+    name: Option<String>,
+}
+
+/// Render a [`VarValPair`] as `var=val` for the FFI surface, reusing
+/// [`format_puzvar`] so scalar and indexed variables match `format_puzlit`.
+fn format_varval(vv: &VarValPair) -> String {
+    format!("{}={}", format_puzvar(vv.var()), vv.val())
 }
 
 /// JS-facing planner handle.
@@ -228,6 +255,47 @@ impl WasmPlanner {
             num_muses: muses.len(),
         };
         to_js(&payload).map_err(Into::into)
+    }
+
+    /// Every deduction whose smallest MUS is of the globally-minimum size,
+    /// returned as a `Vec<MusPayload>` — full MUS detail (deduced literals,
+    /// each constraint's English text and the literals it mentions, size,
+    /// fingerprint, technique name).
+    ///
+    /// Sits between [`Self::best_step`] (returns a single smallest MUS, and
+    /// marks it deduced) and [`Self::difficulties`] (sizes every literal far
+    /// past the minimum, the slow path).  Unlike `bestStep`, this is a pure
+    /// query: it deduces nothing, so it can be called repeatedly from a fixed
+    /// state.
+    #[wasm_bindgen(js_name = allMinSteps)]
+    pub fn all_min_steps(&self) -> Result<JsValue, JsError> {
+        let mut planner = self.inner.lock().unwrap();
+        let muses = planner.all_minimum_size_muses();
+        let mut out: Vec<MusPayload> = Vec::with_capacity(muses.len());
+        for mc in &muses {
+            let user_mus = planner.mus_to_user_mus(mc);
+            let parse = planner.puzzle();
+            let constraints: Vec<ConstraintPayload> = mc
+                .mus
+                .iter()
+                .map(|c| ConstraintPayload {
+                    text: parse.lit_to_con(c).clone(),
+                    literals: parse
+                        .constraint_scope_for_lit(c)
+                        .iter()
+                        .map(format_varval)
+                        .collect(),
+                })
+                .collect();
+            out.push(MusPayload {
+                literals: user_mus.lits.iter().map(format_puzlit).collect(),
+                constraints,
+                mus_size: mc.mus_len(),
+                fingerprint: user_mus.fingerprint,
+                name: user_mus.name,
+            });
+        }
+        to_js(&out).map_err(Into::into)
     }
 
     /// Solve the whole puzzle, returning `Vec<Vec<UserMusPayload>>`.

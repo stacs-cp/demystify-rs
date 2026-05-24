@@ -202,6 +202,81 @@ fn deduces_3x3_addition_table_from_one_given() {
     }
 }
 
+/// `all_minimum_size_muses` is the "in-between" query the wasm `allMinSteps`
+/// wraps: every deduction whose smallest MUS is of the globally-minimum size.
+/// It must return all of them at one size (vs `best_step`, which collapses to
+/// one), leave the planner state untouched (pure query), and expose usable
+/// per-constraint detail — the description plus the literals each constraint
+/// mentions, exactly the path `allMinSteps` renders.
+#[test]
+fn all_minimum_size_muses_returns_all_min_size_steps() {
+    let puzzle = Arc::new(build_binairo_tricolor(3, 3, &[(1, 1, 0)]));
+
+    // best_step path on a fresh planner — collapses to a single MUS.
+    let best_muses = {
+        let solver = PuzzleSolver::new(puzzle.clone()).unwrap();
+        let mut planner = PuzzlePlanner::new(solver);
+        planner.smallest_muses_with_config()
+    };
+    assert!(!best_muses.is_empty(), "best_step found no MUS");
+    let best_size = best_muses[0].mus_len();
+
+    // all-min-steps path on another fresh planner.
+    let solver = PuzzleSolver::new(puzzle.clone()).unwrap();
+    let mut planner = PuzzlePlanner::new(solver);
+    let before = planner.get_provable_varlits();
+
+    let min_muses = planner.all_minimum_size_muses();
+    eprintln!(
+        "best_step -> {} mus(es) of size {best_size}; all_minimum_size_muses -> {} mus(es) sizes {:?}",
+        best_muses.len(),
+        min_muses.len(),
+        min_muses.iter().map(|m| m.mus_len()).collect::<Vec<_>>(),
+    );
+    assert!(!min_muses.is_empty(), "all_minimum_size_muses found no MUS");
+
+    // Every returned MUS is of the one minimum size, agreeing with best_step.
+    for mc in &min_muses {
+        assert_eq!(
+            mc.mus_len(),
+            best_size,
+            "min-size query returned a MUS of size {}, minimum is {best_size}",
+            mc.mus_len(),
+        );
+    }
+    // It returns at least as many steps as best_step (which collapses).
+    assert!(
+        min_muses.len() >= best_muses.len(),
+        "min-size query returned fewer steps ({}) than best_step ({})",
+        min_muses.len(),
+        best_muses.len(),
+    );
+
+    // Per-constraint detail is usable: a non-empty description and at least
+    // one mentioned literal for every constraint of every MUS.
+    let parse = planner.puzzle();
+    for mc in &min_muses {
+        assert!(!mc.lits.is_empty(), "a min-size MUS deduced nothing");
+        for c in &mc.mus {
+            assert!(
+                !parse.lit_to_con(c).is_empty(),
+                "constraint with empty description",
+            );
+            assert!(
+                !parse.constraint_scope_for_lit(c).is_empty(),
+                "constraint mentions no literals",
+            );
+        }
+    }
+
+    // Pure query: nothing was marked deduced.
+    let after = planner.get_provable_varlits();
+    assert_eq!(
+        before, after,
+        "all_minimum_size_muses changed the deduced state",
+    );
+}
+
 #[test]
 fn table_rejects_tuple_with_wrong_arity() {
     let mut b = PuzzleBuilder::new();

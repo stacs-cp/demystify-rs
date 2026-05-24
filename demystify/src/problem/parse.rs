@@ -983,14 +983,19 @@ impl PuzzleParse {
 
     #[must_use]
     pub fn constraint_scope(&self, con: &String) -> BTreeSet<VarValPair> {
-        let lit = self.constraints.lit_for(con);
-        let lits = self.constraints.var_lits(lit);
-        let puzlits = lits
+        self.constraint_scope_for_lit(self.constraints.lit_for(con))
+    }
+
+    /// The [`VarValPair`]s a single constraint mentions, identified by its
+    /// activation [`Lit`] — the form a MUS stores constraints in.
+    /// [`Self::constraint_scope`] is the description-keyed wrapper around this.
+    #[must_use]
+    pub fn constraint_scope_for_lit(&self, lit: &Lit) -> BTreeSet<VarValPair> {
+        self.constraints
+            .var_lits(lit)
             .iter()
             .flat_map(|l| self.direct_or_ordered_lit_to_varvalpair(l))
-            .collect_vec();
-
-        BTreeSet::from_iter(puzlits)
+            .collect()
     }
 
     /// Returns the constraint Lits whose scope mentions the variable of the given literal.
