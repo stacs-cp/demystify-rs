@@ -11,17 +11,17 @@ resolver = "2"
 # Keep optimisation at O3 but retain debug symbols so samply/perf can
 # symbolise stack frames.  Costs some binary size; run-time is unaffected.
 #
-# `panic = "abort"` is workspace-wide: demystify is a "correctness first"
-# tool, so we'd rather terminate than try to recover from a panic, and
-# abort lets the compiler drop all unwinding machinery (panic-format,
-# rustc_demangle, unwind tables) across the whole dependency tree.
-# This applies to release builds only — tests still use dev/test
-# profiles which keep `panic = "unwind"`, so `catch_unwind` in tests
-# continues to work as expected.  NB: `cargo test --release` would
-# compile tests under abort and break any `catch_unwind`-based test.
+# We deliberately keep the default `panic = "unwind"` here.  Setting
+# `panic = "abort"` shaves a little off the wasm binary (it drops the
+# unwind tables / panic-format machinery), but the `demystify-lua` cdylib
+# is loaded into LuaJIT via mlua, which carries Lua errors back across the
+# Rust FFI boundary using the `C-unwind` ABI — and that needs stack
+# unwinding.  Under `panic = "abort"` *every* mlua error (not just a Rust
+# panic) aborts the host process with LuaJIT's "unprotected error in call
+# to Lua API" instead of being catchable by `pcall`.  The size win wasn't
+# worth breaking error handling, so don't re-add abort.
 [profile.release]
 debug = true
-panic = "abort"
 
 # Wasm doesn't need DWARF symbols (samply/perf can't read them in a
 # browser anyway), and bandwidth matters more than build speed.
