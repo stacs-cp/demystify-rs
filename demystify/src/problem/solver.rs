@@ -663,7 +663,7 @@ impl PuzzleSolver {
         // The puzzle may have become unsolvable (in which case there are no
         // solvable lits), but we didn't realise yet (as we don't check that
         // at every addition of a known lit).
-        debug_assert!(self.get_provable_varlits().contains(&lit) || !self.is_currently_solvable());
+        assert!(self.get_provable_varlits().contains(&lit) || !self.is_currently_solvable());
         self.add_known_lit_unchecked(lit);
     }
 

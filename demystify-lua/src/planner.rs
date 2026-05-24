@@ -52,6 +52,10 @@ use demystify::problem::{
 
 use crate::puzzle::LuaPuzzle;
 
+fn fix_reject_error(reason: String) -> LuaError {
+    LuaError::RuntimeError(reason)
+}
+
 /// A wrapper around PuzzlePlanner that can be used from Lua.
 pub struct LuaPlanner {
     inner: Arc<Mutex<PuzzlePlanner>>,
@@ -106,8 +110,12 @@ impl LuaUserData for LuaPlanner {
                 let puzlits = planner.puzzle().lit_to_vars(lit);
                 for puzlit in puzlits {
                     if format_puzlit(puzlit) == lit_str {
+                        if let Err(reason) = planner.puzzle().check_fixable_var(puzlit.var().name())
+                        {
+                            return Err(fix_reject_error(reason));
+                        }
                         let lit_copy = lit;
-                        planner.mark_lit_as_deduced(lit_copy);
+                        planner.mark_lit_as_fixed(lit_copy);
                         return Ok(true);
                     }
                 }
@@ -119,15 +127,18 @@ impl LuaUserData for LuaPlanner {
                 let mut found = None;
                 for (puzlit, sat_lit) in planner.puzzle().direct.litmap.iter() {
                     if format_puzlit(puzlit) == lit_str {
-                        found = Some(*sat_lit);
+                        found = Some((*sat_lit, puzlit.var().name().clone()));
                         break;
                     }
                 }
                 found
             };
 
-            if let Some(lit) = matching_lit {
-                planner.mark_lit_as_deduced(&lit);
+            if let Some((lit, var_name)) = matching_lit {
+                if let Err(reason) = planner.puzzle().check_fixable_var(&var_name) {
+                    return Err(fix_reject_error(reason));
+                }
+                planner.mark_lit_as_fixed(&lit);
                 return Ok(true);
             }
 
@@ -151,12 +162,15 @@ impl LuaUserData for LuaPlanner {
 
                 // Build PuzVar and PuzLit
                 let puzvar = PuzVar::new(&name, idx_vec);
+                if let Err(reason) = planner.puzzle().check_fixable_var(&name) {
+                    return Err(fix_reject_error(reason));
+                }
                 let varval = VarValPair::new(&puzvar, value);
                 let puzlit = PuzLit::new_eq(varval);
 
                 // Look up in litmap
                 if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
-                    planner.mark_lit_as_deduced(&sat_lit);
+                    planner.mark_lit_as_fixed(&sat_lit);
                     return Ok(true);
                 }
 
@@ -196,6 +210,9 @@ impl LuaUserData for LuaPlanner {
 
             // Build PuzVar and PuzLit
             let puzvar = PuzVar::new(&name, idx_vec);
+            if let Err(reason) = planner.puzzle().check_fixable_var(&name) {
+                return Err(fix_reject_error(reason));
+            }
             let varval = VarValPair::new(&puzvar, value);
             let puzlit = if equal {
                 PuzLit::new_eq(varval)
@@ -205,7 +222,7 @@ impl LuaUserData for LuaPlanner {
 
             // Look up in litmap
             if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
-                planner.mark_lit_as_deduced(&sat_lit);
+                planner.mark_lit_as_fixed(&sat_lit);
                 return Ok(true);
             }
 

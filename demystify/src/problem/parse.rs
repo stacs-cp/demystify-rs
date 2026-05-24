@@ -981,6 +981,30 @@ impl PuzzleParse {
         self.eprime.cons.keys().cloned().collect()
     }
 
+    /// Whether a variable (by base name) may be manually fixed by the user.
+    /// Returns `Ok(())` for `$#VAR` / `$#AUX` / `conjure_aux`, or
+    /// `Err(reason)` explaining why not — distinct messages for CON atoms,
+    /// REVEAL targets, and genuinely unknown names (likely a typo).
+    pub fn check_fixable_var(&self, name: &str) -> Result<(), String> {
+        if self.eprime.vars.contains(name)
+            || self.eprime.auxvars.contains(name)
+            || name.starts_with("conjure_aux")
+        {
+            return Ok(());
+        }
+        if self.eprime.cons.contains_key(name) {
+            return Err(format!(
+                "cannot fix '{name}': it is a $#CON constraint atom"
+            ));
+        }
+        if self.eprime.reveal.contains_key(name) || self.eprime.reveal_values.contains(name) {
+            return Err(format!("cannot fix '{name}': it is a $#REVEAL target"));
+        }
+        Err(format!(
+            "cannot fix '{name}': unknown variable name (typo?)"
+        ))
+    }
+
     #[must_use]
     pub fn constraint_scope(&self, con: &String) -> BTreeSet<VarValPair> {
         self.constraint_scope_for_lit(self.constraints.lit_for(con))

@@ -234,11 +234,17 @@ local function test_fix_methods(puzzle)
         end
     end
 
-    -- Test that fix with bad args returns false
+    -- Test that fix with unknown variable name errors (likely a typo).
     local planner3 = demystify.Planner.new(puzzle)
-    local bad_result = planner3:fix_var("nonexistent_var_xyz", {999, 999}, -999)
-    assert(bad_result == false, "fix_var with bad args should return false")
-    print("fix_var with bad args correctly returns false")
+    local ok, err = pcall(function()
+        planner3:fix_var("nonexistent_var_xyz", {999, 999}, -999)
+    end)
+    assert(not ok, "fix_var with unknown var should error")
+    assert(
+        string.find(tostring(err), "unknown variable name") ~= nil,
+        "error should mention unknown variable name; got: " .. tostring(err)
+    )
+    print("fix_var with unknown var correctly errors: " .. tostring(err))
 
     print("PASS: fix_methods")
 end

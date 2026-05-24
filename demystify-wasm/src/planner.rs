@@ -154,8 +154,15 @@ impl WasmPlanner {
         for lit in &provable {
             for puzlit in planner.puzzle().lit_to_vars(lit) {
                 if format_puzlit(puzlit) == lit_str {
+                    if planner
+                        .puzzle()
+                        .check_fixable_var(puzlit.var().name())
+                        .is_err()
+                    {
+                        return false;
+                    }
                     let lit_copy = *lit;
-                    planner.mark_lit_as_deduced(&lit_copy);
+                    planner.mark_lit_as_fixed(&lit_copy);
                     return true;
                 }
             }
@@ -165,15 +172,18 @@ impl WasmPlanner {
             let mut found = None;
             for (puzlit, sat_lit) in planner.puzzle().direct.litmap.iter() {
                 if format_puzlit(puzlit) == lit_str {
-                    found = Some(*sat_lit);
+                    found = Some((*sat_lit, puzlit.var().name().clone()));
                     break;
                 }
             }
             found
         };
 
-        if let Some(lit) = matching {
-            planner.mark_lit_as_deduced(&lit);
+        if let Some((lit, var_name)) = matching {
+            if planner.puzzle().check_fixable_var(&var_name).is_err() {
+                return false;
+            }
+            planner.mark_lit_as_fixed(&lit);
             return true;
         }
         false
@@ -206,6 +216,9 @@ impl WasmPlanner {
 
     fn fix_internal(&self, name: &str, indices: Vec<i64>, value: i64, equal: bool) -> bool {
         let mut planner = self.inner.lock().unwrap();
+        if planner.puzzle().check_fixable_var(name).is_err() {
+            return false;
+        }
         let puzvar = PuzVar::new(name, indices);
         let varval = VarValPair::new(&puzvar, value);
         let puzlit = if equal {
@@ -214,7 +227,7 @@ impl WasmPlanner {
             PuzLit::new_neq(varval)
         };
         if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
-            planner.mark_lit_as_deduced(&sat_lit);
+            planner.mark_lit_as_fixed(&sat_lit);
             true
         } else {
             false

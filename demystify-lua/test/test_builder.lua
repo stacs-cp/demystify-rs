@@ -179,9 +179,10 @@ local function test_and_atom_gate()
 
     local puzzle = b:build()
     local planner = demystify.Planner.new(puzzle)
-    planner:fix({ name = "rule", indices = {}, value = 1 })
-    -- We can't easily inspect gate's value from Lua (anonymous atom),
-    -- but the build/solve plumbing should succeed.
+    -- The and_atom gate's CNF encoding is registered directly; the
+    -- build/solve plumbing exercises it without crashing.  We can't
+    -- easily inspect the gate's value from Lua (anonymous atom), but
+    -- the planner construction alone exercises the full encoding path.
     print("PASS: and_atom_gate")
 end
 

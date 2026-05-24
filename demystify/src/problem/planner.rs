@@ -567,6 +567,15 @@ impl PuzzlePlanner {
         self.psolve.add_known_lit(*lit);
     }
 
+    /// Mark a literal as fixed (not a deduction).  Unlike
+    /// [`Self::mark_lit_as_deduced`], this bypasses the provability
+    /// assertion — the caller accepts that the literal is an axiom, not
+    /// proved by the solver, and that adding it may make the puzzle
+    /// unsolvable or invalidate cached state.
+    pub fn mark_lit_as_fixed(&mut self, lit: &Lit) {
+        self.psolve.add_not_provable_known_lit(*lit);
+    }
+
     /// Marks multiple literals as deduced.
     ///
     /// This method should only be called if there are no solutions with the negation of the literals.
