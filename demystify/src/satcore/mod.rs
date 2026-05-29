@@ -595,7 +595,7 @@ impl SatCore {
     ///
     /// MUS-finding algorithms that *do* have a sensible fallback (try another
     /// dive, skip this literal, etc.) should continue to use the limited
-    /// [`assumption_solve`] and handle the `Err(SearchError::Limit)` case
+    /// [`Self::assumption_solve`] and handle the `Err(SearchError::Limit)` case
     /// explicitly.
     pub fn assumption_solve_no_limit(&self, known: &[Lit], lits: &[Lit]) -> bool {
         let t0 = Instant::now();
@@ -622,7 +622,7 @@ impl SatCore {
     }
 
     /// Solve as an assumption problem with **no conflict limit applied**, and
-    /// return the full model when SAT.  See [`assumption_solve_no_limit`].
+    /// return the full model when SAT.  See [`Self::assumption_solve_no_limit`].
     pub fn assumption_solve_solution_no_limit(
         &self,
         known: &[Lit],

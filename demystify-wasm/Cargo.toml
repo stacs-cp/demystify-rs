@@ -5,6 +5,7 @@ edition = "2024"
 description = "WebAssembly bindings for demystify, a constraint solving tool for explaining puzzles"
 license = "MPL-2.0"
 repository = "https://github.com/stacs-cp/demystify-rs"
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]

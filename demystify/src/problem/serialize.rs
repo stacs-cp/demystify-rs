@@ -77,8 +77,8 @@ impl From<SerializableEPrimeAnnotations> for EPrimeAnnotations {
 /// Serializable version of PuzzleParse
 ///
 /// This converts rustsat types to their serializable equivalents:
-/// - `Lit` -> i32 (via ipasir format), stored as String keys where needed for JSON
-/// - `Cnf` -> Vec<Vec<i32>> (list of clauses)
+/// - `Lit` -> `i32` (via ipasir format), stored as String keys where needed for JSON
+/// - `Cnf` -> `Vec<Vec<i32>>` (list of clauses)
 /// - `SatInstance` is not serialized (rebuilt from cnf on load)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SerializablePuzzleParse {

@@ -19,7 +19,7 @@ Once `conjure` and `rust` are installed, you can proceed to set up `demystify`.
 1. Clone the `demystify` repository:
    ```sh
    git clone https://github.com/stacs-cp/demystify-rs
-   cd demystify
+   cd demystify-rs
    ```
 
 

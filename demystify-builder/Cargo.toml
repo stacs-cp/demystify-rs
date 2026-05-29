@@ -5,6 +5,7 @@ edition = "2024"
 description = "Build demystify puzzle inputs directly in Rust, bypassing Conjure"
 license = "MPL-2.0"
 repository = "https://github.com/stacs-cp/demystify-rs"
+publish = false
 
 [dependencies]
 demystify = { path = "../demystify", version = "0.2" }

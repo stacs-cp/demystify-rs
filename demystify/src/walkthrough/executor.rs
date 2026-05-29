@@ -66,7 +66,7 @@ impl<'a> Executor<'a> {
     /// Run every step of `script`.  Top-level defaults (`repeats`,
     /// `strategy`) are applied before the first step; per-step overrides
     /// are scoped to that step only.  `repeats` defaults to
-    /// [`TUTORIAL_DEFAULT_REPEATS`] when the script does not set it.
+    /// the tutorial-tuned default (currently 50) when the script does not set it.
     pub fn run(&mut self, script: &Script) -> Result<()> {
         self.planner.config_mut().mus_config.repeats =
             script.repeats.unwrap_or(Self::TUTORIAL_DEFAULT_REPEATS);

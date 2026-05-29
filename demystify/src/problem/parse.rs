@@ -1273,7 +1273,12 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
     for line in reader.lines() {
         let line = line?;
 
-        if line.contains("$#") {
+        // Only treat a line as an annotation when it begins (after optional
+        // leading whitespace) with `$#`.  A regular comment that merely mentions
+        // `$#CON` etc. mid-line must be left alone, not parsed as a (malformed)
+        // annotation.
+        if line.trim_start().starts_with("$#") {
+            let line = line.trim_start();
             debug!(target: "parser", "line {:?}", line);
             let parts: Vec<&str> = line.split_whitespace().collect();
 
@@ -2341,6 +2346,53 @@ mod tests {
         assert_eq!(f.members.get("row_alldiff"), Some(&"Row".to_string()));
         assert_eq!(f.members.get("con_alldiff"), Some(&"Column".to_string()));
         assert_eq!(f.members.get("box_alldiff"), Some(&"Box".to_string()));
+    }
+
+    #[test]
+    fn test_parse_hash_annotation_in_comment_is_ignored() {
+        // Regression: a normal comment ($ ...) that merely *mentions* a
+        // `$#CON` / `$#VAR` / `$#AUX` token mid-line must NOT be parsed as a
+        // (malformed) annotation.  Annotations are only recognised when the
+        // line begins with `$#` (after optional leading whitespace).
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "$#VAR x").unwrap();
+        writeln!(temp_file, "$#CON real_con \"a real constraint\"").unwrap();
+        writeln!(temp_file, "$ split out as a $#CON so demystify can reason with it").unwrap();
+        writeln!(temp_file, "$ see the $#VAR and $#AUX notes above").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path)
+            .expect("a comment mentioning $#CON mid-line must not break parsing");
+
+        assert!(parsed.vars.contains("x"));
+        assert!(parsed.cons.contains_key("real_con"));
+        assert_eq!(
+            parsed.cons.len(),
+            1,
+            "comment text must not register extra constraints: {:?}",
+            parsed.cons.keys().collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_parse_indented_annotation_is_recognised() {
+        // Annotations are recognised after leading whitespace too.
+        let mut temp_file = tempfile::Builder::new()
+            .prefix(".demystify-")
+            .tempfile_in(".")
+            .unwrap();
+        writeln!(temp_file, "    $#VAR y").unwrap();
+        writeln!(temp_file, "\t$#CON indented_con \"an indented constraint\"").unwrap();
+
+        let path = temp_file.path().to_path_buf();
+        let parsed = super::parse_eprime_file(&path)
+            .expect("indented annotations must parse");
+
+        assert!(parsed.vars.contains("y"));
+        assert!(parsed.cons.contains_key("indented_con"));
     }
 
     #[test]

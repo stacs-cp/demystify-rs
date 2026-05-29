@@ -98,6 +98,14 @@ struct Opt {
 
     #[arg(
         long,
+        help = "After solving, print a final line to stdout reporting solvability: \
+                `SOLVABILITY unsolved=N` where N is the number of solution literals not \
+                pinned to a single value (0 = uniquely solvable), or `SOLVABILITY inconsistent`."
+    )]
+    report_solvability: bool,
+
+    #[arg(
+        long,
         value_enum,
         help = "Specify the method to run the solver (Native, Docker, Podman)"
     )]
@@ -340,6 +348,13 @@ fn main() -> anyhow::Result<()> {
 
     let solve_secs = t_solve.elapsed().as_secs_f64();
     tracing::info!(target: "progress", "solve completed in {solve_secs:.2}s");
+
+    if opt.report_solvability {
+        match planner.check_solvability() {
+            Some(unsolved) => println!("SOLVABILITY unsolved={unsolved}"),
+            None => println!("SOLVABILITY inconsistent"),
+        }
+    }
 
     if !opt.quiet {
         print_mus_stats();

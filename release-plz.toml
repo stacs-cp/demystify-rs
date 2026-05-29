@@ -3,3 +3,15 @@ name = "demystify-lua"
 release = false
 publish = false
 changelog_update = false
+
+[[package]]
+name = "demystify-builder"
+release = false
+publish = false
+changelog_update = false
+
+[[package]]
+name = "demystify-wasm"
+release = false
+publish = false
+changelog_update = false
