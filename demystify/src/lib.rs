@@ -116,7 +116,11 @@
 //! - **Serialization**: Save/load parsed puzzles as JSON for fast startup
 //! - **HTML/SVG output**: Generate visual step-by-step explanations
 
-#![allow(dead_code)]
+// The Conjure/Savile-Row parsing pipeline is compiled out on wasm32 (which
+// loads pre-parsed JSON instead), so its helper functions are uncalled there.
+// Exempt only the wasm build from dead-code checking; native builds — the
+// primary target — keep full dead-code analysis.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
 pub mod json;
 pub mod named_strategy;

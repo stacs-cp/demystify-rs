@@ -150,6 +150,9 @@ impl Clone for SatCoreCache {
 /// solver; the two clones never share solver state.
 #[derive(Clone)]
 pub struct PuzzleSolver {
+    // Read via `get_satcore` in the normal build; the `deterministic` build
+    // rebuilds the core on every call instead, so the field is unused there.
+    #[cfg_attr(feature = "deterministic", allow(dead_code))]
     satcore: SatCoreCache,
     puzzleparse: Arc<PuzzleParse>,
 

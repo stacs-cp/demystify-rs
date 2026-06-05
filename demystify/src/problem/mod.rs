@@ -325,13 +325,6 @@ pub struct ConID {
     pub name: String,
 }
 
-impl ConID {
-    /// Creates a new `ConID` instance.
-    fn new(lit: PuzLit, name: String) -> ConID {
-        ConID { lit, name }
-    }
-}
-
 /// Format a [`PuzLit`] for the FFI surfaces (`demystify-lua`,
 /// `demystify-wasm`).  Differs from [`PuzLit`]'s `Display` impl in
 /// one place: scalar variables (no indices) are rendered as `"x=5"`
