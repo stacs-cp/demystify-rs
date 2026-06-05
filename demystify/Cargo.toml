@@ -2,6 +2,7 @@
 name = "demystify"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.94.1"
 description = "A constraint solving tool for explaining puzzles"
 license = "MPL-2.0"
 repository = "https://github.com/stacs-cp/demystify-rs"

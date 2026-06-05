@@ -77,7 +77,7 @@ Contributions to `demystify` are welcome. Feel free to open issues and submit pu
 
 ## License
 
-`demystify` is licensed under the MPL 2.0 License. See the `LICENSE` file for more details.
+`demystify` is licensed under the MPL 2.0 License. See the `LICENSE.txt` file for more details.
 
 ---
 

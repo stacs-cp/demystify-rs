@@ -2,6 +2,7 @@
 name = "demystify-web"
 version = "0.1.4"
 edition = "2024"
+rust-version = "1.94.1"
 description = "A web front end to demystify, a constraint solving tool for explaining puzzles"
 license = "MPL-2.0"
 repository = "https://github.com/stacs-cp/demystify-rs"

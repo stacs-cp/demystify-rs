@@ -2,9 +2,13 @@
 name = "demystify-lua"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.94.1"
 description = "Lua bindings for demystify, a constraint solving tool for explaining puzzles"
 license = "MPL-2.0"
 repository = "https://github.com/stacs-cp/demystify-rs"
+# cdylib for LuaJIT; depends on the unpublished demystify-builder, so not
+# publishable to crates.io.
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
