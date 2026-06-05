@@ -139,11 +139,18 @@ fn encode_via_totalizer(
     let units: Vec<Lit> = match bound {
         Bound::Lower => {
             enc.encode_lb(k..=k, &mut scratch, var_manager)?;
-            enc.enforce_lb(k).unwrap_or_default()
+            // The callers guarantee 0 < k < n and we just encoded `k..=k`, so
+            // the bound is both encoded and satisfiable — `enforce_lb` cannot
+            // return `NotEncoded` or `Unsat`. Crash loudly if that invariant
+            // is ever broken rather than silently dropping the enforcing
+            // literals (which would leave the cardinality bound unenforced).
+            enc.enforce_lb(k)
+                .expect("enforce_lb on a just-encoded, in-range (0<k<n) bound")
         }
         Bound::Upper => {
             enc.encode_ub(k..=k, &mut scratch, var_manager)?;
-            enc.enforce_ub(k).unwrap_or_default()
+            enc.enforce_ub(k)
+                .expect("enforce_ub on a just-encoded, in-range (0<k<n) bound")
         }
     };
 

@@ -1285,6 +1285,9 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
             let parts: Vec<&str> = line.split_whitespace().collect();
 
             if line.starts_with("$#VAR") {
+                if parts.len() != 2 {
+                    bail!("Malformed $#VAR annotation (expected `$#VAR <name>`): {line}");
+                }
                 let v = parts[1].to_string();
                 info!(target: "parser", "Found VAR: '{}'", v);
 
@@ -1295,6 +1298,9 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 
                 vars.insert(v);
             } else if line.starts_with("$#PUZZLE") {
+                if parts.len() != 2 {
+                    bail!("Malformed $#PUZZLE annotation (expected `$#PUZZLE <name>`): {line}");
+                }
                 let v = parts[1].to_string();
                 info!(target: "parser", "Found PUZZLE: '{}'", v);
 
@@ -1332,6 +1338,9 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 }
                 safe_insert(&mut cons, con_name, con_value)?;
             } else if line.starts_with("$#AUX") {
+                if parts.len() != 2 {
+                    bail!("Malformed $#AUX annotation (expected `$#AUX <name>`): {line}");
+                }
                 let v = parts[1].to_string();
                 info!(target: "parser", "Found Aux VAR: '{}'", v);
 
@@ -1342,7 +1351,12 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
 
                 auxvars.insert(v);
             } else if line.starts_with("$#KIND") {
-                let v = parts[1].to_string();
+                // The kind may be several words (e.g. "Killer Sudoku"), so take
+                // the rest of the line rather than a single whitespace token.
+                let v = line.strip_prefix("$#KIND").unwrap_or("").trim().to_string();
+                if v.is_empty() {
+                    bail!("Malformed $#KIND annotation (expected `$#KIND <name>`): {line}");
+                }
                 if kind.is_some() {
                     bail!("Cannot have two 'KIND' statements");
                 }
