@@ -51,6 +51,16 @@ web-time = "1"
 rustsat-glucose = { version = "0.7" }
 rustsat-cadical = "0.7.5"
 which = "8"
+# Parse cache: persistent, multi-process SQLite KV store; zstd to shrink the
+# (highly compressible) parse JSON; sha2 to build the content+version key.
+cute-sqlite-kv = "0.1.0"
+zstd = "0.13"
+sha2 = "0.10"
+
+# Hash the crate source + lockfile at build time so the parse cache key changes
+# whenever demystify's own parsing code (or a dependency version) changes.
+[build-dependencies]
+sha2 = "0.10"
 
 [dev-dependencies]
 insta = "1"

@@ -397,6 +397,21 @@ impl PuzzleParse {
             serde_json::from_str(s).context("Failed to deserialize puzzle")?;
         serializable.try_into()
     }
+
+    /// Serialize to compact (non-pretty) JSON bytes.
+    ///
+    /// Used by the parse cache, which compresses these bytes before storing.
+    pub fn to_json_bytes(&self) -> Result<Vec<u8>> {
+        let serializable = SerializablePuzzleParse::try_from(self)?;
+        serde_json::to_vec(&serializable).context("Failed to serialize puzzle")
+    }
+
+    /// Load a puzzle parse from JSON bytes produced by [`Self::to_json_bytes`].
+    pub fn from_json_bytes(bytes: &[u8]) -> Result<Self> {
+        let serializable: SerializablePuzzleParse =
+            serde_json::from_slice(bytes).context("Failed to deserialize puzzle")?;
+        serializable.try_into()
+    }
 }
 
 #[cfg(test)]

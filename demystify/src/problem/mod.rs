@@ -1,6 +1,11 @@
 pub mod musdict;
 /// Module containing problem-related functionality.
 pub mod parse;
+/// Persistent, multi-process cache for parsed puzzles (skips Conjure/Savile
+/// Row when the same model/param has been parsed before). Not on wasm, which
+/// never invokes the external toolchain.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod parse_cache;
 pub mod planner;
 pub mod serialize;
 pub mod solver;

@@ -116,6 +116,34 @@ impl ProgramRunner {
         }
     }
 
+    /// Return Savile Row's version line (the first line of `savilerow -help`,
+    /// e.g. `Savile Row 1.10.1 (Repository Version: 4257aab38 ...)`), which
+    /// includes both the release number and the upstream git hash.
+    pub fn get_savilerow_version() -> Result<String, String> {
+        let current_dir =
+            std::env::current_dir().map_err(|e| format!("Failed to get current directory: {e}"))?;
+        let mut cmd = Self::prepare("savilerow", &current_dir);
+        cmd.arg("-help");
+
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to execute savilerow: {e}"))?;
+
+        // `savilerow -help` prints its banner to stdout and exits; the version
+        // is the first line. We don't check the exit status (help may exit
+        // non-zero on some builds) — only that we got a recognisable banner.
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let first = stdout.lines().next().unwrap_or("").trim();
+        if first.starts_with("Savile Row") {
+            Ok(first.to_owned())
+        } else {
+            Err(format!(
+                "Could not read Savile Row version from `savilerow -help`. stdout:\n{stdout}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ))
+        }
+    }
+
     /// Prepare a `Command` to run a program, either natively or in a container
     #[must_use]
     pub fn prepare(program: &str, localdir: &std::path::Path) -> Command {

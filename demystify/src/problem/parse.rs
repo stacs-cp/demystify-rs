@@ -31,6 +31,8 @@ use std::fs::File;
 use std::io;
 
 #[cfg(not(target_arch = "wasm32"))]
+use crate::problem::parse_cache;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::problem::solver::{PuzzleSolver, SolverConfig};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::problem::util::exec::ProgramRunner;
@@ -1755,6 +1757,26 @@ fn read_dimacs(in_path: &PathBuf, dimacs: &mut PuzzleParse) -> anyhow::Result<()
 pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Result<PuzzleParse> {
     let t_total = Instant::now();
 
+    // Consult the parse cache before doing any (expensive) Conjure/Savile Row
+    // work. The key covers the model + param bytes and the tool/library
+    // versions, so a hit faithfully reproduces a fresh parse.
+    let model_bytes =
+        fs::read(eprimein).with_context(|| format!("reading model file {eprimein:?}"))?;
+    let param_bytes =
+        fs::read(eprimeparamin).with_context(|| format!("reading param file {eprimeparamin:?}"))?;
+    let model_ext = eprimein
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let cache_key = parse_cache::cache_key(&model_bytes, &param_bytes, &model_ext);
+
+    if let Some(puzzle) = parse_cache::try_load(&cache_key)? {
+        let secs = t_total.elapsed().as_secs_f64();
+        info!(target: "progress", "loaded parse from cache in {secs:.2}s (skipped conjure/savilerow)");
+        return Ok(puzzle);
+    }
+
     let tdir = tempfile::Builder::new()
         .prefix(".demystify-")
         .tempdir_in(".")
@@ -1866,6 +1888,8 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
     let setup_secs = t_setup.elapsed().as_secs_f64();
     let total_secs = t_total.elapsed().as_secs_f64();
     info!(target: "progress", "parse setup completed in {setup_secs:.2}s (total parse: {total_secs:.2}s)");
+
+    parse_cache::store(&cache_key, &eprimeparse)?;
 
     Ok(eprimeparse)
 }
