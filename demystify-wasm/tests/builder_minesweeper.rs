@@ -119,7 +119,7 @@ fn difficulties_nonempty_on_minesweeper() {
     // smallest MUS size — at least equal in cardinality to the
     // bestStep / quickSolve output.
     let puzzle = build_minesweeper();
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
 
     let provable_count: usize = {
         let val = planner
@@ -260,7 +260,7 @@ fn difficulties_grow_progressively_minesweeper() {
     // The set of cells visible in `known_literals() ∪ difficulties()`
     // must therefore strictly grow by exactly one cell at each step.
     let puzzle = build_reveal_minesweeper(1, 4, &[(1, 1)], &[(1, 1, 0), (1, 2, 0), (1, 3, 1)]);
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
 
     let mut visible_at: Vec<BTreeSet<(i64, i64)>> = vec![visible_cells(&planner, 1, 4)];
 
@@ -329,7 +329,7 @@ fn difficulties_omit_undecidable_cell_minesweeper() {
     // the reveal cascade has activated the (1,1) sumcheck — making
     // (1,2)=mine immediately provable, not (1,1).
     let puzzle = build_reveal_minesweeper(1, 3, &[(1, 1)], &[(1, 1, 1)]);
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
 
     let initial_known: Vec<String> =
         from_value(planner.known_literals().expect("initial known")).expect("decode initial known");
@@ -392,7 +392,7 @@ fn difficulties_omit_undecidable_cell_minesweeper() {
 #[wasm_bindgen_test]
 fn planner_deduces_minesweeper_via_reveal() {
     let puzzle = build_minesweeper();
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
     let _ = planner.quick_solve().expect("quick_solve");
     assert!(
         planner.is_solved(),

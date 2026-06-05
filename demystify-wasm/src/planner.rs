@@ -11,11 +11,46 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use demystify::problem::{
-    PuzLit, PuzVar, VarValPair, format_puzlit, format_puzvar, planner::PuzzlePlanner,
-    solver::PuzzleSolver,
+    PuzLit, PuzVar, VarValPair, format_puzlit, format_puzvar,
+    planner::PuzzlePlanner,
+    solver::{PuzzleSolver, SolverConfig},
 };
 
 use crate::puzzle::WasmPuzzle;
+
+/// JS-facing options accepted by [`WasmPlanner::new`].  Every field is
+/// optional and defaults to the same value the CLI uses when its flag is
+/// omitted.  Pass an empty object `{}` (or `null` / `undefined`) for the
+/// all-defaults shape.
+///
+/// Fields:
+/// - `onlyAssignments`: mirrors the CLI's `--only-assign`.  When true, the
+///   planner only targets positive value-assignment lits — `=v` puzlits —
+///   and never tries individual `!=v` deductions.
+#[derive(serde::Deserialize, Default)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+struct WasmPlannerOptions {
+    only_assignments: bool,
+}
+
+impl WasmPlannerOptions {
+    fn from_js(options: JsValue) -> Result<Self, JsError> {
+        if options.is_null() || options.is_undefined() {
+            return Ok(Self::default());
+        }
+        // Route via serde_json::Value so `deny_unknown_fields` actually
+        // fires: serde-wasm-bindgen's direct deserialiser reads requested
+        // struct fields by name without iterating the JS object's keys,
+        // so typos like `onlyAssingments` would silently fall back to
+        // defaults.  The intermediate Map round-trip costs nothing in
+        // practice for a tiny options object and turns silent typos into
+        // a clear error at the FFI boundary.
+        let value: serde_json::Value = serde_wasm_bindgen::from_value(options)
+            .map_err(|e| JsError::new(&format!("Invalid WasmPlanner options: {e}")))?;
+        serde_json::from_value(value)
+            .map_err(|e| JsError::new(&format!("Invalid WasmPlanner options: {e}")))
+    }
+}
 
 #[derive(Serialize)]
 struct StepPayload {
@@ -51,6 +86,19 @@ struct MusPayload {
     mus_size: usize,
     fingerprint: String,
     name: Option<String>,
+}
+
+/// Result of [`WasmPlanner::check_uniqueness`].  The tag/field names
+/// are the JS-facing shape: `{status: "unsolvable" | "unique" | "multiple", unfixedVars?: [...]}`.
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "lowercase")]
+enum SolvabilityPayload {
+    Unsolvable,
+    Unique,
+    Multiple {
+        #[serde(rename = "unfixedVars")]
+        unfixed_vars: Vec<String>,
+    },
 }
 
 /// Render a [`VarValPair`] as `var=val` for the FFI surface, reusing
@@ -104,10 +152,17 @@ pub fn enable_console_logs(max_level: Option<String>) {
 
 #[wasm_bindgen]
 impl WasmPlanner {
-    /// Build a planner from a puzzle. Errors if the SAT setup fails.
+    /// Build a planner from a puzzle.  `options` is a required JS object
+    /// whose fields are documented on [`WasmPlannerOptions`]; pass `{}` (or
+    /// `null` / `undefined`) for all-defaults.  Errors if `options` is
+    /// malformed or the SAT setup fails.
     #[wasm_bindgen(constructor)]
-    pub fn new(puzzle: &WasmPuzzle) -> Result<WasmPlanner, JsError> {
-        let solver = PuzzleSolver::new(puzzle.arc())
+    pub fn new(puzzle: &WasmPuzzle, options: JsValue) -> Result<WasmPlanner, JsError> {
+        let opts = WasmPlannerOptions::from_js(options)?;
+        let solver_config = SolverConfig {
+            only_assignments: opts.only_assignments,
+        };
+        let solver = PuzzleSolver::new_with_config(puzzle.arc(), solver_config)
             .map_err(|e| JsError::new(&format!("Failed to create solver: {e}")))?;
         let planner = PuzzlePlanner::new(solver);
         Ok(WasmPlanner {
@@ -142,6 +197,33 @@ impl WasmPlanner {
             }
         }
         to_js(&out).map_err(Into::into)
+    }
+
+    /// Classify the puzzle's solution status. Runs propagation to a
+    /// fixed point on a *cloned* planner (so this call does not mutate
+    /// the caller's state) and returns one of:
+    ///
+    /// - `{status: "unsolvable"}` — no satisfying assignment exists.
+    /// - `{status: "unique"}` — exactly one solution.
+    /// - `{status: "multiple", unfixedVars: ["grid[2,3]", ...]}` —
+    ///   multiple solutions; `unfixedVars` lists the puzzle variables
+    ///   whose value is not pinned by the current clues.
+    ///
+    /// REVEAL targets are propagated automatically because the
+    /// fixed-point loop keeps deducing as new triggers fire.
+    #[wasm_bindgen(js_name = checkUniqueness)]
+    pub fn check_uniqueness(&self) -> Result<JsValue, JsError> {
+        let mut planner: PuzzlePlanner = self.inner.lock().unwrap().clone();
+        let payload = match planner.check_solvability() {
+            None => SolvabilityPayload::Unsolvable,
+            Some(0) => SolvabilityPayload::Unique,
+            Some(_) => {
+                let vars = planner.unsolved_vars_after_solve();
+                let unfixed_vars = vars.iter().map(format_puzvar).collect();
+                SolvabilityPayload::Multiple { unfixed_vars }
+            }
+        };
+        to_js(&payload).map_err(Into::into)
     }
 
     /// Mark a literal as deduced. Returns true if the literal was found, false

@@ -8,14 +8,15 @@
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
-use demystify_wasm::{WasmPlanner, load_puzzle, parse_literal};
+use demystify_wasm::{WasmBuilder, WasmPlanner, load_puzzle, parse_literal};
 use serde_wasm_bindgen::from_value;
 
 const LITTLE1_JSON: &str = include_str!("fixtures/little1.json");
 
 fn load_planner() -> WasmPlanner {
     let puzzle = load_puzzle(LITTLE1_JSON).expect("load_puzzle should succeed");
-    WasmPlanner::new(&puzzle).expect("planner construction should succeed")
+    WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL)
+        .expect("planner construction should succeed")
 }
 
 #[wasm_bindgen_test]
@@ -154,6 +155,128 @@ fn parse_literal_roundtrip() {
     assert!(
         parse_literal("not a literal").is_err(),
         "malformed input should error"
+    );
+}
+
+#[wasm_bindgen_test]
+fn check_uniqueness_reports_unique_for_little1() {
+    let planner = load_planner();
+    // little1 has a unique solution. checkUniqueness should classify it
+    // as "unique" without mutating the planner.
+    let val = planner.check_uniqueness().expect("check_uniqueness");
+    let parsed: serde_json::Value = from_value(val).expect("deserialise");
+    assert_eq!(parsed["status"], "unique", "got {parsed:?}");
+
+    // Caller's planner must be untouched — provableLiterals should still
+    // return a non-empty set as it did before the uniqueness check.
+    let lits: Vec<String> = from_value(planner.provable_literals().expect("provable_literals"))
+        .expect("deserialise provable literals");
+    assert!(
+        !lits.is_empty(),
+        "check_uniqueness must not consume the planner's deductions"
+    );
+}
+
+#[wasm_bindgen_test]
+fn check_uniqueness_classifies_three_cases() {
+    use std::collections::BTreeSet;
+
+    // Build a tiny 1-d boolean puzzle with the given constraints, run
+    // checkUniqueness, and return the parsed JSON.
+    fn classify(build: impl FnOnce(&WasmBuilder)) -> serde_json::Value {
+        let b = WasmBuilder::new();
+        build(&b);
+        let puzzle = b.build().expect("build");
+        let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
+        from_value(planner.check_uniqueness().expect("check_uniqueness"))
+            .expect("deserialise checkUniqueness")
+    }
+
+    // Unique: 1 cell, sum >= 1 forces it true.
+    let unique = classify(|b| {
+        let dims = serde_wasm_bindgen::to_value(&vec![vec![1_i64, 1]]).expect("encode dims");
+        let g = b.var_bool_matrix("g", dims).expect("var_bool_matrix");
+        let rule = b.con_bool("rule").expect("con_bool");
+        let signed = vec![g.get(vec![1]).expect("g[1]").pos()];
+        let guard = b.guard(&rule, "rule", "g[1] true").expect("guard");
+        b.sum_ge(guard, signed, 1).expect("sum_ge");
+    });
+    assert_eq!(unique["status"], "unique", "got {unique:?}");
+
+    // Multiple: 2 cells, sum >= 1 leaves both cells loose
+    // (TT, TF, FT are all valid; neither cell is pinned).
+    let multiple = classify(|b| {
+        let dims = serde_wasm_bindgen::to_value(&vec![vec![1_i64, 2]]).expect("encode dims");
+        let g = b.var_bool_matrix("g", dims).expect("var_bool_matrix");
+        let rule = b.con_bool("rule").expect("con_bool");
+        let signed = vec![
+            g.get(vec![1]).expect("g[1]").pos(),
+            g.get(vec![2]).expect("g[2]").pos(),
+        ];
+        let guard = b
+            .guard(&rule, "rule", "at least one of g[1], g[2] true")
+            .expect("guard");
+        b.sum_ge(guard, signed, 1).expect("sum_ge");
+    });
+    assert_eq!(multiple["status"], "multiple", "got {multiple:?}");
+    let unfixed: BTreeSet<String> =
+        from_value(serde_wasm_bindgen::to_value(&multiple["unfixedVars"]).unwrap())
+            .expect("decode unfixedVars");
+    assert_eq!(
+        unfixed,
+        BTreeSet::from(["g[1]".to_string(), "g[2]".to_string()]),
+        "both cells should be unfixed: got {unfixed:?}"
+    );
+
+    // Unsolvable: 1 cell forced both true and false.
+    let unsolvable = classify(|b| {
+        let dims = serde_wasm_bindgen::to_value(&vec![vec![1_i64, 1]]).expect("encode dims");
+        let g = b.var_bool_matrix("g", dims).expect("var_bool_matrix");
+
+        let rule_pos = b.con_bool("rule_pos").expect("con_bool pos");
+        let signed = vec![g.get(vec![1]).expect("g[1]").pos()];
+        let guard = b
+            .guard(&rule_pos, "rule_pos", "g[1] true")
+            .expect("guard pos");
+        b.sum_ge(guard, signed, 1).expect("sum_ge");
+
+        let rule_neg = b.con_bool("rule_neg").expect("con_bool neg");
+        let signed = vec![g.get(vec![1]).expect("g[1]").pos()];
+        let guard = b
+            .guard(&rule_neg, "rule_neg", "g[1] false")
+            .expect("guard neg");
+        b.sum_le(guard, signed, 0).expect("sum_le");
+    });
+    assert_eq!(unsolvable["status"], "unsolvable", "got {unsolvable:?}");
+}
+
+#[wasm_bindgen_test]
+fn only_assignments_option_is_accepted_and_solves() {
+    // Mirrors the CLI's --only-assign: target only positive `=v`
+    // deductions, never `!=v`.  The planner should still solve the
+    // puzzle, just via a narrower candidate-lit bucket.
+    let puzzle = load_puzzle(LITTLE1_JSON).expect("load_puzzle");
+    let opts = serde_wasm_bindgen::to_value(&serde_json::json!({ "onlyAssignments": true }))
+        .expect("encode opts");
+    let planner = WasmPlanner::new(&puzzle, opts).expect("planner");
+
+    let _ = planner.quick_solve().expect("quick_solve");
+    assert!(
+        planner.is_solved(),
+        "puzzle should still solve with onlyAssignments=true"
+    );
+}
+
+#[wasm_bindgen_test]
+fn unknown_planner_option_is_rejected() {
+    // deny_unknown_fields on WasmPlannerOptions catches typos at the
+    // FFI boundary instead of silently ignoring them.
+    let puzzle = load_puzzle(LITTLE1_JSON).expect("load_puzzle");
+    let opts =
+        serde_wasm_bindgen::to_value(&serde_json::json!({ "bogusKey": 1 })).expect("encode opts");
+    assert!(
+        WasmPlanner::new(&puzzle, opts).is_err(),
+        "construction should reject unknown options"
     );
 }
 

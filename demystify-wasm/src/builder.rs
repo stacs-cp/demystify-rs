@@ -323,6 +323,26 @@ impl WasmBuilder {
         })
     }
 
+    /// Declare a `$#AUX` multi-valued matrix (one-hot).  Same shape as
+    /// [`Self::var_int_matrix`] — cells are accepted anywhere VAR-int
+    /// cells are (in `sumGe`/`sumLe`/`sumEq` and `table`) — but the
+    /// atoms are auxiliary: their values are solved for by SAT but not
+    /// surfaced as discrete user-facing deduction steps.
+    #[wasm_bindgen(js_name = auxIntMatrix)]
+    pub fn aux_int_matrix(
+        &self,
+        name: &str,
+        dims: JsValue,
+        domain: Vec<i64>,
+    ) -> Result<WasmIntMatrix, JsError> {
+        let dims = parse_dims(dims)?;
+        self.with_mut(|b| {
+            Ok(WasmIntMatrix {
+                inner: b.aux_int_matrix(name, &dims, &domain),
+            })
+        })
+    }
+
     /// Declare a `$#CON` boolean matrix.
     #[wasm_bindgen(js_name = conBoolMatrix)]
     pub fn con_bool_matrix(&self, name: &str, dims: JsValue) -> Result<WasmBoolMatrix, JsError> {

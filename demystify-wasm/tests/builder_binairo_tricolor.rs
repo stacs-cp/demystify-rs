@@ -187,7 +187,7 @@ fn build_binairo_tricolor(h: i64, w: i64, givens: &[(i64, i64, i64)]) -> WasmPuz
 #[wasm_bindgen_test]
 fn planner_deduces_binairo_tricolor_3x3() {
     let puzzle = build_binairo_tricolor(3, 3, &[(1, 1, 0)]);
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
     let _ = planner.quick_solve().expect("quick_solve");
     assert!(
         planner.is_solved(),

@@ -541,7 +541,24 @@ impl PuzzleBuilder {
         dims: &[RangeInclusive<i64>],
         domain: &[i64],
     ) -> IntMatrix {
-        self.declare_int_matrix(name, dims, domain)
+        self.declare_int_matrix(name, dims, domain, AtomRole::Var)
+    }
+
+    /// Declare a `$#AUX` *multi-valued* matrix over `domain` — the one-hot
+    /// generalisation of [`Self::aux_bool_matrix`].  Cells are usable
+    /// anywhere a [`Self::var_int_matrix`] cell is (in `sum_*` and
+    /// `table` constraints), but the atoms are auxiliary: the SAT solver
+    /// still pins their values, but the planner does not surface them as
+    /// discrete user-facing deduction steps (they're absent from
+    /// `var_lits_*`, so `get_provable_varlits` / `provableLiterals` skip
+    /// them).
+    pub fn aux_int_matrix(
+        &mut self,
+        name: &str,
+        dims: &[RangeInclusive<i64>],
+        domain: &[i64],
+    ) -> IntMatrix {
+        self.declare_int_matrix(name, dims, domain, AtomRole::Aux)
     }
 
     /// Declare a `$#CON` constraint family.  Each atom in the returned
@@ -733,16 +750,19 @@ impl PuzzleBuilder {
         }
     }
 
-    /// One-hot declaration of a `$#VAR` multi-valued matrix.  Mirrors the
-    /// `$#VAR` branch of `finalise()` in `demystify/src/problem/parse.rs`
-    /// for a general (non-boolean) direct encoding: one lit per (cell,
-    /// value), `eq`/`neq` litmap entries, full domainmap, the matching
-    /// var_lits classification, and a structural exactly-one per cell.
+    /// One-hot declaration of a `$#VAR` or `$#AUX` multi-valued matrix.
+    /// Mirrors the `$#VAR` / `$#AUX` branches of `finalise()` in
+    /// `demystify/src/problem/parse.rs` for a general (non-boolean) direct
+    /// encoding: one lit per (cell, value), `eq`/`neq` litmap entries, full
+    /// domainmap, the role-specific var_lits classification, and a
+    /// structural exactly-one per cell.  `role` must be `Var` or `Aux`;
+    /// other roles panic.
     fn declare_int_matrix(
         &mut self,
         name: &str,
         dims: &[RangeInclusive<i64>],
         domain: &[i64],
+        role: AtomRole,
     ) -> IntMatrix {
         self.assert_name_free(name);
         assert!(
@@ -790,12 +810,29 @@ impl PuzzleBuilder {
                 self.litmap.insert(PuzLit::new_neq(vv), !lit);
 
                 // var_lits — the general-domain form of the boolean case in
-                // `declare_matrix`: the `eq` puzlit (sign true) puts `lit`
-                // in positive; the `neq` puzlit (sign false) puts `!lit` in
-                // both positive and negative.
-                self.var_lits_pos.insert(lit);
-                self.var_lits_pos.insert(!lit);
-                self.var_lits_neg.insert(!lit);
+                // `declare_matrix`.
+                match role {
+                    AtomRole::Var => {
+                        // The `eq` puzlit (sign true) puts `lit` in positive;
+                        // the `neq` puzlit (sign false) puts `!lit` in both
+                        // positive and negative.
+                        self.var_lits_pos.insert(lit);
+                        self.var_lits_pos.insert(!lit);
+                        self.var_lits_neg.insert(!lit);
+                    }
+                    AtomRole::Aux => {
+                        // Mirrors finalise() in parse.rs: only the `=v`
+                        // (sign=true) puzlits of a `demystify_*` AUX go to
+                        // `special`; other AUX atoms are absent from
+                        // var_lits entirely.
+                        if name.starts_with("demystify_") {
+                            self.var_lits_special.insert(lit);
+                        }
+                    }
+                    AtomRole::Con | AtomRole::RevealTarget => {
+                        unreachable!("declare_int_matrix only supports Var/Aux roles");
+                    }
+                }
             }
 
             self.domainmap
@@ -808,7 +845,15 @@ impl PuzzleBuilder {
                 .expect("one-hot exactly-one encoding ran out of memory");
         }
 
-        self.var_names.insert(name.to_string());
+        match role {
+            AtomRole::Var => {
+                self.var_names.insert(name.to_string());
+            }
+            AtomRole::Aux => {
+                self.aux_names.insert(name.to_string());
+            }
+            AtomRole::Con | AtomRole::RevealTarget => unreachable!(),
+        }
 
         IntMatrix {
             name: name.to_string(),
@@ -1512,6 +1557,83 @@ mod tests {
         assert!(puzzle.eprime.auxvars.contains("helper"));
         assert!(puzzle.eprime.vars.contains("g"));
         assert!(puzzle.eprime.cons.contains_key("rule"));
+    }
+
+    #[test]
+    fn aux_int_builds_with_table_and_sum() {
+        // An $#AUX int matrix should be registered as an aux var (not a
+        // $#VAR), its cells should be usable in both `table` and `sum_*`
+        // constraints, and its value-lits should be absent from the
+        // var_lits user-facing buckets — same role-semantics as
+        // aux_bool, generalised to multi-valued one-hot.
+        let mut b = PuzzleBuilder::new();
+        let pick = b.var_int_matrix("pick", &[1..=1], &[1, 2, 3]);
+        let aux = b.aux_int_matrix("aux", &[1..=1], &[10, 20, 30]);
+
+        // table: tie aux to pick — only (1,10), (2,20), (3,30) allowed.
+        let bind = b.con_bool("bind");
+        let guard = b.guard(bind, "bind", "pick determines aux").unwrap();
+        let mut forbidden = Vec::new();
+        for p in &[1_i64, 2, 3] {
+            for a in &[10_i64, 20, 30] {
+                if !((*p == 1 && *a == 10) || (*p == 2 && *a == 20) || (*p == 3 && *a == 30)) {
+                    forbidden.push(vec![*p, *a]);
+                }
+            }
+        }
+        b.table(guard, &[pick.cell(&[1]), aux.cell(&[1])], &forbidden)
+            .unwrap();
+
+        // sum_eq over an AUX-int value-lit: pin aux = 20.
+        let pin = b.con_bool("pin");
+        let guard = b.guard(pin, "pin", "aux is 20").unwrap();
+        b.sum_eq(guard, &[aux.cell(&[1]).eq(20)], 1).unwrap();
+
+        // Annotation buckets are role-correct *before* build.
+        assert!(b.aux_names.contains("aux"));
+        assert!(b.var_names.contains("pick"));
+        assert!(!b.var_names.contains("aux"));
+
+        // VAR-int value-lits land in var_lits_pos; AUX-int ones do not.
+        let pick_eq_2 =
+            b.litmap[&PuzLit::new_eq(VarValPair::new(&PuzVar::new("pick", vec![1]), 2))];
+        let aux_eq_20 =
+            b.litmap[&PuzLit::new_eq(VarValPair::new(&PuzVar::new("aux", vec![1]), 20))];
+        assert!(b.var_lits_pos.contains(&pick_eq_2));
+        assert!(!b.var_lits_pos.contains(&aux_eq_20));
+        assert!(!b.var_lits_neg.contains(&aux_eq_20));
+        assert!(!b.var_lits_special.contains(&aux_eq_20));
+
+        let puzzle = b.build().unwrap();
+        assert!(puzzle.eprime.auxvars.contains("aux"));
+        assert!(puzzle.eprime.vars.contains("pick"));
+        assert!(!puzzle.eprime.vars.contains("aux"));
+    }
+
+    #[test]
+    fn aux_int_demystify_prefix_goes_to_special() {
+        // The `demystify_*` reserved namespace: AUX-int matrices with
+        // that prefix should put their `=v` lits in var_lits_special
+        // (mirroring the bool-AUX rule).
+        let mut b = PuzzleBuilder::new();
+        let v = b.var_bool_matrix("g", &[1..=1]);
+        let special = b.aux_int_matrix("demystify_score", &[1..=1], &[0, 1]);
+
+        // Use both vars in one constraint so build() is happy.
+        let rule = b.con_bool("rule");
+        let guard = b.guard(rule, "rule", "g[1] or score=1").unwrap();
+        b.sum_ge(guard, &[v.get(&[1]).pos(), special.cell(&[1]).eq(1)], 1)
+            .unwrap();
+
+        let score_eq_1 =
+            b.litmap[&PuzLit::new_eq(VarValPair::new(&PuzVar::new("demystify_score", vec![1]), 1))];
+        let score_eq_0 =
+            b.litmap[&PuzLit::new_eq(VarValPair::new(&PuzVar::new("demystify_score", vec![1]), 0))];
+        // The two `=v` value-lits go to special; nothing in pos/neg.
+        assert!(b.var_lits_special.contains(&score_eq_1));
+        assert!(b.var_lits_special.contains(&score_eq_0));
+        assert!(!b.var_lits_pos.contains(&score_eq_1));
+        assert!(!b.var_lits_pos.contains(&score_eq_0));
     }
 
     #[test]

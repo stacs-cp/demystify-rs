@@ -156,7 +156,7 @@ fn builder_produces_three_con_families() {
 #[wasm_bindgen_test]
 fn planner_deduces_full_solution() {
     let puzzle = build_sudoku_4x4();
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
     let _ = planner.quick_solve().expect("quick_solve");
 
     let known: Vec<String> = from_value(planner.known_literals().expect("known_literals"))

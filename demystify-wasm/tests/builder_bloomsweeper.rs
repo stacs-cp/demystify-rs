@@ -171,7 +171,7 @@ fn build_puzzle() -> WasmPuzzle {
 #[wasm_bindgen_test]
 fn difficulties_populated_on_bloomsweeper_tutorial() {
     let puzzle = build_puzzle();
-    let planner = WasmPlanner::new(&puzzle).expect("planner");
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
 
     let provable = planner.num_provable();
     assert!(provable > 0, "puzzle should have provable lits");
