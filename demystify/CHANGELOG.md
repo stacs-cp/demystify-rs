@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.2.0...demystify-v0.3.0) - 2026-06-05
+
+### Added
+
+- Persistent, multi-process parse cache: Conjure/Savile Row output is cached
+  (keyed by the model + param contents and the Conjure, Savile Row and
+  demystify versions) so re-running the same puzzle skips compilation. On by
+  default; controlled by the `DEMYSTIFY_PARSE_CACHE` environment variable
+  (a directory to relocate it, or `off` to disable).
+- Declared a minimum supported Rust version (`rust-version = "1.94.1"`).
+
+### Fixed
+
+- The annotation parser no longer panics with an index-out-of-bounds on a
+  malformed `$#VAR` / `$#PUZZLE` / `$#AUX` / `$#KIND` line; it reports a clear
+  error instead.
+- A multi-word `$#KIND` (e.g. `Jigsaw Sudoku`) is no longer silently truncated
+  to its first word.
+- `demystify.trace` is now created only when `--trace` is passed, instead of
+  leaving an empty file in the working directory on every run.
+
 ## [0.2.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.1.3...demystify-v0.2.0) - 2026-04-04
 
 ### Added

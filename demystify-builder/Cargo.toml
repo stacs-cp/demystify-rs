@@ -8,13 +8,13 @@ repository = "https://github.com/stacs-cp/demystify-rs"
 publish = false
 
 [dependencies]
-demystify = { path = "../demystify", version = "0.2" }
+demystify = { path = "../demystify", version = "0.3" }
 rustsat = { version = "0.7", features = ["ipasir-display"] }
 anyhow = "1"
 thiserror = "2"
 
 [dev-dependencies]
-demystify = { path = "../demystify", version = "0.2", features = ["deterministic"] }
+demystify = { path = "../demystify", version = "0.3", features = ["deterministic"] }
 rustsat-batsat = "0.7"
 rand = "0.10"
 rand_chacha = "0.10"
