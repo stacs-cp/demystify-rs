@@ -21,19 +21,22 @@ struct Opt {
 fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
 
-    let (non_block, _guard) = tracing_appender::non_blocking(File::create("demystify.trace")?);
-
-    if opt.trace {
+    // Only open the trace file when --trace is given, so an ordinary run
+    // doesn't leave an empty demystify.trace in the working directory. The
+    // flush guard is held until the end of main.
+    let _trace_guard = if opt.trace {
+        let (non_block, guard) = tracing_appender::non_blocking(File::create("demystify.trace")?);
         tracing_subscriber::fmt()
             .with_span_events(FmtSpan::ACTIVE)
             .with_max_level(Level::TRACE)
-            //.with_env_filter("trace,tracer=off")
             .with_ansi(false)
             .without_time()
-            //.pretty()
             .with_writer(non_block)
             .init();
-    }
+        Some(guard)
+    } else {
+        None
+    };
 
     let file = File::open(&opt.puzzle)?;
     let problem: Problem = serde_json::from_reader(file)?;

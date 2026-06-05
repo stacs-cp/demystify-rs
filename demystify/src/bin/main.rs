@@ -189,7 +189,11 @@ fn main() -> anyhow::Result<()> {
         );
     }
 
-    let (non_block, _guard) = tracing_appender::non_blocking(File::create("demystify.trace")?);
+    // The trace file is only opened inside the `--trace` branch below, so an
+    // ordinary run doesn't leave an empty demystify.trace in the working
+    // directory. The non-blocking writer's flush guard is held here for the
+    // lifetime of the program.
+    let mut _trace_guard = None;
 
     // Choose how we run conjure, native, docker or podman
     if let Some(method) = opt.conjure {
@@ -205,6 +209,9 @@ fn main() -> anyhow::Result<()> {
     // implicitly enabled on stderr.
     {
         let trace_layer = if opt.trace {
+            let (non_block, guard) =
+                tracing_appender::non_blocking(File::create("demystify.trace")?);
+            _trace_guard = Some(guard);
             Some(
                 tracing_subscriber::fmt::layer()
                     .with_span_events(FmtSpan::ACTIVE)
