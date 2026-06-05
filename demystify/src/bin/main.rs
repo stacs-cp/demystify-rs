@@ -135,8 +135,8 @@ struct Opt {
 
     #[arg(
         long,
-        default_value_t = 100,
-        help = "Per-SAT-call conflict limit (0 = no limit). Default 100."
+        default_value_t = 1000,
+        help = "Per-SAT-call conflict limit (0 = no limit). Default 1000."
     )]
     conflict_limit: i64,
 

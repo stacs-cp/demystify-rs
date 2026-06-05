@@ -193,7 +193,7 @@ pub struct SatCore {
 // Solvers can sometimes time out, so we add a conflict limit.
 // We also set a 'counter', which checks if the solver is frequently hitting it's limit, if so
 // we increase the limit
-static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(100);
+static CONFLICT_LIMIT: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1000);
 /// Upper bound on the auto-ramp conflict limit — prevents overflow on very long runs.
 const MAX_CONFLICT_LIMIT: i64 = 100_000_000;
 /// Number of limited SAT calls since the last ramp check.
@@ -201,7 +201,7 @@ static LIMITED_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI6
 /// Number of interrupted calls since the last ramp check.
 static LIMITED_INTERRUPTED: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 /// Warmup period: wait this many limited calls before checking the interrupt ratio.
-const RAMP_WARMUP: i64 = 100;
+const RAMP_WARMUP: i64 = 50;
 /// If the interrupt ratio exceeds this threshold, multiply the limit by 10.
 const RAMP_THRESHOLD: f64 = 0.10;
 static SOLVER_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);

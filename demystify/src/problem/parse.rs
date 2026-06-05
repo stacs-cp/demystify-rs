@@ -1305,7 +1305,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
             } else if line.starts_with("$#CON") {
                 info!(target: "parser", "{}", line);
                 let captures = conmatch
-                    .captures(&line)
+                    .captures(line)
                     .context(format!("Malformed $#CON line: {line}"))?;
 
                 let con_name = captures.get(1).unwrap().as_str().to_string();
@@ -2360,7 +2360,11 @@ mod tests {
             .unwrap();
         writeln!(temp_file, "$#VAR x").unwrap();
         writeln!(temp_file, "$#CON real_con \"a real constraint\"").unwrap();
-        writeln!(temp_file, "$ split out as a $#CON so demystify can reason with it").unwrap();
+        writeln!(
+            temp_file,
+            "$ split out as a $#CON so demystify can reason with it"
+        )
+        .unwrap();
         writeln!(temp_file, "$ see the $#VAR and $#AUX notes above").unwrap();
 
         let path = temp_file.path().to_path_buf();
@@ -2388,8 +2392,7 @@ mod tests {
         writeln!(temp_file, "\t$#CON indented_con \"an indented constraint\"").unwrap();
 
         let path = temp_file.path().to_path_buf();
-        let parsed = super::parse_eprime_file(&path)
-            .expect("indented annotations must parse");
+        let parsed = super::parse_eprime_file(&path).expect("indented annotations must parse");
 
         assert!(parsed.vars.contains("y"));
         assert!(parsed.cons.contains_key("indented_con"));
