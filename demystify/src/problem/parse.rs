@@ -1769,7 +1769,8 @@ pub fn parse_essence(eprimein: &PathBuf, eprimeparamin: &PathBuf) -> anyhow::Res
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_ascii_lowercase();
-    let cache_key = parse_cache::cache_key(&model_bytes, &param_bytes, &model_ext);
+    parse_cache::log_status();
+    let cache_key = parse_cache::cache_key(&model_bytes, &param_bytes, &model_ext)?;
 
     if let Some(puzzle) = parse_cache::try_load(&cache_key)? {
         let secs = t_total.elapsed().as_secs_f64();

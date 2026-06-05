@@ -28,7 +28,13 @@ use tracing_subscriber::prelude::*;
                   Performance: --searches, --conflict-limit, --conjure\n  \
                   Persistence: --save-parsed, --load-parsed, --pin-assignment\n  \
                   Logging:     --trace, --log, --quiet, --verbose\n  \
-                  Database:    --strategy-db"
+                  Database:    --strategy-db\n\n\
+                  Environment:\n  \
+                  DEMYSTIFY_PARSE_CACHE  Parsed puzzles are cached (keyed by model+param\n                         \
+                         content and tool/library versions) to skip Conjure/Savile\n                         \
+                         Row on repeat runs. Default: a SQLite DB under the OS temp\n                         \
+                         dir. Set to a directory to relocate it, or to `off` to\n                         \
+                         disable."
 )]
 struct Opt {
     #[arg(

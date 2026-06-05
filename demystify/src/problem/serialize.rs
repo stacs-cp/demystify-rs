@@ -444,6 +444,24 @@ mod tests {
     }
 
     #[test]
+    fn test_json_bytes_roundtrip() {
+        // The parse cache serialises via `to_json_bytes` and reloads via
+        // `from_json_bytes`; check that round-trip preserves the parse.
+        let original = build_puzzleparse("./tst/little1.eprime", "./tst/little1.param");
+
+        let bytes = original.to_json_bytes().unwrap();
+        let loaded = PuzzleParse::from_json_bytes(&bytes).unwrap();
+
+        assert_eq!(original.eprime.vars, loaded.eprime.vars);
+        assert_eq!(original.eprime.auxvars, loaded.eprime.auxvars);
+        assert_eq!(original.eprime.cons, loaded.eprime.cons);
+        assert_eq!(original.eprime.kind, loaded.eprime.kind);
+        assert_eq!(original.direct, loaded.direct);
+        assert_eq!(original.constraints, loaded.constraints);
+        assert_eq!(original.var_lits, loaded.var_lits);
+    }
+
+    #[test]
     fn test_serialize_roundtrip_binairo() {
         let original = build_puzzleparse("./tst/binairo.eprime", "./tst/binairo-1.param");
 

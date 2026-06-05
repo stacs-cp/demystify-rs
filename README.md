@@ -53,6 +53,20 @@ cargo run --bin demystify --release -- --model eprime/sudoku.eprime --param epri
 
 After running this command, open `sudoku.html` in your web browser to view the solution and its detailed explanation.
 
+## Parse cache
+
+Compiling a model with Conjure/Savile Row is the slow part of loading a puzzle (seconds to tens of seconds on large instances). `demystify` caches the parsed result so that re-running the same model + parameter file — for example when generating many instances of one puzzle — skips that step.
+
+The cache is **on by default** and needs no flags. It is keyed by the contents of the model and parameter files together with the Conjure, Savile Row, and `demystify` versions, so a cached entry is only ever reused when it would reproduce a fresh parse exactly.
+
+It is controlled by the `DEMYSTIFY_PARSE_CACHE` environment variable:
+
+* **unset** — cache in a SQLite database under the OS temporary directory (`<temp>/demystify-parse-cache/parse.sqlite`). This is fine to lose; it is rebuilt on demand.
+* **a directory path** — store the cache there instead (the database is `<dir>/parse.sqlite`).
+* **`off`** — disable caching entirely.
+
+The cache is safe to share between processes running at the same time. To see where it lives, run with `--log progress`.
+
 ## Development Status
 
 Please note that `demystify` is a work in progress. Some features are currently only half-completed and may be subject to changes. Your feedback and contributions are welcome to help improve the project.

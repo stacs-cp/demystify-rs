@@ -79,23 +79,34 @@ fn cache_db_path() -> Option<PathBuf> {
     Some(dir.join("parse.sqlite"))
 }
 
-/// External-tool versions, probed once per process.
-fn tool_versions() -> &'static (String, String) {
+/// External-tool versions, probed once per process. Fallible: a missing or
+/// broken Conjure/Savile Row yields a clean error rather than a panic.
+fn tool_versions() -> Result<&'static (String, String)> {
     static VERSIONS: OnceLock<(String, String)> = OnceLock::new();
-    VERSIONS.get_or_init(|| {
+    if VERSIONS.get().is_none() {
+        // `OnceLock` has no stable fallible initialiser, so probe into a local
+        // first. A concurrent racer that wins `set` is harmless — the version
+        // strings are identical, so we just drop ours.
         let sr = ProgramRunner::get_savilerow_version()
-            .expect("parse cache: failed to read Savile Row version");
+            .map_err(|e| anyhow::anyhow!("parse cache: reading Savile Row version: {e}"))?;
         let conjure = ProgramRunner::get_conjure_version()
-            .expect("parse cache: failed to read Conjure version");
-        (sr, conjure)
-    })
+            .map_err(|e| anyhow::anyhow!("parse cache: reading Conjure version: {e}"))?;
+        let _ = VERSIONS.set((sr, conjure));
+    }
+    Ok(VERSIONS.get().expect("just initialised"))
 }
 
-/// Compute the cache key for a model/param pair.
-pub fn cache_key(model_bytes: &[u8], param_bytes: &[u8], model_ext: &str) -> String {
-    let (sr_ver, conjure_ver) = tool_versions();
-    let src_hash = env!("DEMYSTIFY_SRC_HASH");
-
+/// Combine the key components into a stable hex digest. Pure (no I/O) so it can
+/// be unit-tested for determinism and field-sensitivity. Each field is
+/// length-delimited so distinct (label, content) splits cannot alias.
+fn hash_key(
+    src_hash: &str,
+    sr_ver: &str,
+    conjure_ver: &str,
+    model_ext: &str,
+    model_bytes: &[u8],
+    param_bytes: &[u8],
+) -> String {
     let mut h = Sha256::new();
     let mut field = |label: &str, bytes: &[u8]| {
         h.update(label.as_bytes());
@@ -110,6 +121,19 @@ pub fn cache_key(model_bytes: &[u8], param_bytes: &[u8], model_ext: &str) -> Str
     field("param", param_bytes);
 
     format!("{CACHE_VERSION}-{:x}", h.finalize())
+}
+
+/// Compute the cache key for a model/param pair.
+pub fn cache_key(model_bytes: &[u8], param_bytes: &[u8], model_ext: &str) -> Result<String> {
+    let (sr_ver, conjure_ver) = tool_versions()?;
+    Ok(hash_key(
+        env!("DEMYSTIFY_SRC_HASH"),
+        sr_ver,
+        conjure_ver,
+        model_ext,
+        model_bytes,
+        param_bytes,
+    ))
 }
 
 /// Open the cache store, creating its directory if necessary.
@@ -161,15 +185,77 @@ pub fn store(key: &str, puzzle: &PuzzleParse) -> Result<()> {
     Ok(())
 }
 
-/// Whether caching is currently enabled (for logging/diagnostics).
-pub fn is_enabled() -> bool {
-    cache_db_path().is_some()
-}
-
-/// Emit a one-line note about cache configuration the first time it matters.
+/// Emit a one-line note about where the cache lives (or that it is disabled).
+/// Logged on the `progress` target, so visible with `--log progress`/`--trace`.
 pub fn log_status() {
     match cache_db_path() {
         Some(p) => info!(target: "progress", "parse cache enabled at {p:?}"),
         None => warn!(target: "progress", "parse cache disabled (DEMYSTIFY_PARSE_CACHE=off)"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::hash_key;
+
+    fn key(ext: &str, model: &[u8], param: &[u8]) -> String {
+        hash_key("srchash", "sr-1.10", "conjure-2.5", ext, model, param)
+    }
+
+    #[test]
+    fn key_is_deterministic() {
+        assert_eq!(
+            key("eprime", b"model", b"param"),
+            key("eprime", b"model", b"param")
+        );
+    }
+
+    #[test]
+    fn key_changes_with_every_field() {
+        let base = key("eprime", b"model", b"param");
+        // Each component must influence the key.
+        assert_ne!(
+            base,
+            hash_key(
+                "OTHER",
+                "sr-1.10",
+                "conjure-2.5",
+                "eprime",
+                b"model",
+                b"param"
+            )
+        );
+        assert_ne!(
+            base,
+            hash_key(
+                "srchash",
+                "sr-9.99",
+                "conjure-2.5",
+                "eprime",
+                b"model",
+                b"param"
+            )
+        );
+        assert_ne!(
+            base,
+            hash_key(
+                "srchash",
+                "sr-1.10",
+                "conjure-9.9",
+                "eprime",
+                b"model",
+                b"param"
+            )
+        );
+        assert_ne!(base, key("essence", b"model", b"param"));
+        assert_ne!(base, key("eprime", b"MODEL", b"param"));
+        assert_ne!(base, key("eprime", b"model", b"PARAM"));
+    }
+
+    #[test]
+    fn key_fields_are_length_delimited() {
+        // Moving a byte across the model/param boundary must change the key,
+        // i.e. the fields cannot be silently concatenated.
+        assert_ne!(key("eprime", b"ab", b"c"), key("eprime", b"a", b"bc"));
     }
 }
