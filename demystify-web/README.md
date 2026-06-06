@@ -4,7 +4,7 @@
 
 ## Overview
 
-This package offers a convenient web-based frontend to the core `demystify` solver. If you're looking for low-level access to the solving engine, please install the main [`demystify`](https://github.com/stacs-cp/demystify) package instead.
+This package offers a web-based frontend to the core `demystify` solver. If you want low-level access to the solving engine, use the main [`demystify`](https://github.com/stacs-cp/demystify-rs) package instead.
 
 ## Installation
 
@@ -20,7 +20,7 @@ The web interface will automatically handle the installation of `conjure` (via D
 1. Clone the repository:
    ```sh
    git clone https://github.com/stacs-cp/demystify-rs
-   cd demystify-web
+   cd demystify-rs
    ```
 
 ## Running the Web Interface
@@ -49,12 +49,8 @@ Note: The first test run may take longer if Docker/Podman needs to download the 
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open issues and submit pull requests on the [GitHub repository](https://github.com/stacs-cp/demystify-rs).
+Contributions are welcome. Feel free to open issues and submit pull requests on the [GitHub repository](https://github.com/stacs-cp/demystify-rs).
 
 ## License
 
-Licensed under the MPL 2.0 License. See the `LICENSE` file for details.
-
----
-
-Happy puzzling through the web interface!
+Licensed under the MPL 2.0 License. See the `LICENSE.txt` file for details.

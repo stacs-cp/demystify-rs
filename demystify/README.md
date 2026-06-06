@@ -5,7 +5,7 @@
 ## Installation
 
 
-`demystify` requires `conjure`, a tool for constraint satisfaction and optimization problems. There are 2 ways to run conjure:
+`demystify` requires `conjure`, a tool for constraint satisfaction and optimisation problems. There are 2 ways to run conjure:
 
 * Follow the instructions on the [Conjure GitHub page](https://www.github.com/conjure-cp/conjure) to install `conjure`.
 * If you have docker, or podman, installed then if `conjure` isn't in your path it will be automatically downloaded via docker/podman. On **windows**, you must use docker.
@@ -25,7 +25,7 @@ Once `conjure` and `rust` are installed, you can proceed to set up `demystify`.
 
 ## Testing your installation
 
-If you want to test demystify is working correctly, run it's tests:
+If you want to test demystify is working correctly, run its tests:
 
 ```sh
 cargo test --workspace
@@ -41,7 +41,7 @@ The easiest way to get started with `demystify` is with the web interface. This 
 cargo run --release --bin demystify-web
 ```
 
-The go to the webpage it mentions (usually `https://localhost:8008` )
+Then go to the webpage it mentions (usually `http://localhost:8008` )
 
 ## Quick Start
 
@@ -69,7 +69,7 @@ The cache is safe to share between processes running at the same time. To see wh
 
 ## Development Status
 
-Please note that `demystify` is a work in progress. Some features are currently only half-completed and may be subject to changes. Your feedback and contributions are welcome to help improve the project.
+Please note that `demystify` is a work in progress. Some features are only half-completed and may change.
 
 ## Contributing
 
@@ -78,7 +78,3 @@ Contributions to `demystify` are welcome. Feel free to open issues and submit pu
 ## License
 
 `demystify` is licensed under the MPL 2.0 License. See the `LICENSE.txt` file for more details.
-
----
-
-Happy puzzling!

@@ -15,13 +15,13 @@
 //!
 //! ## Architecture
 //!
-//! The library is organized into several modules:
+//! The library is organised into several modules:
 //!
 //! - [`problem`] - Core data structures and solving logic
 //!   - [`problem::parse`] - Parsing Essence Prime and DIMACS files
 //!   - [`problem::solver`] - SAT solving and MUS computation
 //!   - [`problem::planner`] - Step-by-step solution planning
-//!   - [`problem::serialize`] - JSON serialization for pre-parsed puzzles
+//!   - [`problem::serialize`] - JSON serialisation for pre-parsed puzzles
 //! - [`satcore`] - Low-level SAT solver wrapper (rustsat-glucose, rustsat-cadical, rustsat-batsat; wasm32 uses BatSat only)
 //! - [`json`] - JSON puzzle representation utilities
 //! - [`web`] - SVG/HTML output generation
@@ -87,7 +87,7 @@
 //! - Futoshiki
 //! - And many more...
 //!
-//! ## Example: Analyzing Solution Difficulty
+//! ## Example: Analysing Solution Difficulty
 //!
 //! ```rust,no_run
 //! use demystify::problem::parse::PuzzleParse;
@@ -113,7 +113,7 @@
 //! - **Incremental solving**: Efficiently reuses SAT solver state
 //! - **Parallel MUS computation**: Uses rayon for parallel constraint analysis
 //! - **Multiple MUS algorithms**: `Quick`, `Slice`, `Cake`, and `Dynamic` (the default); see [`problem::solver::Strategy`]
-//! - **Serialization**: Save/load parsed puzzles as JSON for fast startup
+//! - **Serialisation**: Save/load parsed puzzles as JSON for fast startup
 //! - **HTML/SVG output**: Generate visual step-by-step explanations
 
 // The Conjure/Savile-Row parsing pipeline is compiled out on wasm32 (which
