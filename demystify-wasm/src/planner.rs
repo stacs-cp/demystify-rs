@@ -89,12 +89,18 @@ struct MusPayload {
 }
 
 /// Result of [`WasmPlanner::check_uniqueness`].  The tag/field names
-/// are the JS-facing shape: `{status: "unsolvable" | "unique" | "multiple", unfixedVars?: [...]}`.
+/// are the JS-facing shape:
+/// `{status: "unsolvable" | "unique" | "multiple", solution?: [...], unfixedVars?: [...]}`.
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
 enum SolvabilityPayload {
     Unsolvable,
-    Unique,
+    Unique {
+        /// The unique solution, as `var=val` strings (one per assigned
+        /// puzzle literal), in the same `format_puzlit` form as
+        /// [`WasmPlanner::provable_literals`].
+        solution: Vec<String>,
+    },
     Multiple {
         #[serde(rename = "unfixedVars")]
         unfixed_vars: Vec<String>,
@@ -204,7 +210,8 @@ impl WasmPlanner {
     /// the caller's state) and returns one of:
     ///
     /// - `{status: "unsolvable"}` — no satisfying assignment exists.
-    /// - `{status: "unique"}` — exactly one solution.
+    /// - `{status: "unique", solution: ["grid[1,1]=5", ...]}` — exactly
+    ///   one solution; `solution` lists every assigned puzzle literal.
     /// - `{status: "multiple", unfixedVars: ["grid[2,3]", ...]}` —
     ///   multiple solutions; `unfixedVars` lists the puzzle variables
     ///   whose value is not pinned by the current clues.
@@ -216,7 +223,22 @@ impl WasmPlanner {
         let mut planner: PuzzlePlanner = self.inner.lock().unwrap().clone();
         let payload = match planner.check_solvability() {
             None => SolvabilityPayload::Unsolvable,
-            Some(0) => SolvabilityPayload::Unique,
+            Some(0) => {
+                // check_solvability propagated to a fixed point, so every
+                // puzzle variable is now fixed.  The solution is each
+                // positive var-lit that ended up known-true.
+                let known: std::collections::HashSet<_> =
+                    planner.get_all_known_lits().iter().copied().collect();
+                let mut solution = Vec::new();
+                for lit in planner.puzzle().var_lits.positive() {
+                    if known.contains(lit) {
+                        for puzlit in planner.puzzle().lit_to_vars(lit) {
+                            solution.push(format_puzlit(puzlit));
+                        }
+                    }
+                }
+                SolvabilityPayload::Unique { solution }
+            }
             Some(_) => {
                 let vars = planner.unsolved_vars_after_solve();
                 let unfixed_vars = vars.iter().map(format_puzvar).collect();
