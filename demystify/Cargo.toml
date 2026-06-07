@@ -1,6 +1,6 @@
 [package]
 name = "demystify"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.94.1"
 description = "A constraint solving tool for explaining puzzles"

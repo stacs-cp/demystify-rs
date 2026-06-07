@@ -11,7 +11,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-demystify = { path = "../demystify", version = "0.3.0" }
+demystify = { path = "../demystify", version = "0.3.1" }
 demystify-builder = { path = "../demystify-builder", version = "0.1.0" }
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"

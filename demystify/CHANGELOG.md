@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.3.0...demystify-v0.3.1) - 2026-06-07
+
+### Other
+
+- Fix doc errors and tidy README prose
+- Replace crate-wide allow(dead_code) with scoped exemptions
+
 ## [0.3.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.2.0...demystify-v0.3.0) - 2026-06-05
 
 ### Added

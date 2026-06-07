@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-web-v0.1.4...demystify-web-v0.2.0) - 2026-06-07
+
+### Other
+
+- Fix doc errors and tidy README prose
+- Release demystify 0.3.0
+- Fix README errors, declare MSRV, mark demystify-lua unpublishable
+- Delete orphan inspector templates and their dead CSS section
+- Share strategy-DB loading across binaries
+- fix coldown direction in thermometer game level
+- Merge branch 'demystify-game'
+- Add hide_untouched_candidates option to JSON renderer
+- Extend $#SHOW with renderer roles, drop magic-name fallbacks
+- Add $#SHOW <var> <role> directive for renderer variable selection
+- Move SessionSnapshot from demystify-web to demystify::snapshot
+- Add named-strategy recognition for MUSes
+- Add session export/import for sharing solve states
+- Bundle htmx, D3.js, and fonts for fully offline operation
+- Add step history with undo via PuzzlePlanner forking
+- Add solve tree web page using session puzzle
+- Add 'explore' mode to the GUI
+- Update gui
+
 ## [0.1.4](https://github.com/stacs-cp/demystify-rs/compare/demystify-web-v0.1.3...demystify-web-v0.1.4) - 2026-04-04
 
 ### Added
