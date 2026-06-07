@@ -775,7 +775,16 @@ impl Problem {
         deduced_lits: &BTreeSet<PuzLit>,
         comments: &str,
     ) -> anyhow::Result<Problem> {
-        Self::new_from_puzzle_and_mus(solver, tosolve, known, deduced_lits, &[], comments, false)
+        Self::new_from_puzzle_and_mus(
+            solver,
+            tosolve,
+            known,
+            deduced_lits,
+            &[],
+            comments,
+            false,
+            true,
+        )
     }
 
     /// `hide_untouched_candidates`: when true, cells that have no known
@@ -786,6 +795,12 @@ impl Problem {
     /// candidate value the planner could in principle deduce.  The
     /// interactive GUI keeps the default (false) so it still has clickable
     /// candidate lits in every cell.
+    /// `draw_constraint_shapes`: when false, the per-constraint scope overlays
+    /// (the Row/Col/Pair/Region lines) are omitted while the literals involved
+    /// are still tinted (`highlight_conN`) and marked. Used for merged steps,
+    /// where drawing a line per constraint across dozens of deductions buries
+    /// the grid.
+    #[allow(clippy::too_many_arguments)]
     pub fn new_from_puzzle_and_mus(
         solver: &PuzzleSolver,
         tosolve: &BTreeSet<VarValPair>,
@@ -794,6 +809,7 @@ impl Problem {
         deduction_list: &[DescriptionStatement],
         comments: &str,
         hide_untouched_candidates: bool,
+        draw_constraint_shapes: bool,
     ) -> anyhow::Result<Problem> {
         let puzzle = Puzzle::new_from_puzzle_and_known(solver.puzzleparse(), known)?;
 
@@ -961,7 +977,13 @@ impl Problem {
             }
         }
 
-        let constraint_shapes = build_constraint_shapes(solver, &constraint_num, &allowed_names);
+        // Merged steps suppress the per-constraint overlays (too many lines);
+        // the literals stay tinted via the `highlight_conN` tags above.
+        let constraint_shapes = if draw_constraint_shapes {
+            build_constraint_shapes(solver, &constraint_num, &allowed_names)
+        } else {
+            Vec::new()
+        };
 
         // Cells with no knowledge_grid entry and no start_grid value
         // render as "?" (only meaningful when hide_untouched_candidates

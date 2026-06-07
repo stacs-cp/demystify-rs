@@ -1210,6 +1210,10 @@ impl PuzzlePlanner {
                 .cloned()
                 .collect();
 
+            // Draw the per-constraint overlays only for a single MUS; a merged
+            // step (many MUSes) would stack a line per constraint and bury the
+            // grid, so we suppress the lines and keep just the literal tinting.
+            let draw_shapes = base_muses.len() <= 1;
             let problem = Problem::new_from_puzzle_and_mus(
                 &self.psolve,
                 &tosolve_varvals,
@@ -1218,6 +1222,7 @@ impl PuzzlePlanner {
                 &description_list,
                 &pre_string,
                 false,
+                draw_shapes,
             )
             .expect("Cannot make puzzle json");
 
@@ -1314,6 +1319,7 @@ impl PuzzlePlanner {
             &description_list,
             &pre_string,
             false,
+            true,
         )
         .expect("Cannot make puzzle json")
     }
