@@ -86,7 +86,11 @@ fn fix_literal_advances_known_set() {
 
     let known_before: Vec<String> =
         from_value(planner.known_literals().expect("known_literals")).expect("deserialise known");
-    assert!(planner.fix_literal(&first), "fix_literal should succeed");
+    // Whitespace-insensitive: a spaced form of the literal must still resolve.
+    let spaced = first.replace('=', " = ");
+    planner
+        .fix_literal(&spaced)
+        .expect("fix_literal should succeed");
     let known_after: Vec<String> =
         from_value(planner.known_literals().expect("known_literals")).expect("deserialise known");
 
@@ -97,6 +101,13 @@ fn fix_literal_advances_known_set() {
     assert!(
         known_after.iter().any(|k| k == &first),
         "fixed literal should now appear in known_literals: {first}"
+    );
+
+    // A literal that names no puzzle variable is a loud error, not a silent
+    // no-op.
+    assert!(
+        planner.fix_literal("nope[9]=9").is_err(),
+        "fixing an unknown literal must error"
     );
 }
 

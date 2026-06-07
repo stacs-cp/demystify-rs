@@ -114,9 +114,19 @@ enum SolvabilityPayload {
     },
 }
 
+/// Normalise a literal string for matching by dropping all whitespace, so
+/// callers needn't reproduce `format_puzlit`'s exact spacing: `grid[1,1]=5`,
+/// `grid[1, 1]=5`, and `grid[1, 1] = 5` all match the canonical form.  This
+/// is collision-free because two distinct puzzle literals never differ only
+/// in whitespace (variable names are alphanumeric).
+fn lit_match_key(s: &str) -> String {
+    s.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
 /// Pin each `var=val` / `var!=val` string in `lits` onto `planner` as an
-/// assumption (a not-required-to-be-proven known lit).  Returns an error
-/// naming the first string that doesn't resolve to a known puzzle literal.
+/// assumption (a not-required-to-be-proven known lit).  Whitespace-tolerant.
+/// Returns an error naming the first string that doesn't resolve to a known
+/// puzzle literal.
 fn apply_assumptions(planner: &mut PuzzlePlanner, lits: &[String]) -> Result<(), String> {
     if lits.is_empty() {
         return Ok(());
@@ -126,10 +136,10 @@ fn apply_assumptions(planner: &mut PuzzlePlanner, lits: &[String]) -> Result<(),
         .direct
         .litmap
         .iter()
-        .map(|(puzlit, sat_lit)| (format_puzlit(puzlit), *sat_lit))
+        .map(|(puzlit, sat_lit)| (lit_match_key(&format_puzlit(puzlit)), *sat_lit))
         .collect();
     for s in lits {
-        match lookup.get(s) {
+        match lookup.get(&lit_match_key(s)) {
             Some(lit) => planner.mark_lit_as_fixed(lit),
             None => return Err(format!("unknown literal: {s}")),
         }
@@ -275,8 +285,9 @@ impl WasmPlanner {
     /// assignment.
     ///
     /// `literals` is an optional JS array of `var=val` / `var!=val` strings
-    /// (the same form [`Self::provable_literals`] emits); pass `null`,
-    /// `undefined`, or `[]` for none. Each is pinned as an assumption before
+    /// (the same form [`Self::provable_literals`] emits, but
+    /// whitespace-insensitive — `grid[1,1]=5` and `grid[1, 1] = 5` both work);
+    /// pass `null`, `undefined`, or `[]` for none. Each is pinned before
     /// solving, so the call doubles as "is this partial assignment solvable,
     /// and what does it force?". It runs on a *cloned* planner, so the
     /// caller's state is untouched. Returns one of:
@@ -307,59 +318,44 @@ impl WasmPlanner {
         to_js(&payload).map_err(Into::into)
     }
 
-    /// Mark a literal as deduced. Returns true if the literal was found, false
-    /// otherwise. Matches `LuaPlanner::fix_literal`.
+    /// Mark a literal as deduced, given as a `var=val` / `var!=val` string
+    /// (whitespace-insensitive). Throws if the string doesn't name a puzzle
+    /// literal, or if its variable can't be fixed. Matches
+    /// `LuaPlanner::fix_literal`.
     #[wasm_bindgen(js_name = fixLiteral)]
-    pub fn fix_literal(&self, lit_str: &str) -> bool {
+    pub fn fix_literal(&self, lit_str: &str) -> Result<(), JsError> {
         let mut planner = self.inner.lock().unwrap();
-        let provable = planner.get_provable_varlits();
-
-        for lit in &provable {
-            for puzlit in planner.puzzle().lit_to_vars(lit) {
-                if format_puzlit(puzlit) == lit_str {
-                    if planner
-                        .puzzle()
-                        .check_fixable_var(puzlit.var().name())
-                        .is_err()
-                    {
-                        return false;
-                    }
-                    let lit_copy = *lit;
-                    planner.mark_lit_as_fixed(&lit_copy);
-                    return true;
-                }
-            }
-        }
-
+        let key = lit_match_key(lit_str);
         let matching = {
             let mut found = None;
             for (puzlit, sat_lit) in planner.puzzle().direct.litmap.iter() {
-                if format_puzlit(puzlit) == lit_str {
+                if lit_match_key(&format_puzlit(puzlit)) == key {
                     found = Some((*sat_lit, puzlit.var().name().clone()));
                     break;
                 }
             }
             found
         };
-
-        if let Some((lit, var_name)) = matching {
-            if planner.puzzle().check_fixable_var(&var_name).is_err() {
-                return false;
-            }
-            planner.mark_lit_as_fixed(&lit);
-            return true;
+        let (lit, var_name) =
+            matching.ok_or_else(|| JsError::new(&format!("unknown literal: {lit_str}")))?;
+        if let Err(reason) = planner.puzzle().check_fixable_var(&var_name) {
+            return Err(JsError::new(&format!("cannot fix {lit_str}: {reason}")));
         }
-        false
+        planner.mark_lit_as_fixed(&lit);
+        Ok(())
     }
 
-    /// Mark a literal as deduced by name + indices + value.
+    /// Mark a literal as deduced by name + indices + value. Throws on the
+    /// same conditions as [`Self::fix`].
     #[wasm_bindgen(js_name = fixVar)]
-    pub fn fix_var(&self, name: &str, indices: Vec<i64>, value: i64) -> bool {
+    pub fn fix_var(&self, name: &str, indices: Vec<i64>, value: i64) -> Result<(), JsError> {
         self.fix_internal(name, indices, value, true)
     }
 
-    /// Mark a literal as deduced from a `{name, indices, value, equal?}` object.
-    pub fn fix(&self, args: JsValue) -> Result<bool, JsError> {
+    /// Mark a literal as deduced from a `{name, indices, value, equal?}`
+    /// object. Throws if the variable can't be fixed or the `var=val` it names
+    /// isn't a puzzle literal.
+    pub fn fix(&self, args: JsValue) -> Result<(), JsError> {
         #[derive(serde::Deserialize)]
         struct FixArgs {
             name: String,
@@ -374,13 +370,19 @@ impl WasmPlanner {
 
         let args: FixArgs = serde_wasm_bindgen::from_value(args)
             .map_err(|e| JsError::new(&format!("Invalid fix() argument: {e}")))?;
-        Ok(self.fix_internal(&args.name, args.indices, args.value, args.equal))
+        self.fix_internal(&args.name, args.indices, args.value, args.equal)
     }
 
-    fn fix_internal(&self, name: &str, indices: Vec<i64>, value: i64, equal: bool) -> bool {
+    fn fix_internal(
+        &self,
+        name: &str,
+        indices: Vec<i64>,
+        value: i64,
+        equal: bool,
+    ) -> Result<(), JsError> {
         let mut planner = self.inner.lock().unwrap();
-        if planner.puzzle().check_fixable_var(name).is_err() {
-            return false;
+        if let Err(reason) = planner.puzzle().check_fixable_var(name) {
+            return Err(JsError::new(&format!("cannot fix {name}: {reason}")));
         }
         let puzvar = PuzVar::new(name, indices);
         let varval = VarValPair::new(&puzvar, value);
@@ -389,11 +391,15 @@ impl WasmPlanner {
         } else {
             PuzLit::new_neq(varval)
         };
-        if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
-            planner.mark_lit_as_fixed(&sat_lit);
-            true
-        } else {
-            false
+        match planner.puzzle().direct.litmap.get(&puzlit) {
+            Some(&sat_lit) => {
+                planner.mark_lit_as_fixed(&sat_lit);
+                Ok(())
+            }
+            None => Err(JsError::new(&format!(
+                "unknown literal: {}",
+                format_puzlit(&puzlit)
+            ))),
         }
     }
 
@@ -605,15 +611,17 @@ impl WasmPlanner {
         .map_err(Into::into)
     }
 
-    /// All literals currently known (deduced or fixed).
+    /// All literals currently known (deduced or fixed), in `format_puzlit`
+    /// form. Every puzlit a known SAT lit witnesses is listed (e.g. `cell=0`
+    /// alongside `cell!=1`, `cell!=2`), matching [`Self::provable_literals`]
+    /// and [`Self::difficulties`].
     #[wasm_bindgen(js_name = knownLiterals)]
     pub fn known_literals(&self) -> Result<JsValue, JsError> {
         let planner = self.inner.lock().unwrap();
         let mut out = Vec::new();
         for lit in planner.get_all_known_lits() {
-            let puzlits = planner.puzzle().lit_to_vars(lit);
-            if let Some(first) = puzlits.iter().next() {
-                out.push(format_puzlit(first));
+            for puzlit in planner.puzzle().lit_to_vars(lit) {
+                out.push(format_puzlit(puzlit));
             }
         }
         to_js(&out).map_err(Into::into)

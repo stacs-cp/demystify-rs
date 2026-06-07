@@ -196,25 +196,20 @@ local function test_fix_methods(puzzle)
     local planner = demystify.Planner.new(puzzle)
     assert(planner, "planner should be created")
 
-    -- Test fix_var method - try to fix a value that exists
-    -- We'll get provable literals and try to fix one
+    -- Test fix_var method - fixing a provable literal succeeds (no error).
     local num_provable = planner:num_provable()
     if num_provable > 0 then
         local provable = planner:provable_literals()
         if #provable > 0 then
-            -- Parse the first provable literal to get components
             local lit = demystify.helpers.parse_literal(provable[1])
             if lit and lit.equal then
-                -- Try fix_var with positional args
-                local result = planner:fix_var(lit.name, lit.indices, lit.value)
-                assert(type(result) == "boolean", "fix_var should return boolean")
-                print("fix_var result: " .. tostring(result))
+                planner:fix_var(lit.name, lit.indices, lit.value)
+                print("fix_var succeeded on " .. provable[1])
             end
         end
     end
 
-    -- Test fix method with table args
-    -- Create another fresh planner
+    -- Test fix method with table args - also succeeds on a provable literal.
     local planner2 = demystify.Planner.new(puzzle)
     num_provable = planner2:num_provable()
     if num_provable > 0 then
@@ -222,14 +217,12 @@ local function test_fix_methods(puzzle)
         if #provable > 0 then
             local lit = demystify.helpers.parse_literal(provable[1])
             if lit and lit.equal then
-                -- Try fix with table args
-                local result = planner2:fix({
+                planner2:fix({
                     name = lit.name,
                     indices = lit.indices,
                     value = lit.value
                 })
-                assert(type(result) == "boolean", "fix should return boolean")
-                print("fix (table) result: " .. tostring(result))
+                print("fix (table) succeeded on " .. provable[1])
             end
         end
     end
@@ -245,6 +238,12 @@ local function test_fix_methods(puzzle)
         "error should mention unknown variable name; got: " .. tostring(err)
     )
     print("fix_var with unknown var correctly errors: " .. tostring(err))
+
+    -- Test that an unknown literal string errors, rather than silently failing.
+    local planner4 = demystify.Planner.new(puzzle)
+    local ok2 = pcall(function() planner4:fix_literal("nope[9]=9") end)
+    assert(not ok2, "fix_literal with unknown literal should error")
+    print("fix_literal with unknown literal correctly errors")
 
     print("PASS: fix_methods")
 end

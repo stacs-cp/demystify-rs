@@ -322,8 +322,9 @@ fn check_solvability_partial_assignment() {
         "{res}"
     );
 
-    // Pin x[1]=1: x[2]=0 follows, so the completion is now unique.
-    let lits = serde_wasm_bindgen::to_value(&vec!["x[1]=1".to_string()]).expect("encode lits");
+    // Pin x[1]=1: x[2]=0 follows, so the completion is now unique. The spaced
+    // form must resolve too (whitespace-insensitive literal matching).
+    let lits = serde_wasm_bindgen::to_value(&vec!["x[1] = 1".to_string()]).expect("encode lits");
     let res: serde_json::Value =
         from_value(planner.check_solvability(lits).expect("check")).expect("decode");
     assert_eq!(status_of(&res), Some("unique"), "{res}");

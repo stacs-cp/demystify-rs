@@ -31,9 +31,9 @@
 //! | `check_solvability([lits])` | Classifies solvability (optionally under a partial assignment); reports fixed/unfixed vars |
 //! | `known_literals()` | Returns array of all known literals |
 //! | `current_state()` | Returns nested table of current assignments |
-//! | `fix_literal(str)` | Manually fixes a literal by string |
-//! | `fix_var(name, indices, value)` | Fixes literal by components |
-//! | `fix(table)` | Fixes literal by table with name/indices/value/equal |
+//! | `fix_literal(str)` | Fixes a literal by string; errors if unknown/unfixable |
+//! | `fix_var(name, indices, value)` | Fixes literal by components; errors if unknown/unfixable |
+//! | `fix(table)` | Fixes literal by `{name, indices, value, equal?}` table; errors if unknown/unfixable |
 //!
 //! # Step Structure
 //!
@@ -56,6 +56,15 @@ use crate::puzzle::LuaPuzzle;
 
 fn fix_reject_error(reason: String) -> LuaError {
     LuaError::RuntimeError(reason)
+}
+
+/// Normalise a literal string for matching by dropping all whitespace, so
+/// callers needn't reproduce `format_puzlit`'s exact spacing: `grid[1,1]=5`,
+/// `grid[1, 1]=5`, and `grid[1, 1] = 5` all match the canonical form.  This
+/// is collision-free because two distinct puzzle literals never differ only
+/// in whitespace (variable names are alphanumeric).
+fn lit_match_key(s: &str) -> String {
+    s.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
 /// A wrapper around PuzzlePlanner that can be used from Lua.
@@ -99,36 +108,18 @@ impl LuaUserData for LuaPlanner {
             Ok(result)
         });
 
-        // Manually fix/deduce a literal by its string representation
-        // The literal string should be in the format "var[i,j,...]=val" or "var[i,j,...]!=val"
+        // Manually fix/deduce a literal by its string representation, in the
+        // form "var[i,j,...]=val" or "var[i,j,...]!=val" (whitespace-insensitive).
+        // Errors if the string names no puzzle literal, or its variable can't
+        // be fixed.
         methods.add_method_mut("fix_literal", |_, this, lit_str: String| {
             let mut planner = this.inner.lock().unwrap();
+            let key = lit_match_key(&lit_str);
 
-            // Parse the literal string to find the matching Lit
-            let provable = planner.get_provable_varlits();
-
-            // First check provable literals
-            for lit in &provable {
-                let puzlits = planner.puzzle().lit_to_vars(lit);
-                for puzlit in puzlits {
-                    if format_puzlit(puzlit) == lit_str {
-                        if let Err(reason) = planner.puzzle().check_fixable_var(puzlit.var().name())
-                        {
-                            return Err(fix_reject_error(reason));
-                        }
-                        let lit_copy = lit;
-                        planner.mark_lit_as_fixed(lit_copy);
-                        return Ok(true);
-                    }
-                }
-            }
-
-            // If not found in provable, check all literals in litmap
-            // We need to collect the matching literal first to avoid borrow issues
             let matching_lit = {
                 let mut found = None;
                 for (puzlit, sat_lit) in planner.puzzle().direct.litmap.iter() {
-                    if format_puzlit(puzlit) == lit_str {
+                    if lit_match_key(&format_puzlit(puzlit)) == key {
                         found = Some((*sat_lit, puzlit.var().name().clone()));
                         break;
                     }
@@ -136,15 +127,13 @@ impl LuaUserData for LuaPlanner {
                 found
             };
 
-            if let Some((lit, var_name)) = matching_lit {
-                if let Err(reason) = planner.puzzle().check_fixable_var(&var_name) {
-                    return Err(fix_reject_error(reason));
-                }
-                planner.mark_lit_as_fixed(&lit);
-                return Ok(true);
+            let (lit, var_name) = matching_lit
+                .ok_or_else(|| LuaError::RuntimeError(format!("unknown literal: {lit_str}")))?;
+            if let Err(reason) = planner.puzzle().check_fixable_var(&var_name) {
+                return Err(fix_reject_error(reason));
             }
-
-            Ok(false)
+            planner.mark_lit_as_fixed(&lit);
+            Ok(())
         });
 
         // Fix a literal by its components (positional arguments)
@@ -171,12 +160,16 @@ impl LuaUserData for LuaPlanner {
                 let puzlit = PuzLit::new_eq(varval);
 
                 // Look up in litmap
-                if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
-                    planner.mark_lit_as_fixed(&sat_lit);
-                    return Ok(true);
+                match planner.puzzle().direct.litmap.get(&puzlit) {
+                    Some(&sat_lit) => {
+                        planner.mark_lit_as_fixed(&sat_lit);
+                        Ok(())
+                    }
+                    None => Err(LuaError::RuntimeError(format!(
+                        "unknown literal: {}",
+                        format_puzlit(&puzlit)
+                    ))),
                 }
-
-                Ok(false)
             },
         );
 
@@ -223,12 +216,16 @@ impl LuaUserData for LuaPlanner {
             };
 
             // Look up in litmap
-            if let Some(&sat_lit) = planner.puzzle().direct.litmap.get(&puzlit) {
-                planner.mark_lit_as_fixed(&sat_lit);
-                return Ok(true);
+            match planner.puzzle().direct.litmap.get(&puzlit) {
+                Some(&sat_lit) => {
+                    planner.mark_lit_as_fixed(&sat_lit);
+                    Ok(())
+                }
+                None => Err(LuaError::RuntimeError(format!(
+                    "unknown literal: {}",
+                    format_puzlit(&puzlit)
+                ))),
             }
-
-            Ok(false)
         });
 
         // Get the best next step
@@ -385,10 +382,12 @@ impl LuaUserData for LuaPlanner {
                             .direct
                             .litmap
                             .iter()
-                            .map(|(puzlit, sat_lit)| (format_puzlit(puzlit), *sat_lit))
+                            .map(|(puzlit, sat_lit)| {
+                                (lit_match_key(&format_puzlit(puzlit)), *sat_lit)
+                            })
                             .collect();
                         for s in &assume {
-                            match lookup.get(s) {
+                            match lookup.get(&lit_match_key(s)) {
                                 Some(lit) => planner.mark_lit_as_fixed(lit),
                                 None => {
                                     return Err(LuaError::RuntimeError(format!(
@@ -444,10 +443,11 @@ impl LuaUserData for LuaPlanner {
             let planner = this.inner.lock().unwrap();
             let result = lua.create_table()?;
 
-            for (i, lit) in planner.get_all_known_lits().iter().enumerate() {
-                let puzlits = planner.puzzle().lit_to_vars(lit);
-                if let Some(first) = puzlits.iter().next() {
-                    result.set(i + 1, format_puzlit(first))?;
+            let mut idx = 1;
+            for lit in planner.get_all_known_lits() {
+                for puzlit in planner.puzzle().lit_to_vars(lit) {
+                    result.set(idx, format_puzlit(puzlit))?;
+                    idx += 1;
                 }
             }
 

@@ -238,8 +238,9 @@ local function test_check_solvability_partial_assignment()
     assert(#res.unfixed_vars == 2 and res.unfixed_vars[1] == "x[1]"
         and res.unfixed_vars[2] == "x[2]", "expected x[1], x[2] unfixed")
 
-    -- Pin x[1]=1: x[2]=0 follows, so the completion is unique.
-    res = planner:check_solvability({ "x[1]=1" })
+    -- Pin x[1]=1: x[2]=0 follows, so the completion is unique. The spaced form
+    -- must resolve too (whitespace-insensitive literal matching).
+    res = planner:check_solvability({ "x[1] = 1" })
     assert(res.status == "unique", "expected unique, got " .. tostring(res.status))
     table.sort(res.fixed_vars)
     assert(#res.fixed_vars == 2 and res.fixed_vars[1] == "x[1]=1"
