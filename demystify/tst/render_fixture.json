@@ -1,0 +1,60 @@
+{
+  "puzzle": {
+    "kind": "Sudoku",
+    "width": 4,
+    "height": 4,
+    "start_grid": [
+      [1, null, null, null],
+      [null, null, null, null],
+      [null, null, null, null],
+      [null, null, null, 4]
+    ],
+    "solution_grid": null,
+    "cages": [
+      [1, 1, 2, 2],
+      [1, 3, 3, 2],
+      [4, 3, 3, 5],
+      [4, 4, 5, 5]
+    ],
+    "region_tint": null,
+    "top_labels": null,
+    "bottom_labels": null,
+    "left_labels": null,
+    "right_labels": null,
+    "thermometers": [[[1, 0], [1, 1], [2, 1]]],
+    "less_than": [[0, 1, 0, 2]],
+    "cage_sums": [3, 6, 9, 5, 7],
+    "info": null,
+    "constraint_classes": null,
+    "decorations": ["sudoku_grid", "blank_input_val=0"]
+  },
+  "state": {
+    "knowledge_grid": [
+      [null,
+       [{"val": 2, "classes": ["litpos"]}, {"val": 3, "classes": ["litneg"]}],
+       [{"val": 1, "classes": ["litinmus"]}, {"val": 2, "classes": []}, {"val": 3, "classes": []}, {"val": 4, "classes": []}],
+       [{"val": 4, "classes": ["litknown"]}]],
+      [[{"val": 1, "classes": []}, {"val": 2, "classes": []}, {"val": 3, "classes": []}, {"val": 4, "classes": []}],
+       [{"val": 2, "classes": ["litpos"]}],
+       null,
+       [{"val": 3, "classes": []}, {"val": 4, "classes": []}]],
+      [null, null,
+       [{"val": 1, "classes": []}, {"val": 2, "classes": []}],
+       [{"val": 1, "classes": ["litneg"]}, {"val": 2, "classes": ["litneg"]}, {"val": 3, "classes": ["litpos"]}]],
+      [[{"val": 2, "classes": []}, {"val": 3, "classes": []}],
+       [{"val": 1, "classes": []}],
+       [{"val": 2, "classes": []}],
+       null]
+    ],
+    "statements": [{"content": "r1c2 = 2", "classes": ["deduction"]}],
+    "description": "Render fixture",
+    "blocked_cells": [[2, 0], [2, 1]],
+    "constraint_shapes": [
+      {"idx": 0, "kind": "Row", "cells": [[0, 1], [0, 2], [0, 3]], "stagger": 0},
+      {"idx": 1, "kind": "Col", "cells": [[0, 0], [1, 0], [3, 0]], "stagger": 0},
+      {"idx": 2, "kind": "Pair", "cells": [[1, 1], [2, 3]], "stagger": 0},
+      {"idx": 3, "kind": "Region", "cells": [[2, 2], [2, 3], [3, 2]], "stagger": 0}
+    ],
+    "verbose": null
+  }
+}

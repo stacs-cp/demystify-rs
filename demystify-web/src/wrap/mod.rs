@@ -37,7 +37,7 @@ pub struct ExampleInfo {
     param: &'static str,
 }
 
-static EXAMPLES: Lazy<[ExampleInfo; 14]> = Lazy::new(|| {
+static EXAMPLES: Lazy<[ExampleInfo; 15]> = Lazy::new(|| {
     [
         ExampleInfo {
             name: "Sudoku",
@@ -122,6 +122,12 @@ static EXAMPLES: Lazy<[ExampleInfo; 14]> = Lazy::new(|| {
             description: "Identify mine locations; numbered cells show exactly how many of their neighbours are mines.",
             model: include_model_file!("examples/eprime/minesweeper.eprime"),
             param: include_model_file!("examples/eprime/minesweeper/minesweeper-5x5.param"),
+        },
+        ExampleInfo {
+            name: "HexBinairo",
+            description: "Binairo on a hexagonal board: each of the three line directions is half 0s / half 1s with no three equal in a row.",
+            model: include_model_file!("examples/eprime/hexbinairo.eprime"),
+            param: include_model_file!("examples/eprime/hexbinairo/hexbinairo-1.param"),
         },
     ]
 });

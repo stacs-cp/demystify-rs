@@ -210,6 +210,16 @@ fn read_edge_labels(
     ]))
 }
 
+/// Whether cell `(i, j)` (0-indexed) is present given an optional presence mask.
+/// `None` means every cell is present; otherwise a `false`/out-of-range entry
+/// marks an absent cell (e.g. outside a hexagon carved from the rhombus).
+fn cell_present_idx(present: &Option<Vec<Vec<bool>>>, i: usize, j: usize) -> bool {
+    match present {
+        None => true,
+        Some(grid) => grid.get(i).and_then(|r| r.get(j)).copied().unwrap_or(false),
+    }
+}
+
 /// Build the list of `ConstraintShape`s for the constraints in `constraint_num`.
 /// Cells are extracted from each constraint's scope, filtered to the main `$#SHOW`
 /// var (so non-grid auxiliaries don't leak in), kind detected, and stagger
@@ -345,6 +355,12 @@ pub struct Puzzle {
     /// SVG decoration flags from `$#DEC` directives (e.g. "sudoku_grid", "blank_input_val=2").
     #[serde(default)]
     pub decorations: Vec<String>,
+    /// Per-cell presence mask for non-rectangular boards (e.g. a radius-N hexagon
+    /// carved from the `[r][q]` rhombus). `Some(grid)` with `grid[row][col] ==
+    /// false` means that cell is absent: it is not drawn and holds no candidates.
+    /// `None` means every cell of the `height × width` grid is present.
+    #[serde(default)]
+    pub present: Option<Vec<Vec<bool>>>,
 }
 
 impl Puzzle {
@@ -463,6 +479,17 @@ impl Puzzle {
                             })
                             .collect()
                     })
+                    .collect(),
+            );
+        }
+
+        // Presence mask (non-rectangular boards): 0 = absent cell.
+        let mut present = None;
+        if let Some(p) = find_role(&|r| matches!(r, ShowRole::Presence)) {
+            let raw = read_2d_i64(problem, known, p)?;
+            present = Some(
+                raw.into_iter()
+                    .map(|row| row.into_iter().map(|v| v != 0).collect())
                     .collect(),
             );
         }
@@ -628,6 +655,7 @@ impl Puzzle {
             info,
             constraint_classes,
             decorations: problem.eprime.decs.clone(),
+            present,
         })
     }
 }
@@ -861,6 +889,12 @@ impl Problem {
             let i = i - 1;
             let j = j - 1;
 
+            // Absent cells (presence mask) are pinned in the model but must not
+            // render as deducible.
+            if !cell_present_idx(&puzzle.present, i, j) {
+                continue;
+            }
+
             let mut tags = BTreeSet::new();
 
             if let Some(val) = constraint_tags.get(&l) {
@@ -937,7 +971,8 @@ impl Problem {
         let blocked: Vec<[i64; 2]> = (0..height)
             .flat_map(|r| (0..width).map(move |c| (r, c)))
             .filter(|&(r, c)| {
-                knowledgegrid[r][c].is_none()
+                cell_present_idx(&puzzle.present, r, c)
+                    && knowledgegrid[r][c].is_none()
                     && puzzle
                         .start_grid
                         .as_ref()
@@ -1050,6 +1085,12 @@ impl Problem {
                 continue;
             }
 
+            // Absent cells (presence mask) are pinned in the model but must not
+            // render as deducible.
+            if !cell_present_idx(&puzzle.present, i, j) {
+                continue;
+            }
+
             let mut tags = BTreeSet::new();
 
             if let Some(val) = complexity.get(&l) {
@@ -1089,7 +1130,8 @@ impl Problem {
         let blocked: Vec<[i64; 2]> = (0..height)
             .flat_map(|r| (0..width).map(move |c| (r, c)))
             .filter(|&(r, c)| {
-                knowledgegrid[r][c].is_none()
+                cell_present_idx(&puzzle.present, r, c)
+                    && knowledgegrid[r][c].is_none()
                     && puzzle
                         .start_grid
                         .as_ref()
@@ -1125,6 +1167,56 @@ mod tests {
 
     use crate::json::Puzzle;
     use crate::problem::util::test_utils::build_puzzleparse;
+
+    /// End-to-end: the hex-binairo Essence′ model parses, solves, populates the
+    /// presence mask from `$#SHOW mask presence`, and renders as a hexagonal
+    /// board. Writes the SVG to a temp file for manual inspection.
+    #[test]
+    fn test_hexbinairo_pipeline_renders_hex() -> anyhow::Result<()> {
+        use crate::problem::PuzLit;
+        use crate::problem::solver::PuzzleSolver;
+        use crate::web::puzsvg::PuzzleDraw;
+        use std::collections::BTreeSet;
+        use std::sync::Arc;
+
+        let pp = Arc::new(build_puzzleparse(
+            "./tst/hexbinairo.eprime",
+            "./tst/hexbinairo-1.param",
+        ));
+        let mut solver = PuzzleSolver::new(pp)?;
+        let varlits = solver.get_provable_varlits().clone();
+        let tosolve: BTreeSet<_> = varlits
+            .iter()
+            .flat_map(|x| solver.lit_to_puzlit(x))
+            .map(PuzLit::varval)
+            .collect();
+        let problem = super::Problem::new_from_puzzle_and_state(
+            &solver,
+            &tosolve,
+            &BTreeSet::new(),
+            &BTreeSet::new(),
+            "hex",
+        )?;
+
+        // Presence mask carved from $#SHOW mask presence; hexagon < full square.
+        let present = problem
+            .puzzle
+            .present
+            .as_ref()
+            .expect("presence mask should be populated");
+        let n_present: usize = present.iter().flatten().filter(|&&p| p).count();
+        assert_eq!(n_present, 19, "radius-2 hexagon has 19 cells");
+
+        let svg = PuzzleDraw::new_with_decs(&problem.puzzle.kind, &problem.puzzle.decorations)
+            .draw_puzzle(&problem);
+        let s = svg.to_string();
+        assert!(
+            s.contains("1.732"),
+            "should render as hexagons (√3 spacing)"
+        );
+        std::fs::write(std::env::temp_dir().join("hexbin_render.svg"), &s).ok();
+        Ok(())
+    }
 
     #[test]
     fn detect_kind_classifies_layouts() {

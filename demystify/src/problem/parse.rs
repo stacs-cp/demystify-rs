@@ -121,6 +121,11 @@ pub enum ShowRole {
     /// Combined four-side edge labels: a 4-row matrix in left/top/right/
     /// bottom order.  At most one.
     SideLabels,
+    /// Per-cell presence mask: a `[row, col]` matrix where `0` marks an absent
+    /// cell (not drawn, no candidates) and non-zero a present cell.  Used to
+    /// carve non-rectangular boards — e.g. a radius-N hexagon from the `[r][q]`
+    /// rhombus.  At most one.
+    Presence,
 }
 
 /// Which axis a `less_than_grid` SHOW directive labels.
@@ -1412,7 +1417,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 }
                 let role = match role_token {
                     "main" | "cages" | "region_tint" | "givens" | "cage_sums" | "less_than"
-                    | "side_labels" => {
+                    | "side_labels" | "presence" => {
                         if !role_args.is_empty() {
                             bail!(
                                 "$#SHOW {show_var} {role_token}: takes no \
@@ -1427,6 +1432,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                             "cage_sums" => ShowRole::CageSums,
                             "less_than" => ShowRole::LessThan,
                             "side_labels" => ShowRole::SideLabels,
+                            "presence" => ShowRole::Presence,
                             _ => unreachable!(),
                         }
                     }
@@ -1581,6 +1587,7 @@ fn parse_eprime_file(in_path: &PathBuf) -> anyhow::Result<ParsedEprimeData> {
                 ShowRole::LessThan => Some("less_than"),
                 ShowRole::Thermometers { .. } => Some("thermometers"),
                 ShowRole::SideLabels => Some("side_labels"),
+                ShowRole::Presence => Some("presence"),
                 ShowRole::Edge { .. } | ShowRole::LessThanGrid { .. } => None,
             };
             if let Some(key) = singleton_key

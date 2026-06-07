@@ -1,0 +1,30 @@
+{
+  "puzzle": {
+    "kind": "Nonogram",
+    "width": 5,
+    "height": 5,
+    "start_grid": null,
+    "solution_grid": null,
+    "cages": null,
+    "region_tint": null,
+    "top_labels": [
+      ["", "", "", "", "1"],
+      ["", "1", "3", "2", "1"],
+      ["5", "3", "1", "2", "1"]
+    ],
+    "bottom_labels": null,
+    "left_labels": [
+      ["", "", "", "", ""],
+      ["", "", "", "", ""],
+      ["5", "1", "3", "2", "5"]
+    ],
+    "right_labels": null,
+    "thermometers": null,
+    "less_than": null,
+    "cage_sums": null,
+    "info": null,
+    "constraint_classes": null,
+    "decorations": []
+  },
+  "state": null
+}

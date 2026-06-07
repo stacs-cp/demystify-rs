@@ -1,0 +1,110 @@
+language ESSENCE' 1.0
+$#KIND HexBinairo
+$#DEC hex
+$#DEC blank_input_val=2
+
+$ Hex binairo on a radius-R hexagon, stored as an (n = 2R+1) square matrix
+$ indexed by (row, col) = (r+R+1, q+R+1) in cube coords (q + r + s = 0).
+$ `mask` carves the hexagon out of the square: mask[i,j] = 0 marks a cell
+$ outside the hexagon. The three hex line directions are, in matrix terms:
+$   - horizontal (constant r) = matrix rows      (vary col)
+$   - NW-SE      (constant q) = matrix columns   (vary row)
+$   - NE-SW      (constant s) = anti-diagonals    (row+col constant)
+
+given n: int
+letting ndim be domain int(1..n)
+
+$#SHOW mask presence
+given mask: matrix indexed by [ndim, ndim] of int(0,1)
+
+$#SHOW start_grid givens
+given start_grid: matrix indexed by [ndim, ndim] of int(0,1,2)
+$ 0 = black, 1 = white, 2 = empty
+
+$#VAR grid
+$#SHOW grid main
+find grid: matrix indexed by [ndim, ndim] of bool
+
+$ Balance: each hex line is half white / half black (±1 for odd length).
+$#CON rowbal "horizontal line through row {{index[0]}} is balanced"
+find rowbal: matrix indexed by [ndim] of bool
+$#CON colbal "NW-SE line through column {{index[0]}} is balanced"
+find colbal: matrix indexed by [ndim] of bool
+$#CON adiagbal "NE-SW line with row+col {{index[0]}} is balanced"
+find adiagbal: matrix indexed by [int(2..2*n)] of bool
+
+$ No three of the same colour consecutively along any hex line.
+$#CON rowmatch "no three same in horizontal line, row {{index[0]}} from col {{index[1]}}"
+find rowmatch: matrix indexed by [ndim, int(1..n-2)] of bool
+$#CON colmatch "no three same in NW-SE line, col {{index[0]}} from row {{index[1]}}"
+find colmatch: matrix indexed by [ndim, int(1..n-2)] of bool
+$#CON adiagmatch "no three same in NE-SW line from cell ({{index[0]}},{{index[1]}})"
+find adiagmatch: matrix indexed by [int(1..n-2), int(3..n)] of bool
+
+$#FAMILY balance "Line balance" rowbal "Row" colbal "Column" adiagbal "Diagonal"
+$#FAMILY nothree  "No three in a line" rowmatch "Row" colmatch "Column" adiagmatch "Diagonal"
+
+such that
+
+$ Cells outside the hexagon are pinned (so the solution is unique) and never
+$ enter a line constraint.
+forAll i,j : ndim. (mask[i,j] = 0) -> (grid[i,j] = false),
+
+$ Givens.
+forAll i,j : ndim. (start_grid[i,j] = 1) -> grid[i,j],
+forAll i,j : ndim. (start_grid[i,j] = 0) -> !grid[i,j],
+
+$ Row (horizontal) balance.
+forAll i : ndim.
+rowbal[i] -> (
+  (2 * sum([toInt(grid[i,j]) | j : ndim, mask[i,j] = 1]) >= sum([mask[i,j] | j : ndim]) - 1) /\
+  (2 * sum([toInt(grid[i,j]) | j : ndim, mask[i,j] = 1]) <= sum([mask[i,j] | j : ndim]) + 1)
+),
+
+$ Column (NW-SE) balance.
+forAll j : ndim.
+colbal[j] -> (
+  (2 * sum([toInt(grid[i,j]) | i : ndim, mask[i,j] = 1]) >= sum([mask[i,j] | i : ndim]) - 1) /\
+  (2 * sum([toInt(grid[i,j]) | i : ndim, mask[i,j] = 1]) <= sum([mask[i,j] | i : ndim]) + 1)
+),
+
+$ Anti-diagonal (NE-SW) balance: cells (i, d-i) with row+col = d.
+forAll d : int(2..2*n).
+adiagbal[d] -> (
+  (2 * sum([toInt(grid[i,d-i]) | i : ndim, d-i >= 1, d-i <= n, mask[i,d-i] = 1]) >=
+        sum([mask[i,d-i] | i : ndim, d-i >= 1, d-i <= n]) - 1) /\
+  (2 * sum([toInt(grid[i,d-i]) | i : ndim, d-i >= 1, d-i <= n, mask[i,d-i] = 1]) <=
+        sum([mask[i,d-i] | i : ndim, d-i >= 1, d-i <= n]) + 1)
+),
+
+$ No-three, horizontal.
+forAll i : ndim. forAll j : int(1..n-2).
+rowmatch[i,j] -> (
+  (mask[i,j] = 1 /\ mask[i,j+1] = 1 /\ mask[i,j+2] = 1) -> (
+    !(grid[i,j] /\ grid[i,j+1] /\ grid[i,j+2]) /\
+    !(!grid[i,j] /\ !grid[i,j+1] /\ !grid[i,j+2])
+  )
+),
+
+$ No-three, NW-SE (down a column).
+forAll j : ndim. forAll i : int(1..n-2).
+colmatch[j,i] -> (
+  (mask[i,j] = 1 /\ mask[i+1,j] = 1 /\ mask[i+2,j] = 1) -> (
+    !(grid[i,j] /\ grid[i+1,j] /\ grid[i+2,j]) /\
+    !(!grid[i,j] /\ !grid[i+1,j] /\ !grid[i+2,j])
+  )
+),
+
+$ No-three, NE-SW (anti-diagonal: (i,j),(i+1,j-1),(i+2,j-2)).
+forAll i : int(1..n-2). forAll j : int(3..n).
+adiagmatch[i,j] -> (
+  (mask[i,j] = 1 /\ mask[i+1,j-1] = 1 /\ mask[i+2,j-2] = 1) -> (
+    !(grid[i,j] /\ grid[i+1,j-1] /\ grid[i+2,j-2]) /\
+    !(!grid[i,j] /\ !grid[i+1,j-1] /\ !grid[i+2,j-2])
+  )
+)
+
+,false -> and(flatten([
+  and(flatten(rowbal)), and(flatten(colbal)), and(flatten(adiagbal)),
+  and(flatten(rowmatch)), and(flatten(colmatch)), and(flatten(adiagmatch))
+]))

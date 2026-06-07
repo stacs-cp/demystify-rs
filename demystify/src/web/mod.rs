@@ -1,3 +1,4 @@
+pub mod geometry;
 pub mod puzsvg;
 
 use crate::json::{ConstraintInstance, Problem, Puzzle, Statement};
@@ -7,6 +8,13 @@ use self::puzsvg::PuzzleDraw;
 #[must_use]
 pub fn base_css() -> &'static str {
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/include/base.css"))
+}
+
+/// Self-contained styling for the SVG board, embedded inline in every rendered
+/// board so it displays correctly without an external stylesheet.
+#[must_use]
+pub fn board_css() -> &'static str {
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/include/board.css"))
 }
 
 #[must_use]

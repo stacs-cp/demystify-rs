@@ -6,6 +6,7 @@ use std::collections::BTreeSet;
 use crate::json::StateLit;
 
 use crate::json::{ConstraintShape, ConstraintShapeKind, Problem, Puzzle};
+use crate::web::geometry::{Geometry, HexGeometry, SquareGeometry};
 use itertools::Itertools;
 use svg::Node;
 
@@ -27,6 +28,8 @@ enum DecorationKind {
     /// dark border with a lighter interior. Clue numbers (value >= 0) are shown centered inside.
     /// Negative values (e.g. -1 = black unnumbered) get the wall visual but no text.
     WallBelow(i64),
+    /// Lay the grid out as pointy-top hexagons (axial coordinates) rather than squares.
+    Hex,
 }
 
 /// A composable set of SVG decoration flags for a puzzle.
@@ -48,6 +51,8 @@ impl Decorations {
             for dec in decs {
                 if dec == "sudoku_grid" {
                     flags.insert(DecorationKind::SudokuGrid);
+                } else if dec == "hex" {
+                    flags.insert(DecorationKind::Hex);
                 } else if let Some(val_str) = dec.strip_prefix("blank_input_val=") {
                     if let Ok(val) = val_str.parse::<i64>() {
                         flags.insert(DecorationKind::BlankInputVal(val));
@@ -80,6 +85,10 @@ impl Decorations {
 
     fn sudoku_grid(&self) -> bool {
         self.flags.contains(&DecorationKind::SudokuGrid)
+    }
+
+    fn hex(&self) -> bool {
+        self.flags.contains(&DecorationKind::Hex)
     }
 
     fn blank_input_val(&self) -> Option<i64> {
@@ -124,9 +133,9 @@ impl PuzzleDraw {
     #[must_use]
     pub fn new(kind: &str) -> Self {
         PuzzleDraw {
-            base_width: 0.005,
-            mid_width: 0.01,
-            thick_width: 0.02,
+            base_width: 0.02,
+            mid_width: 0.04,
+            thick_width: 0.08,
             decorations: Decorations::new(kind, &[]),
         }
     }
@@ -134,9 +143,9 @@ impl PuzzleDraw {
     #[must_use]
     pub fn new_with_decs(kind: &str, decs: &[String]) -> Self {
         PuzzleDraw {
-            base_width: 0.005,
-            mid_width: 0.01,
-            thick_width: 0.02,
+            base_width: 0.02,
+            mid_width: 0.04,
+            thick_width: 0.08,
             decorations: Decorations::new(kind, decs),
         }
     }
@@ -146,11 +155,15 @@ impl PuzzleDraw {
     #[must_use]
     pub fn draw_puzzle(&self, puzjson: &Problem) -> svg::Document {
         let puzzle = &puzjson.puzzle;
+        let geom: Box<dyn Geometry> = if self.decorations.hex() {
+            Box::new(HexGeometry::new(puzzle.width, puzzle.height))
+        } else {
+            Box::new(SquareGeometry::new(puzzle.width, puzzle.height))
+        };
+        let geom = geom.as_ref();
 
-        let mut out = self.draw_grid(puzzle);
-
-        let mut cells = self.make_cells(puzzle);
-        let mut text_cells = self.make_text_cells(puzzle);
+        let mut cells = self.make_cells(geom, puzzle);
+        let mut text_cells = self.make_text_cells(geom);
 
         if let Some(start_grid) = &puzzle.start_grid {
             self.fill_fixed_state(&mut cells, &mut text_cells, start_grid);
@@ -173,83 +186,101 @@ impl PuzzleDraw {
             self.fill_blocked_cells(&mut cells, puzzle, blocked);
         }
 
-        /*
-            if ("solution_grid" in puzzle) {
-              const solutionCpy = structuredClone(puzzle["solution_grid"]);
-              if ("start_grid" in puzzle) {
-                for (let i = 0; i < puzzle["start_grid"].length; i++) {
-                  for (let j = 0; j < puzzle["start_grid"][i].length; j++) {
-                    const cell = puzzle["start_grid"][i][j];
-                    if (cell) {
-                      solutionCpy[i][j] = null;
-                    }
-                  }
-                }
-              }
-              this.fillFixedState(out, solutionCpy, { color: "grey" });
-            }
-        */
-
         self.set_cell_data_states(&mut cells, puzjson);
 
-        // Thermometer overlays drawn before cells so grid lines appear on top.
-        out.append(self.draw_thermometers(puzzle));
+        // Fixed layer stack — document order is z-order, bottom to top.
+        let mut board = element::Group::new();
 
-        let mut cellgrp = element::Group::new();
+        // Cage / region fills and the grid outline.
+        board.append(self.draw_grid(geom, puzzle));
 
+        // Constraint lines (thermometers) sit above the grid but below cells.
+        board.append(self.draw_thermometers(geom, puzzle));
+
+        // Cell backgrounds and per-cell interactive content (litboxes, walls).
+        let mut cells_layer = element::Group::new();
+        cells_layer.assign("class", "layer-cells");
         for row in cells {
             for c in row {
-                cellgrp.append(c);
+                cells_layer.append(c);
             }
         }
+        board.append(cells_layer);
 
-        out.append(cellgrp);
-
-        // Overlays drawn after cell backgrounds but BEFORE the text overlay,
-        // so digits / candidate numbers always sit on top.
-        out.append(self.draw_less_than(puzzle));
-        out.append(self.draw_cage_sums(puzzle));
+        // Overlays drawn above cell backgrounds but below the text overlay, so
+        // digits / candidate numbers always sit on top.
+        let mut overlay_layer = element::Group::new();
+        overlay_layer.assign("class", "layer-overlays");
+        overlay_layer.append(self.draw_less_than(geom, puzzle));
+        overlay_layer.append(self.draw_cage_sums(geom, puzzle));
         if let Some(state) = &puzjson.state
             && let Some(shapes) = &state.constraint_shapes
         {
-            out.append(self.draw_constraint_shapes(puzzle, shapes));
+            overlay_layer.append(self.draw_constraint_shapes(geom, shapes));
         }
+        board.append(overlay_layer);
 
-        let mut textgrp = element::Group::new();
-        textgrp.assign("class", "cell-text-overlays");
+        // Text (givens and candidate digits), always on top of overlays.
+        let mut text_layer = element::Group::new();
+        text_layer.assign("class", "layer-digits cell-text-overlays");
         for row in text_cells {
             for c in row {
-                textgrp.append(c);
+                text_layer.append(c);
             }
         }
-        out.append(textgrp);
+        board.append(text_layer);
 
-        let out = self.fill_outside_labels(out, puzzle);
+        // Outside labels add their own layer and may extend the viewBox.
+        let (labels_layer, (min_x, min_y, max_x, max_y)) = self.fill_outside_labels(geom, puzzle);
+        board.append(labels_layer);
 
-        let mut final_grp = element::Group::new();
-        final_grp.assign("transform", "translate(50,50) scale(400)");
-        final_grp.append(out);
+        let margin = 0.15;
+        let vb = (
+            min_x - margin,
+            min_y - margin,
+            (max_x - min_x) + 2.0 * margin,
+            (max_y - min_y) + 2.0 * margin,
+        );
+
+        // Inline the board stylesheet so the SVG renders correctly on its own
+        // (standalone export, file preview) without an external stylesheet. On a
+        // demystify-web page these rules coexist with the page's own CSS.
+        let style = element::Style::new(crate::web::board_css());
 
         let doc = svg::Document::new()
-            .set("viewBox", (0, 0, 500, 500))
-            .set("width", 500)
-            .set("height", 500)
+            .set("viewBox", vb)
+            .set("preserveAspectRatio", "xMidYMid meet")
             .set("id", "board")
             .set("class", "puzzle");
-        doc.add(final_grp)
+        doc.add(style).add(board)
     }
 
-    fn fill_outside_labels(&self, mut grid: element::Group, p: &Puzzle) -> element::Group {
+    /// Build the outside-label layer and return it together with the bounding
+    /// box `(min_x, min_y, max_x, max_y)` of the grid *and* its labels, in cell
+    /// units, so the caller can size the `viewBox`.
+    ///
+    /// Label placement preserves the existing (transposed) side convention:
+    /// `top_labels` render to the left of the grid, `bottom_labels` to the
+    /// right, `left_labels` above and `right_labels` below — the puzzle pipeline
+    /// feeds them in that transposed order.
+    fn fill_outside_labels(
+        &self,
+        geom: &dyn Geometry,
+        p: &Puzzle,
+    ) -> (element::Group, (f64, f64, f64, f64)) {
         let mut label_group = element::Group::new();
-        label_group.assign("class", "labels");
+        label_group.assign("class", "layer-labels labels");
 
-        let step = 1.0 / std::cmp::min(p.width, p.height) as f64;
+        let (mut min_x, mut min_y, mut max_x, mut max_y) = geom.bounds();
+        let mut expand = |row: i64, col: i64| {
+            for (x, y) in geom.cell_polygon(row, col) {
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x);
+                max_y = max_y.max(y);
+            }
+        };
 
-        let mut puz_bounds = (0.0, step * (p.width as f64), 0.0, step * (p.height as f64));
-
-        // Each side's labels are a Vec of layers. Closures map (total_layers L, layer index,
-        // along-side index i) → (row, col) for make_cell, plus a per-layer bounds bump.
-        // For top/left, layer 0 is furthest from the grid; for bottom/right, layer 0 is nearest.
         let label_groups = [
             &p.top_labels,
             &p.bottom_labels,
@@ -257,77 +288,39 @@ impl PuzzleDraw {
             &p.right_labels,
         ];
 
-        #[allow(clippy::type_complexity)]
-        let label_positions: Vec<(
-            Box<dyn Fn(i64, i64, usize) -> i64>,
-            Box<dyn Fn(i64, i64, usize) -> i64>,
-            Box<dyn Fn(&mut (f64, f64, f64, f64))>,
-        )> = vec![
-            (
-                Box::new(|_l, _layer, i| i as i64),
-                Box::new(|l, layer, _i| -(l - layer)),
-                Box::new(|bounds| bounds.0 -= step),
-            ),
-            (
-                Box::new(|_l, _layer, i| i as i64),
-                Box::new(|_l, layer, _i| p.height + layer),
-                Box::new(|bounds| bounds.1 += step),
-            ),
-            (
-                Box::new(|l, layer, _i| -(l - layer)),
-                Box::new(|_l, _layer, i| i as i64),
-                Box::new(|bounds| bounds.2 -= step),
-            ),
-            (
-                Box::new(|_l, layer, _i| p.width + layer),
-                Box::new(|_l, _layer, i| i as i64),
-                Box::new(|bounds| bounds.3 += step),
-            ),
-        ];
+        // (total_layers L, layer index, along-side index i) → (row, col).
+        let pos = |side: usize, l: i64, layer: i64, i: i64| -> (i64, i64) {
+            match side {
+                0 => (i, -(l - layer)),     // top_labels
+                1 => (i, p.height + layer), // bottom_labels
+                2 => (-(l - layer), i),     // left_labels
+                _ => (p.width + layer, i),  // right_labels
+            }
+        };
 
-        for (layers_opt, position) in label_groups.iter().zip(label_positions.iter()) {
+        for (side, layers_opt) in label_groups.iter().enumerate() {
             if let Some(layers) = layers_opt {
                 let total_layers = layers.len() as i64;
                 for (layer_idx, labels) in layers.iter().enumerate() {
-                    position.2(&mut puz_bounds);
                     let layer = layer_idx as i64;
                     for (i, label) in labels.iter().enumerate() {
                         if label.is_empty() {
                             continue;
                         }
+                        let (row, col) = pos(side, total_layers, layer, i as i64);
                         let mut node = svg::node::element::Text::new(label);
                         node.assign("font-size", 1);
                         node.assign("transform", "translate(0.2, 0.9)");
-                        let mut g = make_cell(
-                            position.0(total_layers, layer, i),
-                            position.1(total_layers, layer, i),
-                            step,
-                        );
+                        let mut g = make_cell(geom, row, col);
                         g.append(node);
                         label_group.append(g);
+                        expand(row, col);
                     }
                 }
             }
         }
 
-        grid.append(label_group);
-
-        let max_scale = f64::min(
-            1.0 / (-puz_bounds.0 + puz_bounds.1),
-            1.0 / (-puz_bounds.2 + puz_bounds.3),
-        );
-
-        let mut resized_grid = element::Group::new();
-        resized_grid.assign(
-            "transform",
-            format!(
-                "translate({},{}) scale({},{})",
-                -puz_bounds.0, -puz_bounds.2, max_scale, max_scale
-            ),
-        );
-        resized_grid.append(grid);
-
-        resized_grid
+        (label_group, (min_x, min_y, max_x, max_y))
     }
 
     fn fixed_cell_is_used(&self, cell: Option<i64>) -> bool {
@@ -350,21 +343,20 @@ impl PuzzleDraw {
                 if let Some(wb) = wall_below
                     && val.is_some_and(|v| v < wb)
                 {
-                    // Dark outer rect fills the entire cell.
+                    // Dark outer rect fills the entire cell (colour from board.css).
                     let mut outer = element::Rectangle::new();
                     outer.assign("width", 1);
                     outer.assign("height", 1);
-                    outer.assign("fill", "#666666");
                     outer.assign("class", "wall-cell");
                     cells[i][j].append(outer);
 
-                    // White inner rect — leaves a thick dark border around the edge.
+                    // Light inner rect — leaves a thick dark border around the edge.
                     let mut inner = element::Rectangle::new();
                     inner.assign("x", 0.1);
                     inner.assign("y", 0.1);
                     inner.assign("width", 0.8);
                     inner.assign("height", 0.8);
-                    inner.assign("fill", "white");
+                    inner.assign("class", "wall-inner");
                     cells[i][j].append(inner);
 
                     // Show clue number only for numbered cells (value >= 0).
@@ -514,18 +506,17 @@ impl PuzzleDraw {
             let mut bg = element::Rectangle::new();
             bg.assign("width", 1);
             bg.assign("height", 1);
-            bg.assign("fill", "#cccccc");
+            bg.assign("class", "blocked-cell");
             bg.assign("opacity", 0.5);
             cells[i][j].append(bg);
 
-            // "?" text centered in the cell.
+            // "?" text centered in the cell (colour from board.css .litundeducable).
             let mut text = svg::node::element::Text::new("?");
             text.assign("font-size", 0.7);
             text.assign("x", 0.5);
             text.assign("y", 0.75);
             text.assign("dominant-baseline", "middle");
             text.assign("text-anchor", "middle");
-            text.assign("fill", "#888888");
             text.assign("class", "litundeducable");
             cells[i][j].append(text);
         }
@@ -565,45 +556,44 @@ impl PuzzleDraw {
         }
     }
 
-    fn draw_grid(&self, puzzle: &Puzzle) -> element::Group {
+    fn draw_grid(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> element::Group {
         let mut topgrp = element::Group::new();
-
-        let mut grp = element::Group::new();
 
         let width = usize::try_from(puzzle.width).expect("negative width?");
         let height = usize::try_from(puzzle.height).expect("negative height?");
         let cages = &puzzle.cages;
 
-        let step = 1.0 / std::cmp::min(width, height) as f64;
+        // Number of palette colours defined as `.region-N` in board.css.
+        const REGION_COLOURS: i64 = 16;
 
-        let colours_list = [
-            "#85586f", "#d6efed", "#957dad", "#ac7d88", "#b7d3df", "#e0bbe4", "#deb6ab", "#c9bbcf",
-            "#fec8d8", "#f8ecd1", "#898aa6", "#ffdfd3", "#c4dfaa", "#f5f0bb", "#e6e1cd", "#d6b1dd",
-        ];
+        // Closed `path d` tracing the polygon of cell (row, col).
+        let cell_path = |row: i64, col: i64| -> String {
+            let poly = geom.cell_polygon(row, col);
+            let mut d = String::new();
+            for (k, (x, y)) in poly.iter().enumerate() {
+                d.push_str(if k == 0 { "M " } else { "L " });
+                d.push_str(&format!("{x} {y} "));
+            }
+            d.push('Z');
+            d
+        };
 
         let mut cagegrp = element::Group::new();
+        cagegrp.assign("class", "layer-cages");
 
         if let Some(cages) = &cages {
             let colours: BTreeSet<_> = cages.iter().flatten().filter_map(|cell| *cell).collect();
 
             for i in 0..width {
                 for j in 0..height {
+                    if !cell_present(puzzle, j as i64, i as i64) {
+                        continue;
+                    }
                     if let Some(cell) = cages[j][i] {
-                        let col = colours.iter().position(|&c| c == cell).unwrap();
-                        let i_f = i as f64;
-                        let j_f = j as f64;
-                        let path = format!(
-                            "M {} {} H {} V {} H {} Z",
-                            step * i_f,
-                            step * j_f,
-                            step * (i_f + 1.0),
-                            step * (j_f + 1.0),
-                            step * i_f
-                        );
-
+                        let col = colours.iter().position(|&c| c == cell).unwrap() as i64;
                         let mut p = element::Path::new();
-                        p.assign("d", path);
-                        p.assign("fill", colours_list[col]);
+                        p.assign("d", cell_path(j as i64, i as i64));
+                        p.assign("class", format!("region-{}", col % REGION_COLOURS));
                         cagegrp.append(p);
                     }
                 }
@@ -618,29 +608,35 @@ impl PuzzleDraw {
             for i in 0..width {
                 for j in 0..height {
                     let Some(k) = tints[j][i] else { continue };
-                    let col = ((k - 1).max(0) as usize) % colours_list.len();
-                    let i_f = i as f64;
-                    let j_f = j as f64;
-                    let path = format!(
-                        "M {} {} H {} V {} H {} Z",
-                        step * i_f,
-                        step * j_f,
-                        step * (i_f + 1.0),
-                        step * (j_f + 1.0),
-                        step * i_f
-                    );
+                    let col = (k - 1).max(0) % REGION_COLOURS;
                     let mut p = element::Path::new();
-                    p.assign("d", path);
-                    p.assign("fill", colours_list[col]);
+                    p.assign("d", cell_path(j as i64, i as i64));
+                    p.assign("class", format!("region-{col}"));
                     cagegrp.append(p);
                 }
             }
         }
 
-        grp.append(cagegrp);
+        topgrp.append(cagegrp);
 
+        let outlinegrp = if self.decorations.hex() {
+            self.draw_outline_generic(geom, puzzle)
+        } else {
+            self.draw_outline_square(puzzle, width, height)
+        };
+        topgrp.append(outlinegrp);
+        topgrp
+    }
+
+    /// Rectangular grid outline: one stroke per grid line, thicker at the border,
+    /// at cage boundaries and (for sudoku) every third line. This is the original
+    /// square path, kept verbatim so square puzzles render unchanged.
+    fn draw_outline_square(&self, puzzle: &Puzzle, width: usize, height: usize) -> element::Group {
+        let cages = &puzzle.cages;
         let mut outlinegrp = element::Group::new();
+        outlinegrp.assign("class", "layer-grid");
 
+        // Vertical grid lines.
         for i in 0..=width {
             for j in 0..height {
                 let mut stroke = self.base_width;
@@ -656,16 +652,7 @@ impl PuzzleDraw {
                         stroke = self.thick_width;
                     }
                 }
-                let i_f = i as f64;
-                let j_f = j as f64;
-
-                let path = format!(
-                    "M {} {} L {} {}",
-                    step * i_f,
-                    step * j_f,
-                    step * i_f,
-                    step * (j_f + 1.0)
-                );
+                let path = format!("M {} {} L {} {}", i, j, i, j + 1);
                 let mut p = element::Path::new();
                 p.assign("d", path);
                 p.assign("stroke", "black");
@@ -675,6 +662,7 @@ impl PuzzleDraw {
             }
         }
 
+        // Horizontal grid lines.
         for i in 0..width {
             for j in 0..=height {
                 let mut stroke = self.base_width;
@@ -690,16 +678,7 @@ impl PuzzleDraw {
                         stroke = self.thick_width;
                     }
                 }
-                let i_f = i as f64;
-                let j_f = j as f64;
-
-                let path = format!(
-                    "M {} {} L {} {}",
-                    step * i_f,
-                    step * j_f,
-                    step * (i_f + 1.0),
-                    step * j_f
-                );
+                let path = format!("M {} {} L {} {}", i, j, i + 1, j);
                 let mut p = element::Path::new();
                 p.assign("d", path);
                 p.assign("stroke", "black");
@@ -709,28 +688,75 @@ impl PuzzleDraw {
             }
         }
 
-        grp.append(outlinegrp);
+        outlinegrp
+    }
 
-        topgrp.append(grp);
-        topgrp
+    /// Topology-generic outline: stroke each present cell's polygon edges, drawing
+    /// every shared edge once (from the lexicographically-smaller cell). Edges on
+    /// the board boundary or between different cages get the thick stroke. Works
+    /// for any [`Geometry`]; used for hex boards.
+    fn draw_outline_generic(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> element::Group {
+        let mut outlinegrp = element::Group::new();
+        outlinegrp.assign("class", "layer-grid");
+
+        let cage_at = |r: i64, c: i64| -> Option<i64> {
+            puzzle
+                .cages
+                .as_ref()
+                .and_then(|cg| cg.get(r as usize))
+                .and_then(|row| row.get(c as usize))
+                .copied()
+                .flatten()
+        };
+
+        for r in 0..geom.height() {
+            for c in 0..geom.width() {
+                if !cell_present(puzzle, r, c) {
+                    continue;
+                }
+                let poly = geom.cell_polygon(r, c);
+                let n = poly.len();
+                for (nr, nc, k) in geom.neighbours(r, c) {
+                    let nb_present = cell_present(puzzle, nr, nc);
+                    // Draw each shared edge once: skip if a present neighbour is
+                    // lexicographically smaller (it will draw the edge instead).
+                    if nb_present && (nr, nc) < (r, c) {
+                        continue;
+                    }
+                    let stroke = if !nb_present || cage_at(r, c) != cage_at(nr, nc) {
+                        self.thick_width
+                    } else {
+                        self.base_width
+                    };
+                    let (x0, y0) = poly[k];
+                    let (x1, y1) = poly[(k + 1) % n];
+                    let mut p = element::Path::new();
+                    p.assign("d", format!("M {x0} {y0} L {x1} {y1}"));
+                    p.assign("stroke", "black");
+                    p.assign("stroke-width", stroke);
+                    p.assign("stroke-linecap", "round");
+                    outlinegrp.append(p);
+                }
+            }
+        }
+        outlinegrp
     }
 
     /// Draw thermometer paths (bulb circle + tube line) as SVG overlays.
-    fn draw_thermometers(&self, puzzle: &Puzzle) -> element::Group {
+    fn draw_thermometers(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> element::Group {
         let mut grp = element::Group::new();
+        grp.assign("class", "layer-lines");
         let therms = match &puzzle.thermometers {
             Some(t) => t,
             None => return grp,
         };
 
-        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-        let radius = step * 0.38;
-        let tube_width = step * 0.5;
-        let outline_extra = step * 0.06;
-        let fill_color = "#d8d8d8";
-        let outline_color = "#888888";
+        let radius = 0.38;
+        let tube_width = 0.5;
+        let outline_extra = 0.06;
 
         // Two-pass rendering: outlines first, then fills, so fills appear on top.
+        // Colours come from board.css (`.thermo-*`); only geometry is inline.
         let mut outlines = element::Group::new();
         let mut fills = element::Group::new();
 
@@ -741,7 +767,10 @@ impl PuzzleDraw {
 
             let points: String = therm
                 .iter()
-                .map(|[r, c]| format!("{},{}", step * (*c as f64 + 0.5), step * (*r as f64 + 0.5)))
+                .map(|[r, c]| {
+                    let (x, y) = geom.cell_centre(*r, *c);
+                    format!("{x},{y}")
+                })
                 .collect::<Vec<_>>()
                 .join(" ");
 
@@ -749,7 +778,7 @@ impl PuzzleDraw {
                 let mut poly_outline = element::Polyline::new();
                 poly_outline.assign("points", points.clone());
                 poly_outline.assign("fill", "none");
-                poly_outline.assign("stroke", outline_color);
+                poly_outline.assign("class", "thermo-tube-outline");
                 poly_outline.assign("stroke-width", tube_width + outline_extra);
                 poly_outline.assign("stroke-linecap", "round");
                 poly_outline.assign("stroke-linejoin", "round");
@@ -758,7 +787,7 @@ impl PuzzleDraw {
                 let mut poly_fill = element::Polyline::new();
                 poly_fill.assign("points", points);
                 poly_fill.assign("fill", "none");
-                poly_fill.assign("stroke", fill_color);
+                poly_fill.assign("class", "thermo-tube");
                 poly_fill.assign("stroke-width", tube_width);
                 poly_fill.assign("stroke-linecap", "round");
                 poly_fill.assign("stroke-linejoin", "round");
@@ -767,21 +796,20 @@ impl PuzzleDraw {
 
             // Bulb circle at the first cell.
             let [br, bc] = therm[0];
-            let cx = step * (bc as f64 + 0.5);
-            let cy = step * (br as f64 + 0.5);
+            let (cx, cy) = geom.cell_centre(br, bc);
 
             let mut bulb_outline = element::Circle::new();
             bulb_outline.assign("cx", cx);
             bulb_outline.assign("cy", cy);
             bulb_outline.assign("r", radius + outline_extra / 2.0);
-            bulb_outline.assign("fill", outline_color);
+            bulb_outline.assign("class", "thermo-bulb-outline");
             outlines.append(bulb_outline);
 
             let mut bulb_fill = element::Circle::new();
             bulb_fill.assign("cx", cx);
             bulb_fill.assign("cy", cy);
             bulb_fill.assign("r", radius);
-            bulb_fill.assign("fill", fill_color);
+            bulb_fill.assign("class", "thermo-bulb");
             fills.append(bulb_fill);
         }
 
@@ -794,16 +822,16 @@ impl PuzzleDraw {
     ///
     /// Each chevron is two SVG line segments forming a ‹/›/∧/∨ shape.
     /// The tip points toward the smaller cell (r1,c1).
-    fn draw_less_than(&self, puzzle: &Puzzle) -> element::Group {
+    fn draw_less_than(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> element::Group {
         let mut grp = element::Group::new();
+        grp.assign("class", "layer-ineq");
         let pairs = match &puzzle.less_than {
             Some(p) => p,
             None => return grp,
         };
 
-        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-        let s = step * 0.14; // half-arm length
-        let stroke_w = step * 0.03;
+        let s = 0.14; // half-arm length, cell units
+        let stroke_w = 0.03;
 
         for &[r1, c1, r2, c2] in pairs {
             // Only render for directly adjacent cells.
@@ -811,15 +839,19 @@ impl PuzzleDraw {
                 continue;
             }
 
-            // Centre of the symbol sits on the shared cell boundary.
+            // The symbol sits at the midpoint of the two cell centres, which for
+            // adjacent cells is the shared edge midpoint.
+            let (ax1, ay1) = geom.cell_centre(r1, c1);
+            let (ax2, ay2) = geom.cell_centre(r2, c2);
+            let cx = (ax1 + ax2) / 2.0;
+            let cy = (ay1 + ay2) / 2.0;
+
             // Chevron: two lines (ax,ay)→(mx,my) and (mx,my)→(bx,by).
             // (mx,my) is the tip, pointing toward the smaller cell (r1,c1).
             let (ax, ay, mx, my, bx, by);
 
             if r1 == r2 {
                 // Horizontal neighbours.
-                let cx = step * (c1.min(c2) as f64 + 1.0);
-                let cy = step * (r1 as f64 + 0.5);
                 if c1 < c2 {
                     // smaller on left → tip points left  (<)
                     ax = cx + s;
@@ -839,8 +871,6 @@ impl PuzzleDraw {
                 }
             } else {
                 // Vertical neighbours.
-                let cx = step * (c1 as f64 + 0.5);
-                let cy = step * (r1.min(r2) as f64 + 1.0);
                 if r1 < r2 {
                     // smaller on top → tip points up  (^)
                     ax = cx - s;
@@ -866,7 +896,7 @@ impl PuzzleDraw {
                 line.assign("y1", y1);
                 line.assign("x2", x2);
                 line.assign("y2", y2);
-                line.assign("stroke", "#444444");
+                line.assign("class", "ineq");
                 line.assign("stroke-width", stroke_w);
                 line.assign("stroke-linecap", "round");
                 grp.append(line);
@@ -883,13 +913,12 @@ impl PuzzleDraw {
     /// the cell tint).
     fn draw_constraint_shapes(
         &self,
-        puzzle: &Puzzle,
+        geom: &dyn Geometry,
         shapes: &[ConstraintShape],
     ) -> element::Group {
         let mut grp = element::Group::new();
         grp.assign("class", "constraint-shapes");
-        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-        let stagger_unit = step * 0.04;
+        let stagger_unit = 0.04;
 
         for shape in shapes {
             let class = format!(
@@ -907,15 +936,17 @@ impl PuzzleDraw {
                     if shape.cells.len() < 2 {
                         continue;
                     }
-                    let row = shape.cells[0][0] as f64;
+                    let row = shape.cells[0][0];
                     let cols: Vec<i64> = shape.cells.iter().map(|c| c[1]).collect();
-                    let c0 = (*cols.iter().min().unwrap()) as f64;
-                    let c1 = (*cols.iter().max().unwrap()) as f64;
-                    let y = step * (row + 0.5) + stagger_unit * shape.stagger as f64;
+                    let c0 = *cols.iter().min().unwrap();
+                    let c1 = *cols.iter().max().unwrap();
+                    let (x0, y) = geom.cell_centre(row, c0);
+                    let (x1, _) = geom.cell_centre(row, c1);
+                    let y = y + stagger_unit * shape.stagger as f64;
                     let mut line = element::Line::new();
-                    line.assign("x1", step * (c0 + 0.5));
+                    line.assign("x1", x0);
                     line.assign("y1", y);
-                    line.assign("x2", step * (c1 + 0.5));
+                    line.assign("x2", x1);
                     line.assign("y2", y);
                     line.assign("class", class);
                     grp.append(line);
@@ -924,31 +955,35 @@ impl PuzzleDraw {
                     if shape.cells.len() < 2 {
                         continue;
                     }
-                    let col = shape.cells[0][1] as f64;
+                    let col = shape.cells[0][1];
                     let rows: Vec<i64> = shape.cells.iter().map(|c| c[0]).collect();
-                    let r0 = (*rows.iter().min().unwrap()) as f64;
-                    let r1 = (*rows.iter().max().unwrap()) as f64;
-                    let x = step * (col + 0.5) + stagger_unit * shape.stagger as f64;
+                    let r0 = *rows.iter().min().unwrap();
+                    let r1 = *rows.iter().max().unwrap();
+                    let (x, y0) = geom.cell_centre(r0, col);
+                    let (_, y1) = geom.cell_centre(r1, col);
+                    let x = x + stagger_unit * shape.stagger as f64;
                     let mut line = element::Line::new();
                     line.assign("x1", x);
-                    line.assign("y1", step * (r0 + 0.5));
+                    line.assign("y1", y0);
                     line.assign("x2", x);
-                    line.assign("y2", step * (r1 + 0.5));
+                    line.assign("y2", y1);
                     line.assign("class", class);
                     grp.append(line);
                 }
                 ConstraintShapeKind::Pair => {
                     let [a, b] = [shape.cells[0], shape.cells[1]];
+                    let (ax, ay) = geom.cell_centre(a[0], a[1]);
+                    let (bx, by) = geom.cell_centre(b[0], b[1]);
                     let mut line = element::Line::new();
-                    line.assign("x1", step * (a[1] as f64 + 0.5));
-                    line.assign("y1", step * (a[0] as f64 + 0.5));
-                    line.assign("x2", step * (b[1] as f64 + 0.5));
-                    line.assign("y2", step * (b[0] as f64 + 0.5));
+                    line.assign("x1", ax);
+                    line.assign("y1", ay);
+                    line.assign("x2", bx);
+                    line.assign("y2", by);
                     line.assign("class", class);
                     grp.append(line);
                 }
                 ConstraintShapeKind::Region => {
-                    let path_d = region_perimeter_path(&shape.cells, step);
+                    let path_d = region_perimeter_path(geom, &shape.cells);
                     if path_d.is_empty() {
                         continue;
                     }
@@ -963,8 +998,9 @@ impl PuzzleDraw {
     }
 
     /// Draw small cage sum labels in the top-left corner of each cage's top-left cell.
-    fn draw_cage_sums(&self, puzzle: &Puzzle) -> element::Group {
+    fn draw_cage_sums(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> element::Group {
         let mut grp = element::Group::new();
+        grp.assign("class", "layer-cage-sums");
         let cages = match &puzzle.cages {
             Some(c) => c,
             None => return grp,
@@ -974,8 +1010,7 @@ impl PuzzleDraw {
             None => return grp,
         };
 
-        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-        let font_size = step * 0.28;
+        let font_size = 0.28;
         let height = usize::try_from(puzzle.height).expect("negative height");
         let width = usize::try_from(puzzle.width).expect("negative width");
 
@@ -996,29 +1031,34 @@ impl PuzzleDraw {
                 continue;
             }
             let sum = cage_sums[idx];
-            let x = step * c as f64 + step * 0.04;
-            let y = step * r as f64 + font_size + step * 0.03;
+            // Top-left vertex of the cell, nudged inward.
+            let (vx, vy) = geom.cell_polygon(r as i64, c as i64)[0];
+            let x = vx + 0.04;
+            let y = vy + font_size + 0.03;
 
             let mut text = svg::node::element::Text::new(sum.to_string());
             text.assign("x", x);
             text.assign("y", y);
             text.assign("font-size", font_size);
-            text.assign("fill", "#111111");
+            text.assign("class", "cage-sum");
             grp.append(text);
         }
 
         grp
     }
 
-    fn make_cells(&self, puzzle: &Puzzle) -> Vec<Vec<element::Group>> {
-        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-
+    fn make_cells(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> Vec<Vec<element::Group>> {
         let mut out = Vec::new();
-        for i in 0..puzzle.height {
+        for i in 0..geom.height() {
             out.push(vec![]);
-            for j in 0..puzzle.width {
-                let g = make_cell(i, j, step);
-
+            for j in 0..geom.width() {
+                // Absent cells (presence mask) get an empty placeholder so the
+                // grid stays indexable, but render nothing.
+                let g = if cell_present(puzzle, i, j) {
+                    make_cell(geom, i, j)
+                } else {
+                    element::Group::new()
+                };
                 out.last_mut().unwrap().push(g);
             }
         }
@@ -1031,25 +1071,13 @@ impl PuzzleDraw {
     /// candidates) so they can be rendered AFTER overlays — keeping numbers
     /// always on top of constraint-shape lines/regions.  No `id` (would
     /// clash with the corresponding cell `<g>`) and no background rect.
-    fn make_text_cells(&self, puzzle: &Puzzle) -> Vec<Vec<element::Group>> {
-        let step = 1.0 / std::cmp::min(puzzle.width, puzzle.height) as f64;
-
+    fn make_text_cells(&self, geom: &dyn Geometry) -> Vec<Vec<element::Group>> {
         let mut out = Vec::new();
-        for i in 0..puzzle.height {
+        for i in 0..geom.height() {
             out.push(vec![]);
-            for j in 0..puzzle.width {
-                let i_f = i as f64;
-                let j_f = j as f64;
+            for j in 0..geom.width() {
                 let mut g = element::Group::new();
-                g.assign(
-                    "transform",
-                    format!(
-                        "translate({} {}) scale({})",
-                        step * (j_f + 0.05),
-                        step * (i_f + 0.05),
-                        step * 0.9
-                    ),
-                );
+                g.assign("transform", cell_content_transform(geom, i, j));
                 // Mouse / hover handling stays on the underlying cell <g>.
                 g.assign("pointer-events", "none");
                 g.assign("class", "cell-text-overlay");
@@ -1061,63 +1089,74 @@ impl PuzzleDraw {
     }
 }
 
+/// Whether cell `(row, col)` is part of the board: in bounds, and not masked
+/// out by the presence grid (used to carve non-rectangular shapes, e.g. a
+/// radius-N hexagon from the `[r][q]` rhombus).
+fn cell_present(puzzle: &Puzzle, row: i64, col: i64) -> bool {
+    if row < 0 || col < 0 || row >= puzzle.height || col >= puzzle.width {
+        return false;
+    }
+    match &puzzle.present {
+        None => true,
+        Some(grid) => grid
+            .get(row as usize)
+            .and_then(|r| r.get(col as usize))
+            .copied()
+            .unwrap_or(false),
+    }
+}
+
 /// Build an SVG `path d` attribute tracing the outline of the union of `cells`,
 /// skipping any cell-edge that's shared with another cell in the same set.
-/// Edges sit exactly on cell boundaries (no inset).  Output is a series of
-/// disconnected `M x y L x y` segments — fine for stroking, the path is not
-/// expected to be closed or filled.
-fn region_perimeter_path(cells: &[[i64; 2]], step: f64) -> String {
+/// Edges follow the geometry's cell polygons, so this works for square and hex
+/// boards alike. Output is a series of disconnected `M x y L x y` segments —
+/// fine for stroking; the path is not expected to be closed or filled.
+fn region_perimeter_path(geom: &dyn Geometry, cells: &[[i64; 2]]) -> String {
     use std::collections::BTreeSet;
     let cellset: BTreeSet<[i64; 2]> = cells.iter().copied().collect();
     let mut out = String::new();
     for &[r, c] in cells {
-        let x0 = step * c as f64;
-        let x1 = step * (c + 1) as f64;
-        let y0 = step * r as f64;
-        let y1 = step * (r + 1) as f64;
-        // Top edge — skip if cell (r-1, c) is in scope.
-        if !cellset.contains(&[r - 1, c]) {
-            out.push_str(&format!("M {x0} {y0} L {x1} {y0} "));
-        }
-        // Bottom edge — skip if cell (r+1, c) is in scope.
-        if !cellset.contains(&[r + 1, c]) {
-            out.push_str(&format!("M {x0} {y1} L {x1} {y1} "));
-        }
-        // Left edge — skip if cell (r, c-1) is in scope.
-        if !cellset.contains(&[r, c - 1]) {
-            out.push_str(&format!("M {x0} {y0} L {x0} {y1} "));
-        }
-        // Right edge — skip if cell (r, c+1) is in scope.
-        if !cellset.contains(&[r, c + 1]) {
-            out.push_str(&format!("M {x1} {y0} L {x1} {y1} "));
+        let poly = geom.cell_polygon(r, c);
+        let n = poly.len();
+        for (nr, nc, k) in geom.neighbours(r, c) {
+            // Draw this edge unless the neighbour across it is also in the set.
+            if cellset.contains(&[nr, nc]) {
+                continue;
+            }
+            let (x0, y0) = poly[k];
+            let (x1, y1) = poly[(k + 1) % n];
+            out.push_str(&format!("M {x0} {y0} L {x1} {y1} "));
         }
     }
     out
 }
 
-fn make_cell(i: i64, j: i64, step: f64) -> element::Group {
-    let i_f = i as f64;
-    let j_f = j as f64;
+/// Transform placing a cell's local `0..1` content box (used for candidate
+/// grids, given digits, walls) centred on the cell, inset to 0.9 of the cell so
+/// a small margin shows around the content.  Works for any geometry: the box is
+/// centred on [`Geometry::cell_centre`].
+fn cell_content_transform(geom: &dyn Geometry, i: i64, j: i64) -> String {
+    let (cx, cy) = geom.cell_centre(i, j);
+    format!("translate({} {}) scale(0.9)", cx - 0.45, cy - 0.45)
+}
 
+fn make_cell(geom: &dyn Geometry, i: i64, j: i64) -> element::Group {
     let mut g = element::Group::new();
     g.assign("id", format!("C_{}_{}", i + 1, j + 1));
     g.assign("data-cell", format!("{},{}", i + 1, j + 1));
-    g.assign(
-        "transform",
-        format!(
-            "translate({} {}) scale({})",
-            step * (j_f + 0.05),
-            step * (i_f + 0.05),
-            step * 0.9
-        ),
-    );
+    g.assign("transform", cell_content_transform(geom, i, j));
 
-    // Transparent background rect — always present so CSS can target it for highlighting
-    // (e.g. g.con-preview .cell-bg { fill: ... }).  Sized to fill the 0..1 cell coordinate space.
-    let mut bg = element::Rectangle::new();
+    // Transparent background polygon — always present so CSS can target it for
+    // highlighting (e.g. g.con-preview .cell-bg { fill: ... }).  Follows the cell
+    // shape (square or hex) in the 0..1 local content space.
+    let points = geom
+        .local_bg_points()
+        .iter()
+        .map(|(x, y)| format!("{x},{y}"))
+        .join(" ");
+    let mut bg = element::Polygon::new();
     bg.assign("class", "cell-bg");
-    bg.assign("width", 1);
-    bg.assign("height", 1);
+    bg.assign("points", points);
     g.append(bg);
 
     g
@@ -1130,6 +1169,107 @@ mod tests {
     use test_log::test;
 
     use crate::{json::Problem, web::puzsvg::PuzzleDraw};
+
+    /// The cell-unit/layer refactor must keep a cell-unit viewBox (not the old
+    /// 500×500 + scale(400) wrapper), emit the named layer stack, and preserve
+    /// the literal-by-default DOM contract the JS hover layer and CSS depend on.
+    #[test]
+    fn test_svg_cell_unit_layers_and_literals() -> anyhow::Result<()> {
+        let file = File::open("./tst/render_fixture.json")?;
+        let problem: Problem = serde_json::from_reader(file)?;
+        let svg = PuzzleDraw::new_with_decs(&problem.puzzle.kind, &problem.puzzle.decorations)
+            .draw_puzzle(&problem);
+        let s = svg.to_string();
+
+        // Cell-unit coordinate system, not the legacy fixed-pixel wrapper.
+        assert!(
+            !s.contains("0 0 500 500") && !s.contains("scale(400)"),
+            "should use a cell-unit viewBox, not the 500×500 wrapper"
+        );
+        // Named layer stack.
+        for cls in [
+            "layer-cages",
+            "layer-grid",
+            "layer-cells",
+            "layer-overlays",
+            "layer-digits",
+        ] {
+            assert!(s.contains(cls), "missing layer class {cls}");
+        }
+        // Literal-by-default DOM contract: per-cell ids, candidate boxes, classes.
+        assert!(s.contains("C_1_1"), "cell id C_1_1 missing");
+        assert!(s.contains("litbox"), "candidate litbox missing");
+        assert!(s.contains("data-cand"), "data-cand missing");
+        assert!(s.contains("litinmus"), "litinmus class missing");
+        Ok(())
+    }
+
+    /// The board carries its styling inline (so exported SVG renders standalone)
+    /// and moves colours out of Rust into board.css classes.
+    #[test]
+    fn test_svg_self_contained_styling() -> anyhow::Result<()> {
+        let file = File::open("./tst/render_fixture.json")?;
+        let problem: Problem = serde_json::from_reader(file)?;
+        let svg = PuzzleDraw::new_with_decs(&problem.puzzle.kind, &problem.puzzle.decorations)
+            .draw_puzzle(&problem);
+        let s = svg.to_string();
+        // Inline stylesheet present.
+        assert!(s.contains("<style"), "inline <style> missing");
+        assert!(s.contains(".thermo-tube"), "board.css not embedded");
+        // Colours are class-driven, not hardcoded as fill attributes.
+        assert!(
+            s.contains("class=\"thermo-bulb\""),
+            "thermo bulb class missing"
+        );
+        assert!(
+            s.contains("region-"),
+            "cage/region fills should use region-N classes"
+        );
+        assert!(
+            !s.contains("fill=\"#d8d8d8\""),
+            "thermometer colour should live in CSS, not a fill attribute"
+        );
+        Ok(())
+    }
+
+    /// The `hex` decoration lays the board out as hexagons: cell centres use the
+    /// √3 axial spacing, candidates and region perimeters still render.
+    #[test]
+    fn test_svg_hex_topology() -> anyhow::Result<()> {
+        let file = File::open("./tst/hex_fixture.json")?;
+        let problem: Problem = serde_json::from_reader(file)?;
+        let svg = PuzzleDraw::new_with_decs(&problem.puzzle.kind, &problem.puzzle.decorations)
+            .draw_puzzle(&problem);
+        let s = svg.to_string();
+        // Hex axial spacing leaves the √3 factor in coordinates; a square board
+        // would only have integer / half-integer cell positions.
+        assert!(
+            s.contains("1.732"),
+            "hex √3 spacing missing — not laid out as hexagons"
+        );
+        // Literal-by-default candidates and the hex region perimeter both render.
+        assert!(s.contains("litbox"), "hex candidates missing");
+        assert!(
+            s.contains("constraint-shape region"),
+            "hex region perimeter missing"
+        );
+        Ok(())
+    }
+
+    /// Outside labels (nonogram clues) still render and the viewBox expands to
+    /// include them.
+    #[test]
+    fn test_svg_labels_expand_viewbox() -> anyhow::Result<()> {
+        let file = File::open("./tst/nonogram_fixture.json")?;
+        let problem: Problem = serde_json::from_reader(file)?;
+        let svg = PuzzleDraw::new_with_decs(&problem.puzzle.kind, &problem.puzzle.decorations)
+            .draw_puzzle(&problem);
+        let s = svg.to_string();
+        assert!(s.contains("layer-labels"), "labels layer missing");
+        // 10 + 5 = 15 non-empty clue strings → 15 label <text> elements.
+        assert!(s.contains("viewBox"), "viewBox missing");
+        Ok(())
+    }
 
     #[test]
     fn test_svg_sudoku() -> anyhow::Result<()> {
@@ -1198,6 +1338,7 @@ mod tests {
             info: None,
             constraint_classes: None,
             decorations: vec![],
+            present: None,
         };
         let problem = Problem {
             puzzle,
