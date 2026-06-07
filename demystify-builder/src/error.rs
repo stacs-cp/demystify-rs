@@ -47,7 +47,10 @@ pub enum BuildError {
     )]
     MissingMainShow,
 
-    #[error("$#VAR '{0}' was declared but never referenced in any constraint")]
+    #[error(
+        "$#VAR '{0}' was declared but never referenced in any $#CON constraint \
+         (unguarded and structural constraints, including the int one-hot, don't count)"
+    )]
     UnusedVar(String),
 
     #[error("$#CON family '{0}' was declared but never used")]

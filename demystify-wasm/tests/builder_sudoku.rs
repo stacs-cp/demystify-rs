@@ -201,8 +201,12 @@ fn check_uniqueness_returns_solution() {
     let puzzle = build_sudoku_4x4();
     let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
 
-    let res: serde_json::Value =
-        from_value(planner.check_uniqueness().expect("check_uniqueness")).expect("decode result");
+    let res: serde_json::Value = from_value(
+        planner
+            .check_uniqueness(JsValue::NULL)
+            .expect("check_uniqueness"),
+    )
+    .expect("decode result");
 
     assert_eq!(
         res.get("status").and_then(|s| s.as_str()),
@@ -211,9 +215,9 @@ fn check_uniqueness_returns_solution() {
     );
 
     let solution = res
-        .get("solution")
+        .get("fixedVars")
         .and_then(|s| s.as_array())
-        .unwrap_or_else(|| panic!("unique result must carry a solution array; got {res}"));
+        .unwrap_or_else(|| panic!("unique result must carry a fixedVars array; got {res}"));
 
     // Every cell[r,c,v] boolean is decided, so the solution is one equality
     // per cell variable: N^3 entries, of which the N*N "=1" ones spell out
@@ -255,5 +259,93 @@ fn check_uniqueness_returns_solution() {
     assert!(
         !planner.is_solved(),
         "check_uniqueness should not advance the caller's planner state"
+    );
+}
+
+/// A two-cell puzzle with "exactly one of x[1], x[2] is true": two
+/// solutions, so check_uniqueness can exercise the multiple / partial /
+/// unsolvable branches and the literals argument.
+fn build_two_cell() -> WasmPuzzle {
+    let b = WasmBuilder::new();
+    b.kind("two-cell").expect("kind");
+    let dims = serde_wasm_bindgen::to_value(&vec![vec![1_i64, 2]]).expect("encode dims");
+    let x = b.var_bool_matrix("x", dims).expect("declare x");
+    // Guarded so x counts as referenced (unguarded constraints don't), and
+    // con guards are active by default, so "exactly one" really holds.
+    let g = b
+        .guard(
+            &b.con_bool("one").expect("con atom"),
+            "one",
+            "exactly one of x is true",
+        )
+        .expect("guard");
+    b.sum_eq(
+        g,
+        vec![
+            x.get(vec![1]).expect("x[1]").pos(),
+            x.get(vec![2]).expect("x[2]").pos(),
+        ],
+        1,
+    )
+    .expect("exactly-one");
+    b.build().expect("build")
+}
+
+fn status_of(res: &serde_json::Value) -> Option<&str> {
+    res.get("status").and_then(|s| s.as_str())
+}
+
+fn string_array(res: &serde_json::Value, field: &str) -> Vec<String> {
+    res.get(field)
+        .and_then(|v| v.as_array())
+        .unwrap_or_else(|| panic!("{field} missing/not an array; got {res}"))
+        .iter()
+        .map(|e| e.as_str().expect("array entry is a string").to_string())
+        .collect()
+}
+
+#[wasm_bindgen_test]
+fn check_uniqueness_partial_assignment() {
+    let puzzle = build_two_cell();
+    let planner = WasmPlanner::new(&puzzle, JsValue::NULL).expect("planner");
+
+    // No clues: two solutions; both cells free, nothing fixed.
+    let res: serde_json::Value =
+        from_value(planner.check_uniqueness(JsValue::NULL).expect("check")).expect("decode");
+    assert_eq!(status_of(&res), Some("multiple"), "{res}");
+    assert!(string_array(&res, "fixedVars").is_empty(), "{res}");
+    let mut unfixed = string_array(&res, "unfixedVars");
+    unfixed.sort();
+    assert_eq!(
+        unfixed,
+        vec!["x[1]".to_string(), "x[2]".to_string()],
+        "{res}"
+    );
+
+    // Pin x[1]=1: x[2]=0 follows, so the completion is now unique.
+    let lits = serde_wasm_bindgen::to_value(&vec!["x[1]=1".to_string()]).expect("encode lits");
+    let res: serde_json::Value =
+        from_value(planner.check_uniqueness(lits).expect("check")).expect("decode");
+    assert_eq!(status_of(&res), Some("unique"), "{res}");
+    let mut fixed = string_array(&res, "fixedVars");
+    fixed.sort();
+    assert_eq!(
+        fixed,
+        vec!["x[1]=1".to_string(), "x[2]=0".to_string()],
+        "{res}"
+    );
+
+    // Pin both true: contradicts exactly-one, so unsolvable.
+    let lits = serde_wasm_bindgen::to_value(&vec!["x[1]=1".to_string(), "x[2]=1".to_string()])
+        .expect("encode lits");
+    let res: serde_json::Value =
+        from_value(planner.check_uniqueness(lits).expect("check")).expect("decode");
+    assert_eq!(status_of(&res), Some("unsolvable"), "{res}");
+
+    // A literal that doesn't resolve is an error, not a silent miss.
+    let lits = serde_wasm_bindgen::to_value(&vec!["nope[9]=9".to_string()]).expect("encode lits");
+    assert!(
+        planner.check_uniqueness(lits).is_err(),
+        "an unknown literal should error"
     );
 }

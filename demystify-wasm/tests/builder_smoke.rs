@@ -130,9 +130,12 @@ fn aux_int_matrix_drives_table_constraint() {
 
     // Uniqueness: only the AUX side was pinned, but the table forces
     // the VAR side too — so the puzzle should classify as unique.
-    let uniq: serde_json::Value =
-        serde_wasm_bindgen::from_value(planner.check_uniqueness().expect("check_uniqueness"))
-            .expect("deserialise checkUniqueness");
+    let uniq: serde_json::Value = serde_wasm_bindgen::from_value(
+        planner
+            .check_uniqueness(wasm_bindgen::JsValue::NULL)
+            .expect("check_uniqueness"),
+    )
+    .expect("deserialise checkUniqueness");
     assert_eq!(uniq["status"], "unique", "got {uniq:?}");
 
     // Drive the planner; pick=2 lands in currentState (it's the VAR

@@ -88,23 +88,89 @@ struct MusPayload {
     name: Option<String>,
 }
 
-/// Result of [`WasmPlanner::check_uniqueness`].  The tag/field names
-/// are the JS-facing shape:
-/// `{status: "unsolvable" | "unique" | "multiple", solution?: [...], unfixedVars?: [...]}`.
+/// Result of [`WasmPlanner::check_uniqueness`].  The tag/field names are
+/// the JS-facing shape:
+///
+/// - `{status: "unsolvable"}`
+/// - `{status: "unique", fixedVars: ["grid[1,1]=5", ...]}`
+/// - `{status: "multiple", fixedVars: [...], unfixedVars: ["grid[2,3]", ...]}`
+///
+/// `fixedVars` holds the `var=val` equality each determined variable
+/// resolved to (in `format_puzlit` form); `unfixedVars` holds the names of
+/// the variables still free (in `format_puzvar` form).
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
 enum SolvabilityPayload {
     Unsolvable,
     Unique {
-        /// The unique solution, as `var=val` strings (one per assigned
-        /// puzzle literal), in the same `format_puzlit` form as
-        /// [`WasmPlanner::provable_literals`].
-        solution: Vec<String>,
+        #[serde(rename = "fixedVars")]
+        fixed_vars: Vec<String>,
     },
     Multiple {
+        #[serde(rename = "fixedVars")]
+        fixed_vars: Vec<String>,
         #[serde(rename = "unfixedVars")]
         unfixed_vars: Vec<String>,
     },
+}
+
+/// Pin each `var=val` / `var!=val` string in `lits` onto `planner` as an
+/// assumption (a not-required-to-be-proven known lit).  Returns an error
+/// naming the first string that doesn't resolve to a known puzzle literal.
+fn apply_assumptions(planner: &mut PuzzlePlanner, lits: &[String]) -> Result<(), String> {
+    if lits.is_empty() {
+        return Ok(());
+    }
+    let lookup: std::collections::HashMap<String, _> = planner
+        .puzzle()
+        .direct
+        .litmap
+        .iter()
+        .map(|(puzlit, sat_lit)| (format_puzlit(puzlit), *sat_lit))
+        .collect();
+    for s in lits {
+        match lookup.get(s) {
+            Some(lit) => planner.mark_lit_as_fixed(lit),
+            None => return Err(format!("unknown literal: {s}")),
+        }
+    }
+    Ok(())
+}
+
+/// Propagate `planner` to a fixed point and classify the result. Shared by
+/// every entry into [`WasmPlanner::check_uniqueness`]; mutates the planner,
+/// so callers pass a clone.
+fn solvability_payload(planner: &mut PuzzlePlanner) -> SolvabilityPayload {
+    if planner.check_solvability().is_none() {
+        return SolvabilityPayload::Unsolvable;
+    }
+    // Every decided variable contributes its `var=val` equality puzlit; the
+    // matching `!=` puzlits are dropped by the `sign()` filter.
+    let known: std::collections::HashSet<_> =
+        planner.get_all_known_lits().iter().copied().collect();
+    let mut fixed_vars = Vec::new();
+    for lit in planner.puzzle().var_lits.positive() {
+        if known.contains(lit) {
+            for puzlit in planner.puzzle().lit_to_vars(lit) {
+                if puzlit.sign() {
+                    fixed_vars.push(format_puzlit(puzlit));
+                }
+            }
+        }
+    }
+    let unfixed_vars: Vec<String> = planner
+        .unsolved_vars_after_solve()
+        .iter()
+        .map(format_puzvar)
+        .collect();
+    if unfixed_vars.is_empty() {
+        SolvabilityPayload::Unique { fixed_vars }
+    } else {
+        SolvabilityPayload::Multiple {
+            fixed_vars,
+            unfixed_vars,
+        }
+    }
 }
 
 /// Render a [`VarValPair`] as `var=val` for the FFI surface, reusing
@@ -205,49 +271,39 @@ impl WasmPlanner {
         to_js(&out).map_err(Into::into)
     }
 
-    /// Classify the puzzle's solution status. Runs propagation to a
-    /// fixed point on a *cloned* planner (so this call does not mutate
-    /// the caller's state) and returns one of:
+    /// Classify the puzzle's solvability, optionally under a partial
+    /// assignment.
     ///
-    /// - `{status: "unsolvable"}` — no satisfying assignment exists.
-    /// - `{status: "unique", solution: ["grid[1,1]=5", ...]}` — exactly
-    ///   one solution; `solution` lists every assigned puzzle literal.
-    /// - `{status: "multiple", unfixedVars: ["grid[2,3]", ...]}` —
-    ///   multiple solutions; `unfixedVars` lists the puzzle variables
-    ///   whose value is not pinned by the current clues.
+    /// `literals` is an optional JS array of `var=val` / `var!=val` strings
+    /// (the same form [`Self::provable_literals`] emits); pass `null`,
+    /// `undefined`, or `[]` for none. Each is pinned as an assumption before
+    /// solving, so the call doubles as "is this partial assignment solvable,
+    /// and what does it force?". It runs on a *cloned* planner, so the
+    /// caller's state is untouched. Returns one of:
     ///
-    /// REVEAL targets are propagated automatically because the
-    /// fixed-point loop keeps deducing as new triggers fire.
+    /// - `{status: "unsolvable"}` — no satisfying assignment exists (the
+    ///   clues, or the supplied literals, contradict each other).
+    /// - `{status: "unique", fixedVars: ["grid[1,1]=5", ...]}` — exactly one
+    ///   solution; every variable is determined and listed in `fixedVars`.
+    /// - `{status: "multiple", fixedVars: [...], unfixedVars: ["grid[2,3]",
+    ///   ...]}` — several solutions; `fixedVars` are the variables propagation
+    ///   pins (with their values) and `unfixedVars` the names of those still
+    ///   free.
+    ///
+    /// Errors if any string in `literals` doesn't resolve to a known puzzle
+    /// literal. REVEAL targets are propagated automatically.
     #[wasm_bindgen(js_name = checkUniqueness)]
-    pub fn check_uniqueness(&self) -> Result<JsValue, JsError> {
-        let mut planner: PuzzlePlanner = self.inner.lock().unwrap().clone();
-        let payload = match planner.check_solvability() {
-            None => SolvabilityPayload::Unsolvable,
-            Some(0) => {
-                // check_solvability propagated to a fixed point, so every
-                // puzzle variable is now decided.  The solution is the
-                // equality (`var=val`) puzlit each variable resolved to; the
-                // matching `!=` puzlits are dropped by the `sign()` filter.
-                let known: std::collections::HashSet<_> =
-                    planner.get_all_known_lits().iter().copied().collect();
-                let mut solution = Vec::new();
-                for lit in planner.puzzle().var_lits.positive() {
-                    if known.contains(lit) {
-                        for puzlit in planner.puzzle().lit_to_vars(lit) {
-                            if puzlit.sign() {
-                                solution.push(format_puzlit(puzlit));
-                            }
-                        }
-                    }
-                }
-                SolvabilityPayload::Unique { solution }
-            }
-            Some(_) => {
-                let vars = planner.unsolved_vars_after_solve();
-                let unfixed_vars = vars.iter().map(format_puzvar).collect();
-                SolvabilityPayload::Multiple { unfixed_vars }
-            }
+    pub fn check_uniqueness(&self, literals: JsValue) -> Result<JsValue, JsError> {
+        let assume: Vec<String> = if literals.is_null() || literals.is_undefined() {
+            Vec::new()
+        } else {
+            serde_wasm_bindgen::from_value(literals)
+                .map_err(|e| JsError::new(&format!("invalid literals list: {e}")))?
         };
+
+        let mut planner: PuzzlePlanner = self.inner.lock().unwrap().clone();
+        apply_assumptions(&mut planner, &assume).map_err(|e| JsError::new(&e))?;
+        let payload = solvability_payload(&mut planner);
         to_js(&payload).map_err(Into::into)
     }
 

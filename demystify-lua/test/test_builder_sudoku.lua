@@ -176,18 +176,18 @@ local function test_check_uniqueness_returns_solution()
     local res = planner:check_uniqueness()
     assert(res.status == "unique",
         "expected unique status, got " .. tostring(res.status))
-    assert(res.solution ~= nil, "unique result must carry a solution")
+    assert(res.fixed_vars ~= nil, "unique result must carry fixed_vars")
 
-    -- Every cell[r,c,v] boolean is decided, so the solution is one equality
+    -- Every cell[r,c,v] boolean is decided, so fixed_vars has one equality
     -- per cell variable: N*N*N entries, of which the N*N "=1" ones spell out
     -- the grid.
-    assert(#res.solution == N * N * N,
-        "expected " .. (N * N * N) .. " assignments; got " .. tostring(#res.solution))
+    assert(#res.fixed_vars == N * N * N,
+        "expected " .. (N * N * N) .. " assignments; got " .. tostring(#res.fixed_vars))
 
     local grid = {}
     for r = 1, N do grid[r] = {} end
     local ones = 0
-    for _, s in ipairs(res.solution) do
+    for _, s in ipairs(res.fixed_vars) do
         local r, c, v = string.match(s, "cell%[(%d+),%s*(%d+),%s*(%d+)%]=1$")
         if r ~= nil then
             grid[tonumber(r)][tonumber(c)] = tonumber(v)
@@ -212,8 +212,53 @@ local function test_check_uniqueness_returns_solution()
     print("PASS: check_uniqueness_returns_solution")
 end
 
+-- A two-cell puzzle with "exactly one of x[1], x[2] is true": two solutions,
+-- so check_uniqueness can exercise the multiple / partial / unsolvable
+-- branches and the literals argument.
+local function build_two_cell()
+    local b = demystify.Builder.new()
+    b:kind("two-cell")
+    local x = b:var_bool_matrix("x", {{1, 2}})
+    -- Guarded so x counts as referenced (unguarded constraints don't), and
+    -- con guards are active by default, so "exactly one" really holds.
+    local g = b:guard(b:con_bool("one"), "one", "exactly one of x is true")
+    b:sum_eq(g, { x:get({1}):pos(), x:get({2}):pos() }, 1)
+    return b:build()
+end
+
+local function test_check_uniqueness_partial_assignment()
+    local planner = demystify.Planner.new(build_two_cell())
+
+    -- No clues: two solutions; both cells free, nothing fixed.
+    local res = planner:check_uniqueness()
+    assert(res.status == "multiple", "expected multiple, got " .. tostring(res.status))
+    assert(#res.fixed_vars == 0,
+        "nothing should be fixed yet; got " .. tostring(#res.fixed_vars))
+    table.sort(res.unfixed_vars)
+    assert(#res.unfixed_vars == 2 and res.unfixed_vars[1] == "x[1]"
+        and res.unfixed_vars[2] == "x[2]", "expected x[1], x[2] unfixed")
+
+    -- Pin x[1]=1: x[2]=0 follows, so the completion is unique.
+    res = planner:check_uniqueness({ "x[1]=1" })
+    assert(res.status == "unique", "expected unique, got " .. tostring(res.status))
+    table.sort(res.fixed_vars)
+    assert(#res.fixed_vars == 2 and res.fixed_vars[1] == "x[1]=1"
+        and res.fixed_vars[2] == "x[2]=0", "expected x[1]=1 and x[2]=0")
+
+    -- Pin both true: contradicts exactly-one, so unsolvable.
+    res = planner:check_uniqueness({ "x[1]=1", "x[2]=1" })
+    assert(res.status == "unsolvable", "expected unsolvable, got " .. tostring(res.status))
+
+    -- An unknown literal is an error, not a silent miss.
+    local ok = pcall(function() planner:check_uniqueness({ "nope[9]=9" }) end)
+    assert(not ok, "an unknown literal should error")
+
+    print("PASS: check_uniqueness_partial_assignment")
+end
+
 test_builds_uniquely_solvable_puzzle()
 test_planner_deduces_full_solution()
 test_check_uniqueness_returns_solution()
+test_check_uniqueness_partial_assignment()
 
 print("All sudoku-4x4 builder tests passed")

@@ -163,7 +163,9 @@ fn check_uniqueness_reports_unique_for_little1() {
     let planner = load_planner();
     // little1 has a unique solution. checkUniqueness should classify it
     // as "unique" without mutating the planner.
-    let val = planner.check_uniqueness().expect("check_uniqueness");
+    let val = planner
+        .check_uniqueness(wasm_bindgen::JsValue::NULL)
+        .expect("check_uniqueness");
     let parsed: serde_json::Value = from_value(val).expect("deserialise");
     assert_eq!(parsed["status"], "unique", "got {parsed:?}");
 
@@ -188,8 +190,12 @@ fn check_uniqueness_classifies_three_cases() {
         build(&b);
         let puzzle = b.build().expect("build");
         let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
-        from_value(planner.check_uniqueness().expect("check_uniqueness"))
-            .expect("deserialise checkUniqueness")
+        from_value(
+            planner
+                .check_uniqueness(wasm_bindgen::JsValue::NULL)
+                .expect("check_uniqueness"),
+        )
+        .expect("deserialise checkUniqueness")
     }
 
     // Unique: 1 cell, sum >= 1 forces it true.
