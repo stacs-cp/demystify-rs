@@ -88,7 +88,7 @@ struct MusPayload {
     name: Option<String>,
 }
 
-/// Result of [`WasmPlanner::check_uniqueness`].  The tag/field names are
+/// Result of [`WasmPlanner::check_solvability`].  The tag/field names are
 /// the JS-facing shape:
 ///
 /// - `{status: "unsolvable"}`
@@ -138,7 +138,7 @@ fn apply_assumptions(planner: &mut PuzzlePlanner, lits: &[String]) -> Result<(),
 }
 
 /// Propagate `planner` to a fixed point and classify the result. Shared by
-/// every entry into [`WasmPlanner::check_uniqueness`]; mutates the planner,
+/// every entry into [`WasmPlanner::check_solvability`]; mutates the planner,
 /// so callers pass a clone.
 fn solvability_payload(planner: &mut PuzzlePlanner) -> SolvabilityPayload {
     if planner.check_solvability().is_none() {
@@ -292,8 +292,8 @@ impl WasmPlanner {
     ///
     /// Errors if any string in `literals` doesn't resolve to a known puzzle
     /// literal. REVEAL targets are propagated automatically.
-    #[wasm_bindgen(js_name = checkUniqueness)]
-    pub fn check_uniqueness(&self, literals: JsValue) -> Result<JsValue, JsError> {
+    #[wasm_bindgen(js_name = checkSolvability)]
+    pub fn check_solvability(&self, literals: JsValue) -> Result<JsValue, JsError> {
         let assume: Vec<String> = if literals.is_null() || literals.is_undefined() {
             Vec::new()
         } else {

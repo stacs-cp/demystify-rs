@@ -169,11 +169,11 @@ local function test_planner_deduces_full_solution()
     print("PASS: planner_deduces_full_solution")
 end
 
-local function test_check_uniqueness_returns_solution()
+local function test_check_solvability_returns_solution()
     local puzzle = build_sudoku_4x4()
     local planner = demystify.Planner.new(puzzle)
 
-    local res = planner:check_uniqueness()
+    local res = planner:check_solvability()
     assert(res.status == "unique",
         "expected unique status, got " .. tostring(res.status))
     assert(res.fixed_vars ~= nil, "unique result must carry fixed_vars")
@@ -207,13 +207,13 @@ local function test_check_uniqueness_returns_solution()
 
     -- The call solves a clone, so the caller's planner is untouched.
     assert(not planner:is_solved(),
-        "check_uniqueness should not advance the caller's planner state")
+        "check_solvability should not advance the caller's planner state")
 
-    print("PASS: check_uniqueness_returns_solution")
+    print("PASS: check_solvability_returns_solution")
 end
 
 -- A two-cell puzzle with "exactly one of x[1], x[2] is true": two solutions,
--- so check_uniqueness can exercise the multiple / partial / unsolvable
+-- so check_solvability can exercise the multiple / partial / unsolvable
 -- branches and the literals argument.
 local function build_two_cell()
     local b = demystify.Builder.new()
@@ -226,11 +226,11 @@ local function build_two_cell()
     return b:build()
 end
 
-local function test_check_uniqueness_partial_assignment()
+local function test_check_solvability_partial_assignment()
     local planner = demystify.Planner.new(build_two_cell())
 
     -- No clues: two solutions; both cells free, nothing fixed.
-    local res = planner:check_uniqueness()
+    local res = planner:check_solvability()
     assert(res.status == "multiple", "expected multiple, got " .. tostring(res.status))
     assert(#res.fixed_vars == 0,
         "nothing should be fixed yet; got " .. tostring(#res.fixed_vars))
@@ -239,26 +239,26 @@ local function test_check_uniqueness_partial_assignment()
         and res.unfixed_vars[2] == "x[2]", "expected x[1], x[2] unfixed")
 
     -- Pin x[1]=1: x[2]=0 follows, so the completion is unique.
-    res = planner:check_uniqueness({ "x[1]=1" })
+    res = planner:check_solvability({ "x[1]=1" })
     assert(res.status == "unique", "expected unique, got " .. tostring(res.status))
     table.sort(res.fixed_vars)
     assert(#res.fixed_vars == 2 and res.fixed_vars[1] == "x[1]=1"
         and res.fixed_vars[2] == "x[2]=0", "expected x[1]=1 and x[2]=0")
 
     -- Pin both true: contradicts exactly-one, so unsolvable.
-    res = planner:check_uniqueness({ "x[1]=1", "x[2]=1" })
+    res = planner:check_solvability({ "x[1]=1", "x[2]=1" })
     assert(res.status == "unsolvable", "expected unsolvable, got " .. tostring(res.status))
 
     -- An unknown literal is an error, not a silent miss.
-    local ok = pcall(function() planner:check_uniqueness({ "nope[9]=9" }) end)
+    local ok = pcall(function() planner:check_solvability({ "nope[9]=9" }) end)
     assert(not ok, "an unknown literal should error")
 
-    print("PASS: check_uniqueness_partial_assignment")
+    print("PASS: check_solvability_partial_assignment")
 end
 
 test_builds_uniquely_solvable_puzzle()
 test_planner_deduces_full_solution()
-test_check_uniqueness_returns_solution()
-test_check_uniqueness_partial_assignment()
+test_check_solvability_returns_solution()
+test_check_solvability_partial_assignment()
 
 print("All sudoku-4x4 builder tests passed")

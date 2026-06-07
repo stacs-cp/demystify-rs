@@ -159,13 +159,13 @@ fn parse_literal_roundtrip() {
 }
 
 #[wasm_bindgen_test]
-fn check_uniqueness_reports_unique_for_little1() {
+fn check_solvability_reports_unique_for_little1() {
     let planner = load_planner();
-    // little1 has a unique solution. checkUniqueness should classify it
+    // little1 has a unique solution. checkSolvability should classify it
     // as "unique" without mutating the planner.
     let val = planner
-        .check_uniqueness(wasm_bindgen::JsValue::NULL)
-        .expect("check_uniqueness");
+        .check_solvability(wasm_bindgen::JsValue::NULL)
+        .expect("check_solvability");
     let parsed: serde_json::Value = from_value(val).expect("deserialise");
     assert_eq!(parsed["status"], "unique", "got {parsed:?}");
 
@@ -175,16 +175,16 @@ fn check_uniqueness_reports_unique_for_little1() {
         .expect("deserialise provable literals");
     assert!(
         !lits.is_empty(),
-        "check_uniqueness must not consume the planner's deductions"
+        "check_solvability must not consume the planner's deductions"
     );
 }
 
 #[wasm_bindgen_test]
-fn check_uniqueness_classifies_three_cases() {
+fn check_solvability_classifies_three_cases() {
     use std::collections::BTreeSet;
 
     // Build a tiny 1-d boolean puzzle with the given constraints, run
-    // checkUniqueness, and return the parsed JSON.
+    // checkSolvability, and return the parsed JSON.
     fn classify(build: impl FnOnce(&WasmBuilder)) -> serde_json::Value {
         let b = WasmBuilder::new();
         build(&b);
@@ -192,10 +192,10 @@ fn check_uniqueness_classifies_three_cases() {
         let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
         from_value(
             planner
-                .check_uniqueness(wasm_bindgen::JsValue::NULL)
-                .expect("check_uniqueness"),
+                .check_solvability(wasm_bindgen::JsValue::NULL)
+                .expect("check_solvability"),
         )
-        .expect("deserialise checkUniqueness")
+        .expect("deserialise checkSolvability")
     }
 
     // Unique: 1 cell, sum >= 1 forces it true.

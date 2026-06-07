@@ -28,7 +28,7 @@
 //! | `best_step()` | Returns next deduction step with smallest MUS |
 //! | `quick_solve()` | Solves entire puzzle, returns all steps |
 //! | `difficulties()` | Returns difficulty (MUS size) for each deduction |
-//! | `check_uniqueness([lits])` | Classifies solvability (optionally under a partial assignment); reports fixed/unfixed vars |
+//! | `check_solvability([lits])` | Classifies solvability (optionally under a partial assignment); reports fixed/unfixed vars |
 //! | `known_literals()` | Returns array of all known literals |
 //! | `current_state()` | Returns nested table of current assignments |
 //! | `fix_literal(str)` | Manually fixes a literal by string |
@@ -368,9 +368,9 @@ impl LuaUserData for LuaPlanner {
         //   - "multiple" adds `fixed_vars` (the variables propagation pins,
         //     with values) and `unfixed_vars` (names of those still free).
         // Errors if a supplied literal doesn't resolve to a known puzzle
-        // literal. Mirrors `WasmPlanner::checkUniqueness`.
+        // literal. Mirrors `WasmPlanner::checkSolvability`.
         methods.add_method_mut(
-            "check_uniqueness",
+            "check_solvability",
             |lua, this, literals: Option<LuaTable>| {
                 let mut planner = this.inner.lock().unwrap().clone();
 
