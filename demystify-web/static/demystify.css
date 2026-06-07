@@ -706,176 +706,74 @@ body.he-root {
   background: var(--heather-soft);
 }
 
-/* ─── SVG puzzle styling ─── */
-
-.puzzle {
-  font-family: 'Inter', -apple-system, sans-serif;
-}
-
-.cell-bg {
-  fill: none;
-}
-
-[data-state="given"] .cell-bg {
-  fill: var(--sd-given);
-}
-
-/* ─── SVG highlight states (driven by JS data-hl attributes) ─── */
-
-#board [data-hl="scope"] .cell-bg   { fill: var(--sd-accent-b); }
-#board [data-hl="target"] .cell-bg  { fill: var(--sd-accent); }
-#board [data-hl="support"] .cell-bg {
-  stroke: var(--sd-accent-c);
-  stroke-width: 0.05;
-  stroke-dasharray: 0.03 0.02;
-  fill: var(--sd-accent-b);
-}
-#board .cell-bg { transition: fill 160ms ease; }
-
-/* ─── Existing literal/constraint CSS classes (MUS highlighting, heatmaps) ─── */
-
-.litpos {
-  color: var(--heather);
-  fill: var(--heather);
-}
-
-.litneg {
-  color: var(--heather);
-  fill: var(--heather);
-}
-
-.litneg text {
-  text-decoration: line-through;
-}
-
-.litinmus .litbox {
-  stroke-width: 0.05;
-  stroke: var(--warm);
-}
-
-.litknown {
-  fill: var(--ink-soft);
-  font-weight: bold;
-}
-
-.litinmus {
-  font-weight: bold;
-}
-
-.litbox {
-  stroke-width: 0.01;
-  stroke: rgba(107,63,181,0.2);
-  fill: none;
-  /* fill:none + default visiblePainted means clicks pass through the rect
-   * interior — only the thin stroke would catch them. Force capture so
-   * clicks anywhere inside the candidate cell reach its [data-cand] <g>. */
-  pointer-events: all;
-}
-
-@keyframes lit-pulse {
-  0%   { stroke: var(--heather); stroke-width: 0.08; }
-  50%  { stroke: var(--warm);    stroke-width: 0.08; }
-  100% { stroke: var(--heather); stroke-width: 0.08; }
-}
-
-g.selected rect {
-  fill: var(--sd-accent) !important;
-  animation: lit-pulse 0.8s ease-in-out infinite;
-}
+/* ─── SVG board styling lives in demystify/include/board.css ───
+ * It is embedded inline (<style>) in every rendered board, so it styles
+ * boards on this page and in standalone exports from a single source.
+ * Only rules that target the surrounding *HTML* (the deductions list and
+ * constraint rail) remain here. */
 
 .constraintlist div.selected,
 .he-deductions div.selected {
   background-color: var(--sd-accent) !important;
 }
 
-/* Constraint highlight colours (50 unique pastel shades) */
-.highlight_con0 rect, .constraintlist > div.highlight_con0, .he-deductions div.highlight_con0 { background-color: #d0ffff; fill: #d0ffff; }
-.highlight_con1 rect, .constraintlist > div.highlight_con1, .he-deductions div.highlight_con1 { background-color: #ffd0ff; fill: #ffd0ff; }
-.highlight_con2 rect, .constraintlist > div.highlight_con2, .he-deductions div.highlight_con2 { background-color: #ffffd0; fill: #ffffd0; }
-.highlight_con3 rect, .constraintlist > div.highlight_con3, .he-deductions div.highlight_con3 { background-color: #d0d0ff; fill: #d0d0ff; }
-.highlight_con4 rect, .constraintlist > div.highlight_con4, .he-deductions div.highlight_con4 { background-color: #d0ffd0; fill: #d0ffd0; }
-.highlight_con5 rect, .constraintlist > div.highlight_con5, .he-deductions div.highlight_con5 { background-color: #ffd0d0; fill: #ffd0d0; }
-.highlight_con6 rect, .constraintlist > div.highlight_con6, .he-deductions div.highlight_con6 { background-color: #ffe0c0; fill: #ffe0c0; }
-.highlight_con7 rect, .constraintlist > div.highlight_con7, .he-deductions div.highlight_con7 { background-color: #d0e8ff; fill: #d0e8ff; }
-.highlight_con8 rect, .constraintlist > div.highlight_con8, .he-deductions div.highlight_con8 { background-color: #e0d0ff; fill: #e0d0ff; }
-.highlight_con9 rect, .constraintlist > div.highlight_con9, .he-deductions div.highlight_con9 { background-color: #d0ffe0; fill: #d0ffe0; }
-.highlight_con10 rect, .constraintlist > div.highlight_con10, .he-deductions div.highlight_con10 { background-color: #f8d8e8; fill: #f8d8e8; }
-.highlight_con11 rect, .constraintlist > div.highlight_con11, .he-deductions div.highlight_con11 { background-color: #d8f8d8; fill: #d8f8d8; }
-.highlight_con12 rect, .constraintlist > div.highlight_con12, .he-deductions div.highlight_con12 { background-color: #e8e8ff; fill: #e8e8ff; }
-.highlight_con13 rect, .constraintlist > div.highlight_con13, .he-deductions div.highlight_con13 { background-color: #ffe8d8; fill: #ffe8d8; }
-.highlight_con14 rect, .constraintlist > div.highlight_con14, .he-deductions div.highlight_con14 { background-color: #d8ffe8; fill: #d8ffe8; }
-.highlight_con15 rect, .constraintlist > div.highlight_con15, .he-deductions div.highlight_con15 { background-color: #f0d8ff; fill: #f0d8ff; }
-.highlight_con16 rect, .constraintlist > div.highlight_con16, .he-deductions div.highlight_con16 { background-color: #e6f7ff; fill: #e6f7ff; }
-.highlight_con17 rect, .constraintlist > div.highlight_con17, .he-deductions div.highlight_con17 { background-color: #fff7d8; fill: #fff7d8; }
-.highlight_con18 rect, .constraintlist > div.highlight_con18, .he-deductions div.highlight_con18 { background-color: #e6d8f7; fill: #e6d8f7; }
-.highlight_con19 rect, .constraintlist > div.highlight_con19, .he-deductions div.highlight_con19 { background-color: #ffd8e6; fill: #ffd8e6; }
-.highlight_con20 rect, .constraintlist > div.highlight_con20, .he-deductions div.highlight_con20 { background-color: #d8f7f7; fill: #d8f7f7; }
-.highlight_con21 rect, .constraintlist > div.highlight_con21, .he-deductions div.highlight_con21 { background-color: #f7f7d8; fill: #f7f7d8; }
-.highlight_con22 rect, .constraintlist > div.highlight_con22, .he-deductions div.highlight_con22 { background-color: #ecd8ff; fill: #ecd8ff; }
-.highlight_con23 rect, .constraintlist > div.highlight_con23, .he-deductions div.highlight_con23 { background-color: #d8ecff; fill: #d8ecff; }
-.highlight_con24 rect, .constraintlist > div.highlight_con24, .he-deductions div.highlight_con24 { background-color: #ffece1; fill: #ffece1; }
-.highlight_con25 rect, .constraintlist > div.highlight_con25, .he-deductions div.highlight_con25 { background-color: #e1ffec; fill: #e1ffec; }
-.highlight_con26 rect, .constraintlist > div.highlight_con26, .he-deductions div.highlight_con26 { background-color: #f0e1ff; fill: #f0e1ff; }
-.highlight_con27 rect, .constraintlist > div.highlight_con27, .he-deductions div.highlight_con27 { background-color: #ffe1f0; fill: #ffe1f0; }
-.highlight_con28 rect, .constraintlist > div.highlight_con28, .he-deductions div.highlight_con28 { background-color: #e1f0ff; fill: #e1f0ff; }
-.highlight_con29 rect, .constraintlist > div.highlight_con29, .he-deductions div.highlight_con29 { background-color: #f0ffe1; fill: #f0ffe1; }
-.highlight_con30 rect, .constraintlist > div.highlight_con30, .he-deductions div.highlight_con30 { background-color: #e8d8d8; fill: #e8d8d8; }
-.highlight_con31 rect, .constraintlist > div.highlight_con31, .he-deductions div.highlight_con31 { background-color: #d8e8d8; fill: #d8e8d8; }
-.highlight_con32 rect, .constraintlist > div.highlight_con32, .he-deductions div.highlight_con32 { background-color: #d8d8e8; fill: #d8d8e8; }
-.highlight_con33 rect, .constraintlist > div.highlight_con33, .he-deductions div.highlight_con33 { background-color: #f9e9d9; fill: #f9e9d9; }
-.highlight_con34 rect, .constraintlist > div.highlight_con34, .he-deductions div.highlight_con34 { background-color: #d9f9e9; fill: #d9f9e9; }
-.highlight_con35 rect, .constraintlist > div.highlight_con35, .he-deductions div.highlight_con35 { background-color: #e9d9f9; fill: #e9d9f9; }
-.highlight_con36 rect, .constraintlist > div.highlight_con36, .he-deductions div.highlight_con36 { background-color: #f9d9e9; fill: #f9d9e9; }
-.highlight_con37 rect, .constraintlist > div.highlight_con37, .he-deductions div.highlight_con37 { background-color: #d9e9f9; fill: #d9e9f9; }
-.highlight_con38 rect, .constraintlist > div.highlight_con38, .he-deductions div.highlight_con38 { background-color: #e9f9d9; fill: #e9f9d9; }
-.highlight_con39 rect, .constraintlist > div.highlight_con39, .he-deductions div.highlight_con39 { background-color: #f5e0f0; fill: #f5e0f0; }
-.highlight_con40 rect, .constraintlist > div.highlight_con40, .he-deductions div.highlight_con40 { background-color: #e0f5e0; fill: #e0f5e0; }
-.highlight_con41 rect, .constraintlist > div.highlight_con41, .he-deductions div.highlight_con41 { background-color: #e0e0f5; fill: #e0e0f5; }
-.highlight_con42 rect, .constraintlist > div.highlight_con42, .he-deductions div.highlight_con42 { background-color: #f5f0e0; fill: #f5f0e0; }
-.highlight_con43 rect, .constraintlist > div.highlight_con43, .he-deductions div.highlight_con43 { background-color: #e0f0f5; fill: #e0f0f5; }
-.highlight_con44 rect, .constraintlist > div.highlight_con44, .he-deductions div.highlight_con44 { background-color: #f0e0f5; fill: #f0e0f5; }
-.highlight_con45 rect, .constraintlist > div.highlight_con45, .he-deductions div.highlight_con45 { background-color: #f5e0e0; fill: #f5e0e0; }
-.highlight_con46 rect, .constraintlist > div.highlight_con46, .he-deductions div.highlight_con46 { background-color: #e0f5f0; fill: #e0f5f0; }
-.highlight_con47 rect, .constraintlist > div.highlight_con47, .he-deductions div.highlight_con47 { background-color: #f0f5e0; fill: #f0f5e0; }
-.highlight_con48 rect, .constraintlist > div.highlight_con48, .he-deductions div.highlight_con48 { background-color: #e8e0ec; fill: #e8e0ec; }
-.highlight_con49 rect, .constraintlist > div.highlight_con49, .he-deductions div.highlight_con49 { background-color: #ece8e0; fill: #ece8e0; }
-.highlight_con50 rect, .constraintlist > div.highlight_con50, .he-deductions div.highlight_con50 { background-color: #e0ece8; fill: #e0ece8; }
-
-g.con-preview .cell-bg {
-  fill: #ffe066 !important;
-}
-
 .constraint-instance:hover {
   background-color: rgba(107,63,181,0.05);
 }
 
-.litundeducable {
-  fill: #888888;
-}
-
-/* ─── Variable-specific styling ─── */
-
-/* Mines: show 1 as filled circle (mine), 0 as empty (safe) */
-.var-mines {
-  font-size: 0 !important;
-}
-
-.var-mines[data-cand="1"] .litbox {
-  stroke: #8b2020;
-  stroke-width: 0.05;
-  fill: #c04040 !important;
-}
-
-.var-mines[data-cand="0"] .litbox {
-  stroke: #5a7a5a;
-  stroke-width: 0.05;
-  fill: #a8d5a8 !important;
-}
-
-/* puz_initial (reveal-style puzzles): don't show as givens, it's only metadata */
-[data-state="given"] .var-puz_initial {
-  display: none !important;
-}
+/* Per-constraint highlight colours on the deduction list / rail (HTML).
+ * The matching board-cell tints are defined in board.css. */
+.constraintlist > div.highlight_con0, .he-deductions div.highlight_con0 { background-color: #d0ffff; }
+.constraintlist > div.highlight_con1, .he-deductions div.highlight_con1 { background-color: #ffd0ff; }
+.constraintlist > div.highlight_con2, .he-deductions div.highlight_con2 { background-color: #ffffd0; }
+.constraintlist > div.highlight_con3, .he-deductions div.highlight_con3 { background-color: #d0d0ff; }
+.constraintlist > div.highlight_con4, .he-deductions div.highlight_con4 { background-color: #d0ffd0; }
+.constraintlist > div.highlight_con5, .he-deductions div.highlight_con5 { background-color: #ffd0d0; }
+.constraintlist > div.highlight_con6, .he-deductions div.highlight_con6 { background-color: #ffe0c0; }
+.constraintlist > div.highlight_con7, .he-deductions div.highlight_con7 { background-color: #d0e8ff; }
+.constraintlist > div.highlight_con8, .he-deductions div.highlight_con8 { background-color: #e0d0ff; }
+.constraintlist > div.highlight_con9, .he-deductions div.highlight_con9 { background-color: #d0ffe0; }
+.constraintlist > div.highlight_con10, .he-deductions div.highlight_con10 { background-color: #f8d8e8; }
+.constraintlist > div.highlight_con11, .he-deductions div.highlight_con11 { background-color: #d8f8d8; }
+.constraintlist > div.highlight_con12, .he-deductions div.highlight_con12 { background-color: #e8e8ff; }
+.constraintlist > div.highlight_con13, .he-deductions div.highlight_con13 { background-color: #ffe8d8; }
+.constraintlist > div.highlight_con14, .he-deductions div.highlight_con14 { background-color: #d8ffe8; }
+.constraintlist > div.highlight_con15, .he-deductions div.highlight_con15 { background-color: #f0d8ff; }
+.constraintlist > div.highlight_con16, .he-deductions div.highlight_con16 { background-color: #e6f7ff; }
+.constraintlist > div.highlight_con17, .he-deductions div.highlight_con17 { background-color: #fff7d8; }
+.constraintlist > div.highlight_con18, .he-deductions div.highlight_con18 { background-color: #e6d8f7; }
+.constraintlist > div.highlight_con19, .he-deductions div.highlight_con19 { background-color: #ffd8e6; }
+.constraintlist > div.highlight_con20, .he-deductions div.highlight_con20 { background-color: #d8f7f7; }
+.constraintlist > div.highlight_con21, .he-deductions div.highlight_con21 { background-color: #f7f7d8; }
+.constraintlist > div.highlight_con22, .he-deductions div.highlight_con22 { background-color: #ecd8ff; }
+.constraintlist > div.highlight_con23, .he-deductions div.highlight_con23 { background-color: #d8ecff; }
+.constraintlist > div.highlight_con24, .he-deductions div.highlight_con24 { background-color: #ffece1; }
+.constraintlist > div.highlight_con25, .he-deductions div.highlight_con25 { background-color: #e1ffec; }
+.constraintlist > div.highlight_con26, .he-deductions div.highlight_con26 { background-color: #f0e1ff; }
+.constraintlist > div.highlight_con27, .he-deductions div.highlight_con27 { background-color: #ffe1f0; }
+.constraintlist > div.highlight_con28, .he-deductions div.highlight_con28 { background-color: #e1f0ff; }
+.constraintlist > div.highlight_con29, .he-deductions div.highlight_con29 { background-color: #f0ffe1; }
+.constraintlist > div.highlight_con30, .he-deductions div.highlight_con30 { background-color: #e8d8d8; }
+.constraintlist > div.highlight_con31, .he-deductions div.highlight_con31 { background-color: #d8e8d8; }
+.constraintlist > div.highlight_con32, .he-deductions div.highlight_con32 { background-color: #d8d8e8; }
+.constraintlist > div.highlight_con33, .he-deductions div.highlight_con33 { background-color: #f9e9d9; }
+.constraintlist > div.highlight_con34, .he-deductions div.highlight_con34 { background-color: #d9f9e9; }
+.constraintlist > div.highlight_con35, .he-deductions div.highlight_con35 { background-color: #e9d9f9; }
+.constraintlist > div.highlight_con36, .he-deductions div.highlight_con36 { background-color: #f9d9e9; }
+.constraintlist > div.highlight_con37, .he-deductions div.highlight_con37 { background-color: #d9e9f9; }
+.constraintlist > div.highlight_con38, .he-deductions div.highlight_con38 { background-color: #e9f9d9; }
+.constraintlist > div.highlight_con39, .he-deductions div.highlight_con39 { background-color: #f5e0f0; }
+.constraintlist > div.highlight_con40, .he-deductions div.highlight_con40 { background-color: #e0f5e0; }
+.constraintlist > div.highlight_con41, .he-deductions div.highlight_con41 { background-color: #e0e0f5; }
+.constraintlist > div.highlight_con42, .he-deductions div.highlight_con42 { background-color: #f5f0e0; }
+.constraintlist > div.highlight_con43, .he-deductions div.highlight_con43 { background-color: #e0f0f5; }
+.constraintlist > div.highlight_con44, .he-deductions div.highlight_con44 { background-color: #f0e0f5; }
+.constraintlist > div.highlight_con45, .he-deductions div.highlight_con45 { background-color: #f5e0e0; }
+.constraintlist > div.highlight_con46, .he-deductions div.highlight_con46 { background-color: #e0f5f0; }
+.constraintlist > div.highlight_con47, .he-deductions div.highlight_con47 { background-color: #f0f5e0; }
+.constraintlist > div.highlight_con48, .he-deductions div.highlight_con48 { background-color: #e8e0ec; }
+.constraintlist > div.highlight_con49, .he-deductions div.highlight_con49 { background-color: #ece8e0; }
+.constraintlist > div.highlight_con50, .he-deductions div.highlight_con50 { background-color: #e0ece8; }
 
 /* ─── htmx loading state ─── */
 
