@@ -225,15 +225,18 @@ impl WasmPlanner {
             None => SolvabilityPayload::Unsolvable,
             Some(0) => {
                 // check_solvability propagated to a fixed point, so every
-                // puzzle variable is now fixed.  The solution is each
-                // positive var-lit that ended up known-true.
+                // puzzle variable is now decided.  The solution is the
+                // equality (`var=val`) puzlit each variable resolved to; the
+                // matching `!=` puzlits are dropped by the `sign()` filter.
                 let known: std::collections::HashSet<_> =
                     planner.get_all_known_lits().iter().copied().collect();
                 let mut solution = Vec::new();
                 for lit in planner.puzzle().var_lits.positive() {
                     if known.contains(lit) {
                         for puzlit in planner.puzzle().lit_to_vars(lit) {
-                            solution.push(format_puzlit(puzlit));
+                            if puzlit.sign() {
+                                solution.push(format_puzlit(puzlit));
+                            }
                         }
                     }
                 }

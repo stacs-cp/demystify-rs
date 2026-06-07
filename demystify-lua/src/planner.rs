@@ -28,6 +28,7 @@
 //! | `best_step()` | Returns next deduction step with smallest MUS |
 //! | `quick_solve()` | Solves entire puzzle, returns all steps |
 //! | `difficulties()` | Returns difficulty (MUS size) for each deduction |
+//! | `check_uniqueness()` | Classifies solvability; returns the solution when unique |
 //! | `known_literals()` | Returns array of all known literals |
 //! | `current_state()` | Returns nested table of current assignments |
 //! | `fix_literal(str)` | Manually fixes a literal by string |
@@ -47,7 +48,8 @@ use std::sync::{Arc, Mutex};
 use mlua::prelude::*;
 
 use demystify::problem::{
-    PuzLit, PuzVar, VarValPair, format_puzlit, planner::PuzzlePlanner, solver::PuzzleSolver,
+    PuzLit, PuzVar, VarValPair, format_puzlit, format_puzvar, planner::PuzzlePlanner,
+    solver::PuzzleSolver,
 };
 
 use crate::puzzle::LuaPuzzle;
@@ -351,6 +353,55 @@ impl LuaUserData for LuaPlanner {
                 }
             }
 
+            Ok(result)
+        });
+
+        // Classify the puzzle's solution status without mutating the
+        // caller's state. Returns a table { status = "unsolvable" | "unique"
+        // | "multiple", ... }:
+        //   - "unique"   adds `solution`: an array of "var=val" strings.
+        //   - "multiple" adds `unfixed_vars`: an array of variable names
+        //     whose value is not pinned by the current clues.
+        // Mirrors `WasmPlanner::checkUniqueness`.
+        methods.add_method_mut("check_uniqueness", |lua, this, ()| {
+            let mut planner = this.inner.lock().unwrap().clone();
+            let result = lua.create_table()?;
+            match planner.check_solvability() {
+                None => {
+                    result.set("status", "unsolvable")?;
+                }
+                Some(0) => {
+                    // check_solvability propagated to a fixed point, so every
+                    // puzzle variable is now decided. The solution is the
+                    // equality (`var=val`) puzlit each variable resolved to;
+                    // the matching `!=` puzlits are dropped by the sign filter.
+                    result.set("status", "unique")?;
+                    let known: std::collections::HashSet<_> =
+                        planner.get_all_known_lits().iter().copied().collect();
+                    let solution = lua.create_table()?;
+                    let mut idx = 1;
+                    for lit in planner.puzzle().var_lits.positive() {
+                        if known.contains(lit) {
+                            for puzlit in planner.puzzle().lit_to_vars(lit) {
+                                if puzlit.sign() {
+                                    solution.set(idx, format_puzlit(puzlit))?;
+                                    idx += 1;
+                                }
+                            }
+                        }
+                    }
+                    result.set("solution", solution)?;
+                }
+                Some(_) => {
+                    result.set("status", "multiple")?;
+                    let vars = planner.unsolved_vars_after_solve();
+                    let unfixed = lua.create_table()?;
+                    for (i, var) in vars.iter().enumerate() {
+                        unfixed.set(i + 1, format_puzvar(var))?;
+                    }
+                    result.set("unfixed_vars", unfixed)?;
+                }
+            }
             Ok(result)
         });
 

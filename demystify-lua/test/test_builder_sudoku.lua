@@ -169,7 +169,51 @@ local function test_planner_deduces_full_solution()
     print("PASS: planner_deduces_full_solution")
 end
 
+local function test_check_uniqueness_returns_solution()
+    local puzzle = build_sudoku_4x4()
+    local planner = demystify.Planner.new(puzzle)
+
+    local res = planner:check_uniqueness()
+    assert(res.status == "unique",
+        "expected unique status, got " .. tostring(res.status))
+    assert(res.solution ~= nil, "unique result must carry a solution")
+
+    -- Every cell[r,c,v] boolean is decided, so the solution is one equality
+    -- per cell variable: N*N*N entries, of which the N*N "=1" ones spell out
+    -- the grid.
+    assert(#res.solution == N * N * N,
+        "expected " .. (N * N * N) .. " assignments; got " .. tostring(#res.solution))
+
+    local grid = {}
+    for r = 1, N do grid[r] = {} end
+    local ones = 0
+    for _, s in ipairs(res.solution) do
+        local r, c, v = string.match(s, "cell%[(%d+),%s*(%d+),%s*(%d+)%]=1$")
+        if r ~= nil then
+            grid[tonumber(r)][tonumber(c)] = tonumber(v)
+            ones = ones + 1
+        end
+    end
+    assert(ones == N * N,
+        "expected " .. (N * N) .. " placed cells; got " .. tostring(ones))
+
+    for r = 1, N do
+        for c = 1, N do
+            assert(grid[r][c] == SOLUTION[r][c],
+                string.format("solution[%d,%d] = %s, expected %d",
+                    r, c, tostring(grid[r][c]), SOLUTION[r][c]))
+        end
+    end
+
+    -- The call solves a clone, so the caller's planner is untouched.
+    assert(not planner:is_solved(),
+        "check_uniqueness should not advance the caller's planner state")
+
+    print("PASS: check_uniqueness_returns_solution")
+end
+
 test_builds_uniquely_solvable_puzzle()
 test_planner_deduces_full_solution()
+test_check_uniqueness_returns_solution()
 
 print("All sudoku-4x4 builder tests passed")

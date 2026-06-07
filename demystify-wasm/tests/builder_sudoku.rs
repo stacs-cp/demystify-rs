@@ -195,3 +195,65 @@ fn planner_deduces_full_solution() {
         "planner did not deduce the unique sudoku-4x4 solution"
     );
 }
+
+#[wasm_bindgen_test]
+fn check_uniqueness_returns_solution() {
+    let puzzle = build_sudoku_4x4();
+    let planner = WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner");
+
+    let res: serde_json::Value =
+        from_value(planner.check_uniqueness().expect("check_uniqueness")).expect("decode result");
+
+    assert_eq!(
+        res.get("status").and_then(|s| s.as_str()),
+        Some("unique"),
+        "expected a unique solution; got {res}"
+    );
+
+    let solution = res
+        .get("solution")
+        .and_then(|s| s.as_array())
+        .unwrap_or_else(|| panic!("unique result must carry a solution array; got {res}"));
+
+    // Every cell[r,c,v] boolean is decided, so the solution is one equality
+    // per cell variable: N^3 entries, of which the N*N "=1" ones spell out
+    // the grid.
+    let n = N as usize;
+    assert_eq!(
+        solution.len(),
+        n * n * n,
+        "expected one assignment per cell variable"
+    );
+
+    let mut grid = [[0_i64; 4]; 4];
+    let mut ones = 0;
+    for entry in solution {
+        let s = entry.as_str().expect("solution entry is a string");
+        let (var, val) = s.split_once('=').expect("literal has '='");
+        let inner = var
+            .strip_prefix("cell[")
+            .and_then(|x| x.strip_suffix(']'))
+            .unwrap_or_else(|| panic!("unexpected literal format: {s}"));
+        let nums: Vec<i64> = inner
+            .split(',')
+            .map(|p| p.trim().parse::<i64>().expect("index int"))
+            .collect();
+        assert_eq!(nums.len(), 3, "cell literal should have 3 indices: {s}");
+        if val == "1" {
+            grid[(nums[0] - 1) as usize][(nums[1] - 1) as usize] = nums[2];
+            ones += 1;
+        }
+    }
+    assert_eq!(ones, n * n, "expected one placed cell per square");
+
+    assert_eq!(
+        grid, SOLUTION,
+        "check_uniqueness solution did not match the unique sudoku-4x4 answer"
+    );
+
+    // The call solves a clone, so the caller's planner is untouched.
+    assert!(
+        !planner.is_solved(),
+        "check_uniqueness should not advance the caller's planner state"
+    );
+}
