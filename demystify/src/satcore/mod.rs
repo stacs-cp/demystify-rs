@@ -785,12 +785,28 @@ impl SatCore {
         us: &[Lit],
         max_size: Option<i64>,
     ) -> SearchResult<Vec<Lit>> {
+        Ok(self
+            .minimise_us_bounded(known, us, max_size)?
+            .expect("minimise_us: greedy_minimise must succeed (input is UNSAT)"))
+    }
+
+    /// Bounded variant of [`Self::minimise_us`].  Returns `Some(mus)` for a MUS
+    /// of size at most `max_size`, or `None` if greedy minimisation could not
+    /// bring the subset down to that size.  Unlike `minimise_us`, the "no MUS
+    /// that small" outcome is returned rather than panicked on, so callers can
+    /// cheaply test "is there a MUS of size ≤ N for this literal?".
+    ///
+    /// Panics if `us` is satisfiable under `known`.
+    pub fn minimise_us_bounded(
+        &self,
+        known: &[Lit],
+        us: &[Lit],
+        max_size: Option<i64>,
+    ) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(known);
         let initial = self.raw_assumption_solve_with_core(us)?;
         let core = initial.expect("minimise_us: input must be an unsatisfiable subset");
-        Ok(self
-            .greedy_minimise(core, max_size)?
-            .expect("minimise_us: greedy_minimise must succeed (input is UNSAT)"))
+        self.greedy_minimise(core, max_size)
     }
 
     /// Finds a minimal unsatisfiable subset (MUS) of literals given a set of known literals.

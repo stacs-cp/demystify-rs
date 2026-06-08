@@ -697,6 +697,209 @@ impl PuzzlePlanner {
         solvesteps
     }
 
+    /// One cost-tiered greedy pass at MUS-size bound `bound`.
+    ///
+    /// Tier 1 (cheap): grab a raw core for every provable literal — one SAT call
+    /// each.  If *any* raw core is already `≤ bound`, accept those literals and
+    /// return.  The accepted cores are then minimised into true (irreducible)
+    /// MUSes so the step is readable — this is cheap because we only minimise
+    /// cores already known to be `≤ bound` (the huge cores are never touched),
+    /// and it cannot change which literals we deduce, only how tightly each is
+    /// explained.
+    ///
+    /// Tier 2 (only when no raw core qualified): bounded-minimise the cores we
+    /// already hold, accepting any that drop to `≤ bound`.
+    ///
+    /// Returns the accepted MUSes (every one of size `≤ bound`), or an empty
+    /// vector when nothing could be brought under the bound this pass — the
+    /// signal for [`Self::quick_solve_greedy`] to run the frontier search.
+    fn greedy_pass(&mut self, bound: i64) -> Vec<MusContext> {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        if varlits.is_empty() {
+            return vec![];
+        }
+
+        // Tier 1: raw cores; minimise the ones already small enough to accept.
+        let cores = self.psolve.get_all_cores(&varlits);
+        if cores.is_empty() {
+            return vec![];
+        }
+
+        let tier1: Vec<MusContext> = cores
+            .iter()
+            .filter(|(_, core)| core.len() as i64 <= bound)
+            .par_bridge()
+            .map(|(lit, core)| {
+                // Already ≤ bound, so this is a small minimisation.  If the
+                // solver hits a limit, the raw core is still a valid (if
+                // non-minimal) explanation, so fall back to it.
+                let mus = match self.psolve.minimise_core_for_lit(*lit, core) {
+                    Ok(m) => m,
+                    Err(_) => core.clone(),
+                };
+                MusContext::new(*lit, mus.into_iter().collect())
+            })
+            .collect();
+        if !tier1.is_empty() {
+            return merge_muscontexts(&tier1);
+        }
+
+        // Tier 2: bounded minimisation of the cores already in hand.
+        let tier2: Vec<MusContext> = self
+            .psolve
+            .minimise_cores_bounded(&cores, bound)
+            .into_iter()
+            .map(|(lit, mus)| MusContext::new(lit, mus.into_iter().collect()))
+            .collect();
+        merge_muscontexts(&tier2)
+    }
+
+    /// Thorough "harvest" pass: gather *every* provable literal that has a MUS of
+    /// size ≤ `target` in a single flat all-literals search, and return them
+    /// merged, ready to apply together.
+    ///
+    /// This sits between [`Self::greedy_pass`] (cheap, low recall) and the tight
+    /// frontier search in [`Self::quick_solve_greedy`].  When the cheap pass
+    /// stalls but the running maximum has *not* been reached, one harvest clears
+    /// the whole backlog at the current size — instead of re-paying the expensive
+    /// smallest-MUS search once per remaining literal of that size.  It does not
+    /// raise the maximum (everything it returns is ≤ `target`).
+    fn harvest_up_to(&mut self, target: i64) -> Vec<MusContext> {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        if varlits.is_empty() {
+            return vec![];
+        }
+        let found = self.psolve.get_muses_up_to(&varlits, target);
+        let muses: Vec<MusContext> = found
+            .into_iter()
+            .map(|(lit, mus)| MusContext::new(lit, mus.into_iter().collect()))
+            .collect();
+        merge_muscontexts(&muses)
+    }
+
+    /// Select the next greedy step's MUSes, advancing `current_max` if the step
+    /// raised the running maximum.  Does **not** mark anything deduced — the
+    /// caller applies the returned MUSes (so the same selection logic drives both
+    /// [`Self::quick_solve_greedy`] and [`Self::quick_solve_greedy_html`]).
+    ///
+    /// Escalates cheapest-first: a [`Self::greedy_pass`] at the current bound,
+    /// then (if that stalls and the bound is ≥ 2) a thorough [`Self::harvest_up_to`]
+    /// of everything ≤ `current_max`, and only if *that* also stalls the tight
+    /// `smallest_muses_with_config` frontier search — the sole place `current_max`
+    /// can rise.  Returns an empty vector only when the puzzle is fully solved.
+    fn next_greedy_step(&mut self, current_max: &mut i64) -> Vec<MusContext> {
+        let muses = self.greedy_pass(*current_max);
+        if !muses.is_empty() {
+            return muses;
+        }
+
+        // Cheap pass stalled but the maximum is ≥ 2: try a thorough harvest of
+        // everything ≤ current_max before paying for the tight search.  (At
+        // current_max ≤ 1 the frontier's size-1 scan is the better tool.)
+        if *current_max >= 2 {
+            let harvested = self.harvest_up_to(*current_max);
+            if !harvested.is_empty() {
+                return harvested;
+            }
+        }
+
+        // Genuinely nothing ≤ current_max: run the tight smallest-MUS search to
+        // find the new minimum.  This is the only place `current_max` can rise.
+        let frontier = self.smallest_muses_with_config();
+        if frontier.is_empty() {
+            return vec![];
+        }
+        let m = frontier.iter().map(|mc| mc.mus_len()).max().unwrap() as i64;
+        *current_max = (*current_max).max(m);
+        frontier
+    }
+
+    /// Solve the puzzle greedily, optimised to find the largest MUS in the solve
+    /// path as fast as possible.
+    ///
+    /// [`Self::quick_solve`] runs a full smallest-MUS search every step.  This
+    /// instead clears every deduction reachable at or below the largest MUS size
+    /// seen so far with cheap bounded passes ([`Self::greedy_pass`] /
+    /// [`Self::harvest_up_to`]), and only pays for a full smallest-MUS search when
+    /// those passes stall — which is the *only* place the running maximum can
+    /// rise.  Greedy minimisation is incomplete, so a stall does not by itself
+    /// prove no small MUS remains; the maximum is therefore only ever raised by
+    /// the frontier search, whose result is a true minimum (so the reported
+    /// maximum cannot over-report).
+    ///
+    /// Conceptually this is `--merge` with a threshold that auto-discovers the
+    /// puzzle's difficulty: each step applies every deduction whose MUS is ≤ the
+    /// largest size seen so far, instead of a fixed `--merge N`.  Every displayed
+    /// MUS is minimised (irreducible), so the output is as readable as
+    /// [`Self::quick_solve`]'s; only the *order* differs (a single step may mix
+    /// sizes rather than grouping by exact size).
+    pub fn quick_solve_greedy(&mut self) -> Vec<Vec<UserMus>> {
+        let mut solvesteps = vec![];
+        let mut current_max: i64 = 0;
+        while !self.psolve.get_provable_varlits().is_empty() {
+            if self.config.max_steps.is_some_and(|n| solvesteps.len() >= n) {
+                break;
+            }
+            let _step_timer = crate::stats::PhaseTimer::solve_step();
+
+            let muses = self.next_greedy_step(&mut current_max);
+            if muses.is_empty() {
+                break;
+            }
+
+            for mus in &muses {
+                let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
+                for lit in &mus.lits {
+                    self.psolve.verify_mus_provability(*lit, &mus_cons);
+                }
+            }
+
+            for mus in &muses {
+                for lit in &mus.lits {
+                    self.mark_lit_as_deduced(lit);
+                }
+            }
+
+            let muses = muses
+                .into_iter()
+                .map(|mus| self.mus_to_user_mus(&mus))
+                .collect_vec();
+
+            info!(target: "progress",
+                "greedy: {} steps, applied {} muses (max size so far {}), {} left, {} solver calls so far",
+                solvesteps.len(),
+                muses.len(),
+                current_max,
+                self.psolve.get_provable_varlits().len(),
+                get_solver_calls(),
+            );
+
+            solvesteps.push(muses);
+        }
+        info!(target: "planner", "greedy solved!");
+        solvesteps
+    }
+
+    /// HTML rendering of a greedy solve: same step selection as
+    /// [`Self::quick_solve_greedy`], rendered with the shared per-step HTML
+    /// builder used by [`Self::quick_solve_html`].
+    pub fn quick_solve_greedy_html(&mut self) -> String {
+        let mut html = String::new();
+        let mut current_max: i64 = 0;
+        while !self.psolve.get_provable_varlits().is_empty() {
+            let muses = self.next_greedy_step(&mut current_max);
+            let (new_html, lits) = if muses.is_empty() {
+                self.quick_display_html_step_impl(None, "There are no more values to deduce")
+            } else {
+                self.quick_display_html_step(Some(muses))
+            };
+            html += &new_html;
+            self.mark_lits_as_deduced(&lits);
+            html += "<br/>";
+        }
+        html
+    }
+
     /// Checks the solvability of the current problem state. This can be used
     /// to both check if a problem is inconsistent, or how much of the problem
     /// does not have a unique solution
@@ -1423,6 +1626,60 @@ mod tests {
             without_find_one.len(),
             "find_one changed the number of deduction steps"
         );
+    }
+
+    /// `quick_solve_greedy` must reach the same full set of deduced literals as
+    /// `quick_solve`.  The maximum MUS size and the per-step breakdown differ
+    /// (greedy applies non-minimal MUSes below the running maximum, and the
+    /// underlying search is nondeterministic), but the solution closure — the
+    /// union of all deduced `PuzLit`s — is path-independent, so it must match.
+    fn assert_greedy_deduces_same_lits(model: &str, param: &str) {
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            model, param,
+        ));
+
+        let mut quick = PuzzlePlanner::new(PuzzleSolver::new(result.clone()).unwrap());
+        let quick_seq = quick.quick_solve();
+
+        let mut greedy = PuzzlePlanner::new(PuzzleSolver::new(result).unwrap());
+        let greedy_seq = greedy.quick_solve_greedy();
+
+        // Greedy must fully solve the puzzle, with a well-formed sequence.
+        assert_valid_sequence(&greedy_seq);
+        assert!(
+            greedy.psolve.get_provable_varlits().is_empty(),
+            "quick_solve_greedy left literals unsolved"
+        );
+
+        let quick_lits: BTreeSet<PuzLit> = quick_seq
+            .into_iter()
+            .flatten()
+            .flat_map(|um| um.lits)
+            .collect();
+        let greedy_lits: BTreeSet<PuzLit> = greedy_seq
+            .into_iter()
+            .flatten()
+            .flat_map(|um| um.lits)
+            .collect();
+        assert_eq!(
+            quick_lits, greedy_lits,
+            "quick_solve_greedy deduced a different set of literals than quick_solve"
+        );
+    }
+
+    #[test]
+    fn test_greedy_solves_little_essence() {
+        assert_greedy_deduces_same_lits("./tst/little1.eprime", "./tst/little1.param");
+    }
+
+    #[test]
+    fn test_greedy_solves_binairo_essence() {
+        assert_greedy_deduces_same_lits("./tst/binairo.eprime", "./tst/binairo-1.param");
+    }
+
+    #[test]
+    fn test_greedy_solves_minesweeper_wall_essence() {
+        assert_greedy_deduces_same_lits("./tst/minesweeper.eprime", "./tst/minesweeperWall.param");
     }
 
     /// Verify that a solve sequence is well-formed:

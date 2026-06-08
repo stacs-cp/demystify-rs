@@ -1255,6 +1255,83 @@ impl PuzzleSolver {
             .collect())
     }
 
+    /// Bounded variant of [`Self::minimise_core_for_lit`].  Returns `Some(mus)`
+    /// (constraint lits only) for a MUS using at most `max_cons` constraints, or
+    /// `None` if greedy minimisation could not bring the core down to that size.
+    ///
+    /// The `+1` accounts for the deduction literal `!lit`: it is part of the
+    /// unsatisfiable subset being minimised but is not itself a constraint, so a
+    /// MUS with `max_cons` constraints has total size `max_cons + 1`.
+    pub fn minimise_core_for_lit_bounded(
+        &self,
+        lit: Lit,
+        core: &[Lit],
+        max_cons: i64,
+    ) -> SearchResult<Option<Vec<Lit>>> {
+        let mut us = core.to_vec();
+        us.push(!lit);
+        let minimised =
+            self.get_satcore()
+                .minimise_us_bounded(&self.knownlits, &us, Some(max_cons + 1))?;
+        Ok(minimised.map(|m| {
+            m.into_iter()
+                .filter(|x| self.puzzleparse.constraints.lits().contains(x))
+                .collect()
+        }))
+    }
+
+    /// Bounded-minimise a batch of `(lit, core)` pairs in parallel, keeping only
+    /// those that reduce to a MUS of at most `max_cons` constraints.  Returns the
+    /// `(lit, mus_cons)` pairs that succeeded; literals whose core could not be
+    /// brought under the bound (or hit a solver limit) are omitted.
+    pub fn minimise_cores_bounded(
+        &self,
+        cores: &[(Lit, Vec<Lit>)],
+        max_cons: i64,
+    ) -> Vec<(Lit, Vec<Lit>)> {
+        cores
+            .par_iter()
+            .filter_map(|(lit, core)| {
+                match self.minimise_core_for_lit_bounded(*lit, core, max_cons) {
+                    Ok(Some(mus)) => Some((*lit, mus)),
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
+    /// Flat "gather everything ≤ `target`" MUS search.  For every literal, run
+    /// one strategy search bounded at `target` and keep whatever MUS it returns
+    /// (guaranteed ≤ `target`).
+    ///
+    /// Unlike [`Self::get_many_vars_small_mus_quick`] there is **no** bound
+    /// tightening toward the global minimum: once the running maximum has risen
+    /// to `target` we no longer care whether a deduction's MUS is 2, 3 or 4, only
+    /// that it is ≤ `target`.  Searching flat at `target` is barely more expensive
+    /// than searching for size 2, and a single pass gathers every literal we can
+    /// currently explain within the bound — so the caller can clear the whole
+    /// backlog at the current size in one search instead of re-paying the tight
+    /// smallest-MUS search per size.
+    pub fn get_muses_up_to(&self, lits: &BTreeSet<Lit>, target: i64) -> Vec<(Lit, Vec<Lit>)> {
+        lits.par_iter()
+            .filter_map(|&x| {
+                let t0 = Instant::now();
+                let (ret, func) = self.search_one_mus(x, target, Strategy::default());
+                let elapsed = t0.elapsed();
+                let outcome = match &ret {
+                    Ok(Some(m)) => crate::stats::MusOutcome::Found(m.len()),
+                    Ok(None) => crate::stats::MusOutcome::NotFound,
+                    Err(_) => crate::stats::MusOutcome::Timeout,
+                };
+                crate::stats::record_mus_search(elapsed, outcome, func);
+                match ret {
+                    Ok(Some(m)) if (m.len() as i64) <= target => Some((x, m)),
+                    _ => None,
+                }
+            })
+            .collect()
+    }
+
     /// Minimise a batch of `(lit, core)` pairs in parallel, returning a [`MusDict`].
     pub fn minimise_cores(&self, cores: &[(Lit, Vec<Lit>)]) -> MusDict {
         let results: Vec<_> = cores

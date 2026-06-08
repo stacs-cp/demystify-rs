@@ -62,6 +62,17 @@ struct Opt {
 
     #[arg(
         long,
+        help = "Greedy mode: find the largest MUS (the puzzle's difficulty) as fast \
+                as possible. Like --merge but with a threshold that auto-discovers the \
+                difficulty — each step applies every deduction whose MUS is at or below \
+                the largest size seen so far, paying the full smallest-MUS search only \
+                when forced to raise that maximum. Output stays readable (every shown \
+                MUS is minimised)."
+    )]
+    greedy: bool,
+
+    #[arg(
+        long,
         help = "Write a full trace log to `demystify.trace` (all targets, all levels)"
     )]
     trace: bool,
@@ -329,7 +340,11 @@ fn main() -> anyhow::Result<()> {
     let t_solve = demystify::time::Instant::now();
 
     if opt.html {
-        let html = planner.quick_solve_html();
+        let html = if opt.greedy {
+            planner.quick_solve_greedy_html()
+        } else {
+            planner.quick_solve_html()
+        };
         println!(
             "<html> <head> <style> {} </style> <script> {} </script> </head>",
             base_css(),
@@ -338,24 +353,31 @@ fn main() -> anyhow::Result<()> {
         println!("<body> {html}");
         println!("<script> doJavascript(); </script>");
         println!("</body> </html>");
-    } else if opt.json {
-        for step in planner.quick_solve() {
-            let json_step: Vec<serde_json::Value> = step
-                .iter()
-                .map(|um| {
-                    serde_json::json!({
-                        "lits": um.lits,
-                        "constraints": um.constraints,
-                        "fingerprint": um.fingerprint,
-                        "name": um.name,
-                    })
-                })
-                .collect();
-            println!("{}", serde_json::to_string(&json_step).unwrap());
-        }
     } else {
-        for p in planner.quick_solve() {
-            println!("{p:?}");
+        let steps = if opt.greedy {
+            planner.quick_solve_greedy()
+        } else {
+            planner.quick_solve()
+        };
+        if opt.json {
+            for step in steps {
+                let json_step: Vec<serde_json::Value> = step
+                    .iter()
+                    .map(|um| {
+                        serde_json::json!({
+                            "lits": um.lits,
+                            "constraints": um.constraints,
+                            "fingerprint": um.fingerprint,
+                            "name": um.name,
+                        })
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string(&json_step).unwrap());
+            }
+        } else {
+            for p in steps {
+                println!("{p:?}");
+            }
         }
     }
 
