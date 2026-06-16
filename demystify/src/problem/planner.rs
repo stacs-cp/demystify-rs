@@ -930,6 +930,18 @@ impl PuzzlePlanner {
         }
     }
 
+    /// Cheaply tests whether the puzzle has exactly one solution.
+    ///
+    /// Unlike [`Self::check_solvability`], this does **not** enumerate forced
+    /// literals: it finds one solution and re-solves once with that solution
+    /// blocked over the puzzle's decision variables.  Returns `true` iff
+    /// exactly one solution exists; an unsolvable puzzle (and a puzzle with
+    /// multiple solutions) returns `false`.  Any literals pinned beforehand
+    /// (a partial assignment) are respected.
+    pub fn is_uniquely_solvable(&mut self) -> bool {
+        self.psolve.is_uniquely_solvable()
+    }
+
     /// Returns the solution variables that could not be uniquely determined after
     /// exhausting all constraint propagation.
     ///
@@ -1570,6 +1582,66 @@ mod tests {
         let mut plan = PuzzlePlanner::new(puz);
 
         assert_eq!(plan.check_solvability(), Some(0));
+    }
+
+    /// Resolve a `var[..]=val` / `var[..]!=val` string to its SAT literal via
+    /// the direct encoding, mirroring how the FFI surfaces pin assumptions.
+    fn lit_for(plan: &PuzzlePlanner, name: &str) -> rustsat::types::Lit {
+        use crate::problem::format_puzlit;
+        plan.puzzle()
+            .direct
+            .litmap
+            .iter()
+            .find(|(puzlit, _)| format_puzlit(puzlit) == name)
+            .map(|(_, lit)| *lit)
+            .unwrap_or_else(|| panic!("no lit for {name}"))
+    }
+
+    fn planner_for(eprime: &str, param: &str) -> PuzzlePlanner {
+        let result = Arc::new(crate::problem::util::test_utils::build_puzzleparse(
+            eprime, param,
+        ));
+        PuzzlePlanner::new(PuzzleSolver::new(result).unwrap())
+    }
+
+    #[test]
+    fn test_is_uniquely_solvable_unique() {
+        let mut plan = planner_for("./tst/little1.eprime", "./tst/little1.param");
+        assert!(plan.is_uniquely_solvable());
+        // It must not advance the planner's logical state.
+        let known_before = plan.get_all_known_lits().len();
+        assert!(plan.is_uniquely_solvable());
+        assert_eq!(plan.get_all_known_lits().len(), known_before);
+    }
+
+    #[test]
+    fn test_is_uniquely_solvable_multiple() {
+        // A clueless 3-cell all-different puzzle has 6 solutions.
+        let mut plan = planner_for("./tst/little-sudoku.eprime", "./tst/little-sudoku.param");
+        assert!(!plan.is_uniquely_solvable());
+    }
+
+    #[test]
+    fn test_is_uniquely_solvable_partial_assignment() {
+        // No clues: multiple solutions.
+        let mut plan = planner_for("./tst/little-sudoku.eprime", "./tst/little-sudoku.param");
+        assert!(!plan.is_uniquely_solvable());
+
+        // Pinning two of the three cells forces the third: unique.
+        let mut unique = planner_for("./tst/little-sudoku.eprime", "./tst/little-sudoku.param");
+        let g1 = lit_for(&unique, "grid[1]=1");
+        let g2 = lit_for(&unique, "grid[2]=2");
+        unique.mark_lit_as_fixed(&g1);
+        unique.mark_lit_as_fixed(&g2);
+        assert!(unique.is_uniquely_solvable());
+
+        // Two cells pinned to the same value contradicts all-different: unsolvable.
+        let mut bad = planner_for("./tst/little-sudoku.eprime", "./tst/little-sudoku.param");
+        let b1 = lit_for(&bad, "grid[1]=1");
+        let b2 = lit_for(&bad, "grid[2]=1");
+        bad.mark_lit_as_fixed(&b1);
+        bad.mark_lit_as_fixed(&b2);
+        assert!(!bad.is_uniquely_solvable());
     }
 
     /// `all_muses_with_larger` must return a dict configured to retain larger MUSes.

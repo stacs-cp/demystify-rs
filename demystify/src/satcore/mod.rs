@@ -640,6 +640,29 @@ impl SatCore {
         }
     }
 
+    /// True iff the CNF is satisfiable under `assumps` with the extra
+    /// disjunctive `clause` added.
+    ///
+    /// Runs on a fresh throwaway solver built from `self.cnf`, so the cached
+    /// incremental solver — whose learned clauses must stay sound for later
+    /// memoryless calls, and whose public interface only ever adds *unit*
+    /// literals — is never mutated by this disjunctive clause.  No conflict
+    /// limit is applied: the caller waits for a definitive answer.
+    pub fn solve_with_clause_no_limit(&self, assumps: &[Lit], clause: &[Lit]) -> bool {
+        let mut cnf = self.cnf.as_ref().clone();
+        cnf.add_clause(clause.iter().copied().collect());
+        let mut solver = Solver::default();
+        solver
+            .add_cnf(cnf)
+            .expect("FATAL: solver build in solve_with_clause_no_limit");
+        SOLVER_CALLS.fetch_add(1, Relaxed);
+        solver.clear_conflict_limit();
+        matches!(
+            solver.solve_assumps(assumps).unwrap(),
+            rustsat::solvers::SolverResult::Sat
+        )
+    }
+
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
     ///
     /// # Arguments

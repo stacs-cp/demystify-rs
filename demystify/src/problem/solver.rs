@@ -286,6 +286,60 @@ impl PuzzleSolver {
             .assumption_solve_no_limit(self.get_known_lits(), &litorig)
     }
 
+    /// Cheaply tests whether the puzzle has exactly one solution under the
+    /// current known literals.
+    ///
+    /// Unlike [`Self::get_provable_varlits`] (and the planner's
+    /// `check_solvability` built on it), this does **not** fire one SAT call
+    /// per decision literal.  It finds a single solution, then re-solves once
+    /// with that solution blocked over the puzzle's decision variables
+    /// (`var_lits.positive()`): UNSAT means no other solution exists, so the
+    /// puzzle is uniquely solvable.  Two SAT calls regardless of puzzle size.
+    ///
+    /// Returns `true` iff exactly one solution exists; an unsolvable puzzle
+    /// (and one with multiple solutions) returns `false`.
+    pub fn is_uniquely_solvable(&mut self) -> bool {
+        let mut assumps: Vec<Lit> = self
+            .puzzleparse
+            .constraints
+            .lits()
+            .iter()
+            .copied()
+            .collect();
+        assumps.extend_from_slice(&self.knownlits);
+
+        // Step 1: find one solution (one SAT call, no limit).
+        let sol = match self
+            .get_satcore()
+            .assumption_solve_solution_no_limit(self.get_known_lits(), &assumps)
+        {
+            Some(s) => s,
+            None => return false, // unsolvable -> not uniquely solvable
+        };
+
+        // Step 2: blocking clause forbidding that assignment over decision lits.
+        let block: Vec<Lit> = self
+            .puzzleparse
+            .var_lits
+            .positive()
+            .iter()
+            .map(|&v| match sol.lit_value(v) {
+                rustsat::types::TernaryVal::True => !v,
+                rustsat::types::TernaryVal::False => v,
+                rustsat::types::TernaryVal::DontCare => panic!("decision lit unassigned: {v}"),
+            })
+            .collect();
+
+        // Step 3: does a different solution exist?  The throwaway solver used
+        // for the blocking clause has no `fixed` set of its own, so the known
+        // lits must travel as assumptions too.
+        let mut assumps2 = assumps;
+        assumps2.extend_from_slice(self.get_known_lits());
+        !self
+            .get_satcore()
+            .solve_with_clause_no_limit(&assumps2, &block)
+    }
+
     /// Retrieves variable literals which can be proved.
     ///
     /// # Returns
