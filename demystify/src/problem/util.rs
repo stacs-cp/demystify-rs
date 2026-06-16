@@ -20,7 +20,8 @@ pub fn safe_insert<K: Ord, V>(dict: &mut BTreeMap<K, V>, key: K, value: V) -> an
 }
 
 pub struct FindVarConnections {
-    lit_to_clauses: HashMap<Lit, HashSet<Lit>>,
+    clauses: Vec<Vec<Lit>>,
+    lit_to_clauses: HashMap<Lit, HashSet<usize>>,
     all_var_lits: HashSet<Lit>,
 }
 
@@ -28,26 +29,33 @@ impl FindVarConnections {
     #[must_use]
     pub fn new(sat: &SatInstance, all_var_lits: &HashSet<Lit>) -> FindVarConnections {
         let (cnf, _) = sat.clone().into_cnf();
-        let mut lit_to_clauses: HashMap<Lit, HashSet<Lit>> = HashMap::new();
+
+        // Store clauses, and index each literal to the clauses it appears in.
+        // The union of a literal's clauses (computed lazily in `get_connections`)
+        // gives its co-occurring literals; building it eagerly was O(k^2) per
+        // clause of size k, which blew up on very large clauses.
+        let mut clauses: Vec<Vec<Lit>> = Vec::new();
+        let mut lit_to_clauses: HashMap<Lit, HashSet<usize>> = HashMap::new();
         for clause in &cnf {
-            for &lit in clause {
-                let s = lit_to_clauses.entry(lit).or_default();
-                for &l in clause.iter() {
-                    s.insert(l);
-                }
+            let idx = clauses.len();
+            let lits: Vec<Lit> = clause.iter().copied().collect();
+            for &lit in &lits {
+                lit_to_clauses.entry(lit).or_default().insert(idx);
             }
+            clauses.push(lits);
         }
 
         // Blank out any literals in unit clauses
-        for clause in &cnf {
+        for clause in &clauses {
             if clause.len() == 1 {
-                let &lit = clause.iter().next().unwrap();
+                let lit = clause[0];
                 lit_to_clauses.insert(lit, HashSet::new());
                 lit_to_clauses.insert(-lit, HashSet::new());
             }
         }
 
         FindVarConnections {
+            clauses,
             lit_to_clauses,
             all_var_lits: all_var_lits.clone(),
         }
@@ -68,20 +76,22 @@ impl FindVarConnections {
 
         while let Some(todo_lit) = todo.pop() {
             info!("Todo: {}", todo_lit);
-            let litset = self.lit_to_clauses.get(&todo_lit);
-            if let Some(litset) = litset {
-                for &lit in litset {
-                    let lit = -lit;
-                    info!("Considering {}\n", lit.to_ipasir());
-                    if !found.contains(&lit) {
-                        info!("Found {}\n", lit.to_ipasir());
-                        found.insert(lit);
-                        if self.all_var_lits.contains(&lit) {
-                            info!("In var_lits: {}\n", lit.to_ipasir());
-                        } else {
-                            assert!(!self.all_var_lits.contains(&-lit));
-                            info!("Add to todo: {}\n", lit.to_ipasir());
-                            todo.push(lit);
+            let clause_idxs = self.lit_to_clauses.get(&todo_lit);
+            if let Some(clause_idxs) = clause_idxs {
+                for &idx in clause_idxs {
+                    for &lit in &self.clauses[idx] {
+                        let lit = -lit;
+                        info!("Considering {}\n", lit.to_ipasir());
+                        if !found.contains(&lit) {
+                            info!("Found {}\n", lit.to_ipasir());
+                            found.insert(lit);
+                            if self.all_var_lits.contains(&lit) {
+                                info!("In var_lits: {}\n", lit.to_ipasir());
+                            } else {
+                                assert!(!self.all_var_lits.contains(&-lit));
+                                info!("Add to todo: {}\n", lit.to_ipasir());
+                                todo.push(lit);
+                            }
                         }
                     }
                 }
