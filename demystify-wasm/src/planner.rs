@@ -318,6 +318,37 @@ impl WasmPlanner {
         to_js(&payload).map_err(Into::into)
     }
 
+    /// Cheaply test whether the puzzle has exactly one solution, optionally
+    /// under a partial assignment.
+    ///
+    /// `literals` takes the same optional `var=val` / `var!=val` array as
+    /// [`Self::check_solvability`] (pass `null`, `undefined`, or `[]` for
+    /// none); each is pinned before the test. Returns a boolean: `true` iff
+    /// exactly one solution exists. Both unsolvable puzzles and puzzles with
+    /// multiple solutions return `false`.
+    ///
+    /// Unlike `checkSolvability`, this does **not** enumerate every forced
+    /// literal: it finds one solution and re-solves once with that solution
+    /// blocked, so it costs ~2 SAT calls regardless of puzzle size. Use it
+    /// when you only need the yes/no uniqueness answer. Runs on a *cloned*
+    /// planner, so the caller's state is untouched.
+    ///
+    /// Errors if any string in `literals` doesn't resolve to a known puzzle
+    /// literal.
+    #[wasm_bindgen(js_name = isUniquelySolvable)]
+    pub fn is_uniquely_solvable(&self, literals: JsValue) -> Result<bool, JsError> {
+        let assume: Vec<String> = if literals.is_null() || literals.is_undefined() {
+            Vec::new()
+        } else {
+            serde_wasm_bindgen::from_value(literals)
+                .map_err(|e| JsError::new(&format!("invalid literals list: {e}")))?
+        };
+
+        let mut planner: PuzzlePlanner = self.inner.lock().unwrap().clone();
+        apply_assumptions(&mut planner, &assume).map_err(|e| JsError::new(&e))?;
+        Ok(planner.is_uniquely_solvable())
+    }
+
     /// Mark a literal as deduced, given as a `var=val` / `var!=val` string
     /// (whitespace-insensitive). Throws if the string doesn't name a puzzle
     /// literal, or if its variable can't be fixed. Matches

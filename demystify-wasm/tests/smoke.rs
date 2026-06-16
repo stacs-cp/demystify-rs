@@ -268,6 +268,76 @@ fn check_solvability_classifies_three_cases() {
 }
 
 #[wasm_bindgen_test]
+fn is_uniquely_solvable_reports_true_for_little1() {
+    let planner = load_planner();
+    // little1 has a unique solution, and the call must not mutate the planner.
+    assert!(
+        planner
+            .is_uniquely_solvable(wasm_bindgen::JsValue::NULL)
+            .expect("is_uniquely_solvable"),
+        "little1 should be uniquely solvable"
+    );
+    let lits: Vec<String> = from_value(planner.provable_literals().expect("provable_literals"))
+        .expect("deserialise provable literals");
+    assert!(
+        !lits.is_empty(),
+        "is_uniquely_solvable must not consume the planner's deductions"
+    );
+}
+
+#[wasm_bindgen_test]
+fn is_uniquely_solvable_classifies_cases() {
+    // A two-cell "exactly one of g[1], g[2] is true" puzzle: two solutions.
+    fn two_cell() -> WasmPlanner {
+        let b = WasmBuilder::new();
+        let dims = serde_wasm_bindgen::to_value(&vec![vec![1_i64, 2]]).expect("encode dims");
+        let g = b.var_bool_matrix("g", dims).expect("var_bool_matrix");
+        let rule = b.con_bool("rule").expect("con_bool");
+        let signed = vec![
+            g.get(vec![1]).expect("g[1]").pos(),
+            g.get(vec![2]).expect("g[2]").pos(),
+        ];
+        let guard = b
+            .guard(&rule, "rule", "exactly one of g[1], g[2] true")
+            .expect("guard");
+        b.sum_eq(guard, signed, 1).expect("sum_eq");
+        let puzzle = b.build().expect("build");
+        WasmPlanner::new(&puzzle, wasm_bindgen::JsValue::NULL).expect("planner")
+    }
+
+    let planner = two_cell();
+
+    // No clues: two solutions.
+    assert!(
+        !planner
+            .is_uniquely_solvable(wasm_bindgen::JsValue::NULL)
+            .expect("unique?"),
+        "two-cell puzzle has two solutions"
+    );
+
+    // Pin g[1]=1: g[2]=0 follows, so the completion is unique.
+    let lits = serde_wasm_bindgen::to_value(&vec!["g[1]=1"]).expect("encode lits");
+    assert!(
+        planner.is_uniquely_solvable(lits).expect("unique?"),
+        "pinning g[1]=1 forces a unique completion"
+    );
+
+    // Pin both true: contradicts exactly-one, unsolvable -> not unique.
+    let lits = serde_wasm_bindgen::to_value(&vec!["g[1]=1", "g[2]=1"]).expect("encode lits");
+    assert!(
+        !planner.is_uniquely_solvable(lits).expect("unique?"),
+        "contradictory pins are unsolvable, hence not uniquely solvable"
+    );
+
+    // An unknown literal is an error, not a silent miss.
+    let lits = serde_wasm_bindgen::to_value(&vec!["nope[9]=9"]).expect("encode lits");
+    assert!(
+        planner.is_uniquely_solvable(lits).is_err(),
+        "an unknown literal should error"
+    );
+}
+
+#[wasm_bindgen_test]
 fn only_assignments_option_is_accepted_and_solves() {
     // Mirrors the CLI's --only-assign: target only positive `=v`
     // deductions, never `!=v`.  The planner should still solve the

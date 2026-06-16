@@ -438,6 +438,47 @@ impl LuaUserData for LuaPlanner {
             },
         );
 
+        // Cheaply test whether the puzzle has exactly one solution, optionally
+        // under a partial assignment.  Returns a boolean: true iff exactly one
+        // solution exists (unsolvable and multiple-solution puzzles return
+        // false).  Runs on a cloned planner, so the caller's state is untouched.
+        methods.add_method_mut(
+            "is_uniquely_solvable",
+            |_lua, this, literals: Option<LuaTable>| {
+                let mut planner = this.inner.lock().unwrap().clone();
+
+                if let Some(tbl) = literals {
+                    let mut assume: Vec<String> = Vec::new();
+                    for s in tbl.sequence_values::<String>() {
+                        assume.push(s?);
+                    }
+                    if !assume.is_empty() {
+                        let lookup: std::collections::HashMap<String, _> = planner
+                            .puzzle()
+                            .direct
+                            .litmap
+                            .iter()
+                            .map(|(puzlit, sat_lit)| {
+                                (lit_match_key(&format_puzlit(puzlit)), *sat_lit)
+                            })
+                            .collect();
+                        for s in &assume {
+                            match lookup.get(&lit_match_key(s)) {
+                                Some(lit) => planner.mark_lit_as_fixed(lit),
+                                None => {
+                                    return Err(LuaError::RuntimeError(format!(
+                                        "unknown literal: {s}"
+                                    )));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Ok(planner.is_uniquely_solvable())
+            },
+        );
+
         // Get all known literals
         methods.add_method("known_literals", |lua, this, ()| {
             let planner = this.inner.lock().unwrap();

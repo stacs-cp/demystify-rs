@@ -257,9 +257,36 @@ local function test_check_solvability_partial_assignment()
     print("PASS: check_solvability_partial_assignment")
 end
 
+local function test_is_uniquely_solvable()
+    -- The clued 4x4 sudoku has a unique solution.
+    local planner = demystify.Planner.new(build_sudoku_4x4())
+    assert(planner:is_uniquely_solvable() == true,
+        "clued sudoku should be uniquely solvable")
+    -- The call solves a clone, so the caller's planner is untouched.
+    assert(not planner:is_solved(),
+        "is_uniquely_solvable should not advance the caller's planner state")
+
+    local two = demystify.Planner.new(build_two_cell())
+    -- No clues: two solutions.
+    assert(two:is_uniquely_solvable() == false,
+        "two-cell puzzle has two solutions")
+    -- Pin x[1]=1: x[2]=0 follows, so the completion is unique. Spaced form too.
+    assert(two:is_uniquely_solvable({ "x[1] = 1" }) == true,
+        "pinning x[1]=1 forces a unique completion")
+    -- Pin both true: contradicts exactly-one, so unsolvable -> not unique.
+    assert(two:is_uniquely_solvable({ "x[1]=1", "x[2]=1" }) == false,
+        "contradictory pins are unsolvable, hence not uniquely solvable")
+    -- An unknown literal is an error, not a silent miss.
+    local ok = pcall(function() two:is_uniquely_solvable({ "nope[9]=9" }) end)
+    assert(not ok, "an unknown literal should error")
+
+    print("PASS: is_uniquely_solvable")
+end
+
 test_builds_uniquely_solvable_puzzle()
 test_planner_deduces_full_solution()
 test_check_solvability_returns_solution()
 test_check_solvability_partial_assignment()
+test_is_uniquely_solvable()
 
 print("All sudoku-4x4 builder tests passed")
