@@ -27,6 +27,8 @@ conjure-output/
 profile.json.gz
 *.trace
 cargo-flamegraph.trace
+# Save-parsed / solve-trace dumps in the puzzle corpus (inputs are .param/.eprime).
+eprime/**/*.json
 
 # Sibling git repo nested here for convenience
 /walkthroughs/

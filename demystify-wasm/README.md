@@ -258,3 +258,7 @@ a size-≥1 MUS, and the final mapping length.  Combined with the tracing
 logs from `enableConsoleLogs`, that's enough to tell whether the search
 ran at all, whether the tiny scan found size-1 MUSes, and whether the
 cores/main-search phases produced anything.
+
+## License
+
+MPL-2.0. See [`LICENSE.txt`](LICENSE.txt).

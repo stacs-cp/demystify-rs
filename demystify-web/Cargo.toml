@@ -1,6 +1,6 @@
 [package]
 name = "demystify-web"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 rust-version = "1.94.1"
 description = "A web front end to demystify, a constraint solving tool for explaining puzzles"
@@ -23,7 +23,7 @@ serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 anyhow = "1"
 tempfile = "3"
-demystify = { path = "../demystify", version = "0.3.0" }
+demystify = { path = "../demystify", version = "0.4.0" }
 uuid = "1"
 tera = { version = "1.19", default-features = false }
 

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.3.0...demystify-v0.4.0) - 2026-06-16
+
+### Added
+
+- `--greedy` mode: find the puzzle's largest MUS (its difficulty) as fast as
+  possible, applying every deduction whose MUS is at most the largest size seen
+  so far and paying the full smallest-MUS search only when forced to raise that
+  maximum (`PuzzlePlanner::quick_solve_greedy`). On hard puzzles this is much
+  faster and far more stable run-to-run, with the same maximum MUS size.
+- `is_uniquely_solvable`: a cheap unique-solution check, generalised from a
+  partial-assignment solvability check.
+
+### Performance
+
+- `FindVarConnections` sped up by indexing clauses and unioning lazily.
+
+### Changed
+
+- Replaced the crate-wide `allow(dead_code)` with scoped exemptions.
+- Literal handling made tolerant and consistent across the FFI surfaces.
+
 ## [0.3.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.2.0...demystify-v0.3.0) - 2026-06-05
 
 ### Added
