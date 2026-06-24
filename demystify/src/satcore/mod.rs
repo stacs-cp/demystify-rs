@@ -265,6 +265,27 @@ pub fn set_global_conflict_limit(val: i64) {
     CONFLICT_LIMIT.store(val, Relaxed);
 }
 
+/// Multiply the global conflict limit by `factor`, saturating at `i64::MAX`,
+/// and return `(old, new)`.
+///
+/// Used to escalate when a whole MUS-search pass found nothing within the
+/// current budget: a bigger budget lets the (still smallest-first) search reach
+/// MUSes that were just out of reach, without ever committing to an arbitrary
+/// large one.  A limit of `0` means "no limit" and is left unchanged (so
+/// `new == old == 0`); callers treat `new == old` as "already unlimited, cannot
+/// raise further".  Note this is *not* capped at [`MAX_CONFLICT_LIMIT`] (which
+/// only bounds the automatic ramp): escalation must be free to try as hard as it
+/// takes to find a provable literal's smallest MUS.
+pub fn multiply_global_conflict_limit(factor: i64) -> (i64, i64) {
+    let old = CONFLICT_LIMIT.load(Relaxed);
+    if old <= 0 {
+        return (old, old);
+    }
+    let new = old.saturating_mul(factor);
+    CONFLICT_LIMIT.store(new, Relaxed);
+    (old, new)
+}
+
 /// Get the number of solver calls made.
 pub fn get_solver_calls() -> i64 {
     SOLVER_CALLS.load(Relaxed)

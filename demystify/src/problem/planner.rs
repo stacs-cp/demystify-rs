@@ -644,6 +644,29 @@ impl PuzzlePlanner {
                 MusMethod::Mus => (self.smallest_muses_with_config(), 0),
             };
 
+            // The whole pipeline runs under the global conflict limit, kept
+            // deliberately low so we don't sink time into the huge MUSes (200+
+            // constraints) we don't want — the search returns quickly with the
+            // small ones we do.  But on a hard step every remaining literal's
+            // smallest MUS can sit just past the current budget, so the pass finds
+            // nothing.  Don't give up, and don't commit to whichever single
+            // literal happens to be cheapest (its smallest MUS might be enormous):
+            // raise the global budget and retry the whole pass, keeping the search
+            // smallest-first with more effort.  A provable literal always has a
+            // MUS, so a large enough budget eventually surfaces one.
+            if muses.is_empty() {
+                let (old, new) = crate::satcore::multiply_global_conflict_limit(10);
+                assert!(
+                    new > old,
+                    "quick_solve: no MUS found with {} provable lit(s) remaining, but the \
+                     conflict limit ({old}) is already unlimited — a provable literal must have a MUS",
+                    self.psolve.get_provable_varlits().len(),
+                );
+                info!(target: "planner",
+                    "quick_solve: pass found no MUS within budget; raised conflict limit {old} -> {new} and retrying");
+                continue 'litloop;
+            }
+
             for mus in &muses {
                 let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
                 for lit in &mus.lits {

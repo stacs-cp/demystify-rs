@@ -290,6 +290,16 @@ pub fn reset_sat_stats() {
     }
 }
 
+/// Read-only snapshot of the running SAT-call totals: (calls, total_time, conflicts).
+/// Lets callers attribute SAT work across phases by taking deltas around a region.
+pub fn sat_stats_snapshot() -> (u64, Duration, u64) {
+    if let Ok(s) = SAT_STATS.lock() {
+        (s.total as u64, s.total_time, s.total_conflicts as u64)
+    } else {
+        (0, Duration::ZERO, 0)
+    }
+}
+
 /// Print a summary of per-SAT-call stats to stderr.
 pub fn print_sat_stats() {
     if let Ok(s) = SAT_STATS.lock() {
