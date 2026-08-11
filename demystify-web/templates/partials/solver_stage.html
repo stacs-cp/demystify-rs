@@ -51,7 +51,7 @@
       {% endfor %}
     </div>
     {% elif deductions | length > 0 %}
-    <h3>{{ deductions | length }} deduction{{ deductions | length | pluralize }}</h3>
+    <h3>{% if deductions | length > 1 %}{{ deductions | length }} simple deductions, shown together in one step{% else %}1 deduction{% endif %}</h3>
     <div class="he-steplist-scroll">
     <ol class="he-steplist">
       {% for d in deductions %}
