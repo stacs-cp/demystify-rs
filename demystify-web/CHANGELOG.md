@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- HexBinairo example (binairo on a hexagonal board).
+
+### Changed
+
+- Board styling now comes from the SVG-embedded `board.css` in the
+  `demystify` crate; `demystify.css` keeps only the HTML page rules.
+
 ## [0.1.5](https://github.com/stacs-cp/demystify-rs/compare/demystify-web-v0.1.4...demystify-web-v0.1.5) - 2026-06-16
 
 ### Changed

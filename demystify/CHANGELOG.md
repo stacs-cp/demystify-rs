@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Hexagonal boards: a `Geometry` abstraction in the SVG renderer with square
+  and pointy-top hex implementations, selected via `$#DEC hex`. A new
+  `$#SHOW <matrix> presence` role carves non-rectangular boards (e.g. a
+  radius-N hexagon from the `[r][q]` rhombus). Ships with a `hexbinairo`
+  puzzle in the library and web examples.
+
+### Changed
+
+- The SVG renderer now works in cell-unit coordinates with a cell-unit
+  `viewBox` (the old 500×500 + `scale(400)` wrapper is gone), and all board
+  colours/decoration live in a self-contained `board.css` embedded in every
+  SVG (`web::board_css()`), with `var()` fallbacks so standalone renderers
+  such as rsvg display correctly.
+- Merged steps no longer draw per-constraint scope overlays (which buried the
+  grid under one line per constraint); the involved literals stay tinted.
+
+### Fixed
+
+- `demystify-makesvg` now honours `$#DEC` decorations (it previously ignored
+  them by constructing `PuzzleDraw` without them).
+
 ## [0.4.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.3.0...demystify-v0.4.0) - 2026-06-16
 
 ### Added
