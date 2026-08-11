@@ -403,7 +403,6 @@ fn render_one_mus(
         &description_list,
         &format!("MUS of size {}", mc.mus_len()),
         hide_untouched_candidates,
-        true,
     )
     .context("Cannot make puzzle json")
 }

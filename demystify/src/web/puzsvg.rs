@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use crate::json::StateLit;
 
-use crate::json::{ConstraintShape, ConstraintShapeKind, Problem, Puzzle};
+use crate::json::{Problem, Puzzle};
 use crate::web::geometry::{Geometry, HexGeometry, SquareGeometry};
 use itertools::Itertools;
 use svg::Node;
@@ -213,11 +213,6 @@ impl PuzzleDraw {
         overlay_layer.assign("class", "layer-overlays");
         overlay_layer.append(self.draw_less_than(geom, puzzle));
         overlay_layer.append(self.draw_cage_sums(geom, puzzle));
-        if let Some(state) = &puzjson.state
-            && let Some(shapes) = &state.constraint_shapes
-        {
-            overlay_layer.append(self.draw_constraint_shapes(geom, shapes));
-        }
         board.append(overlay_layer);
 
         // Text (givens and candidate digits), always on top of overlays.
@@ -906,97 +901,6 @@ impl PuzzleDraw {
         grp
     }
 
-    /// Draw a per-MUS-constraint visual indicator on the grid.
-    /// All colour, dash pattern, and stroke width are CSS-controlled — the
-    /// renderer only emits structural classes (`constraint-shape`,
-    /// the kind subclass, and the `highlight_conN` class that already drives
-    /// the cell tint).
-    fn draw_constraint_shapes(
-        &self,
-        geom: &dyn Geometry,
-        shapes: &[ConstraintShape],
-    ) -> element::Group {
-        let mut grp = element::Group::new();
-        grp.assign("class", "constraint-shapes");
-        let stagger_unit = 0.04;
-
-        for shape in shapes {
-            let class = format!(
-                "constraint-shape {} highlight_con{}",
-                match shape.kind {
-                    ConstraintShapeKind::Row => "row",
-                    ConstraintShapeKind::Col => "col",
-                    ConstraintShapeKind::Pair => "pair",
-                    ConstraintShapeKind::Region => "region",
-                },
-                shape.idx
-            );
-            match shape.kind {
-                ConstraintShapeKind::Row => {
-                    if shape.cells.len() < 2 {
-                        continue;
-                    }
-                    let row = shape.cells[0][0];
-                    let cols: Vec<i64> = shape.cells.iter().map(|c| c[1]).collect();
-                    let c0 = *cols.iter().min().unwrap();
-                    let c1 = *cols.iter().max().unwrap();
-                    let (x0, y) = geom.cell_centre(row, c0);
-                    let (x1, _) = geom.cell_centre(row, c1);
-                    let y = y + stagger_unit * shape.stagger as f64;
-                    let mut line = element::Line::new();
-                    line.assign("x1", x0);
-                    line.assign("y1", y);
-                    line.assign("x2", x1);
-                    line.assign("y2", y);
-                    line.assign("class", class);
-                    grp.append(line);
-                }
-                ConstraintShapeKind::Col => {
-                    if shape.cells.len() < 2 {
-                        continue;
-                    }
-                    let col = shape.cells[0][1];
-                    let rows: Vec<i64> = shape.cells.iter().map(|c| c[0]).collect();
-                    let r0 = *rows.iter().min().unwrap();
-                    let r1 = *rows.iter().max().unwrap();
-                    let (x, y0) = geom.cell_centre(r0, col);
-                    let (_, y1) = geom.cell_centre(r1, col);
-                    let x = x + stagger_unit * shape.stagger as f64;
-                    let mut line = element::Line::new();
-                    line.assign("x1", x);
-                    line.assign("y1", y0);
-                    line.assign("x2", x);
-                    line.assign("y2", y1);
-                    line.assign("class", class);
-                    grp.append(line);
-                }
-                ConstraintShapeKind::Pair => {
-                    let [a, b] = [shape.cells[0], shape.cells[1]];
-                    let (ax, ay) = geom.cell_centre(a[0], a[1]);
-                    let (bx, by) = geom.cell_centre(b[0], b[1]);
-                    let mut line = element::Line::new();
-                    line.assign("x1", ax);
-                    line.assign("y1", ay);
-                    line.assign("x2", bx);
-                    line.assign("y2", by);
-                    line.assign("class", class);
-                    grp.append(line);
-                }
-                ConstraintShapeKind::Region => {
-                    let path_d = region_perimeter_path(geom, &shape.cells);
-                    if path_d.is_empty() {
-                        continue;
-                    }
-                    let mut p = element::Path::new();
-                    p.assign("d", path_d);
-                    p.assign("class", class);
-                    grp.append(p);
-                }
-            }
-        }
-        grp
-    }
-
     /// Draw small cage sum labels in the top-left corner of each cage's top-left cell.
     fn draw_cage_sums(&self, geom: &dyn Geometry, puzzle: &Puzzle) -> element::Group {
         let mut grp = element::Group::new();
@@ -1069,7 +973,7 @@ impl PuzzleDraw {
     /// Parallel grid of empty groups sharing each cell's local-coordinate
     /// transform.  Used as the destination for text content (digits and
     /// candidates) so they can be rendered AFTER overlays — keeping numbers
-    /// always on top of constraint-shape lines/regions.  No `id` (would
+    /// always on top of the overlay layer.  No `id` (would
     /// clash with the corresponding cell `<g>`) and no background rect.
     fn make_text_cells(&self, geom: &dyn Geometry) -> Vec<Vec<element::Group>> {
         let mut out = Vec::new();
@@ -1104,31 +1008,6 @@ fn cell_present(puzzle: &Puzzle, row: i64, col: i64) -> bool {
             .copied()
             .unwrap_or(false),
     }
-}
-
-/// Build an SVG `path d` attribute tracing the outline of the union of `cells`,
-/// skipping any cell-edge that's shared with another cell in the same set.
-/// Edges follow the geometry's cell polygons, so this works for square and hex
-/// boards alike. Output is a series of disconnected `M x y L x y` segments —
-/// fine for stroking; the path is not expected to be closed or filled.
-fn region_perimeter_path(geom: &dyn Geometry, cells: &[[i64; 2]]) -> String {
-    use std::collections::BTreeSet;
-    let cellset: BTreeSet<[i64; 2]> = cells.iter().copied().collect();
-    let mut out = String::new();
-    for &[r, c] in cells {
-        let poly = geom.cell_polygon(r, c);
-        let n = poly.len();
-        for (nr, nc, k) in geom.neighbours(r, c) {
-            // Draw this edge unless the neighbour across it is also in the set.
-            if cellset.contains(&[nr, nc]) {
-                continue;
-            }
-            let (x0, y0) = poly[k];
-            let (x1, y1) = poly[(k + 1) % n];
-            out.push_str(&format!("M {x0} {y0} L {x1} {y1} "));
-        }
-    }
-    out
 }
 
 /// Transform placing a cell's local `0..1` content box (used for candidate
@@ -1233,7 +1112,7 @@ mod tests {
     }
 
     /// The `hex` decoration lays the board out as hexagons: cell centres use the
-    /// √3 axial spacing, candidates and region perimeters still render.
+    /// √3 axial spacing and candidates still render.
     #[test]
     fn test_svg_hex_topology() -> anyhow::Result<()> {
         let file = File::open("./tst/hex_fixture.json")?;
@@ -1247,12 +1126,8 @@ mod tests {
             s.contains("1.732"),
             "hex √3 spacing missing — not laid out as hexagons"
         );
-        // Literal-by-default candidates and the hex region perimeter both render.
+        // Literal-by-default candidates still render.
         assert!(s.contains("litbox"), "hex candidates missing");
-        assert!(
-            s.contains("constraint-shape region"),
-            "hex region perimeter missing"
-        );
         Ok(())
     }
 

@@ -4,11 +4,41 @@
     "width": 5,
     "height": 5,
     "start_grid": [
-      [1, null, null, null, 0],
-      [null, null, null, null, null],
-      [null, null, 1, null, null],
-      [null, null, null, null, null],
-      [0, null, null, null, 1]
+      [
+        1,
+        null,
+        null,
+        null,
+        0
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        1,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        0,
+        null,
+        null,
+        null,
+        1
+      ]
     ],
     "solution_grid": null,
     "cages": null,
@@ -22,44 +52,250 @@
     "cage_sums": null,
     "info": null,
     "constraint_classes": null,
-    "decorations": ["hex", "blank_input_val=2"],
+    "decorations": [
+      "hex",
+      "blank_input_val=2"
+    ],
     "present": null
   },
   "state": {
     "knowledge_grid": [
-      [null,
-       [{"val": 0, "classes": ["litneg"]}, {"val": 1, "classes": ["litpos"]}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": ["litpos"]}, {"val": 1, "classes": ["litneg"]}],
-       null],
-      [[{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": ["litinmus"]}, {"val": 1, "classes": ["litinmus"]}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}]],
-      [[{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       null,
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}]],
-      [[{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 1, "classes": ["litknown"]}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}]],
-      [null,
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       [{"val": 0, "classes": []}, {"val": 1, "classes": []}],
-       null]
+      [
+        null,
+        [
+          {
+            "val": 0,
+            "classes": [
+              "litneg"
+            ]
+          },
+          {
+            "val": 1,
+            "classes": [
+              "litpos"
+            ]
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": [
+              "litpos"
+            ]
+          },
+          {
+            "val": 1,
+            "classes": [
+              "litneg"
+            ]
+          }
+        ],
+        null
+      ],
+      [
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": [
+              "litinmus"
+            ]
+          },
+          {
+            "val": 1,
+            "classes": [
+              "litinmus"
+            ]
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ]
+      ],
+      [
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        null,
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ]
+      ],
+      [
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 1,
+            "classes": [
+              "litknown"
+            ]
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ]
+      ],
+      [
+        null,
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        [
+          {
+            "val": 0,
+            "classes": []
+          },
+          {
+            "val": 1,
+            "classes": []
+          }
+        ],
+        null
+      ]
     ],
-    "statements": [{"content": "hex demo", "classes": ["deduction"]}],
+    "statements": [
+      {
+        "content": "hex demo",
+        "classes": [
+          "deduction"
+        ]
+      }
+    ],
     "description": "Hex binairo render fixture",
     "blocked_cells": null,
-    "constraint_shapes": [
-      {"idx": 0, "kind": "Region", "cells": [[1, 1], [2, 0], [2, 1], [3, 1]], "stagger": 0},
-      {"idx": 1, "kind": "Pair", "cells": [[0, 1], [0, 3]], "stagger": 0}
-    ],
     "verbose": null
   }
 }

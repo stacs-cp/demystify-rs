@@ -7,6 +7,10 @@ function applyHighlight(element) {
       const highlightedElements = document.getElementsByClassName(className);
       for (let j = 0; j < highlightedElements.length; j++) {
         highlightedElements[j].classList.add("selected");
+        // Also veil the whole cell holding this literal (board SVG only —
+        // the prose copies of the constraint have no [data-cell] ancestor).
+        const cell = highlightedElements[j].closest("[data-cell]");
+        if (cell) cell.classList.add("sel-cell");
       }
     }
   }
@@ -20,6 +24,8 @@ function removeHighlight(element) {
       const highlightedElements = document.getElementsByClassName(className);
       for (let j = 0; j < highlightedElements.length; j++) {
         highlightedElements[j].classList.remove("selected");
+        const cell = highlightedElements[j].closest("[data-cell]");
+        if (cell) cell.classList.remove("sel-cell");
       }
     }
   }

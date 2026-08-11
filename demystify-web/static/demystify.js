@@ -58,6 +58,10 @@
       if (className.startsWith('highlight_')) {
         for (const el of document.getElementsByClassName(className)) {
           el.classList.add('selected');
+          // Also veil the whole cell holding this literal (board SVG only —
+          // the prose copies of the constraint have no [data-cell] ancestor).
+          const cell = el.closest('[data-cell]');
+          if (cell) cell.classList.add('sel-cell');
         }
       }
     }
@@ -68,6 +72,8 @@
       if (className.startsWith('highlight_')) {
         for (const el of document.getElementsByClassName(className)) {
           el.classList.remove('selected');
+          const cell = el.closest('[data-cell]');
+          if (cell) cell.classList.remove('sel-cell');
         }
       }
     }

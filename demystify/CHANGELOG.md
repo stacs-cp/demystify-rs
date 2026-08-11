@@ -22,8 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   colours/decoration live in a self-contained `board.css` embedded in every
   SVG (`web::board_css()`), with `var()` fallbacks so standalone renderers
   such as rsvg display correctly.
-- Merged steps no longer draw per-constraint scope overlays (which buried the
-  grid under one line per constraint); the involved literals stay tinted.
+- Hovering a constraint now also washes each involved cell with a translucent
+  pulsing veil (in step with the literal pulse), so the cells are findable at
+  a glance while the cell's own colouring stays visible underneath.
+
+### Removed
+
+- The per-constraint scope overlays (the Row/Col/Pair/Region lines drawn on
+  the board) are gone: they were visually heavy and hard to read, and the
+  hover highlighting carries the same information. `constraint_shapes` no
+  longer appears in the JSON output.
 
 ### Fixed
 

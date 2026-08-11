@@ -53,66 +53,64 @@ g.selected rect {
 
 
 /* Per-MUS-constraint visual identity, expressed as CSS variables.  Each
- * rule below sets `--hl-bg` (light pastel for the constraint-list panel
- * tint and on-hover cell rect fill) and `--hl-stroke` (saturated dark
- * version of the same hue for the on-hover constraint-shape stroke).
- * Keeping the hue identity in one place means restyling the palette is
- * a single regen.
+ * rule below sets `--hl-bg`, a light pastel for the constraint-list
+ * panel tint and the on-hover cell rect fill.  Keeping the hue identity
+ * in one place means restyling the palette is a single regen.
  *
  * Visibility on the BOARD is gated on `.selected` (toggled by
  * `base.js` on hover); see consumer rules below this block.  The
  * constraint-list panel keeps its tint always-on as a navigation aid. */
-.highlight_con0 { --hl-bg: #d0ffff; --hl-stroke: #238282; }
-.highlight_con1 { --hl-bg: #ffd0ff; --hl-stroke: #822382; }
-.highlight_con2 { --hl-bg: #ffffd0; --hl-stroke: #828223; }
-.highlight_con3 { --hl-bg: #d0d0ff; --hl-stroke: #232382; }
-.highlight_con4 { --hl-bg: #d0ffd0; --hl-stroke: #238223; }
-.highlight_con5 { --hl-bg: #ffd0d0; --hl-stroke: #822323; }
-.highlight_con6 { --hl-bg: #ffe0c0; --hl-stroke: #825323; }
-.highlight_con7 { --hl-bg: #d0e8ff; --hl-stroke: #235382; }
-.highlight_con8 { --hl-bg: #e0d0ff; --hl-stroke: #432382; }
-.highlight_con9 { --hl-bg: #d0ffe0; --hl-stroke: #238243; }
-.highlight_con10 { --hl-bg: #f8d8e8; --hl-stroke: #822352; }
-.highlight_con11 { --hl-bg: #d8f8d8; --hl-stroke: #238223; }
-.highlight_con12 { --hl-bg: #e8e8ff; --hl-stroke: #232382; }
-.highlight_con13 { --hl-bg: #ffe8d8; --hl-stroke: #824923; }
-.highlight_con14 { --hl-bg: #d8ffe8; --hl-stroke: #238249; }
-.highlight_con15 { --hl-bg: #f0d8ff; --hl-stroke: #5d2382; }
-.highlight_con16 { --hl-bg: #e6f7ff; --hl-stroke: #236382; }
-.highlight_con17 { --hl-bg: #fff7d8; --hl-stroke: #826e23; }
-.highlight_con18 { --hl-bg: #e6d8f7; --hl-stroke: #4d2382; }
-.highlight_con19 { --hl-bg: #ffd8e6; --hl-stroke: #822345; }
-.highlight_con20 { --hl-bg: #d8f7f7; --hl-stroke: #238282; }
-.highlight_con21 { --hl-bg: #f7f7d8; --hl-stroke: #828223; }
-.highlight_con22 { --hl-bg: #ecd8ff; --hl-stroke: #532382; }
-.highlight_con23 { --hl-bg: #d8ecff; --hl-stroke: #235382; }
-.highlight_con24 { --hl-bg: #ffece1; --hl-stroke: #824523; }
-.highlight_con25 { --hl-bg: #e1ffec; --hl-stroke: #238245; }
-.highlight_con26 { --hl-bg: #f0e1ff; --hl-stroke: #522382; }
-.highlight_con27 { --hl-bg: #ffe1f0; --hl-stroke: #822352; }
-.highlight_con28 { --hl-bg: #e1f0ff; --hl-stroke: #235282; }
-.highlight_con29 { --hl-bg: #f0ffe1; --hl-stroke: #528223; }
-.highlight_con30 { --hl-bg: #e8d8d8; --hl-stroke: #822323; }
-.highlight_con31 { --hl-bg: #d8e8d8; --hl-stroke: #238223; }
-.highlight_con32 { --hl-bg: #d8d8e8; --hl-stroke: #232382; }
-.highlight_con33 { --hl-bg: #f9e9d9; --hl-stroke: #825223; }
-.highlight_con34 { --hl-bg: #d9f9e9; --hl-stroke: #238252; }
-.highlight_con35 { --hl-bg: #e9d9f9; --hl-stroke: #522382; }
-.highlight_con36 { --hl-bg: #f9d9e9; --hl-stroke: #822352; }
-.highlight_con37 { --hl-bg: #d9e9f9; --hl-stroke: #235282; }
-.highlight_con38 { --hl-bg: #e9f9d9; --hl-stroke: #528223; }
-.highlight_con39 { --hl-bg: #f5e0f0; --hl-stroke: #82236b; }
-.highlight_con40 { --hl-bg: #e0f5e0; --hl-stroke: #238223; }
-.highlight_con41 { --hl-bg: #e0e0f5; --hl-stroke: #232382; }
-.highlight_con42 { --hl-bg: #f5f0e0; --hl-stroke: #826b23; }
-.highlight_con43 { --hl-bg: #e0f0f5; --hl-stroke: #236b82; }
-.highlight_con44 { --hl-bg: #f0e0f5; --hl-stroke: #6b2382; }
-.highlight_con45 { --hl-bg: #f5e0e0; --hl-stroke: #822323; }
-.highlight_con46 { --hl-bg: #e0f5f0; --hl-stroke: #23826b; }
-.highlight_con47 { --hl-bg: #f0f5e0; --hl-stroke: #6b8223; }
-.highlight_con48 { --hl-bg: #e8e0ec; --hl-stroke: #622382; }
-.highlight_con49 { --hl-bg: #ece8e0; --hl-stroke: #826223; }
-.highlight_con50 { --hl-bg: #e0ece8; --hl-stroke: #238262; }
+.highlight_con0 { --hl-bg: #d0ffff; }
+.highlight_con1 { --hl-bg: #ffd0ff; }
+.highlight_con2 { --hl-bg: #ffffd0; }
+.highlight_con3 { --hl-bg: #d0d0ff; }
+.highlight_con4 { --hl-bg: #d0ffd0; }
+.highlight_con5 { --hl-bg: #ffd0d0; }
+.highlight_con6 { --hl-bg: #ffe0c0; }
+.highlight_con7 { --hl-bg: #d0e8ff; }
+.highlight_con8 { --hl-bg: #e0d0ff; }
+.highlight_con9 { --hl-bg: #d0ffe0; }
+.highlight_con10 { --hl-bg: #f8d8e8; }
+.highlight_con11 { --hl-bg: #d8f8d8; }
+.highlight_con12 { --hl-bg: #e8e8ff; }
+.highlight_con13 { --hl-bg: #ffe8d8; }
+.highlight_con14 { --hl-bg: #d8ffe8; }
+.highlight_con15 { --hl-bg: #f0d8ff; }
+.highlight_con16 { --hl-bg: #e6f7ff; }
+.highlight_con17 { --hl-bg: #fff7d8; }
+.highlight_con18 { --hl-bg: #e6d8f7; }
+.highlight_con19 { --hl-bg: #ffd8e6; }
+.highlight_con20 { --hl-bg: #d8f7f7; }
+.highlight_con21 { --hl-bg: #f7f7d8; }
+.highlight_con22 { --hl-bg: #ecd8ff; }
+.highlight_con23 { --hl-bg: #d8ecff; }
+.highlight_con24 { --hl-bg: #ffece1; }
+.highlight_con25 { --hl-bg: #e1ffec; }
+.highlight_con26 { --hl-bg: #f0e1ff; }
+.highlight_con27 { --hl-bg: #ffe1f0; }
+.highlight_con28 { --hl-bg: #e1f0ff; }
+.highlight_con29 { --hl-bg: #f0ffe1; }
+.highlight_con30 { --hl-bg: #e8d8d8; }
+.highlight_con31 { --hl-bg: #d8e8d8; }
+.highlight_con32 { --hl-bg: #d8d8e8; }
+.highlight_con33 { --hl-bg: #f9e9d9; }
+.highlight_con34 { --hl-bg: #d9f9e9; }
+.highlight_con35 { --hl-bg: #e9d9f9; }
+.highlight_con36 { --hl-bg: #f9d9e9; }
+.highlight_con37 { --hl-bg: #d9e9f9; }
+.highlight_con38 { --hl-bg: #e9f9d9; }
+.highlight_con39 { --hl-bg: #f5e0f0; }
+.highlight_con40 { --hl-bg: #e0f5e0; }
+.highlight_con41 { --hl-bg: #e0e0f5; }
+.highlight_con42 { --hl-bg: #f5f0e0; }
+.highlight_con43 { --hl-bg: #e0f0f5; }
+.highlight_con44 { --hl-bg: #f0e0f5; }
+.highlight_con45 { --hl-bg: #f5e0e0; }
+.highlight_con46 { --hl-bg: #e0f5f0; }
+.highlight_con47 { --hl-bg: #f0f5e0; }
+.highlight_con48 { --hl-bg: #e8e0ec; }
+.highlight_con49 { --hl-bg: #ece8e0; }
+.highlight_con50 { --hl-bg: #e0ece8; }
 
 /* Constraint-list panel: always show the tint as a navigation aid. */
 .constraintlist > div[class*="highlight_con"] {
@@ -124,44 +122,6 @@ g.selected rect {
  * keep for non-constraint highlights (deduced literals etc.). */
 [class*="highlight_con"].selected rect {
     fill: var(--hl-bg) !important;
-}
-
-
-/* MUS-constraint shape overlays.
- *
- * Default invisible: with many constraints in a single round the board
- * becomes unreadable when every shape paints simultaneously.  The shape
- * is drawn only when its element acquires `.selected` (added by the
- * hover JS via the matching `highlight_conN` class), at which point the
- * per-conN `--hl-stroke` variable supplies the colour.
- *
- * `fill` is forced to none even when a per-conN rule supplies one:
- * region paths are emitted as disjoint M-L segments, which SVG would
- * implicitly close-and-fill into a solid blob hiding the dotted stroke.
- */
-.constraint-shape {
-    fill: none !important;
-    stroke: none;
-    stroke-width: 0.014;
-    stroke-linecap: round;
-    pointer-events: none;
-    opacity: 0.85;
-}
-.constraint-shape.region {
-    /* Dotted styling — only takes visible effect when the selected stroke
-     * kicks in, but defining it here keeps the region rendering self-
-     * describing rather than coupled to a `.selected` rule. */
-    stroke-dasharray: 0 0.022;
-}
-.constraint-shape.selected {
-    stroke: var(--hl-stroke);
-    stroke-width: 0.018;
-    opacity: 1;
-}
-.constraint-shape.region.selected {
-    /* Solid outline on hover so the selected region reads as one shape
-     * against the dotted (default-invisible) siblings. */
-    stroke-dasharray: none;
 }
 
 

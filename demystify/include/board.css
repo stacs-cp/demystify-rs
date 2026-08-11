@@ -119,72 +119,77 @@ g.selected rect {
   animation: lit-pulse 0.8s ease-in-out infinite;
 }
 
+/* Hovering a constraint pulses the involved literals (above) and washes each
+ * involved cell with a translucent veil, so the cell is findable at a glance.
+ * The veil sits on .cell-bg — above region/cage tints but below the digits —
+ * and stays transparent so the cell's own colouring shows through. Same
+ * palette and rhythm as lit-pulse. */
+@keyframes cell-veil-pulse {
+  0%   { fill: rgba(107, 63, 181, 0.14); }
+  50%  { fill: rgba(216, 150, 96, 0.22); }
+  100% { fill: rgba(107, 63, 181, 0.14); }
+}
+
+[data-cell].sel-cell .cell-bg {
+  fill: rgba(107, 63, 181, 0.14);
+  animation: cell-veil-pulse 0.8s ease-in-out infinite;
+}
+
 g.con-preview .cell-bg { fill: var(--con-preview, #ffe066); }
 
-/* Constraint-shape overlays (drawn as lines/paths): visible stroke, coloured
- * per-constraint by the highlight_conN class below. */
-.constraint-shape {
-  fill: none;
-  stroke: var(--ink-soft, #8a7aa0);
-  stroke-width: 0.04;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.constraint-shape.region { stroke-dasharray: 0.06 0.05; }
-
 /* Per-constraint highlight colours (50 pastel shades). On the board these tint
- * candidate boxes (rect fill) and stroke constraint-shape overlays. */
-.highlight_con0  rect { fill: #d0ffff; } .constraint-shape.highlight_con0  { stroke: #7fd4d4; }
-.highlight_con1  rect { fill: #ffd0ff; } .constraint-shape.highlight_con1  { stroke: #d47fd4; }
-.highlight_con2  rect { fill: #ffffd0; } .constraint-shape.highlight_con2  { stroke: #d4d47f; }
-.highlight_con3  rect { fill: #d0d0ff; } .constraint-shape.highlight_con3  { stroke: #7f7fd4; }
-.highlight_con4  rect { fill: #d0ffd0; } .constraint-shape.highlight_con4  { stroke: #7fd47f; }
-.highlight_con5  rect { fill: #ffd0d0; } .constraint-shape.highlight_con5  { stroke: #d47f7f; }
-.highlight_con6  rect { fill: #ffe0c0; } .constraint-shape.highlight_con6  { stroke: #d4a878; }
-.highlight_con7  rect { fill: #d0e8ff; } .constraint-shape.highlight_con7  { stroke: #7faad4; }
-.highlight_con8  rect { fill: #e0d0ff; } .constraint-shape.highlight_con8  { stroke: #a87fd4; }
-.highlight_con9  rect { fill: #d0ffe0; } .constraint-shape.highlight_con9  { stroke: #7fd4a8; }
-.highlight_con10 rect { fill: #f8d8e8; } .constraint-shape.highlight_con10 { stroke: #d488a8; }
-.highlight_con11 rect { fill: #d8f8d8; } .constraint-shape.highlight_con11 { stroke: #88d488; }
-.highlight_con12 rect { fill: #e8e8ff; } .constraint-shape.highlight_con12 { stroke: #8888d4; }
-.highlight_con13 rect { fill: #ffe8d8; } .constraint-shape.highlight_con13 { stroke: #d4a888; }
-.highlight_con14 rect { fill: #d8ffe8; } .constraint-shape.highlight_con14 { stroke: #88d4a8; }
-.highlight_con15 rect { fill: #f0d8ff; } .constraint-shape.highlight_con15 { stroke: #b888d4; }
-.highlight_con16 rect { fill: #e6f7ff; } .constraint-shape.highlight_con16 { stroke: #88c4d4; }
-.highlight_con17 rect { fill: #fff7d8; } .constraint-shape.highlight_con17 { stroke: #d4c488; }
-.highlight_con18 rect { fill: #e6d8f7; } .constraint-shape.highlight_con18 { stroke: #a888c4; }
-.highlight_con19 rect { fill: #ffd8e6; } .constraint-shape.highlight_con19 { stroke: #d488a8; }
-.highlight_con20 rect { fill: #d8f7f7; } .constraint-shape.highlight_con20 { stroke: #88c4c4; }
-.highlight_con21 rect { fill: #f7f7d8; } .constraint-shape.highlight_con21 { stroke: #c4c488; }
-.highlight_con22 rect { fill: #ecd8ff; } .constraint-shape.highlight_con22 { stroke: #b088d4; }
-.highlight_con23 rect { fill: #d8ecff; } .constraint-shape.highlight_con23 { stroke: #88b0d4; }
-.highlight_con24 rect { fill: #ffece1; } .constraint-shape.highlight_con24 { stroke: #d4b0a0; }
-.highlight_con25 rect { fill: #e1ffec; } .constraint-shape.highlight_con25 { stroke: #a0d4b0; }
-.highlight_con26 rect { fill: #f0e1ff; } .constraint-shape.highlight_con26 { stroke: #b0a0d4; }
-.highlight_con27 rect { fill: #ffe1f0; } .constraint-shape.highlight_con27 { stroke: #d4a0b0; }
-.highlight_con28 rect { fill: #e1f0ff; } .constraint-shape.highlight_con28 { stroke: #a0b0d4; }
-.highlight_con29 rect { fill: #f0ffe1; } .constraint-shape.highlight_con29 { stroke: #b0d4a0; }
-.highlight_con30 rect { fill: #e8d8d8; } .constraint-shape.highlight_con30 { stroke: #c4a0a0; }
-.highlight_con31 rect { fill: #d8e8d8; } .constraint-shape.highlight_con31 { stroke: #a0c4a0; }
-.highlight_con32 rect { fill: #d8d8e8; } .constraint-shape.highlight_con32 { stroke: #a0a0c4; }
-.highlight_con33 rect { fill: #f9e9d9; } .constraint-shape.highlight_con33 { stroke: #d4b896; }
-.highlight_con34 rect { fill: #d9f9e9; } .constraint-shape.highlight_con34 { stroke: #96d4b8; }
-.highlight_con35 rect { fill: #e9d9f9; } .constraint-shape.highlight_con35 { stroke: #b896d4; }
-.highlight_con36 rect { fill: #f9d9e9; } .constraint-shape.highlight_con36 { stroke: #d496b8; }
-.highlight_con37 rect { fill: #d9e9f9; } .constraint-shape.highlight_con37 { stroke: #96b8d4; }
-.highlight_con38 rect { fill: #e9f9d9; } .constraint-shape.highlight_con38 { stroke: #b8d496; }
-.highlight_con39 rect { fill: #f5e0f0; } .constraint-shape.highlight_con39 { stroke: #d4a0c8; }
-.highlight_con40 rect { fill: #e0f5e0; } .constraint-shape.highlight_con40 { stroke: #a0d4a0; }
-.highlight_con41 rect { fill: #e0e0f5; } .constraint-shape.highlight_con41 { stroke: #a0a0d4; }
-.highlight_con42 rect { fill: #f5f0e0; } .constraint-shape.highlight_con42 { stroke: #d4c8a0; }
-.highlight_con43 rect { fill: #e0f0f5; } .constraint-shape.highlight_con43 { stroke: #a0c8d4; }
-.highlight_con44 rect { fill: #f0e0f5; } .constraint-shape.highlight_con44 { stroke: #c8a0d4; }
-.highlight_con45 rect { fill: #f5e0e0; } .constraint-shape.highlight_con45 { stroke: #d4a0a0; }
-.highlight_con46 rect { fill: #e0f5f0; } .constraint-shape.highlight_con46 { stroke: #a0d4c8; }
-.highlight_con47 rect { fill: #f0f5e0; } .constraint-shape.highlight_con47 { stroke: #c8d4a0; }
-.highlight_con48 rect { fill: #e8e0ec; } .constraint-shape.highlight_con48 { stroke: #b8a0c4; }
-.highlight_con49 rect { fill: #ece8e0; } .constraint-shape.highlight_con49 { stroke: #c4b8a0; }
-.highlight_con50 rect { fill: #e0ece8; } .constraint-shape.highlight_con50 { stroke: #a0c4b8; }
+ * candidate boxes (rect fill). */
+.highlight_con0  rect { fill: #d0ffff; }
+.highlight_con1  rect { fill: #ffd0ff; }
+.highlight_con2  rect { fill: #ffffd0; }
+.highlight_con3  rect { fill: #d0d0ff; }
+.highlight_con4  rect { fill: #d0ffd0; }
+.highlight_con5  rect { fill: #ffd0d0; }
+.highlight_con6  rect { fill: #ffe0c0; }
+.highlight_con7  rect { fill: #d0e8ff; }
+.highlight_con8  rect { fill: #e0d0ff; }
+.highlight_con9  rect { fill: #d0ffe0; }
+.highlight_con10 rect { fill: #f8d8e8; }
+.highlight_con11 rect { fill: #d8f8d8; }
+.highlight_con12 rect { fill: #e8e8ff; }
+.highlight_con13 rect { fill: #ffe8d8; }
+.highlight_con14 rect { fill: #d8ffe8; }
+.highlight_con15 rect { fill: #f0d8ff; }
+.highlight_con16 rect { fill: #e6f7ff; }
+.highlight_con17 rect { fill: #fff7d8; }
+.highlight_con18 rect { fill: #e6d8f7; }
+.highlight_con19 rect { fill: #ffd8e6; }
+.highlight_con20 rect { fill: #d8f7f7; }
+.highlight_con21 rect { fill: #f7f7d8; }
+.highlight_con22 rect { fill: #ecd8ff; }
+.highlight_con23 rect { fill: #d8ecff; }
+.highlight_con24 rect { fill: #ffece1; }
+.highlight_con25 rect { fill: #e1ffec; }
+.highlight_con26 rect { fill: #f0e1ff; }
+.highlight_con27 rect { fill: #ffe1f0; }
+.highlight_con28 rect { fill: #e1f0ff; }
+.highlight_con29 rect { fill: #f0ffe1; }
+.highlight_con30 rect { fill: #e8d8d8; }
+.highlight_con31 rect { fill: #d8e8d8; }
+.highlight_con32 rect { fill: #d8d8e8; }
+.highlight_con33 rect { fill: #f9e9d9; }
+.highlight_con34 rect { fill: #d9f9e9; }
+.highlight_con35 rect { fill: #e9d9f9; }
+.highlight_con36 rect { fill: #f9d9e9; }
+.highlight_con37 rect { fill: #d9e9f9; }
+.highlight_con38 rect { fill: #e9f9d9; }
+.highlight_con39 rect { fill: #f5e0f0; }
+.highlight_con40 rect { fill: #e0f5e0; }
+.highlight_con41 rect { fill: #e0e0f5; }
+.highlight_con42 rect { fill: #f5f0e0; }
+.highlight_con43 rect { fill: #e0f0f5; }
+.highlight_con44 rect { fill: #f0e0f5; }
+.highlight_con45 rect { fill: #f5e0e0; }
+.highlight_con46 rect { fill: #e0f5f0; }
+.highlight_con47 rect { fill: #f0f5e0; }
+.highlight_con48 rect { fill: #e8e0ec; }
+.highlight_con49 rect { fill: #ece8e0; }
+.highlight_con50 rect { fill: #e0ece8; }
 
 /* ── Variable-specific styling ──────────────────────────────────────── */
 
