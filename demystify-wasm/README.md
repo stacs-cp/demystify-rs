@@ -21,19 +21,175 @@ the browser. Solving is slower than native, but works.
 ```sh
 rustup target add wasm32-unknown-unknown
 cargo install wasm-pack
-wasm-pack build --target web demystify-wasm
+make wasm          # or: wasm-pack build --target web demystify-wasm
 ```
 
 `pkg/` then contains the `.wasm`, JS shim, and TypeScript declarations.
 
+## Multi-threaded build (optional)
+
+MUS search is the expensive part of solving and is parallelised with `rayon`.
+On wasm that parallelism is **silently lost by default**: `rayon` detects that
+`std::thread::spawn` is unsupported and installs a single-threaded fallback
+pool, so `par_iter` runs serially with no warning. Hard puzzles that take a few
+seconds natively can take 30s or more in the browser.
+
+The `parallel` feature restores real threads via
+[`wasm-bindgen-rayon`](https://github.com/RReverser/wasm-bindgen-rayon) (Web
+Workers over a `SharedArrayBuffer`):
+
+```sh
+rustup toolchain install nightly
+rustup component add rust-src --toolchain nightly
+rustup target add wasm32-unknown-unknown --toolchain nightly
+make wasm-mt       # -> demystify-wasm/pkg-mt
+make wasm-mt-test  # headless browser; cannot run under --node
+```
+
+Use the Makefile targets rather than calling `wasm-pack` directly — the build
+needs a nightly toolchain, `-Z build-std`, and an exact set of `RUSTFLAGS`
+(shared/imported memory plus `__tls_*` and `__heap_base` exports). Getting
+those wrong does **not** fail the build; it produces a module with a private,
+unshared memory that no worker can attach to.
+
+### Choosing a build (for consumers)
+
+**Nothing changes if you do nothing.** `pkg/` is the same single-threaded build
+as before — same 14 exports, unshared memory, no COOP/COEP requirement, callable
+from anywhere including the main thread. Existing code keeps working untouched.
+
+**The threaded build must run inside a Web Worker.** This is not a preference.
+The parallel MUS search blocks on a `std::sync::Mutex`, and the browser main
+thread is a "cannot-block" agent, so a solve started there hangs forever — no
+exception, nothing in the console. `WasmPlanner::new` detects this and returns
+an error rather than hanging, but the constraint is real: **cross-origin
+isolation alone is not enough**, you also need to be off the main thread.
+
+Consequently threads are **opt-in, never feature-detected**. Auto-enabling would
+hang every isolated page that solves synchronously from the UI.
+
+`pkg-mt/` is otherwise a strict **superset** of `pkg/`: identical API plus
+`initThreadPool`, about 5% larger (1.09 MB vs 1.04 MB). No changes to your
+solving code — only to where it runs and how it is initialised.
+
+```js
+// inside worker.js
+import { loadDemystify } from './loader.js';
+
+const { pkg, threads } = await loadDemystify({ threads: true, numThreads: 4 });
+const puzzle = pkg.load_puzzle(json);
+const planner = new pkg.WasmPlanner(puzzle);
+// ... postMessage results back to the page
+```
+
+`loadDemystify()` with no arguments gives you the single-threaded build, which
+is the right default for main-thread callers. Pass `{ threads: true }` to demand
+threads — it throws (naming the reason: main thread, or missing isolation)
+rather than silently falling back and running N times slower. `numThreads`
+defaults to `min(hardwareConcurrency, 8)`; each worker holds its own SAT solver
+instance, so more is not automatically better.
+
+`threadsAvailable()` reports whether this context could use threads at all —
+isolated, `SharedArrayBuffer` present, and not the main thread.
+
+**Bundlers:** both packages are built with wasm-pack's `--target web`, and the
+loader's dynamic `import()` uses a computed specifier that webpack and Vite
+cannot follow statically. If you bundle, import the package you want directly.
+
+### Browser requirements
+
+Threads need three things, and the binding constraint is nested dedicated Workers
+(our Worker spawns the rayon pool's Workers). Versions from MDN's
+browser-compat-data, checked 2026-08-25:
+
+| | Safari / iOS | Chrome | Firefox |
+|---|---|---|---|
+| Nested dedicated Workers | **16.4** | 69 | 34 |
+| `SharedArrayBuffer` | 15.2 | 68 | 79 |
+| `navigator.hardwareConcurrency` | 15.4 | 37 | 48 |
+
+So the floor is **Safari/iOS 16.4** (March 2023). MDN's "partial implementation"
+note against nested Workers refers to *Shared* Workers; dedicated Workers, which
+is what we use, are fine. iOS is not excluded by this.
+
+Safari clamps `hardwareConcurrency` to 4 or 8 to resist fingerprinting, so it
+self-limits to roughly the cap the loader applies anyway.
+
+Anything below those versions should simply not be offered the threaded build —
+which is why the loader defaults to off rather than feature-detecting.
+
+### Serving: keep isolation scoped to opt-in users
+
+The headers, not the wasm, are the change with real blast radius. COOP/COEP apply
+to the **page**, so they affect every visitor — including those who never enable
+threads — and `require-corp` makes every cross-origin subresource fail unless it
+opts in via CORP or CORS.
+
+Prefer to send the isolation headers **only** when threads are actually being
+requested: a separate route, or headers conditional on whatever flag your app uses
+to opt in. Then non-participating users are unaffected and there is nothing to
+regress. `COEP: credentialless` is a lighter-weight alternative if `require-corp`
+proves awkward.
+
+Treat the threaded build as a beta you switch on deliberately, not as a default
+that degrades. The single-threaded build remains the supported path for everyone
+else, and is unchanged.
+
+### Two artifacts, not one adaptive binary
+
+A threaded module *imports* a shared memory, so instantiating it requires
+`SharedArrayBuffer`, which requires the page to be cross-origin isolated. There
+is no way to build one binary that degrades to single-threaded when the headers
+are absent — instantiation simply fails. So ship both and choose at load time
+(see [Choosing a build](#choosing-a-build-for-consumers) — the choice must be an
+explicit opt-in from inside a Worker, not a feature-detect).
+
+Serving `pkg-mt` requires two response headers on the *page*:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+Note that `require-corp` also forces every cross-origin subresource on that page
+to opt in via CORP/CORS, or it will fail to load. `credentialless` is a lighter
+alternative. This is why `pkg` remains the default artifact.
+
+### Initialisation order matters
+
+**`initThreadPool` must be awaited before constructing a `WasmPlanner`.**
+`rayon` installs its fallback pool on the first call to *any* of its APIs, and
+`WasmPlanner::new` reaches one (via `mark_trivial_lits_as_deduced` →
+`get_provable_varlits` → `par_iter`). Once the fallback is in place the real
+pool can never be installed and `initThreadPool` fails with
+`GlobalPoolAlreadyInitialized`.
+
+In the `parallel` build `WasmPlanner::new` therefore checks the pool up front
+and returns a descriptive error rather than silently running serially — if you
+have paid the COOP/COEP cost, quietly taking 30s instead of 4s is not a helpful
+fallback. Recovering requires reloading the page. The default (single-threaded)
+build has no such check and no such requirement.
+
 ## Running the test suite
 
 ```sh
-wasm-pack test --node demystify-wasm
+make wasm-test      # single-threaded suite, under node
+make wasm-mt-test   # threaded suite, headless Firefox
 ```
 
-Drives the planner + builder through node's V8. Tests live in
+`wasm-test` drives the planner + builder through node's V8. Tests live in
 `demystify-wasm/tests/`.
+
+`wasm-mt-test` selects only the three `threads_mt*` targets, because the rest of
+the suite constructs a `WasmPlanner` without a worker pool — which the parallel
+build correctly rejects. Those tests belong to the single-threaded run. It also
+needs a browser: node has no Web `Worker`, so threads cannot be tested there.
+
+The threaded tests use `run_in_dedicated_worker`, not `run_in_browser` —
+`threads_mt` solves a puzzle, and a threaded solve on the main thread would hang
+rather than fail. The exception is `threads_mt_mainthread`, which deliberately
+runs on the main thread to assert that construction is *refused* there; it never
+gets far enough to block.
 
 ## Loading a pre-parsed puzzle
 

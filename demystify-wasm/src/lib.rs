@@ -24,6 +24,15 @@ pub use builder::*;
 pub use planner::*;
 pub use puzzle::*;
 
+/// Exposed to JS as `initThreadPool(numThreads)` by the `parallel` feature.
+///
+/// **Must be awaited before constructing a [`WasmPlanner`]** — see the note
+/// on [`WasmPlanner::new`].  `rayon` installs a single-threaded fallback pool
+/// the first time any of its APIs is touched, and the real pool can only be
+/// installed if that has not happened yet.
+#[cfg(feature = "parallel")]
+pub use wasm_bindgen_rayon::init_thread_pool;
+
 /// Installed once on module load. Routes Rust panics to readable JS errors.
 #[wasm_bindgen(start)]
 pub fn start() {

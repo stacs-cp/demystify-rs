@@ -10,13 +10,25 @@ publish = false
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = []
+# Multi-threaded MUS search via `wasm-bindgen-rayon` (Web Workers over
+# SharedArrayBuffer).  Requires a nightly toolchain, `-Z build-std`, and a
+# specific set of RUSTFLAGS — see the `wasm-mt` target in the top-level
+# Makefile, which is the only supported way to build it.  The resulting
+# module imports a *shared* memory, so it can only be instantiated in a
+# cross-origin-isolated page (COOP + COEP).  Build without this feature for
+# the portable single-threaded artifact; the two are separate downloads
+# selected by feature detection in JS, not one binary that adapts.
+parallel = ["dep:wasm-bindgen-rayon", "dep:rayon"]
+
 [dependencies]
 demystify = { path = "../demystify", version = "0.4.0" }
 demystify-builder = { path = "../demystify-builder", version = "0.1.0" }
 wasm-bindgen = "0.2"
 serde-wasm-bindgen = "0.6"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
+web-sys = { version = "0.3", features = ["console", "Window"] }
 console_error_panic_hook = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -26,6 +38,8 @@ tracing-subscriber = { version = "0.3", default-features = false, features = ["r
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+# Used by the `parallel` tests to await the initThreadPool promise from Rust.
+wasm-bindgen-futures = "0.4"
 
 # wasm-pack ships a wasm-opt that's older than the wasm features modern
 # rustc emits.  Pass the feature flags explicitly so it accepts the
@@ -39,6 +53,9 @@ wasm-opt = [
     "--enable-sign-ext",
     "--enable-nontrapping-float-to-int",
     "--enable-reference-types",
+    # Needed by the `parallel` feature's atomics/shared-memory output.  Inert
+    # for the single-threaded build, which emits no atomic instructions.
+    "--enable-threads",
 ]
 
 # Enable WebAssembly randomness for the transitive getrandom dependency
@@ -46,3 +63,16 @@ wasm-opt = [
 # on wasm32-unknown-unknown.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.4", default-features = false, features = ["wasm_js"] }
+
+# Pinned to a git rev, not a crates.io release, deliberately.  The published
+# 1.3.0 (Dec 2024) predates PR #34, which adds the `--shared-memory` /
+# `--import-memory` / `__tls_*` export link-args.  Building without those
+# flags still *succeeds* on a modern nightly but emits a private, unshared
+# memory with no TLS exports — an artifact that looks fine and cannot work.
+# PR #30 (also unreleased) is a further genuine fix.  Re-pin only after
+# checking the artifact still imports a shared memory.
+wasm-bindgen-rayon = { git = "https://github.com/RReverser/wasm-bindgen-rayon", rev = "4eea1fa55a965ad516ef9f9e9449704c7eac91c5", features = [
+    "no-bundler",
+], optional = true }
+# Only used by the `parallel` feature's pool-initialisation guard.
+rayon = { version = "1", optional = true }

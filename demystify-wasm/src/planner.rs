@@ -52,6 +52,71 @@ impl WasmPlannerOptions {
     }
 }
 
+/// Verifies the Web Worker pool is actually running before anything touches
+/// `rayon`.
+///
+/// Constructing a planner reaches `par_iter` by way of `PuzzlePlanner::new` →
+/// `mark_trivial_lits_as_deduced` → `get_provable_varlits`, and the *first*
+/// `rayon` call of any kind installs a single-threaded fallback pool.  Once
+/// that has happened `initThreadPool` can never succeed — it fails with
+/// `GlobalPoolAlreadyInitialized` from inside `wasm-bindgen-rayon`.  Checking
+/// here turns that confusing, deferred failure into an immediate and specific
+/// one.  This must stay the first `rayon` call in the constructor path.
+///
+/// Deliberately a hard error rather than a silent serial fallback: shipping
+/// the `parallel` artifact means paying the COOP/COEP cost on purpose, so a
+/// page that fails to initialise the pool is misconfigured, and quietly taking
+/// 30s instead of 4s would give no indication why.  Embedders that want
+/// single-threaded behaviour should ship the default build instead.
+#[cfg(feature = "parallel")]
+fn check_thread_pool() -> Result<(), JsError> {
+    // `web_sys::window()` is `Some` only on the main thread; inside any Worker
+    // scope it is `None`.
+    //
+    // The parallel MUS search shares a `std::sync::Mutex<MusDict>` between rayon
+    // workers (`problem/solver.rs`).  Locking a contended `std::sync::Mutex` on
+    // wasm parks the caller via `memory.atomic.wait32`, and the browser main
+    // thread is a "cannot-block" agent — so the lock never returns and solving
+    // hangs indefinitely with no exception and nothing in the console.
+    //
+    // Note this is *not* rayon's own work-stealing: `wasm-bindgen-rayon` enables
+    // `rayon-core/web_spin_lock`, which makes rayon's internals spin instead of
+    // park, which is why upstream's demo can call `par_iter` from the main
+    // thread quite happily.  It is our own mutex that parks, and `web_spin_lock`
+    // does not touch `std::sync::Mutex`.
+    //
+    // Failing here converts an unrecoverable silent hang into an immediate,
+    // explicable error.
+    if web_sys::window().is_some() {
+        return Err(JsError::new(
+            "demystify-wasm (parallel build) must run inside a Web Worker, not on the browser \
+             main thread. The parallel MUS search blocks on a mutex, and the main thread is not \
+             allowed to block, so solving would hang forever with no error. Either move the \
+             solver into a Worker, or load the single-threaded build (pkg/) instead — it has no \
+             such restriction.",
+        ));
+    }
+
+    let n = rayon::current_num_threads();
+    if n <= 1 {
+        return Err(JsError::new(
+            "demystify-wasm was built with the `parallel` feature, but rayon reports \
+             1 thread, so the worker pool is not running. Await \
+             `initThreadPool(navigator.hardwareConcurrency)` immediately after `init()` \
+             and before constructing a WasmPlanner. If you did call it, the page is \
+             most likely not cross-origin isolated -- check `self.crossOriginIsolated` \
+             and the COOP/COEP response headers. Either way the fallback pool is now \
+             installed process-wide, so the page must be reloaded to recover.",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "parallel"))]
+fn check_thread_pool() -> Result<(), JsError> {
+    Ok(())
+}
+
 #[derive(Serialize)]
 struct StepPayload {
     literals: Vec<String>,
@@ -242,6 +307,7 @@ impl WasmPlanner {
     /// malformed or the SAT setup fails.
     #[wasm_bindgen(constructor)]
     pub fn new(puzzle: &WasmPuzzle, options: JsValue) -> Result<WasmPlanner, JsError> {
+        check_thread_pool()?;
         let opts = WasmPlannerOptions::from_js(options)?;
         let solver_config = SolverConfig {
             only_assignments: opts.only_assignments,
