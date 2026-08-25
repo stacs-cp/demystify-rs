@@ -68,12 +68,14 @@ struct UserMusPayload {
     name: Option<String>,
 }
 
-/// One constraint of a MUS: its human-readable description plus the
-/// puzzle literals (`var=val`, via [`format_puzvar`]) it mentions.
+/// One constraint of a MUS: its human-readable description, the puzzle
+/// literals (`var=val`, via [`format_puzvar`]) it mentions, and the
+/// constraint family (`$#CON` root name) it belongs to.
 #[derive(Serialize)]
 struct ConstraintPayload {
     text: String,
     literals: Vec<String>,
+    family: String,
 }
 
 /// A full MUS: the deduced literals, every constraint (text + the
@@ -498,6 +500,10 @@ impl WasmPlanner {
                         .iter()
                         .map(format_varval)
                         .collect(),
+                    family: parse
+                        .lit_to_family(c)
+                        .expect("MUS constraint lit has no family")
+                        .clone(),
                 })
                 .collect();
             out.push(MusPayload {

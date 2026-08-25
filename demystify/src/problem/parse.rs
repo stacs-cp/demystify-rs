@@ -913,6 +913,16 @@ impl PuzzleParse {
         self.constraints.description(lit)
     }
 
+    /// The `$#CON` family a constraint lit belongs to (e.g. `"row_alldiff"`),
+    /// or `None` if the lit is not a constraint. Consumers group a MUS's
+    /// constraints by this: one rule applied at fifty cells is fifty entries
+    /// sharing one family, which reads very differently from fifty distinct
+    /// rules.
+    #[must_use]
+    pub fn lit_to_family(&self, lit: &Lit) -> Option<&String> {
+        self.constraints.family_of(lit)
+    }
+
     #[must_use]
     pub fn lit_is_var(&self, lit: &Lit) -> bool {
         self.var_lits.contains(lit)
