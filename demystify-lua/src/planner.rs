@@ -438,10 +438,12 @@ impl LuaUserData for LuaPlanner {
             },
         );
 
-        // Cheaply test whether the puzzle has exactly one solution, optionally
-        // under a partial assignment.  Returns a boolean: true iff exactly one
+        // Test whether the puzzle has exactly one solution, optionally under a
+        // partial assignment.  Returns a boolean: true iff exactly one
         // solution exists (unsolvable and multiple-solution puzzles return
-        // false).  Runs on a cloned planner, so the caller's state is untouched.
+        // false).  Runs on a cloned planner, so the caller's state is
+        // untouched.  Cheap (~2 SAT calls) except on a $#REVEAL puzzle, where
+        // the clue cascade has to be propagated in full.
         methods.add_method_mut(
             "is_uniquely_solvable",
             |_lua, this, literals: Option<LuaTable>| {

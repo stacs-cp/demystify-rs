@@ -286,19 +286,28 @@ impl PuzzleSolver {
             .assumption_solve_no_limit(self.get_known_lits(), &litorig)
     }
 
-    /// Cheaply tests whether the puzzle has exactly one solution under the
-    /// current known literals.
+    /// Tests whether the puzzle has exactly one solution under the current
+    /// known literals.
     ///
-    /// Unlike [`Self::get_provable_varlits`] (and the planner's
-    /// `check_solvability` built on it), this does **not** fire one SAT call
-    /// per decision literal.  It finds a single solution, then re-solves once
-    /// with that solution blocked over the puzzle's decision variables
-    /// (`var_lits.positive()`): UNSAT means no other solution exists, so the
-    /// puzzle is uniquely solvable.  Two SAT calls regardless of puzzle size.
+    /// For a puzzle with no `$#REVEAL` cascade this is cheap: it finds a
+    /// single solution, then re-solves once with that solution blocked over
+    /// the puzzle's decision variables (`var_lits.positive()`).  UNSAT means
+    /// no other solution exists, so the puzzle is uniquely solvable.  Two SAT
+    /// calls regardless of puzzle size, and equivalent to the planner's
+    /// `check_solvability` (a literal is provable exactly when it is
+    /// entailed, so "nothing left to solve" and "one solution" coincide).
+    ///
+    /// A **reveal puzzle** cannot use that shortcut, and takes the
+    /// deduction-cascade path in [`Self::is_uniquely_solvable_by_deduction`]
+    /// instead — see there for why.
     ///
     /// Returns `true` iff exactly one solution exists; an unsolvable puzzle
     /// (and one with multiple solutions) returns `false`.
     pub fn is_uniquely_solvable(&mut self) -> bool {
+        if self.puzzleparse.has_facts() {
+            return self.is_uniquely_solvable_by_deduction();
+        }
+
         let mut assumps: Vec<Lit> = self
             .puzzleparse
             .constraints
@@ -338,6 +347,55 @@ impl PuzzleSolver {
         !self
             .get_satcore()
             .solve_with_clause_no_limit(&assumps2, &block)
+    }
+
+    /// [`Self::is_uniquely_solvable`] for puzzles with a `$#REVEAL` cascade.
+    ///
+    /// A reveal puzzle's clue constraints are gated behind reveal-target
+    /// variables (minesweeper's `facts[i,j,d]`) which are *unconstrained* in
+    /// the CNF: they only ever become known through the cascade in
+    /// `add_known_lit_internal`, when the deduction that reveals them lands.
+    /// So a single SAT call is free to set every not-yet-revealed target
+    /// false and switch its clue off, and the blocking-clause test above
+    /// would answer a much stricter question — "is the board pinned by the
+    /// starting clues alone" — reporting a perfectly good puzzle as not
+    /// uniquely solvable.
+    ///
+    /// Forcing the reveal targets true instead is not a fix.  `reveal_map`
+    /// holds an entry per (variable, value) pair, so "all targets true"
+    /// asserts every cell was revealed as every one of its values at once;
+    /// and even where a model tolerates that, it grants the solver clues no
+    /// player could see yet.
+    ///
+    /// What a player can actually do is deduce, and let each deduction
+    /// unlock the clues it reveals.  So we propagate to a fixpoint exactly
+    /// as `PuzzlePlanner::check_solvability` does, and the puzzle is
+    /// uniquely solvable iff that leaves a consistent state with nothing
+    /// undetermined.  Costs one SAT call per candidate literal per round.
+    ///
+    /// The deductions are rolled back before returning: `SatCore::fix_values`
+    /// is memoryless (every call is handed the current known set), so
+    /// restoring `knownlits` and the `tosolvelits` cache restores the
+    /// solver's logical state in full.
+    fn is_uniquely_solvable_by_deduction(&mut self) -> bool {
+        let saved_knownlits = self.knownlits.clone();
+        let saved_tosolvelits = self.tosolvelits.clone();
+
+        while !self.get_provable_varlits().is_empty() {
+            let provable = self.get_provable_varlits().clone();
+            for lit in provable {
+                // Provable by construction, so skip `add_known_lit`'s
+                // assertion — re-deriving the provable set per literal
+                // would cost a full SAT sweep each time.
+                self.add_known_lit_unchecked(lit);
+            }
+        }
+
+        let unique = self.is_currently_solvable() && self.get_literals_to_try_solving().is_empty();
+
+        self.knownlits = saved_knownlits;
+        self.tosolvelits = saved_tosolvelits;
+        unique
     }
 
     /// Retrieves variable literals which can be proved.

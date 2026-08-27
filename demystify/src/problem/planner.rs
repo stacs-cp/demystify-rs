@@ -953,14 +953,20 @@ impl PuzzlePlanner {
         }
     }
 
-    /// Cheaply tests whether the puzzle has exactly one solution.
+    /// Tests whether the puzzle has exactly one solution.
     ///
-    /// Unlike [`Self::check_solvability`], this does **not** enumerate forced
-    /// literals: it finds one solution and re-solves once with that solution
-    /// blocked over the puzzle's decision variables.  Returns `true` iff
-    /// exactly one solution exists; an unsolvable puzzle (and a puzzle with
-    /// multiple solutions) returns `false`.  Any literals pinned beforehand
-    /// (a partial assignment) are respected.
+    /// For a puzzle with no `$#REVEAL` cascade this is cheap: unlike
+    /// [`Self::check_solvability`] it does **not** enumerate forced literals,
+    /// but finds one solution and re-solves once with that solution blocked
+    /// over the puzzle's decision variables.  A reveal puzzle can't use that
+    /// shortcut and propagates the cascade instead, at
+    /// `check_solvability`-like cost — see
+    /// `PuzzleSolver::is_uniquely_solvable_by_deduction`.
+    ///
+    /// Returns `true` iff exactly one solution exists; an unsolvable puzzle
+    /// (and a puzzle with multiple solutions) returns `false`.  Any literals
+    /// pinned beforehand (a partial assignment) are respected, and the
+    /// planner's own deductive state is left untouched either way.
     pub fn is_uniquely_solvable(&mut self) -> bool {
         self.psolve.is_uniquely_solvable()
     }
@@ -1665,6 +1671,28 @@ mod tests {
         bad.mark_lit_as_fixed(&b1);
         bad.mark_lit_as_fixed(&b2);
         assert!(!bad.is_uniquely_solvable());
+    }
+
+    /// A `$#REVEAL` puzzle gates each clue behind a target variable that is
+    /// unconstrained in the CNF, so the blocking-clause shortcut would switch
+    /// every not-yet-revealed clue off and call a perfectly good board
+    /// ambiguous.  The answer has to match the deduction cascade instead.
+    #[test]
+    fn test_is_uniquely_solvable_reveal_puzzle_matches_cascade() {
+        let mut plan = planner_for("./tst/minesweeper.eprime", "./tst/minesweeperPrinted.param");
+        assert!(
+            plan.is_uniquely_solvable(),
+            "this board is solved outright by quick_solve"
+        );
+        let mut cascade = planner_for("./tst/minesweeper.eprime", "./tst/minesweeperPrinted.param");
+        assert_eq!(cascade.check_solvability(), Some(0));
+
+        // A board that genuinely can't be finished must still report false.
+        let mut wall = planner_for("./tst/minesweeper.eprime", "./tst/minesweeperWall.param");
+        assert!(!wall.is_uniquely_solvable());
+        let mut wall_cascade =
+            planner_for("./tst/minesweeper.eprime", "./tst/minesweeperWall.param");
+        assert_ne!(wall_cascade.check_solvability(), Some(0));
     }
 
     /// `all_muses_with_larger` must return a dict configured to retain larger MUSes.

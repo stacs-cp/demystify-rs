@@ -335,6 +335,12 @@ impl WasmPlanner {
     /// when you only need the yes/no uniqueness answer. Runs on a *cloned*
     /// planner, so the caller's state is untouched.
     ///
+    /// A puzzle with a `$#REVEAL` cascade is the exception: its clues are
+    /// gated behind reveal targets that a single SAT call could switch off,
+    /// so it propagates the cascade instead and costs the same as
+    /// `checkSolvability`. The answer means the same thing in both cases —
+    /// "exactly one solution, reachable by deduction".
+    ///
     /// Errors if any string in `literals` doesn't resolve to a known puzzle
     /// literal.
     #[wasm_bindgen(js_name = isUniquelySolvable)]

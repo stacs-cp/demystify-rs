@@ -262,3 +262,116 @@ fn and_atom_round_trips_for_a_two_input_gate() {
         "gate=false must imply !(v[1] /\\ v[2])"
     );
 }
+
+/// A three-cell reveal chain, the minimal shape where a clue is reachable
+/// *only* through the cascade:
+///
+/// ```text
+///   grid[1] = 0                          (a given: unit clause)
+///   rule[1] ∧ facts[1,0] -> grid[2] = 0  (unlocked by revealing cell 1)
+///   rule[2] ∧ facts[2,0] -> grid[3] = 1  (unlocked by revealing cell 2)
+/// ```
+///
+/// With `second_rule` false, `rule[2]`'s constraint is vacuous, so `grid[3]`
+/// is never determined and the puzzle has two solutions.
+fn build_reveal_chain(second_rule: bool) -> PuzzleParse {
+    let mut b = PuzzleBuilder::new();
+    b.kind("reveal-chain");
+    let grid = b.var_bool_matrix("grid", &[1..=3]);
+    b.show("grid", ShowRole::Main);
+    let facts = b.reveal_bool_matrix("facts", &[1..=3, 0..=1]);
+    b.set_reveal("grid", "facts").unwrap();
+    let rule = b.con_bool_matrix("rule", &[1..=2]);
+
+    b.sum_eq_unguarded(&[grid.get(&[1]).neg()], 1).unwrap();
+
+    let g1 = b
+        .guard(rule.get(&[1]), "rule", "cell 1's clue: cell 2 is safe")
+        .unwrap()
+        .gated_by(&facts.get(&[1, 0]));
+    b.sum_eq(g1, &[grid.get(&[2]).pos()], 0).unwrap();
+
+    let g2 = b
+        .guard(rule.get(&[2]), "rule", "cell 2's clue: cell 3 is a mine")
+        .unwrap()
+        .gated_by(&facts.get(&[2, 0]));
+    if second_rule {
+        b.sum_eq(g2, &[grid.get(&[3]).pos()], 1).unwrap();
+    } else {
+        b.sum_ge(g2, &[grid.get(&[3]).pos()], 0).unwrap();
+    }
+
+    b.build().unwrap()
+}
+
+/// `is_uniquely_solvable` must agree with the cascade, not with a single SAT
+/// call that leaves every unrevealed clue switched off.
+///
+/// The reveal targets are unconstrained in the CNF, so one SAT call can set
+/// `facts[2,0]` false and drop cell 2's clue — leaving `grid[3]` free and the
+/// puzzle looking non-unique, even though a player deduces it without effort.
+#[test]
+fn is_uniquely_solvable_follows_the_reveal_cascade() {
+    let puzzle = Arc::new(build_reveal_chain(true));
+
+    let mut planner = PuzzlePlanner::new(PuzzleSolver::new(puzzle.clone()).unwrap());
+    assert!(
+        planner.is_uniquely_solvable(),
+        "the chain is fully determined by deduction, so it is uniquely solvable"
+    );
+
+    // Same verdict the deduction-cascade path reaches, and the one the
+    // planner acts on when it actually solves.
+    let mut cascade = PuzzlePlanner::new(PuzzleSolver::new(puzzle.clone()).unwrap());
+    assert_eq!(cascade.check_solvability(), Some(0));
+
+    let mut solve = PuzzlePlanner::new(PuzzleSolver::new(puzzle.clone()).unwrap());
+    let deduced: Vec<String> = solve
+        .quick_solve()
+        .iter()
+        .flatten()
+        .flat_map(|mus| mus.lits.clone())
+        .filter(|pl| pl.var().name() == "grid" && pl.sign())
+        .map(|pl| format!("grid{:?}={}", pl.var().indices(), pl.val()))
+        .collect();
+    assert_eq!(deduced, ["grid[2]=0", "grid[3]=1"]);
+}
+
+/// The cascade path must still say "no" when the puzzle really is ambiguous —
+/// a `true` from every reveal puzzle would be just as wrong.
+#[test]
+fn is_uniquely_solvable_rejects_an_ambiguous_reveal_puzzle() {
+    let puzzle = Arc::new(build_reveal_chain(false));
+
+    let mut planner = PuzzlePlanner::new(PuzzleSolver::new(puzzle.clone()).unwrap());
+    assert!(
+        !planner.is_uniquely_solvable(),
+        "no clue ever determines grid[3], so both values remain possible"
+    );
+
+    let mut cascade = PuzzlePlanner::new(PuzzleSolver::new(puzzle.clone()).unwrap());
+    // Both of grid[3]'s value literals are still open, hence 2, not 1.
+    assert_eq!(
+        cascade.check_solvability(),
+        Some(2),
+        "grid[3] left unsolved"
+    );
+}
+
+/// The cascade is rolled back: asking the question must not answer it.
+#[test]
+fn is_uniquely_solvable_leaves_the_planner_undeduced() {
+    let puzzle = Arc::new(build_reveal_chain(true));
+    let mut planner = PuzzlePlanner::new(PuzzleSolver::new(puzzle.clone()).unwrap());
+
+    let before = planner.get_all_known_lits().clone();
+    assert!(planner.is_uniquely_solvable());
+    assert_eq!(
+        planner.get_all_known_lits(),
+        &before,
+        "is_uniquely_solvable must not advance the planner's deductions"
+    );
+
+    // ...and the planner still solves normally afterwards.
+    assert!(!planner.quick_solve().is_empty());
+}

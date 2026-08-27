@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `demystify-makesvg` now honours `$#DEC` decorations (it previously ignored
   them by constructing `PuzzleDraw` without them).
+- `is_uniquely_solvable` no longer reports solvable `$#REVEAL` puzzles as
+  ambiguous. Reveal targets are unconstrained in the CNF, so the two-call
+  blocking-clause test was free to switch every not-yet-revealed clue off,
+  answering "is the board pinned by the starting clues alone" instead. Reveal
+  puzzles now propagate the deduction cascade, agreeing with
+  `check_solvability`; puzzles without reveals keep the cheap path.
 
 ## [0.4.0](https://github.com/stacs-cp/demystify-rs/compare/demystify-v0.3.0...demystify-v0.4.0) - 2026-06-16
 
