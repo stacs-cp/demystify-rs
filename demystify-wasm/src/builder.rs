@@ -227,6 +227,16 @@ pub struct WasmGuard {
 
 #[wasm_bindgen]
 impl WasmGuard {
+    /// Attach JSON-compatible application metadata, returned with MUS constraints.
+    #[wasm_bindgen(js_name = withMetadata)]
+    pub fn with_metadata(self, metadata: JsValue) -> Result<WasmGuard, JsError> {
+        let value: serde_json::Value =
+            serde_wasm_bindgen::from_value(metadata).map_err(|e| JsError::new(&e.to_string()))?;
+        Ok(WasmGuard {
+            inner: self.inner.with_metadata(value),
+        })
+    }
+
     /// Add an extra atom that must also be true for the guarded
     /// constraint to fire.  The CNF antecedent becomes
     /// `(guard.atom ∧ gate_1 ∧ … ∧ gate_n) → constraint`.  Use this

@@ -706,6 +706,7 @@ dependencies = [
  "rayon",
  "rustsat",
  "rustsat-batsat",
+ "serde_json",
  "thiserror 2.0.18",
 ]
 

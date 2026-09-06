@@ -18,6 +18,15 @@ use demystify::problem::{
 
 use crate::puzzle::WasmPuzzle;
 
+// JSON metadata must preserve nested nulls rather than converting them to undefined.
+fn explanation_to_js<T: Serialize>(value: &T) -> Result<JsValue, serde_wasm_bindgen::Error> {
+    value.serialize(
+        &serde_wasm_bindgen::Serializer::new()
+            .serialize_maps_as_objects(true)
+            .serialize_missing_as_null(true),
+    )
+}
+
 /// JS-facing options accepted by [`WasmPlanner::new`].  Every field is
 /// optional and defaults to the same value the CLI uses when its flag is
 /// omitted.  Pass an empty object `{}` (or `null` / `undefined`) for the
@@ -56,6 +65,7 @@ impl WasmPlannerOptions {
 struct StepPayload {
     literals: Vec<String>,
     constraints: Vec<String>,
+    constraint_details: Vec<ConstraintPayload>,
     mus_size: usize,
     num_muses: usize,
 }
@@ -64,6 +74,7 @@ struct StepPayload {
 struct UserMusPayload {
     literals: Vec<String>,
     constraints: Vec<String>,
+    constraint_details: Vec<ConstraintPayload>,
     fingerprint: String,
     name: Option<String>,
 }
@@ -76,6 +87,8 @@ struct ConstraintPayload {
     text: String,
     literals: Vec<String>,
     family: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<serde_json::Value>,
 }
 
 /// A full MUS: the deduced literals, every constraint (text + the
@@ -469,13 +482,32 @@ impl WasmPlanner {
             }
         }
 
+        let constraint_details = all_constraints
+            .iter()
+            .map(|text| ConstraintPayload {
+                text: text.clone(),
+                literals: planner
+                    .puzzle()
+                    .constraint_scope(text)
+                    .iter()
+                    .map(format_varval)
+                    .collect(),
+                family: planner
+                    .puzzle()
+                    .constraint_family_for_name(text)
+                    .cloned()
+                    .unwrap_or_default(),
+                metadata: planner.puzzle().constraint_metadata_for_name(text).cloned(),
+            })
+            .collect();
         let payload = StepPayload {
+            constraint_details,
             literals: all_lits,
             constraints: all_constraints,
             mus_size: muses.first().map(|m| m.mus_len()).unwrap_or(0),
             num_muses: muses.len(),
         };
-        to_js(&payload).map_err(Into::into)
+        explanation_to_js(&payload).map_err(Into::into)
     }
 
     /// Every deduction whose smallest MUS is of the globally-minimum size,
@@ -500,6 +532,7 @@ impl WasmPlanner {
                 .mus
                 .iter()
                 .map(|c| ConstraintPayload {
+                    metadata: parse.constraint_metadata(c).cloned(),
                     text: parse.lit_to_con(c).clone(),
                     literals: parse
                         .constraint_scope_for_lit(c)
@@ -520,7 +553,7 @@ impl WasmPlanner {
                 name: user_mus.name,
             });
         }
-        to_js(&out).map_err(Into::into)
+        explanation_to_js(&out).map_err(Into::into)
     }
 
     /// Solve the whole puzzle, returning `Vec<Vec<UserMusPayload>>`.
@@ -534,6 +567,28 @@ impl WasmPlanner {
                 step.into_iter()
                     .map(|um| UserMusPayload {
                         literals: um.lits.iter().map(format_puzlit).collect(),
+                        constraint_details: um
+                            .constraints
+                            .iter()
+                            .map(|text| ConstraintPayload {
+                                text: text.clone(),
+                                literals: planner
+                                    .puzzle()
+                                    .constraint_scope(text)
+                                    .iter()
+                                    .map(format_varval)
+                                    .collect(),
+                                family: planner
+                                    .puzzle()
+                                    .constraint_family_for_name(text)
+                                    .cloned()
+                                    .unwrap_or_default(),
+                                metadata: planner
+                                    .puzzle()
+                                    .constraint_metadata_for_name(text)
+                                    .cloned(),
+                            })
+                            .collect(),
                         constraints: um.constraints,
                         fingerprint: um.fingerprint,
                         name: um.name,
@@ -541,7 +596,7 @@ impl WasmPlanner {
                     .collect()
             })
             .collect();
-        to_js(&payload).map_err(Into::into)
+        explanation_to_js(&payload).map_err(Into::into)
     }
 
     /// Difficulty (smallest MUS size) for every provable literal.

@@ -61,3 +61,19 @@ example puzzle constructions (minesweeper, star battle, sudoku, binairo).
 ## License
 
 MPL-2.0. See [`LICENSE.txt`](LICENSE.txt).
+
+## Opaque constraint metadata
+
+Attach optional JSON application information to an explainable constraint
+instance before posting it. Rust: `guard.with_metadata(serde_json::json!({...}))`;
+JavaScript: `guard.withMetadata({id: "column:3", targets: [{kind: "column", index: 3}]})`.
+Both methods consume the guard and return its annotated replacement. Demystify
+interprets none of these keys. An annotation may contain nested JSON values,
+including null. Metadata is preserved by puzzle cloning and JSON save/load,
+removed with its constraint, and excluded from SAT semantics and fingerprints.
+
+WASM `allMinSteps()` returns it as `constraints[].metadata`; absent metadata
+omits that field. `bestStep()` and `quickSolve()` retain string constraints for
+compatibility and add `constraint_details` containing text, literals, family
+and optional metadata. Native callers can use `PuzzleParse::constraint_metadata`
+with the constraint activation literal returned in `ConstraintHandle`.

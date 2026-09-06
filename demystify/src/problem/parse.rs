@@ -391,6 +391,7 @@ pub struct ConstraintStore {
     /// — needed by the named-strategy fingerprinter to identify families,
     /// since the rendered `description` is template-substituted free text.
     family_of: BTreeMap<Lit, String>,
+    metadata: BTreeMap<Lit, serde_json::Value>,
     lits: BTreeSet<Lit>,
 }
 
@@ -402,6 +403,7 @@ impl ConstraintStore {
             invconset: BTreeMap::new(),
             varlits_in_con: BTreeMap::new(),
             family_of: BTreeMap::new(),
+            metadata: BTreeMap::new(),
             lits: BTreeSet::new(),
         }
     }
@@ -421,7 +423,17 @@ impl ConstraintStore {
         Ok(())
     }
 
+    pub fn set_metadata(&mut self, lit: Lit, value: serde_json::Value) {
+        assert!(self.contains(&lit));
+        self.metadata.insert(lit, value);
+    }
+
+    pub fn metadata(&self, lit: &Lit) -> Option<&serde_json::Value> {
+        self.metadata.get(lit)
+    }
+
     pub fn remove(&mut self, lit: &Lit) {
+        self.metadata.remove(lit);
         self.lits.remove(lit);
         if let Some(name) = self.conset.remove(lit) {
             self.invconset.remove(&name);
@@ -513,6 +525,7 @@ impl ConstraintStore {
             invconset,
             varlits_in_con,
             family_of,
+            metadata: BTreeMap::new(),
             lits,
         }
     }
@@ -918,6 +931,21 @@ impl PuzzleParse {
     /// constraints by this: one rule applied at fifty cells is fifty entries
     /// sharing one family, which reads very differently from fifty distinct
     /// rules.
+    #[must_use]
+    pub fn constraint_family_for_name(&self, name: &String) -> Option<&String> {
+        self.constraints.family_of(self.constraints.lit_for(name))
+    }
+
+    #[must_use]
+    pub fn constraint_metadata_for_name(&self, name: &String) -> Option<&serde_json::Value> {
+        self.constraints.metadata(self.constraints.lit_for(name))
+    }
+
+    #[must_use]
+    pub fn constraint_metadata(&self, lit: &Lit) -> Option<&serde_json::Value> {
+        self.constraints.metadata(lit)
+    }
+
     #[must_use]
     pub fn lit_to_family(&self, lit: &Lit) -> Option<&String> {
         self.constraints.family_of(lit)

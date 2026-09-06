@@ -12,6 +12,7 @@ demystify = { path = "../demystify", version = "0.4" }
 rustsat = { version = "0.7", features = ["ipasir-display"] }
 anyhow = "1"
 thiserror = "2"
+serde_json = "1"
 
 [dev-dependencies]
 demystify = { path = "../demystify", version = "0.4", features = ["deterministic"] }

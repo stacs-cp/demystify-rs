@@ -368,10 +368,18 @@ pub struct Guard {
     pub(crate) atom: Atom,
     pub(crate) family: String,
     pub(crate) description: String,
+    pub(crate) metadata: Option<serde_json::Value>,
     pub(crate) gates: Vec<Lit>,
 }
 
 impl Guard {
+    /// Opaque application information; excluded from constraint semantics and fingerprints.
+    #[must_use]
+    pub fn with_metadata(mut self, metadata: serde_json::Value) -> Self {
+        self.metadata = Some(metadata);
+        self
+    }
+
     /// The activation atom — true when the constraint should fire.
     #[must_use]
     pub fn atom(&self) -> Atom {
@@ -970,6 +978,7 @@ impl PuzzleBuilder {
             atom,
             family: family.to_string(),
             description,
+            metadata: None,
             gates: Vec::new(),
         })
     }
@@ -1147,6 +1156,7 @@ impl PuzzleBuilder {
             atom,
             family,
             description,
+            metadata,
             gates,
         } = guard;
         for &g in &gates {
@@ -1165,6 +1175,9 @@ impl PuzzleBuilder {
         self.constraints
             .insert(atom.lit, family, description, var_lits)
             .map_err(|e| BuildError::Other(e.context("ConstraintStore::insert failed")))?;
+        if let Some(metadata) = metadata {
+            self.constraints.set_metadata(atom.lit, metadata);
+        }
         Ok(())
     }
 
@@ -1418,6 +1431,28 @@ mod tests {
         // No constraints reference g.
         let err = b.build().unwrap_err();
         assert!(matches!(err, BuildError::UnusedVar(name) if name == "g"));
+    }
+
+    #[test]
+    fn metadata_survives_clone_serialization_and_removal() {
+        let mut b = PuzzleBuilder::new();
+        let grid = b.var_bool_matrix("grid", &[0..=0]);
+        let con = b.con_bool_matrix("rule", &[0..=0]);
+        let info = serde_json::json!({"id":"column:0","targets":[{"kind":"column","index":0}],"extra":{"a":[true,null,3]}});
+        let guard = b
+            .guard(con.get(&[0]), "rule", "One occupied cell")
+            .unwrap()
+            .with_metadata(info.clone());
+        let handle = b.sum_eq(guard, &[grid.get(&[0]).pos()], 1).unwrap();
+        let puzzle = b.build().unwrap();
+        let cloned = puzzle.clone();
+        assert_eq!(cloned.constraint_metadata(&handle.lit), Some(&info));
+        let bytes = puzzle.to_json_bytes().unwrap();
+        let restored = PuzzleParse::from_json_bytes(&bytes).unwrap();
+        assert_eq!(restored.constraint_metadata(&handle.lit), Some(&info));
+        let mut restored = restored;
+        restored.filter_out_constraint("rule");
+        assert_eq!(restored.constraint_metadata(&handle.lit), None);
     }
 
     #[test]

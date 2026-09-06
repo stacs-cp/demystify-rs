@@ -101,6 +101,8 @@ pub struct SerializablePuzzleParse {
     /// Constraint-family root name (the `$#CON` declaration name) per lit.
     #[serde(default)]
     pub family_of: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub constraint_metadata: BTreeMap<String, serde_json::Value>,
     /// varset_lits with Lit converted to i32
     pub varset_lits: BTreeSet<i32>,
     /// varset_lits_neg with Lit converted to i32
@@ -189,6 +191,15 @@ impl TryFrom<&PuzzleParse> for SerializablePuzzleParse {
                             .map(|&l| lit_to_i32(l))
                             .collect(),
                     )
+                })
+                .collect(),
+            constraint_metadata: p
+                .constraints
+                .iter()
+                .filter_map(|(lit, _)| {
+                    p.constraints
+                        .metadata(lit)
+                        .map(|v| (lit_to_i32(*lit).to_string(), v.clone()))
                 })
                 .collect(),
             family_of: p
@@ -284,6 +295,11 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
             .into_iter()
             .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
             .collect::<Result<_>>()?;
+        let metadata: BTreeMap<Lit, serde_json::Value> = s
+            .constraint_metadata
+            .into_iter()
+            .map(|(k, v)| Ok((i32_to_lit(str_to_i32(&k)?)?, v)))
+            .collect::<Result<_>>()?;
         let conset_lits: BTreeSet<Lit> = s
             .conset_lits
             .into_iter()
@@ -303,13 +319,20 @@ impl TryFrom<SerializablePuzzleParse> for PuzzleParse {
                 .collect::<Result<_>>()?,
             domainmap: s.domainmap.into_iter().collect(),
         };
-        let constraints = parse::ConstraintStore::from_raw(
+        let mut constraints = parse::ConstraintStore::from_raw(
             conset,
             invconset,
             varlits_in_con,
             family_of,
             conset_lits,
         );
+        for (lit, value) in metadata {
+            anyhow::ensure!(
+                constraints.contains(&lit),
+                "Metadata refers to an unknown constraint"
+            );
+            constraints.set_metadata(lit, value);
+        }
         let order = parse::OrderEncoding {
             map: s
                 .order_encoding_map
