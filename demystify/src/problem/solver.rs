@@ -1112,6 +1112,44 @@ impl PuzzleSolver {
         }
     }
 
+    /// Test an explanation using only this state's known facts and the supplied
+    /// constraints. Unlimited: a search timeout must not become a false claim
+    /// that an explanation was unavailable at an earlier state.
+    pub fn explanation_proves(&self, target: Lit, constraints: &[Lit]) -> bool {
+        assert!(
+            constraints
+                .iter()
+                .all(|c| self.puzzleparse.constraints.contains(c))
+        );
+        let mut assumptions = constraints.to_vec();
+        assumptions.push(!target);
+        !self
+            .get_satcore()
+            .assumption_solve_no_limit(&self.knownlits, &assumptions)
+    }
+
+    /// Deterministically reduce a known explanation in this state's context.
+    /// This finds an inclusion-minimal subset, not a minimum-cardinality proof.
+    /// Uses unlimited checks so propagation has a definite fixed point even
+    /// when the separate, randomized discovery searches have a conflict budget.
+    pub fn reduce_explanation(&self, target: Lit, constraints: &[Lit]) -> Option<Vec<Lit>> {
+        if !self.explanation_proves(target, constraints) {
+            return None;
+        }
+        let mut result = constraints.to_vec();
+        result.sort();
+        result.dedup();
+        let mut index = 0;
+        while index < result.len() {
+            let removed = result.remove(index);
+            if !self.explanation_proves(target, &result) {
+                result.insert(index, removed);
+                index += 1;
+            }
+        }
+        Some(result)
+    }
+
     pub fn verify_mus(&self, target_lit: Lit, mus_cons: &[Lit]) {
         self.verify_mus_provability(target_lit, mus_cons);
 

@@ -2,13 +2,29 @@
 
 `demystify` is a Rust-based solver designed to explain constraint satisfaction problems and puzzles. This project is a rewrite of the original `demystify` solver, which was implemented in Python. The long-term goal of `demystify` is to provide users with a robust tool for solving and understanding puzzles through detailed, human-readable explanations.
 
+## What to use
+
+- **Explain a fixed puzzle:** the `demystify` CLI or `demystify-web` below.
+- **Generate levels:** Mystify in the sibling `ms` checkout; start with its
+  `PUZZLE_GENERATION_GUIDE.md`, then its model adaptation notes and manual.
+- **Embed hints:** the workspace's `demystify-builder` and `demystify-wasm` crates.
+- **Study solving routes:** `demystify-solvetree` and the solve-corpus story tools.
+
+MUS size counts grouped constraints in an explanation, not necessarily visible
+clues. A MUS is inclusion-minimal, not automatically minimum-cardinality among
+all proofs. Compare difficulty under the same encoding, move policy and search
+settings. Maximum MUS alone does not describe an entire solve or puzzle quality.
+MUS-1 levels can be useful; some games do not admit useful levels at that size.
+
 ## Installation
 
 
-`demystify` requires `conjure`, a tool for constraint satisfaction and optimisation problems. There are 2 ways to run conjure:
-
-* Follow the instructions on the [Conjure GitHub page](https://www.github.com/conjure-cp/conjure) to install `conjure`.
-* If you have docker, or podman, installed then if `conjure` isn't in your path it will be automatically downloaded via docker/podman. On **windows**, you must use docker.
+For Essence/Essence' input, Demystify uses Conjure and Savile Row. The runner
+tries native `conjure` **and** `savilerow` on `PATH`, then Podman, then Docker.
+Install the native toolchain or a working container runtime yourself; the
+container path can fetch its compiler image on first use. It does not install
+Docker/Podman. See the [Conjure project](https://github.com/conjure-cp/conjure).
+Loading parsed JSON or using the constraint builder avoids runtime compilation.
 
 You will also need a reasonably recent version of `rust`. There are various ways to install Rust, but the easiest is probably with [rustup](https://rustup.rs/)
 
@@ -28,7 +44,7 @@ Once `conjure` and `rust` are installed, you can proceed to set up `demystify`.
 If you want to test demystify is working correctly, run its tests:
 
 ```sh
-cargo test --workspace
+cargo test -p demystify       # core tests; use --workspace for all crates
 ```
 
 Note that this may take a long time the first time you run it (including warnings about 'Tests taking longer than 30 seconds'), if docker or podman is being used, as the Conjure image must be downloaded the first time it is used.
@@ -66,6 +82,13 @@ It is controlled by the `DEMYSTIFY_PARSE_CACHE` environment variable:
 * **`off`** — disable caching entirely.
 
 The cache is safe to share between processes running at the same time. To see where it lives, run with `--log progress`.
+
+## Further documentation
+
+The [workspace README](https://github.com/stacs-cp/demystify-rs#readme) links
+the solve-graph, story-statistics and corpus guides. Commands above assume the
+workspace root, not the `demystify/` crate directory. CLI `--help` is the
+reference for the version you are running.
 
 ## Development Status
 

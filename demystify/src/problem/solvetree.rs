@@ -14,6 +14,9 @@ use super::parse::PuzzleParse;
 use super::planner::{PlannerConfig, PuzzlePlanner};
 use super::solver::{MusConfig, PuzzleSolver, SolverConfig};
 
+/// Persistent, unmerged solve graphs with fixed-point explanation propagation.
+pub mod analysis;
+
 type StateHash = u64;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]

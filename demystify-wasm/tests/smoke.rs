@@ -29,6 +29,35 @@ fn loads_little1_puzzle() {
 }
 
 #[wasm_bindgen_test]
+fn exported_puzzle_round_trips_model_and_deductions() {
+    let original = load_puzzle(LITTLE1_JSON).expect("load fixture");
+    let exported = original.to_json().expect("export model");
+    let restored = load_puzzle(&exported).expect("reload exported model");
+    let mut before: serde_json::Value = serde_json::from_str(&exported).unwrap();
+    let mut after: serde_json::Value = serde_json::from_str(&restored.to_json().unwrap()).unwrap();
+    // These literal collections are HashSets, so their JSON array order is not
+    // stable across a reload. Preserve ordering everywhere else (including CNF).
+    for model in [&mut before, &mut after] {
+        for entry in model["order_encoding_map"].as_array_mut().unwrap() {
+            entry[1]
+                .as_array_mut()
+                .unwrap()
+                .sort_by_key(|lit| lit.as_i64().unwrap());
+        }
+    }
+    for (field, value) in before.as_object().unwrap() {
+        assert_eq!(value, &after[field], "export changed field {field}");
+    }
+    for puzzle in [&original, &restored] {
+        let planner = WasmPlanner::new(puzzle, wasm_bindgen::JsValue::NULL).unwrap();
+        planner
+            .quick_solve()
+            .expect("solve including reveal cascade");
+        assert!(planner.is_solved());
+    }
+}
+
+#[wasm_bindgen_test]
 fn puzzle_metadata_methods_return_values() {
     let puzzle = load_puzzle(LITTLE1_JSON).expect("load_puzzle should succeed");
     // Each of these returns a JsValue; just check they don't error.  Shape

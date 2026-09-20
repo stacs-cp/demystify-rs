@@ -13,7 +13,9 @@ This package offers a web-based frontend to the core `demystify` solver. If you 
 * A reasonably recent version of `rust`. Install with [rustup](https://rustup.rs/)
 * If you're on **Windows**, you'll need LLVM: `winget install LLVM.LLVM`
 
-The web interface will automatically handle the installation of `conjure` (via Docker/Podman if needed) when you run it.
+Install native `conjure` and `savilerow`, or a working Podman/Docker runtime.
+Demystify selects an available runner and can fetch its compiler container image;
+it does not install or start the container runtime for you.
 
 ### Setup
 

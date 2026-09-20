@@ -998,6 +998,8 @@ pub async fn solvetree_page(
 pub struct SolveTreeParams {
     merge_strategy: Option<String>,
     merge_mus_size: Option<usize>,
+    research: Option<bool>,
+    repeats: Option<u32>,
 }
 
 pub async fn solvetree_build(
@@ -1006,6 +1008,49 @@ pub async fn solvetree_build(
 ) -> Result<axum::Json<serde_json::Value>, util::AppError> {
     let solver = get_solver_global(&session)?;
     let puzzle = solver.lock().unwrap().planner.puzzle_arc();
+
+    if form.research.unwrap_or(false) {
+        use demystify::problem::solvetree::analysis::{SearchSettings, SolveGraph};
+        let repeats = form.repeats.unwrap_or(5);
+        if repeats == 0 {
+            return Err(anyhow!("MUS repeats must be positive").into());
+        }
+        // Preserve initial pinned givens, rather than the live session's progress.
+        let initial = solver
+            .lock()
+            .unwrap()
+            .history
+            .first()
+            .context("Missing initial puzzle state")?
+            .fork()?;
+        let initial_solver = PuzzleSolver::fork_with_known_lits(
+            puzzle.clone(),
+            initial.get_all_known_lits(),
+            initial.solver_config(),
+        )?;
+        let graph = tokio::task::spawn_blocking(move || -> anyhow::Result<SolveGraph> {
+            let settings = SearchSettings {
+                mus: demystify::problem::solver::MusConfig::new_with_repeats(i64::from(repeats)),
+                conflict_limit: demystify::satcore::global_conflict_limit(),
+            };
+            let mut graph = SolveGraph::new(
+                initial_solver,
+                puzzle
+                    .eprime
+                    .kind
+                    .clone()
+                    .unwrap_or_else(|| "Uploaded puzzle".into()),
+                settings,
+            )?;
+            graph.run(|_| Ok(()))?;
+            Ok(graph)
+        })
+        .await
+        .context("Research graph build task panicked")??;
+        let mut json = serde_json::to_value(graph.to_d3_json())?;
+        json["archive"] = serde_json::to_value(graph)?;
+        return Ok(axum::Json(json));
+    }
 
     let merge_strategy = match form.merge_strategy.as_deref() {
         Some("greedy") => MergeStrategy::Greedy,

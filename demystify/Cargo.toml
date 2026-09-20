@@ -91,6 +91,10 @@ path = "src/bin/fingerprint.rs"
 name = "demystify-walkthrough"
 path = "src/bin/walkthrough.rs"
 
+[[bin]]
+name = "demystify-solvetree"
+path = "src/bin/solvetree.rs"
+
 [dependencies.clap]
 version = "4.0"
 features = ["derive"]

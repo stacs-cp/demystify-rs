@@ -265,6 +265,11 @@ pub fn set_global_conflict_limit(val: i64) {
     CONFLICT_LIMIT.store(val, Relaxed);
 }
 
+/// Current per-call discovery budget, for recording reproducible run settings.
+pub fn global_conflict_limit() -> i64 {
+    CONFLICT_LIMIT.load(Relaxed)
+}
+
 /// Multiply the global conflict limit by `factor`, saturating at `i64::MAX`,
 /// and return `(old, new)`.
 ///

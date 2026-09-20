@@ -1,0 +1,10 @@
+$ Small rectangular pen-and-paper minesweeper fixture for solve-graph analysis.
+language ESSENCE' 1.0
+letting height be 4
+letting width be 5
+letting grid be [
+    [1, -1, 2, -1, 1],
+    [-1, 1, -1, -1, 1],
+    [1, -1, 1, 2, -1],
+    [-1, 1, -1, 1, -1]
+]

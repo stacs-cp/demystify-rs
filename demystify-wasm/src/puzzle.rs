@@ -48,6 +48,17 @@ pub fn load_puzzle(json: &str) -> Result<WasmPuzzle, JsError> {
 
 #[wasm_bindgen]
 impl WasmPuzzle {
+    /// Export the complete parsed model for native solving or later reuse.
+    /// The result can be passed to `load_puzzle` or the native --load-parsed CLI.
+    #[wasm_bindgen(js_name = toJson)]
+    pub fn to_json(&self) -> Result<String, JsError> {
+        let bytes = self
+            .inner
+            .to_json_bytes()
+            .map_err(|e| JsError::new(&format!("Failed to serialize puzzle: {e}")))?;
+        String::from_utf8(bytes).map_err(|e| JsError::new(&e.to_string()))
+    }
+
     pub fn kind(&self) -> Option<String> {
         self.inner.eprime.kind.clone()
     }

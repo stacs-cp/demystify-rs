@@ -64,6 +64,12 @@ cargo run --release --bin demystify -- \
 
 The wasm side never invokes Conjure or touches the filesystem — only the JSON.
 
+`puzzle.toJson()` exports the same native model format, including builder-created
+CNF, constraint metadata and reveal rules. Reload it with `load_puzzle(json)` or
+save the string and pass it to native tools with `--load-parsed`. This allows
+browser game encoders to feed persistent native solve-graph batches; see the
+[multi-game corpus runner](../scripts/solve-corpus/README.md).
+
 ## Building puzzles in JS
 
 `WasmBuilder` exposes a small constraint vocabulary that's enough to build star

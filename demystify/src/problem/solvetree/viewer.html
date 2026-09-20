@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demystify · Solve graph</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f4ef;color:#22332e;font:15px/1.5 system-ui,sans-serif}header{background:#173d35;color:#fff;padding:28px max(24px,calc((100vw - 1200px)/2))}h1{font-size:28px;margin:0 0 8px}h2{font-size:20px;margin-top:0}h3{font-size:16px}p{margin:8px 0}main{max-width:1248px;margin:auto;padding:24px}section{background:white;border:1px solid #d4ded6;border-radius:10px;padding:20px;margin-bottom:18px}button,input{font:inherit;padding:6px 10px;border:1px solid #9dafa3;border-radius:5px;background:white;color:#234738}button{cursor:pointer}button:hover{background:#e4f1e7}button:disabled{opacity:.5;cursor:default}input[type=number]{width:90px}label{display:inline-flex;gap:8px;align-items:center;margin-right:12px}.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.muted{color:#5a6c63}.badge{display:inline-block;padding:3px 8px;border-radius:5px;background:#e6f0ea;font-size:13px}.columns{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}table{border-collapse:collapse;width:100%;text-align:left}th,td{padding:10px 8px;border-bottom:1px solid #e0e6e1;vertical-align:top}th{font-size:13px;color:#5a6c63}.scroll{max-height:420px;overflow:auto}.small{font-size:13px}a{color:#28644e}#route{display:flex;gap:5px;align-items:end;min-height:90px;overflow-x:auto;padding-top:15px}#route button{min-width:34px;background:#b7d9bf;position:relative}#route button:after{content:attr(data-cost);position:absolute;top:-24px;left:0;width:100%;text-align:center}.error{color:#a12925}.links{display:flex;gap:6px;flex-wrap:wrap}details{margin-top:12px}summary{cursor:pointer}header .muted{color:#cee1d6}@media(max-width:800px){.columns{grid-template-columns:1fr}main{padding:12px}header{padding:20px}}
+</style>
+<header><h1>Demystify · Solve graph</h1><p id="source"></p><p class="muted">Explore move difficulty and when each explanation became available.</p></header>
+<main>
+<section><div class="toolbar"><label>Open archive <input id="open" type="file" accept=".json"></label><button id="save">Save archive</button><button id="root">Go to root</button><label>State <input id="nodeId" type="number" min="0" value="0"></label><button id="go">Go</button><label><input id="historical" type="checkbox"> Include superseded routes</label></div><p id="error" class="error" role="alert"></p><p id="stats"></p><p class="muted small">Costs are smallest explanations found, not certified global minima. A fixed point covers the discovered proofs. A failed availability check rules out that explanation, not every possible explanation.</p></section>
+<section><h2>Selected route</h2><div id="route"></div><p id="routeText" class="muted small">Choose outgoing moves below to follow a route. Bars show the MUS size of each move.</p></section>
+<div class="columns"><section><h2 id="stateTitle"></h2><p id="stateInfo"></p><h3>Incoming moves</h3><div id="parents" class="links"></div><h3>Outgoing moves</h3><div class="scroll"><table><thead><tr><th>Cost</th><th>Deduction / explanation</th><th>Next state</th></tr></thead><tbody id="moves"></tbody></table></div><details><summary>Known facts</summary><p id="known" class="small"></p></details><details><summary>All retained explanations at this state</summary><div id="evidence" class="links"></div></details></section>
+<section><h2>Explanation availability</h2><p id="proofPrompt" class="muted">Select an explanation beside a move.</p><div id="proofDetail" hidden><p id="proofTitle"></p><p id="proofCons"></p><label>Deduction <select id="deduction"></select></label><p id="origin" class="small muted"></p><h3>First usable states on these branches</h3><div id="frontier" class="links"></div><p class="muted small">Availability is tested using only the facts at each state. Different branches can enable the same proof independently.</p><h3>All states where this proof can make this deduction</h3><div id="available" class="links scroll"></div></div></section></div>
+</main>
+<script id="graph-data" type="application/json">@@GRAPH@@</script>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  let graph, depths, incoming, node = 0, selectedProof = null, route = [];
+  const text = (id, value) => { $(id).textContent = value; };
+  function button(label, action) { const b = document.createElement('button'); b.textContent = label; b.onclick = action; return b; }
+  function label(lit) {
+    const ls = graph.puzzle.invlitmap[String(lit)];
+    return ls ? ls.map(l => {
+      const v = l.varval;
+      if (!v.var) return String(lit);
+      return v.var.name + '[' + v.var.indices.join(',') + ']' + (l.equal ? '=' : '≠') + v.val;
+    }).join(', ') : String(lit);
+  }
+  function constraints(p) { return graph.proofs[p].constraints.map(c => graph.puzzle.conset[String(c)] || String(c)).join('; '); }
+  const eligible = i => $('historical').checked || depths[i] !== null;
+  function load(g) {
+    if (g.format !== 'demystify-solve-graph' || g.version !== 1 || !Array.isArray(g.nodes) || !g.nodes[g.root]) throw new Error('Unsupported solve graph archive');
+    graph = g; depths = Array(g.nodes.length).fill(null); incoming = g.nodes.map(() => []);
+    g.nodes.forEach((n,i) => n.edges.forEach(e => { if (!g.nodes[e.target] || !g.proofs[e.proof]) throw new Error('Invalid graph edge'); incoming[e.target].push({source:i, edge:e}); }));
+    depths[g.root] = 0; const queue = [g.root];
+    for (let q=0;q<queue.length;q++) g.nodes[queue[q]].edges.filter(e=>e.active).forEach(e=>{if(depths[e.target]===null){depths[e.target]=depths[queue[q]]+1;queue.push(e.target);}});
+    selectedProof = null; route = []; node = g.root;
+    $('proofPrompt').hidden=false;$('proofDetail').hidden=true;
+    text('source', g.source);
+    const active = g.nodes.filter((_,i)=>depths[i]!==null);
+    const incomplete = active.filter(n=>n.status==='search_incomplete').length;
+    text('stats', `${g.fixed_point ? 'Fixed point' : 'Checkpoint · unfinished'} · ${active.length} active states · ${g.nodes.length} retained states · ${g.proofs.length} proofs · ${g.searches.length} discovery round(s) · ${incomplete} leaves with incomplete search`);
+    $('nodeId').max = g.nodes.length-1;
+    show();
+  }
+  function jump(i) { node=i; route=[]; show(); }
+  function show() {
+    const n = graph.nodes[node]; $('nodeId').value=node;
+    text('stateTitle', `State ${node}`);
+    text('stateInfo', `${n.status.replaceAll('_',' ')} · ${n.remaining.length} remaining deductions · ${n.known.length} known literals · ${depths[node]===null?'outside current routes':'minimum depth '+depths[node]}`);
+    $('parents').replaceChildren();
+    incoming[node].filter(p=>eligible(p.source)&&($('historical').checked||p.edge.active)).forEach(p=>$('parents').append(button(`State ${p.source} · cost ${graph.proofs[p.edge.proof].constraints.length}`,()=>jump(p.source))));
+    $('moves').replaceChildren();
+    n.edges.filter(e=>$('historical').checked||e.active).forEach(e=>{
+      const tr=document.createElement('tr'), cost=document.createElement('td'), explanation=document.createElement('td'), next=document.createElement('td');
+      cost.textContent=graph.proofs[e.proof].constraints.length;
+      const deduction=document.createElement('p'); deduction.textContent=e.deduced.map(label).join(', '); explanation.append(deduction);
+      explanation.append(button(`Proof ${e.proof}${e.active?'':' · superseded'}`,()=>chooseProof(e.proof,e.deduced[0])));
+      if(e.implied.length){const p=document.createElement('p');p.className='small muted';p.textContent=`+ ${e.implied.length} automatic facts`;explanation.append(p);}
+      next.append(button(`State ${e.target}`,()=>{route.push({source:node,...e});node=e.target;show();}));
+      tr.append(cost,explanation,next);$('moves').append(tr);
+    });
+    text('known',n.known.map(label).join('; '));
+    $('evidence').replaceChildren();Object.keys(n.evidence).forEach(p=>$('evidence').append(button(`Proof ${p} · cost ${graph.proofs[p].constraints.length}`,()=>chooseProof(Number(p),n.evidence[p][0]))));
+    $('route').replaceChildren();
+    route.forEach((e,i)=>{const cost=graph.proofs[e.proof].constraints.length;const b=button(String(i+1),()=>{node=e.source;route=route.slice(0,i);show();});b.dataset.cost=cost;b.style.height=(24+cost*10)+'px';b.title=`State ${e.source} → ${e.target}, cost ${cost}`;$('route').append(b);});
+    if (selectedProof!==null) availability();
+  }
+  function chooseProof(p,lit) {
+    selectedProof=p;$('proofPrompt').hidden=true;$('proofDetail').hidden=false;
+    text('proofTitle',`Proof ${p} · MUS size ${graph.proofs[p].constraints.length}`);text('proofCons',constraints(p));
+    const deductions=[...new Set(graph.nodes.flatMap(n=>n.evidence[p]||[]))];$('deduction').replaceChildren();
+    deductions.forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=label(l);$('deduction').append(o);});$('deduction').value=lit;
+    const proof=graph.proofs[p];text('origin',`Discovered at state ${proof.discovered_at}${proof.reduced_from===null?' by MUS search':', reduced from proof '+proof.reduced_from}.`);
+    availability();
+  }
+  function availability() {
+    if(selectedProof===null)return;
+    const lit=Number($('deduction').value), available=new Set();
+    graph.nodes.forEach((n,i)=>{if(eligible(i)&&(n.evidence[selectedProof]||[]).includes(lit))available.add(i);});
+    const frontier=[...available].filter(i=>!incoming[i].some(p=>available.has(p.source)&&($('historical').checked||p.edge.active)));
+    for(const [id,ids] of [['frontier',frontier],['available',[...available]]]){$(id).replaceChildren();ids.sort((a,b)=>(depths[a]??Infinity)-(depths[b]??Infinity)||a-b).forEach(i=>$(id).append(button(`State ${i}${i===graph.root?' · start':''}`,()=>jump(i))));}
+  }
+  $('deduction').onchange=availability;$('historical').onchange=show;$('root').onclick=()=>jump(graph.root);
+  $('go').onclick=()=>{const i=Number($('nodeId').value);if(Number.isInteger(i)&&graph.nodes[i]){text('error','');jump(i);}else text('error','Choose a valid state number.');};
+  $('open').onchange=async e=>{try{load(JSON.parse(await e.target.files[0].text()));text('error','');}catch(err){text('error',err.message);}};
+  $('save').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(graph)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='solve-graph.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+  try { load(JSON.parse($('graph-data').textContent)); } catch (e) { text('error',e.message); }
+})();
+</script>
+</html>

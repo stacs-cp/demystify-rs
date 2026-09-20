@@ -4,9 +4,20 @@
 <div class="st-page">
   <section class="he-paper st-controls">
     <h3>Solve Tree Explorer</h3>
-    <p class="desc">Explore all solving paths through a puzzle by branching on every distinct minimum-sized MUS.</p>
+    <p class="desc">Explore routes through the smallest explanations found. Research mode preserves individual states, propagates explanations to a fixed point, and saves the evidence for later study.</p>
 
     <div class="st-form">
+      <label>
+        Mode
+        <select id="stMode" class="he-btn">
+          <option value="compact">Compact exploration</option>
+          <option value="research">Research (small puzzles)</option>
+        </select>
+      </label>
+      <label>
+        MUS searches
+        <input id="stRepeats" type="number" class="he-btn" value="5" min="1" style="width:5rem;" disabled>
+      </label>
       <label>
         Merge strategy
         <select id="stMerge" class="he-btn">
@@ -20,6 +31,7 @@
         <input id="stMergeSize" type="number" class="he-btn" value="1" min="0" max="99" style="width:5rem;">
       </label>
       <button id="stBuild" class="he-btn primary">Build tree</button>
+      <button id="stSave" class="he-btn" disabled>Save research graph</button>
     </div>
     <div id="stStatus" class="st-status"></div>
   </section>
@@ -40,12 +52,30 @@
   const canvas = document.getElementById('stCanvas');
   const detail = document.getElementById('stDetail');
   const statsEl = document.getElementById('stStats');
+  const saveBtn = document.getElementById('stSave');
+  let archive = null;
+  document.getElementById('stMode').addEventListener('change', () => {
+    const research = document.getElementById('stMode').value === 'research';
+    document.getElementById('stMerge').disabled = research;
+    document.getElementById('stMergeSize').disabled = research;
+    document.getElementById('stRepeats').disabled = !research;
+  });
+  saveBtn.addEventListener('click', () => {
+    if (!archive) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(archive)], {type:'application/json'}));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'solve-graph.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
 
   btn.addEventListener('click', async () => {
     const merge = document.getElementById('stMerge').value;
     const mergeSize = document.getElementById('stMergeSize').value;
+    const research = document.getElementById('stMode').value === 'research';
+    const repeats = document.getElementById('stRepeats').value;
 
     btn.disabled = true;
+    saveBtn.disabled = true;
     status.textContent = 'Building solve tree… (this may take a while)';
     status.className = 'st-status loading';
     detail.style.display = 'none';
@@ -55,17 +85,22 @@
       const resp = await fetch('/solvetree/build', {
         method: 'POST',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `merge_strategy=${merge}&merge_mus_size=${mergeSize}`
+        body: new URLSearchParams({merge_strategy:merge, merge_mus_size:mergeSize, research:String(research), repeats})
       });
       if (!resp.ok) {
         const text = await resp.text();
         throw new Error(text || resp.statusText);
       }
       const data = await resp.json();
+      archive = data.archive || null;
+      saveBtn.disabled = !archive;
       status.textContent = '';
       status.className = 'st-status';
       renderTree(data);
       showStats(data.stats);
+      if (archive) {
+        status.textContent = `Fixed point for ${archive.proofs.length} discovered proofs; ${archive.nodes.length} states retained. Costs are best found, not certified minima.`;
+      }
     } catch(e) {
       status.textContent = 'Error: ' + e.message;
       status.className = 'st-status error';
