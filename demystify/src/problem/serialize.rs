@@ -5,8 +5,6 @@
 //! tools like conjure or savilerow.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::fs::File;
-use std::io::{BufReader, BufWriter};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -17,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::problem::{PuzLit, PuzVar};
 
+use super::json_file;
 use super::parse::{self, EPrimeAnnotations, PuzzleParse};
 
 /// Serializable version of EPrimeAnnotations
@@ -393,21 +392,15 @@ impl PuzzleParse {
     /// This allows the puzzle to be loaded later without running conjure/savilerow.
     pub fn save_to_json(&self, path: &Path) -> Result<()> {
         let serializable = SerializablePuzzleParse::try_from(self)?;
-        let file = File::create(path).context("Failed to create output file")?;
-        let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, &serializable)
-            .context("Failed to serialize puzzle")?;
-        Ok(())
+        json_file::write_atomic(path, &serializable, true).context("Failed to serialize puzzle")
     }
 
     /// Load a puzzle parse from a JSON file.
     ///
     /// This loads a puzzle that was previously saved with `save_to_json`.
     pub fn load_from_json(path: &Path) -> Result<Self> {
-        let file = File::open(path).context("Failed to open input file")?;
-        let reader = BufReader::new(file);
         let serializable: SerializablePuzzleParse =
-            serde_json::from_reader(reader).context("Failed to deserialize puzzle")?;
+            json_file::read(path).context("Failed to deserialize puzzle")?;
         serializable.try_into()
     }
 
@@ -479,6 +472,21 @@ mod tests {
         assert_eq!(original.eprime.auxvars, loaded.eprime.auxvars);
         assert_eq!(original.eprime.cons, loaded.eprime.cons);
         assert_eq!(original.eprime.kind, loaded.eprime.kind);
+        assert_eq!(original.direct, loaded.direct);
+        assert_eq!(original.constraints, loaded.constraints);
+        assert_eq!(original.var_lits, loaded.var_lits);
+    }
+
+    #[test]
+    fn test_compressed_file_roundtrip() {
+        let original = build_puzzleparse("./tst/little1.eprime", "./tst/little1.param");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("little.json.zst");
+
+        original.save_to_json(&path).unwrap();
+        let loaded = PuzzleParse::load_from_json(&path).unwrap();
+
+        assert_eq!(original.eprime, loaded.eprime);
         assert_eq!(original.direct, loaded.direct);
         assert_eq!(original.constraints, loaded.constraints);
         assert_eq!(original.var_lits, loaded.var_lits);

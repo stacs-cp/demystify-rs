@@ -1,3 +1,4 @@
+pub(crate) mod json_file;
 pub mod musdict;
 /// Module containing problem-related functionality.
 pub mod parse;

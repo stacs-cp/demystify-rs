@@ -9,6 +9,7 @@ from pathlib import Path
 import sqlite3
 
 from expand import fingerprint, size_band
+from jsonio import write_text
 from story import VERSION
 
 
@@ -33,10 +34,7 @@ METRICS = {
 
 
 def save(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + '.tmp')
-    temporary.write_text(value)
-    temporary.replace(path)
+    write_text(path, value)
 
 
 def distribution(values):
@@ -154,7 +152,7 @@ def markdown(result):
     games = [g for g in groups if g['dimension'] == 'game']
     lines = ['# Overall puzzle story statistics', '', f"Updated {result['computed_utc']}.", '',
              f"{len(entries):,} current source entries; " + ', '.join(f'{n:,} {s}' for s, n in sorted(counts.items())) + '.', '',
-             '[Queryable SQLite index](overall.sqlite) · [Full distributions and puzzle rows](overall.json) · [Batch progress](../progress.json)', '',
+             '[Queryable SQLite index](overall.sqlite) · [Full distributions and puzzle rows](overall.json.zst) · [Batch progress](../progress.json)', '',
              '**All story comparisons below are conditional on graph completion.** Slow, highly branching puzzles may be missing disproportionately. '
              'Pending and unfinished graphs are counted in coverage, never treated as zero-valued stories. '
              'Until coverage improves, these are hypotheses to investigate rather than population rankings.', '',
@@ -225,7 +223,7 @@ def write(inventory, roots, out):
                 db.execute('INSERT INTO distributions VALUES (?,?,?,?,?,?,?,?,?,?,?)', vals)
         assert db.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
     temporary.replace(database)
-    save(out / 'overall.json', json.dumps(result, indent=2) + '\n')
+    save(out / 'overall.json.zst', json.dumps(result, indent=2) + '\n')
     save(out / 'README.md', markdown(result))
     print('OVERALL', dict(Counter(e['status'] for e in entries)), 'analysed', sum(bool(e['metrics']) for e in entries), flush=True)
     return result

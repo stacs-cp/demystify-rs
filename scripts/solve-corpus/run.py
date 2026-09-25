@@ -16,6 +16,8 @@ import subprocess
 import threading
 import time
 
+from jsonio import compress_file
+
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 BINARY = REPO / "target/release/demystify-solvetree"
@@ -47,7 +49,7 @@ class Batch:
         self.phase = f"refined-{args.refine}" if args.refine else "baseline"
         self.subdir = self.phase if args.refine else ""
         self.lock = threading.Lock()
-        for folder in ["graphs", "viewers", "logs"]:
+        for folder in ["graphs", "logs"]:
             (self.root / folder / self.subdir).mkdir(parents=True, exist_ok=True)
         self.items = [
             item for item in self.manifest["instances"]
@@ -115,8 +117,11 @@ class Batch:
         # Model bundles are shared by instances of each game, so export serially.
         for item in self.items:
             identifier = item["id"]
-            parsed = self.root / "parsed" / f"{identifier}.json"
+            parsed = self.root / "parsed" / f"{identifier}.json.zst"
+            plain_parsed = parsed.with_suffix('')
             validation_path = self.root / "validation" / f"{identifier}.json"
+            if not parsed.exists() and plain_parsed.exists():
+                compress_file(plain_parsed, parsed)
             if not (parsed.exists() and validation_path.exists()):
                 log = self.root / "logs" / f"{identifier}.export.log"
                 with log.open("a") as stream:
@@ -140,6 +145,9 @@ class Batch:
                         )
                     print(identifier, "EXPORT FAILED", flush=True)
                     continue
+                if not parsed.exists():
+                    assert plain_parsed.exists(), plain_parsed
+                    compress_file(plain_parsed, parsed)
             validation = json.loads(validation_path.read_text())
             with self.db() as db:
                 db.execute(
@@ -173,14 +181,14 @@ class Batch:
         if output.exists():
             command = [str(BINARY), "resume", "--input", str(output)]
         elif self.args.refine:
-            baseline = self.root / "graphs" / f"{item['id']}.graph.json"
+            baseline = self.root / "graphs" / f"{item['id']}.graph.json.zst"
             if not baseline.exists():
                 raise ValueError("No baseline archive to refine")
             command = [str(BINARY), "resume", "--input", str(baseline),
                        "--out", str(output), "--repeats", str(self.args.refine)]
         else:
             command = [str(BINARY), "build", "--load-parsed",
-                       str(self.root / "parsed" / f"{item['id']}.json"),
+                       str(self.root / "parsed" / f"{item['id']}.json.zst"),
                        "--out", str(output), "--only-assign",
                        "--repeats", str(self.args.repeats), "--strategy", "dynamic",
                        "--conflict-limit", "1000"]
@@ -195,30 +203,20 @@ class Batch:
             check=True, capture_output=True, text=True,
         )
         summary = json.loads(inspected.stdout)
-        graph = json.loads(output.read_text())
-        seen = {graph["root"]}
-        queue = list(seen)
-        peak = 0
-        for node in queue:
-            for edge in graph["nodes"][node]["edges"]:
-                if edge["active"]:
-                    peak = max(peak, len(graph["proofs"][edge["proof"]]["constraints"]))
-                    if edge["target"] not in seen:
-                        seen.add(edge["target"])
-                        queue.append(edge["target"])
         result.update({
             "archive_path": str(output.relative_to(self.root)),
             "archive_sha256": sha(output), "archive_bytes": output.stat().st_size,
             "summary_json": json.dumps(summary),
             "active_nodes": summary["active_nodes"],
             "retained_nodes": summary["retained_nodes"], "proofs": summary["proofs"],
-            "difficulty_max": peak, "fixed_point": int(summary["fixed_point"]),
+            "difficulty_max": summary["difficulty_max"],
+            "fixed_point": int(summary["fixed_point"]),
             "status": "checkpoint",
         })
         # Record the actual saved solver settings too, particularly on resume.
         settings = json.loads(result["settings_json"])
-        settings["saved_solver_config"] = graph["solver_config"]
-        settings["saved_searches"] = graph["searches"]
+        settings["saved_solver_config"] = summary["saved_solver_config"]
+        settings["saved_searches"] = summary["saved_searches"]
         result["settings_json"] = json.dumps(settings)
         if summary["fixed_point"]:
             if summary["underdetermined_leaves"]:
@@ -227,16 +225,11 @@ class Batch:
                 result["status"] = "search_incomplete"
             else:
                 result["status"] = "complete"
-        viewer = self.root / "viewers" / self.subdir / output.name.replace(".graph.json", ".html")
-        subprocess.run(
-            [str(BINARY), "render", "--input", str(output), "--out", str(viewer)],
-            check=True, capture_output=True,
-        )
-        result["viewer_path"] = str(viewer.relative_to(self.root))
+        result["viewer_path"] = None
 
     def job(self, item):
         identifier = item["id"]
-        output = self.root / "graphs" / self.subdir / f"{identifier}.graph.json"
+        output = self.root / "graphs" / self.subdir / f"{identifier}.graph.json.zst"
         log = self.root / "logs" / self.subdir / f"{identifier}.run.log"
         start = time.monotonic()
         with self.db() as db:

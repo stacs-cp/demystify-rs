@@ -125,6 +125,21 @@ impl From<SearchStrategy> for Strategy {
     }
 }
 
+fn output_stem(path: &Path) -> Result<String> {
+    let name = path
+        .file_name()
+        .context("Input has no filename")?
+        .to_string_lossy();
+    if let Some(stem) = name.strip_suffix(".json.zst") {
+        return Ok(stem.to_owned());
+    }
+    Ok(path
+        .file_stem()
+        .context("Input has no filename stem")?
+        .to_string_lossy()
+        .into_owned())
+}
+
 #[derive(Serialize)]
 struct Summary {
     source: String,
@@ -138,6 +153,11 @@ struct Summary {
     underdetermined_leaves: usize,
     search_incomplete_leaves: usize,
     propagation_checks: usize,
+    difficulty_max: usize,
+    opening_width: usize,
+    opening_mus: usize,
+    saved_solver_config: SolverConfig,
+    saved_searches: Vec<SearchSettings>,
 }
 
 fn summary(graph: &SolveGraph, path: &Path) -> Summary {
@@ -148,6 +168,19 @@ fn summary(graph: &SolveGraph, path: &Path) -> Summary {
         .enumerate()
         .filter(|(i, _)| depths[*i].is_some())
         .map(|(_, n)| n)
+        .collect();
+    let active_edges = active
+        .iter()
+        .flat_map(|node| node.edges.iter().filter(|edge| edge.active));
+    let difficulty_max = active_edges
+        .clone()
+        .map(|edge| graph.proofs[edge.proof].constraints.len())
+        .max()
+        .unwrap_or(0);
+    let opening_edges: Vec<_> = graph.nodes[graph.root]
+        .edges
+        .iter()
+        .filter(|edge| edge.active)
         .collect();
     Summary {
         source: graph.source.clone(),
@@ -173,6 +206,19 @@ fn summary(graph: &SolveGraph, path: &Path) -> Summary {
             .filter(|n| n.status == NodeStatus::SearchIncomplete)
             .count(),
         propagation_checks: graph.propagation_checks,
+        difficulty_max,
+        opening_width: opening_edges
+            .iter()
+            .map(|edge| edge.target)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        opening_mus: opening_edges
+            .iter()
+            .map(|edge| graph.proofs[edge.proof].constraints.len())
+            .min()
+            .unwrap_or(0),
+        saved_solver_config: graph.solver_config,
+        saved_searches: graph.searches.clone(),
     }
 }
 
@@ -247,11 +293,11 @@ fn main() -> Result<()> {
                 let output = match &out {
                     Some(path) => path.clone(),
                     None => {
-                        let stem = input
-                            .file_stem()
-                            .context("Input has no filename")?
-                            .to_string_lossy();
-                        out_dir.as_ref().unwrap().join(format!("{stem}.graph.json"))
+                        let stem = output_stem(&input)?;
+                        out_dir
+                            .as_ref()
+                            .unwrap()
+                            .join(format!("{stem}.graph.json.zst"))
                     }
                 };
                 ensure!(
@@ -372,4 +418,16 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::output_stem;
+    use std::path::Path;
+
+    #[test]
+    fn batch_output_stem_handles_compressed_json_as_one_suffix() {
+        assert_eq!(output_stem(Path::new("puzzle.json.zst")).unwrap(), "puzzle");
+        assert_eq!(output_stem(Path::new("puzzle.param")).unwrap(), "puzzle");
+    }
 }

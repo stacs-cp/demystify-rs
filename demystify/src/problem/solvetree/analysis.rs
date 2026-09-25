@@ -10,8 +10,6 @@
 //! that randomized MUS discovery found all explanations or the true minimum.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
-use std::fs::File;
-use std::io::{BufReader, Write};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -20,6 +18,7 @@ use rustsat::types::Lit;
 use serde::{Deserialize, Serialize};
 
 use super::{SolveTreeJson, SolveTreeJsonLink, SolveTreeJsonNode, SolveTreeJsonStats};
+use crate::problem::json_file;
 use crate::problem::musdict::MusDict;
 use crate::problem::parse::PuzzleParse;
 use crate::problem::serialize::SerializablePuzzleParse;
@@ -401,22 +400,11 @@ impl SolveGraph {
 
     /// Atomic replacement: a failed/interrupted write leaves the previous checkpoint.
     pub fn save(&self, path: &Path) -> Result<()> {
-        let parent = path
-            .parent()
-            .filter(|p| !p.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        let mut file = tempfile::NamedTempFile::new_in(parent)?;
-        serde_json::to_writer(&mut file, self)?;
-        file.write_all(b"\n")?;
-        file.as_file().sync_all()?;
-        file.persist(path)
-            .map_err(|e| e.error)
-            .context("Replacing solve graph checkpoint")?;
-        Ok(())
+        json_file::write_atomic(path, self, false).context("Replacing solve graph checkpoint")
     }
 
     pub fn load(path: &Path) -> Result<Self> {
-        let graph: Self = serde_json::from_reader(BufReader::new(File::open(path)?))?;
+        let graph: Self = json_file::read(path)?;
         graph.validate()?;
         Ok(graph)
     }
@@ -1017,6 +1005,21 @@ mod tests {
         assert_eq!(&loaded.proofs[..proofs.len()], &proofs);
         loaded.save(&path).unwrap();
         assert!(SolveGraph::load(&path).unwrap().fixed_point);
+    }
+
+    #[test]
+    fn compressed_checkpoint_roundtrip() {
+        let graph = missed_independent_move();
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("graph.json.zst");
+
+        graph.save(&path).unwrap();
+        let loaded = SolveGraph::load(&path).unwrap();
+
+        assert_eq!(
+            serde_json::to_value(graph).unwrap(),
+            serde_json::to_value(loaded).unwrap()
+        );
     }
 
     #[test]

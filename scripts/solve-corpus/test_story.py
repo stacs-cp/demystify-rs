@@ -14,6 +14,7 @@ import sqlite3
 import tempfile
 
 import analyse as driver
+from jsonio import write_text
 
 from story import Story, analyse, IncompleteGraph, InvalidGraph
 
@@ -301,8 +302,8 @@ class CorpusTests(unittest.TestCase):
     def test_database_roundtrip_idempotence_and_stale_hash_exclusion(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            path = root / 'test.graph.json'
-            path.write_text(json.dumps(fixture(3, lambda s, lit: lit)))
+            path = root / 'test.graph.json.zst'
+            write_text(path, json.dumps(fixture(3, lambda s, lit: lit)))
             sha = hashlib.sha256(path.read_bytes()).hexdigest()
             with sqlite3.connect(root / 'corpus.sqlite') as db:
                 db.executescript('''

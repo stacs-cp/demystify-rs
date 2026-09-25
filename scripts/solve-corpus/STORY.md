@@ -11,7 +11,7 @@ All bounds are over complete routes ending in solved leaves.
 ```sh
 # Single archive: JSON plus a readable report with witness routes.
 python3 -B scripts/solve-corpus/analyse.py \
-  --input path/to/puzzle.graph.json --out puzzle.story.json
+  --input path/to/puzzle.graph.json.zst --out puzzle.story.json.zst
 
 # Whole corpus: update its SQLite index and write statistics/README.md.
 python3 -B scripts/solve-corpus/analyse.py \
@@ -24,8 +24,9 @@ python3 -B scripts/solve-corpus/analyse.py --corpus path/to/corpus \
 python3 -B -m unittest discover -s scripts/solve-corpus -p 'test_*.py' -v
 ```
 
-Requires Python 3.9+ and its standard library. `story.analyse(graph)` is the
-reusable in-memory API. The analysis never changes graph archives. It rejects
+Requires Python 3.9+ and the packages in `requirements.txt`.
+`story.analyse(graph)` is the reusable in-memory API. The analysis never changes
+graph archives. It rejects
 unfinished checkpoints and reachable ambiguous/search-incomplete leaves rather
 than treating their partial routes as complete. The batch driver also verifies
 each archive against the generation database's recorded hash.
@@ -140,7 +141,7 @@ completed graphs in the first multi-game corpus fit within the default limit.
 
 ## Persistence and querying
 
-`statistics/PHASE/ID.story.json` is the machine-readable result and
+`statistics/PHASE/ID.story.json.zst` is the machine-readable result and
 `ID.story.md` contains tables and readable witness routes. The JSON records the
 source graph hash, analyser source hashes, settings and computation time stamp.
 `statistics/README.md` links the whole corpus. Re-running the command replaces

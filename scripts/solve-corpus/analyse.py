@@ -11,6 +11,7 @@ import sqlite3
 import time
 
 from story import VERSION, IncompleteGraph, analyse
+from jsonio import read_bytes, read_json, write_text
 
 HERE = Path(__file__).resolve().parent
 
@@ -24,10 +25,14 @@ def digest(path):
 
 
 def save(path, contents):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + '.tmp')
-    temporary.write_text(contents)
-    temporary.replace(path)
+    write_text(path, contents)
+
+
+def report_path(path):
+    path = Path(path)
+    if path.suffix == '.zst':
+        path = path.with_suffix('')
+    return path.with_suffix('.md')
 
 
 def span(row):
@@ -382,16 +387,15 @@ def corpus(args):
             if source['status'] != 'complete':
                 raise IncompleteGraph('Source run is ' + source['status'])
             path = root / source['archive_path']
-            raw = path.read_bytes()
-            sha = hashlib.sha256(raw).hexdigest()
+            sha = digest(path)
             if sha != source['archive_sha256']:
                 raise ValueError('Archive hash differs from the generation database; reindex it first')
-            graph = json.loads(raw)
+            graph = read_json(path)
             result = analyse(graph, max_labels=args.max_labels)
             result['source'] = provenance(path, sha)
             result['source'].update(puzzle_id=identifier, phase=phase)
-            out = root / 'statistics' / phase / f'{identifier}.story.json'
-            md = out.with_suffix('.md')
+            out = root / 'statistics' / phase / f'{identifier}.story.json.zst'
+            md = report_path(out)
             # Machine-readable rows can be large; Markdown is the readable report.
             save(out, json.dumps(result, separators=(',', ':')) + '\n')
             viewer = os.path.relpath(root / source['viewer_path'], md.parent) if source['viewer_path'] else None
@@ -436,17 +440,17 @@ def main():
         corpus(args)
         return
     if args.out:
-        targets = [args.out.resolve(), args.out.with_suffix('.md').resolve()]
+        targets = [args.out.resolve(), report_path(args.out).resolve()]
         if args.input.resolve() in targets or targets[0] == targets[1]:
             parser.error('JSON/report outputs must be distinct and must not replace the source graph')
-    raw = args.input.read_bytes()
+    raw = read_bytes(args.input)
     graph = json.loads(raw)
     result = analyse(graph, max_labels=args.max_labels)
-    result['source'] = provenance(args.input, hashlib.sha256(raw).hexdigest())
+    result['source'] = provenance(args.input, digest(args.input))
     encoded = json.dumps(result, separators=(',', ':')) + '\n'
     if args.out:
         save(args.out, encoded)
-        save(args.out.with_suffix('.md'), report(result, graph, args.input.stem))
+        save(report_path(args.out), report(result, graph, args.input.stem))
     else:
         print(encoded, end='')
 

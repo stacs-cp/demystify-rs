@@ -74,10 +74,10 @@ After running this command, open `sudoku.html` in your web browser to view the s
 For persistent exploration of solving routes through small puzzles, see the
 [solve-graph research guide](demystify/src/problem/solvetree/README.md). The
 `demystify-solvetree` command supports batches, checkpoints, further MUS searches,
-and an offline viewer for move difficulty and explanation availability.
+and on-demand offline viewers for move difficulty and explanation availability.
 The [multi-game corpus runner](scripts/solve-corpus/README.md) exports shipped
 Bloomsweep levels through their app encoders and saves batches with a SQLite
-index, input provenance, resumable graphs, and offline viewers.
+index, input provenance and zstd-compressed resumable graphs.
 The [offline story statistics](scripts/solve-corpus/STORY.md) measure release
 chains, choke points and variation in repeated hard moves across easiest-move
 routes, with exact bounds for the saved graph and saved witness routes. Completed

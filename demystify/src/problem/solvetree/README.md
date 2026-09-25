@@ -14,12 +14,12 @@ cargo build --release -p demystify --bin demystify-solvetree
 target/release/demystify-solvetree build \
   --model eprime/futoshiki.eprime \
   --param eprime/futoshiki/puzzle-futoshiki-com/4x4-easy-01.param \
-  --only-assign --repeats 5 --out futoshiki.graph.json
+  --only-assign --repeats 5 --out futoshiki.graph.json.zst
 
 target/release/demystify-solvetree build \
   --model eprime/ppminesweeper.eprime \
   --param demystify/tst/solvetree-4x5.param \
-  --out minesweeper.graph.json
+  --out minesweeper.graph.json.zst
 ```
 
 `--only-assign` explores assignments rather than individual candidate
@@ -50,7 +50,8 @@ target/release/demystify-solvetree build \
   --only-assign --repeats 5 --threads 4 --out-dir graphs
 ```
 
-Each puzzle gets `<parameter-stem>.graph.json`. Duplicate output names are
+Each puzzle gets `<input-stem>.graph.json.zst` (with `.json.zst` treated as one
+suffix for parsed inputs). Duplicate output names are
 rejected before starting. A failed puzzle does not stop subsequent puzzles;
 `batch-summary.json` is updated after each one, summaries are printed as JSON
 lines on stdout, and the process exits unsuccessfully if any puzzle failed.
@@ -68,14 +69,14 @@ depth or wall-clock cutoff in this initial version.
 
 ```sh
 # Complete unfinished work, retaining search results and checked proof/state pairs.
-target/release/demystify-solvetree resume --input futoshiki.graph.json
+target/release/demystify-solvetree resume --input futoshiki.graph.json.zst
 
 # Another discovery round, followed by propagation and exploration until stable.
-target/release/demystify-solvetree resume --input futoshiki.graph.json \
-  --repeats 20 --conflict-limit 0 --out futoshiki-refined.graph.json
+target/release/demystify-solvetree resume --input futoshiki.graph.json.zst \
+  --repeats 20 --conflict-limit 0 --out futoshiki-refined.graph.json.zst
 
 # Another round using the previous search settings.
-target/release/demystify-solvetree resume --input futoshiki.graph.json --search-more
+target/release/demystify-solvetree resume --input futoshiki.graph.json.zst --search-more
 ```
 
 Plain `resume` on a completed archive does no new searching. Changes to repeats,
@@ -83,7 +84,7 @@ strategy or conflict limit imply a new discovery round. Every requested round's
 settings are retained. New rounds include historical states, since their
 explanations can still improve the active graph.
 
-`build --load-parsed puzzle.json` skips the external compiler. For generated
+`build --load-parsed puzzle.json.zst` skips the external compiler. For generated
 puzzles use `--pin-assignment assignment.json`; it accepts a bare assignment or
 a mystify output containing `puzzle`. The resulting pinned facts are saved in
 the root. Resume needs neither the original files nor Conjure.
@@ -95,10 +96,10 @@ the parsed puzzle, using the games' cell domains and constraint grouping:
 
 ```sh
 cargo build --release -p demystify-builder --example graph_corpus
-target/release/examples/graph_corpus fell level.json fell.parsed.json
+target/release/examples/graph_corpus fell level.json fell.parsed.json.zst
 # Use `mauve` for Mauve level files (lightsThroughOpposite must be true).
-target/release/demystify-solvetree build --load-parsed fell.parsed.json \
-  --only-assign --repeats 5 --out fell.graph.json
+target/release/demystify-solvetree build --load-parsed fell.parsed.json.zst \
+  --only-assign --repeats 5 --out fell.graph.json.zst
 ```
 
 The exporter checks that every value in the supplied reference solution is
@@ -111,9 +112,9 @@ are not measurements under this encoding; compare the resulting graphs.
 ## Study later, offline
 
 ```sh
-target/release/demystify-solvetree inspect --input futoshiki.graph.json
+target/release/demystify-solvetree inspect --input futoshiki.graph.json.zst
 target/release/demystify-solvetree render \
-  --input futoshiki.graph.json --out futoshiki.html
+  --input futoshiki.graph.json.zst --out futoshiki.html
 ```
 
 Open the HTML in a browser. It is self-contained and makes no network requests.
@@ -161,7 +162,9 @@ discovery found no explanation within its budget).
 
 ## Archive schema (version 1)
 
-The top-level `format` is `demystify-solve-graph`. The JSON includes the producer
+The top-level `format` is `demystify-solve-graph`. A `.zst` suffix selects zstd
+level 9 with a frame checksum; legacy plain `.json` remains readable. The JSON
+includes the producer
 version, source label, complete parsed puzzle/CNF, solver target policy, search
 settings, nodes, proofs and propagation progress. It uses signed DIMACS integers
 for literals and constraints; the embedded puzzle maps them back to names.

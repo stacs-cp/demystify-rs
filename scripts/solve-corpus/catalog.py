@@ -15,6 +15,8 @@ import sqlite3
 import statistics
 import subprocess
 
+from jsonio import read_json
+
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -65,7 +67,7 @@ def main():
             continue
         path = root / row["archive_path"]
         assert sha(path) == row["archive_sha256"], path
-        graph = json.loads(path.read_text())
+        graph = read_json(path)
         assert graph["format"] == "demystify-solve-graph", path
         assert bool(graph["fixed_point"]) == bool(row["fixed_point"]), path
         summary = json.loads(row["summary_json"])
@@ -75,10 +77,7 @@ def main():
             assert summary["underdetermined_leaves"] == 0, path
             assert summary["search_incomplete_leaves"] == 0, path
             assert all(not node["needs_expansion"] for node in graph["nodes"]), path
-        if row['viewer_path']:
-            assert (root / row["viewer_path"]).is_file(), path
-        else:
-            assert row['status'] == 'failed', path
+        assert not row['viewer_path'], path
         verified += 1
 
     # Save the actual encoder inputs, not just a revision of a possibly dirty
@@ -162,7 +161,7 @@ def main():
         "",
         "The database indexes the JSON archives alongside it: keep this directory together. "
         "Each graph embeds its puzzle model, constraint descriptions, proofs, states, edges, "
-        "search settings and proof propagation progress. HTML viewers work offline.",
+        "search settings and proof propagation progress. Render an HTML viewer on demand.",
         "",
         manifest.get('selection', 'Selection is recorded in manifest.json.') + ' These are exploratory, '
         "deliberately selected examples, not a representative random sample. Source MUS tiers "
@@ -180,7 +179,7 @@ def main():
         "Default search: five dynamic MUS repeats, assignments only, initial conflict limit "
         "1,000 (the solver may raise it), two solver threads, two concurrent puzzles. Runs "
         "are capped at the recorded wall-clock budget and save checkpoints between work units. "
-        "Runtime includes archive inspection and viewer generation. No story classifications "
+        "Runtime includes archive inspection. No story classifications "
         "have been assigned.",
         "",
         timing,

@@ -52,8 +52,8 @@ web-time = "1"
 rustsat-glucose = { version = "0.7" }
 rustsat-cadical = "0.7.5"
 which = "8"
-# Parse cache: persistent, multi-process SQLite KV store; zstd to shrink the
-# (highly compressible) parse JSON; sha2 to build the content+version key.
+# Parse cache: persistent, multi-process SQLite KV store; zstd also stores
+# parsed puzzles and solve graphs as compressed JSON; sha2 builds cache keys.
 cute-sqlite-kv = "0.1.0"
 zstd = "0.13"
 sha2 = "0.10"

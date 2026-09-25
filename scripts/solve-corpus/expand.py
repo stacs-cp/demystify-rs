@@ -153,7 +153,7 @@ def main():
     chosen = eligible if args.all else selection(items, excluded, args.per_game, args.seed, args.max_area)
     if not chosen:
         parser.error('No new matching levels')
-    for folder in ('inputs', 'parsed', 'graphs', 'viewers', 'logs', 'validation', 'sources'):
+    for folder in ('inputs', 'parsed', 'graphs', 'logs', 'validation', 'sources'):
         (root / folder).mkdir(parents=True, exist_ok=True)
     counts = {}
     for game in sorted({i['game'] for i in items}):

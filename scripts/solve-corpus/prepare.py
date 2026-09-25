@@ -5,7 +5,7 @@ p=argparse.ArgumentParser();p.add_argument('--apps-root',type=pathlib.Path,requi
 root=args.out.resolve();apps=args.apps_root.resolve()
 root.mkdir(parents=True,exist_ok=True)
 assert not (root/'manifest.json').exists(),'Manifest exists; use a new corpus directory'
-for folder in ['inputs','parsed','graphs','viewers','logs','validation','sources']:(root/folder).mkdir(exist_ok=True)
+for folder in ['inputs','parsed','graphs','logs','validation','sources']:(root/folder).mkdir(exist_ok=True)
 def area(d):
  b=d.get('board',{});b=b if isinstance(b,dict) else {}
  return d.get('width',0)*d.get('height',0) or d.get('size',0)**2 or b.get('L',0)*b.get('M',0) or 1+3*d.get('radius',0)*(d.get('radius',0)+1)

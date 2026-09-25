@@ -3,8 +3,9 @@
 These scripts select shipped Bloomsweep puzzles, execute their existing game
 encoders against the local WASM builder, and explore solving routes with the
 native `demystify-solvetree` executable. The result is a SQLite index plus
-self-contained JSON graph archives and offline HTML viewers. No story analysis
-or classification is performed during generation.
+self-contained zstd-compressed JSON graph archives. HTML viewers are rendered
+on demand rather than stored beside every graph. No story analysis or
+classification is performed during generation.
 
 Once graphs are saved, the [story statistics tool](STORY.md) measures release
 chains, choke points, best/worst hard-move counts, breakthrough payoff, routine
@@ -21,9 +22,10 @@ Saved local snapshots: [initial 84 instances](../../etc/example-outputs/solve-gr
 and [123 additional instances with a full-inventory runtime estimate](../../etc/example-outputs/solve-graphs/more-games-2026-09-13/EXPANSION.md).
 Generated corpora are local artifacts, so these links require their saved directories.
 
-Run from the `demystify-rs` workspace. Requirements: Python 3.9+, Node 20+, the
-Bloomsweep checkout with its npm dependencies installed (including esbuild),
-and the normal Rust/WASM build toolchain.
+Run from the `demystify-rs` workspace. Requirements: Python 3.9+ with
+`pip install -r scripts/solve-corpus/requirements.txt`, Node 20+, the Bloomsweep
+checkout with its npm dependencies installed (including esbuild), and the
+normal Rust/WASM build toolchain.
 
 ```sh
 make wasm
@@ -68,7 +70,7 @@ python3 scripts/solve-corpus/run.py \
   --refine 20 --seconds 600
 ```
 
-Refined archives/viewers/logs go into `refined-20` subdirectories and a separate
+Refined archives and logs go into `refined-20` subdirectories and a separate
 database phase. Rerun `catalog.py` after a batch has stopped. It verifies saved
 file hashes, SQLite integrity, and complete-graph status; it copies encoder
 source files and WASM artifacts for provenance and writes a linked catalog.
@@ -131,7 +133,7 @@ workspace modules for new apps before their node_modules links are installed.
 
 `sweep.py` runs a durable first pass over a prepared corpus, interleaving seeded
 shuffled queues from each game. It exports, solves and analyses chunks, then
-refreshes `overall/README.md`, `overall/overall.json` and `overall/overall.sqlite`
+refreshes `overall/README.md`, `overall/overall.json.zst` and `overall/overall.sqlite`
 across the selected corpora. It records live counters and its PID in
 `progress.json`. The finished pass also writes a verified generation catalog.
 
@@ -203,10 +205,9 @@ rules or a comparison with stored reference solutions.
 
 - `manifest.json`: selection, source paths/indices/hashes, source difficulty.
 - `inputs/`: frozen source level JSON and any given-cell pins.
-- `parsed/`: native puzzle models exported from the app encoders.
+- `parsed/`: zstd-compressed native puzzle models exported from the app encoders.
 - `validation/`: uniqueness results, fixed/unfixed variables, and model counts.
-- `graphs/`: resumable JSON archives with models, proofs and all retained states.
-- `viewers/`: self-contained offline HTML viewers.
+- `graphs/`: resumable `.json.zst` archives with models, proofs and all retained states.
 - `logs/`: commands, progress and errors.
 - `sources/`: encoder bundles, source snapshots, WASM and build provenance.
 - `corpus.sqlite`: `games`, `puzzles`, `runs`, `attempts`, and the
@@ -217,6 +218,11 @@ files. `runs.summary_json` holds native summary fields and `settings_json`
 records search settings. `difficulty_max` is the peak MUS on currently active
 edges; `source_tier` is the original pack's label. `board_area` is a size proxy
 and may be a bounding rectangle for hex boards.
+
+Use `demystify-solvetree render --input GRAPH.json.zst --out VIEWER.html` when
+an interactive viewer is needed. The native tool selects compression by the
+`.zst` suffix, reads legacy plain `.json` files, and writes new compressed
+archives at zstd level 9.
 
 `runs` holds the latest result per puzzle/pass. `attempts` retains timings and
 summary metadata for previous attempts, so resuming does not erase time already
