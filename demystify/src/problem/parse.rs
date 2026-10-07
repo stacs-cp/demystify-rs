@@ -916,6 +916,81 @@ impl PuzzleParse {
         var_to_cons
     }
 
+    /// Unit literals that can be added to every SAT solver for this puzzle
+    /// without changing the answer to any query we make.
+    ///
+    /// A variable is a candidate only if no query can assume or ask about it:
+    /// not a constraint in the store, and not a direct- or order-encoding
+    /// literal of a puzzle/`$#AUX`/reveal variable (`$#CON` indicators are
+    /// encoded too, but only the store's selectors are ever assumed).  Such a variable that occurs in only one
+    /// polarity in the (non-tautological) clauses is a pure literal, so fixing
+    /// it to satisfy those clauses preserves satisfiability; one that occurs in
+    /// no such clause can be fixed either way.  This covers `$#CON` indicators
+    /// for index combinations with no constraint (Savilerow declares them with
+    /// a tautology) and the selectors of de-duplicated constraints.  Without
+    /// the units the solver decides every such variable on every SAT answer.
+    #[must_use]
+    pub fn solver_units(&self) -> Vec<Lit> {
+        let cnf = self.cnf.as_ref().expect("solver_units: puzzle has no CNF");
+
+        let mut protected: HashSet<rustsat::types::Var> = HashSet::new();
+        protected.extend(self.constraints.lits().iter().map(|l| l.var()));
+        for (lit, puzlits) in &self.direct.invlitmap {
+            if puzlits
+                .iter()
+                .any(|p| !self.eprime.cons.contains_key(p.var().name()))
+            {
+                protected.insert(lit.var());
+            }
+        }
+        for (lit, var) in &self.order.inv_map {
+            if !self.eprime.cons.contains_key(var.name()) {
+                protected.insert(lit.var());
+            }
+        }
+        protected.extend(self.var_lits.positive().iter().map(|l| l.var()));
+        protected.extend(self.var_lits.negative().iter().map(|l| l.var()));
+        protected.extend(self.var_lits.special().iter().map(|l| l.var()));
+        for (k, v) in &self.reveal_map {
+            protected.insert(k.var());
+            protected.insert(v.var());
+        }
+
+        let mut pos = HashSet::new();
+        let mut neg = HashSet::new();
+        let mut max_idx = 0;
+        for clause in cnf.iter() {
+            let lits: Vec<Lit> = clause.iter().copied().collect();
+            for l in &lits {
+                max_idx = max(max_idx, l.var().idx());
+            }
+            if lits.iter().any(|l| lits.contains(&!*l)) {
+                continue;
+            }
+            for l in &lits {
+                if l.is_pos() {
+                    pos.insert(l.var());
+                } else {
+                    neg.insert(l.var());
+                }
+            }
+        }
+
+        let mut units = Vec::new();
+        for idx in 0..=max_idx {
+            let v = rustsat::types::Var::new(idx as u32);
+            if protected.contains(&v) {
+                continue;
+            }
+            match (pos.contains(&v), neg.contains(&v)) {
+                (true, true) => {}
+                (false, true) => units.push(v.neg_lit()),
+                (true, false) | (false, false) => units.push(v.pos_lit()),
+            }
+        }
+        units
+    }
+
     #[must_use]
     pub fn lit_is_con(&self, lit: &Lit) -> bool {
         self.constraints.contains(lit)

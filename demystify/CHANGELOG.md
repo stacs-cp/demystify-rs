@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on Miracle sudoku (default flags) this cuts solve time from ~650s to ~90s.
   Override with `DEMYSTIFY_REBUILD_CONFLICTS` / `DEMYSTIFY_REBUILD_RATIO`
   (0 disables either condition).
+- SAT solvers now fix every variable that no query ever assumes or asks
+  about and that occurs in only one polarity (`PuzzleParse::solver_units`):
+  e.g. `$#CON` indicators for index combinations with no constraint, which
+  Savilerow declares with a tautology, and selectors of de-duplicated
+  constraints. Previously the solver decided all of them on every SAT answer.
+  Miracle: 23,369 variables fixed, ~25% faster; extreme killer sudoku:
+  1.67M fixed, ~8× faster per step.
 - The per-deduction `verify_mus_provability` check now runs only in debug
   builds. It built a fresh solver per deduced literal on the main thread, and
   took ~25–45% of solve time on small puzzles such as sudoku.

@@ -155,6 +155,8 @@ pub struct PuzzleSolver {
     #[cfg_attr(feature = "deterministic", allow(dead_code))]
     satcore: SatCoreCache,
     puzzleparse: Arc<PuzzleParse>,
+    /// `PuzzleParse::solver_units`, computed on first use and shared by clones.
+    solver_units: Arc<std::sync::OnceLock<Arc<Vec<Lit>>>>,
 
     knownlits: Vec<Lit>,
     tosolvelits: Option<BTreeSet<Lit>>,
@@ -175,6 +177,7 @@ impl PuzzleSolver {
     pub fn new(puzzleparse: Arc<PuzzleParse>) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
             satcore: SatCoreCache::default(),
+            solver_units: Arc::default(),
             puzzleparse,
             tosolvelits: None,
             knownlits: Vec::new(),
@@ -198,6 +201,7 @@ impl PuzzleSolver {
     ) -> anyhow::Result<PuzzleSolver> {
         Ok(PuzzleSolver {
             satcore: SatCoreCache::default(),
+            solver_units: Arc::default(),
             puzzleparse,
             tosolvelits: None,
             knownlits: Vec::new(),
@@ -211,13 +215,23 @@ impl PuzzleSolver {
     /// each SAT call independent of state from prior calls.
     #[cfg(not(feature = "deterministic"))]
     fn get_satcore(&self) -> &SatCore {
-        self.satcore
-            .inner
-            .get_or(|| SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap())
+        self.satcore.inner.get_or(|| self.new_satcore())
     }
     #[cfg(feature = "deterministic")]
     fn get_satcore(&self) -> SatCore {
-        SatCore::new(self.puzzleparse.cnf.clone().unwrap()).unwrap()
+        self.new_satcore()
+    }
+
+    fn new_satcore(&self) -> SatCore {
+        let units = self
+            .solver_units
+            .get_or_init(|| {
+                let units = self.puzzleparse.solver_units();
+                info!(target: "solver", "solver_units: fixing {} never-queried variables", units.len());
+                Arc::new(units)
+            })
+            .clone();
+        SatCore::new_with_units(self.puzzleparse.cnf.clone().unwrap(), units).unwrap()
     }
 
     /// Converts a `PuzLit` instance to a `Lit`.
@@ -1081,6 +1095,8 @@ impl PuzzleSolver {
     }
 
     pub fn verify_mus_provability(&self, target_lit: Lit, mus_cons: &[Lit]) {
+        // Deliberately without `solver_units`, so this check is independent
+        // of that optimisation.
         let fresh_core =
             SatCore::new(self.puzzleparse.cnf.clone().unwrap()).expect("failed to create SatCore");
 

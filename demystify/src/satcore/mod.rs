@@ -188,6 +188,9 @@ pub struct SatCore {
     pub solver: Arc<Mutex<Solver>>,
     pub cnf: Arc<Cnf>,
     pub fixed: RefCell<HashSet<Lit>>,
+    /// Unit literals added after the CNF on every (re)build; see
+    /// `PuzzleParse::solver_units`.
+    units: Arc<Vec<Lit>>,
     /// Time spent inside the SAT solver since this solver was (re)built.
     solve_since_build: Cell<Duration>,
     /// How long the most recent (re)build of the solver took.
@@ -370,6 +373,12 @@ impl SatCore {
     ///
     /// A `SatCore` instance.
     pub fn new(cnf: Arc<Cnf>) -> anyhow::Result<SatCore> {
+        Self::new_with_units(cnf, Arc::new(vec![]))
+    }
+
+    /// As [`Self::new`], additionally asserting `units` (on every rebuild too).
+    /// The units must not change the answer to any query made of this solver.
+    pub fn new_with_units(cnf: Arc<Cnf>, units: Arc<Vec<Lit>>) -> anyhow::Result<SatCore> {
         let timing_on = tracing::enabled!(target: "satcore_build", tracing::Level::INFO);
         let t_total = timing_on.then(Instant::now);
 
@@ -392,6 +401,9 @@ impl SatCore {
 
         let t_addcnf = timing_on.then(Instant::now);
         solver.add_cnf(cnf_clone)?;
+        for &u in units.iter() {
+            solver.add_unit(u)?;
+        }
         if let Some(t) = t_addcnf {
             let e = t.elapsed();
             info!(target: "satcore_build",
@@ -415,6 +427,7 @@ impl SatCore {
             solver: Arc::new(Mutex::new(solver)),
             cnf,
             fixed: RefCell::new(HashSet::new()),
+            units,
             solve_since_build: Cell::new(Duration::ZERO),
             last_build: Cell::new(t_build.elapsed()),
         })
@@ -465,6 +478,9 @@ impl SatCore {
             solver
                 .add_cnf(self.cnf.as_ref().clone())
                 .expect("FATAL: Solver bug 2");
+            for &u in self.units.iter() {
+                solver.add_unit(u).expect("FATAL: Solver bug 2b");
+            }
             fixed.clear();
             for &l in lits {
                 if !fixed.contains(&l) {
