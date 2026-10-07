@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -188,6 +188,10 @@ pub struct SatCore {
     pub solver: Arc<Mutex<Solver>>,
     pub cnf: Arc<Cnf>,
     pub fixed: RefCell<HashSet<Lit>>,
+    /// Time spent inside the SAT solver since this solver was (re)built.
+    solve_since_build: Cell<Duration>,
+    /// How long the most recent (re)build of the solver took.
+    last_build: Cell<Duration>,
 }
 
 // Solvers can sometimes time out, so we add a conflict limit.
@@ -205,6 +209,48 @@ const RAMP_WARMUP: i64 = 50;
 /// If the interrupt ratio exceeds this threshold, multiply the limit by 10.
 const RAMP_THRESHOLD: f64 = 0.10;
 static SOLVER_CALLS: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+
+// Long-lived solvers slow down: after a few thousand conflicts, each SAT call
+// (in particular each model-building SAT answer) costs about twice what it does
+// on a fresh solver.  So we periodically rebuild a solver from the CNF.  On
+// Miracle sudoku (conflict limit 1000) this made solving ~7x faster.
+//
+// A rebuild costs ~5ms on small CNFs but ~200ms on large ones (1.7M clauses for
+// extreme killer sudoku), so we also require the solver to have spent
+// `rebuild_ratio()` times its own build time in SAT calls since it was built.
+// That bounds rebuild overhead to roughly 1/ratio of SAT time.
+
+/// Rebuild a solver once it has accumulated this many conflicts (0 = never).
+/// Default 5000; override with `DEMYSTIFY_REBUILD_CONFLICTS`.
+fn rebuild_conflicts() -> usize {
+    static V: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *V.get_or_init(|| {
+        std::env::var("DEMYSTIFY_REBUILD_CONFLICTS")
+            .map(|s| {
+                s.parse()
+                    .expect("DEMYSTIFY_REBUILD_CONFLICTS must be an integer")
+            })
+            .unwrap_or(5000)
+    })
+}
+
+/// Only rebuild once the solver has spent this many times its own build time
+/// in SAT calls since it was built (0 = no such condition).
+/// Default 20; override with `DEMYSTIFY_REBUILD_RATIO`.
+fn rebuild_ratio() -> f64 {
+    static V: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *V.get_or_init(|| {
+        std::env::var("DEMYSTIFY_REBUILD_RATIO")
+            .map(|s| s.parse().expect("DEMYSTIFY_REBUILD_RATIO must be a number"))
+            .unwrap_or(20.0)
+    })
+}
+static REBUILDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Number of periodic solver rebuilds (see [`rebuild_conflicts`]).
+pub fn get_rebuilds() -> u64 {
+    REBUILDS.load(Relaxed)
+}
 
 // --- Diagnostic timers for `_no_limit` path.
 //
@@ -327,6 +373,7 @@ impl SatCore {
         let timing_on = tracing::enabled!(target: "satcore_build", tracing::Level::INFO);
         let t_total = timing_on.then(Instant::now);
 
+        let t_build = Instant::now();
         let t_solver = timing_on.then(Instant::now);
         let mut solver = Solver::default();
         if let Some(t) = t_solver {
@@ -368,6 +415,8 @@ impl SatCore {
             solver: Arc::new(Mutex::new(solver)),
             cnf,
             fixed: RefCell::new(HashSet::new()),
+            solve_since_build: Cell::new(Duration::ZERO),
+            last_build: Cell::new(t_build.elapsed()),
         })
     }
 
@@ -381,9 +430,15 @@ impl SatCore {
         let t_total = timing_on.then(Instant::now);
         let mut fixed = self.fixed.borrow_mut();
         let fixed_before = fixed.len();
+        let stale;
 
         {
             let mut solver = self.solver.lock().unwrap();
+            let limit = rebuild_conflicts();
+            stale = limit > 0
+                && solver.conflicts() >= limit
+                && self.solve_since_build.get().as_secs_f64()
+                    >= rebuild_ratio() * self.last_build.get().as_secs_f64();
 
             for &l in lits {
                 if !fixed.contains(&l) {
@@ -400,9 +455,12 @@ impl SatCore {
             lits.iter().all(|l| fixed.contains(l)),
             "fix_values: lits contains entries not in fixed (should be impossible after the loop above)"
         );
-        let rebooted = fixed.len() > lits.len();
+        if stale {
+            REBUILDS.fetch_add(1, Relaxed);
+        }
+        let rebooted = fixed.len() > lits.len() || stale;
         if rebooted {
-            let t_reboot = timing_on.then(Instant::now);
+            let t_reboot = Instant::now();
             let mut solver = Solver::default();
             solver
                 .add_cnf(self.cnf.as_ref().clone())
@@ -416,8 +474,10 @@ impl SatCore {
             }
             let mut mutex_solver = self.solver.lock().unwrap();
             *mutex_solver = solver;
-            if let Some(t) = t_reboot {
-                let e = t.elapsed();
+            self.last_build.set(t_reboot.elapsed());
+            self.solve_since_build.set(Duration::ZERO);
+            if timing_on {
+                let e = t_reboot.elapsed();
                 warn!(target: "satcore_build",
                     "fix_values: REBOOTED solver — fixed_before={}, lits={}, rebuild took {:?}",
                     fixed_before, lits.len(), e);
@@ -439,13 +499,19 @@ impl SatCore {
     /// Variant of [`do_solve_assumps`] that clears any conflict limit before
     /// invoking the solver.  Because no limit is in place, the solver will
     /// never return `Interrupted`.  Used by the `*_no_limit` public methods.
-    fn do_solve_assumps_no_limit(solver: &mut MutexGuard<Solver>, lits: &[Lit]) -> SolverResult {
+    fn do_solve_assumps_no_limit(
+        &self,
+        solver: &mut MutexGuard<Solver>,
+        lits: &[Lit],
+    ) -> SolverResult {
         solver.clear_conflict_limit();
         SOLVER_CALLS.fetch_add(1, Relaxed);
         let conflicts_before = solver.conflicts();
         let call_start = Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
         let call_duration = call_start.elapsed();
+        self.solve_since_build
+            .set(self.solve_since_build.get() + call_duration);
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
         solver.clear_conflict_limit();
         crate::stats::record_sat_call(call_duration, conflicts_delta, solve);
@@ -470,6 +536,7 @@ impl SatCore {
     }
 
     fn do_solve_assumps(
+        &self,
         solver: &mut MutexGuard<Solver>,
         lits: &[Lit],
         work_mult: f64,
@@ -485,6 +552,8 @@ impl SatCore {
         let call_start = Instant::now();
         let solve = solver.solve_assumps(lits).unwrap();
         let call_duration = call_start.elapsed();
+        self.solve_since_build
+            .set(self.solve_since_build.get() + call_duration);
         let conflicts_delta = solver.conflicts().saturating_sub(conflicts_before);
         solver.clear_conflict_limit();
 
@@ -557,7 +626,7 @@ impl SatCore {
         let t1 = Instant::now();
         let mut solver = self.solver.lock().unwrap();
         let t2 = Instant::now();
-        let solve = SatCore::do_solve_assumps(&mut solver, lits, work_mult);
+        let solve = self.do_solve_assumps(&mut solver, lits, work_mult);
         let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(true),
@@ -595,7 +664,7 @@ impl SatCore {
         let t1 = Instant::now();
         let mut solver = self.solver.lock().unwrap();
         let t2 = Instant::now();
-        let solve = SatCore::do_solve_assumps(&mut solver, lits, work_mult);
+        let solve = self.do_solve_assumps(&mut solver, lits, work_mult);
         let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(Some(solver.full_solution().unwrap())),
@@ -629,7 +698,7 @@ impl SatCore {
         let t1 = Instant::now();
         let mut solver = self.solver.lock().unwrap();
         let t2 = Instant::now();
-        let solve = SatCore::do_solve_assumps_no_limit(&mut solver, lits);
+        let solve = self.do_solve_assumps_no_limit(&mut solver, lits);
         let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => true,
@@ -656,7 +725,7 @@ impl SatCore {
     ) -> Option<Assignment> {
         self.fix_values(known);
         let mut solver = self.solver.lock().unwrap();
-        let solve = SatCore::do_solve_assumps_no_limit(&mut solver, lits);
+        let solve = self.do_solve_assumps_no_limit(&mut solver, lits);
         match solve {
             rustsat::solvers::SolverResult::Sat => Some(solver.full_solution().unwrap()),
             rustsat::solvers::SolverResult::Unsat => None,
@@ -727,7 +796,7 @@ impl SatCore {
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
         let t2 = Instant::now();
-        let solve = SatCore::do_solve_assumps(&mut solver, lits, 1.0);
+        let solve = self.do_solve_assumps(&mut solver, lits, 1.0);
         let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(None),

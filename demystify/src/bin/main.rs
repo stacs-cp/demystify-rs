@@ -395,6 +395,10 @@ fn main() -> anyhow::Result<()> {
         print_mus_stats();
         print_sat_stats();
         demystify::satcore::print_phase_breakdown();
+        eprintln!(
+            "Periodic SAT solver rebuilds: {}",
+            demystify::satcore::get_rebuilds()
+        );
     }
 
     Ok(())

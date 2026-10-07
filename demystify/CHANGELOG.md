@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Per-thread SAT solvers are now periodically rebuilt from the CNF, once they
+  have accumulated 5000 conflicts and spent 20× their own build time solving
+  since the last build. Long-lived solvers had become about 2× slower per call;
+  on Miracle sudoku (default flags) this cuts solve time from ~650s to ~90s.
+  Override with `DEMYSTIFY_REBUILD_CONFLICTS` / `DEMYSTIFY_REBUILD_RATIO`
+  (0 disables either condition).
 - The SVG renderer now works in cell-unit coordinates with a cell-unit
   `viewBox` (the old 500×500 + `scale(400)` wrapper is gone), and all board
   colours/decoration live in a self-contained `board.css` embedded in every
