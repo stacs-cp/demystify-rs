@@ -36,6 +36,12 @@ pub enum MusMethod {
     #[default]
     #[value(name = "core+mus")]
     CorePlusMus,
+    /// Baseline: for every literal, one SAT core and one unbounded deletion
+    /// pass over it; keep the smallest resulting MUSes.  No size bound, no
+    /// repeats, no size-1 scan.  Use with `--conflict-limit 0` for the pure
+    /// version.
+    #[value(name = "single-dive")]
+    SingleDive,
 }
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
@@ -308,6 +314,13 @@ impl PuzzlePlanner {
             .collect();
 
         self.psolve.minimise_cores(&smallest)
+    }
+
+    /// Baseline: one core per literal, each minimised by a single deletion pass.
+    fn single_dive_muses(&mut self) -> MusDict {
+        let varlits = self.psolve.get_provable_varlits().clone();
+        let cores = self.psolve.get_all_cores(&varlits);
+        self.psolve.minimise_cores(&cores)
     }
 
     /// Hybrid MUS search: size-1 pass, then cores, then full MUS if needed.
@@ -631,6 +644,11 @@ impl PuzzlePlanner {
             let (muses, mus_count_1) = match self.config.mus_method {
                 MusMethod::Core => {
                     let dict = self.core_guided_muses();
+                    let raw = Self::smallest_muses_from_dict(&dict);
+                    (self.apply_config_to_muses(raw), 0)
+                }
+                MusMethod::SingleDive => {
+                    let dict = self.single_dive_muses();
                     let raw = Self::smallest_muses_from_dict(&dict);
                     (self.apply_config_to_muses(raw), 0)
                 }

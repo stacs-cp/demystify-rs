@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--mus-method single-dive`: a baseline that, for every literal, takes one SAT
+  core and makes one unbounded deletion pass over it, keeping the smallest
+  resulting MUSes (no size bound, repeats or size-1 scan). Pair with
+  `--conflict-limit 0` for the pure version.
 - Hexagonal boards: a `Geometry` abstraction in the SVG renderer with square
   and pointy-top hex implementations, selected via `$#DEC hex`. A new
   `$#SHOW <matrix> presence` role carves non-rectangular boards (e.g. a

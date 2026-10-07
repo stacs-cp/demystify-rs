@@ -161,7 +161,7 @@ struct Opt {
         long,
         value_enum,
         default_value_t = MusMethod::default(),
-        help = "MUS generation algorithm: core (raw cores only), mus (standard MUS search), core+mus (hybrid: size-1 pass, cores, then full MUS if needed)"
+        help = "MUS generation algorithm: core (raw cores only), mus (standard MUS search), core+mus (hybrid: size-1 pass, cores, then full MUS if needed), single-dive (baseline: one core and one deletion pass per literal, keep the smallest; pair with --conflict-limit 0)"
     )]
     mus_method: MusMethod,
 
