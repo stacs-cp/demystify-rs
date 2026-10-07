@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `--mus-method` combined with `--html` or `--greedy` is now an error. Those
+  modes use their own MUS search and always ignored the method.
 - Per-thread SAT solvers are now periodically rebuilt from the CNF, once they
   have accumulated 5000 conflicts and spent 20× their own build time solving
   since the last build. Long-lived solvers had become about 2× slower per call;
