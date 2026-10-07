@@ -438,13 +438,15 @@ impl PuzzlePlanner {
             .map(|mc| {
                 let lit = *mc.lits.iter().next().unwrap();
                 let cons: Vec<Lit> = mc.mus.iter().copied().collect();
-                match self.psolve.minimise_core_for_lit(lit, &cons) {
-                    Ok(minimised) => {
-                        let new_mus: BTreeSet<Lit> = minimised.into_iter().collect();
-                        MusContext { mus: new_mus, ..mc }
-                    }
-                    Err(_) => mc,
-                }
+                // If the limited minimisation is interrupted, retry without
+                // the limit: the input is already a small MUS, and keeping it
+                // unminimised would present a possibly non-minimal set as a MUS.
+                let minimised = match self.psolve.minimise_core_for_lit(lit, &cons) {
+                    Ok(minimised) => minimised,
+                    Err(_) => self.psolve.minimise_core_for_lit_no_limit(lit, &cons),
+                };
+                let new_mus: BTreeSet<Lit> = minimised.into_iter().collect();
+                MusContext { mus: new_mus, ..mc }
             })
             .collect();
 
@@ -667,10 +669,12 @@ impl PuzzlePlanner {
                 continue 'litloop;
             }
 
-            for mus in &muses {
-                let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
-                for lit in &mus.lits {
-                    self.psolve.verify_mus_provability(*lit, &mus_cons);
+            if cfg!(debug_assertions) {
+                for mus in &muses {
+                    let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
+                    for lit in &mus.lits {
+                        self.psolve.verify_mus_provability(*lit, &mus_cons);
+                    }
                 }
             }
 
@@ -754,11 +758,11 @@ impl PuzzlePlanner {
             .par_bridge()
             .map(|(lit, core)| {
                 // Already ≤ bound, so this is a small minimisation.  If the
-                // solver hits a limit, the raw core is still a valid (if
-                // non-minimal) explanation, so fall back to it.
+                // solver hits a limit, retry without one rather than present
+                // the raw (possibly non-minimal) core as a MUS.
                 let mus = match self.psolve.minimise_core_for_lit(*lit, core) {
                     Ok(m) => m,
-                    Err(_) => core.clone(),
+                    Err(_) => self.psolve.minimise_core_for_lit_no_limit(*lit, core),
                 };
                 MusContext::new(*lit, mus.into_iter().collect())
             })
@@ -870,10 +874,12 @@ impl PuzzlePlanner {
                 break;
             }
 
-            for mus in &muses {
-                let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
-                for lit in &mus.lits {
-                    self.psolve.verify_mus_provability(*lit, &mus_cons);
+            if cfg!(debug_assertions) {
+                for mus in &muses {
+                    let mus_cons: Vec<Lit> = mus.mus.iter().copied().collect();
+                    for lit in &mus.lits {
+                        self.psolve.verify_mus_provability(*lit, &mus_cons);
+                    }
                 }
             }
 
@@ -1189,10 +1195,12 @@ impl PuzzlePlanner {
                 .copied()
                 .collect_vec();
 
-            for mc in &base_muses {
-                let mus_cons: Vec<Lit> = mc.mus.iter().copied().collect();
-                for lit in &mc.lits {
-                    self.psolve.verify_mus_provability(*lit, &mus_cons);
+            if cfg!(debug_assertions) {
+                for mc in &base_muses {
+                    let mus_cons: Vec<Lit> = mc.mus.iter().copied().collect();
+                    for lit in &mc.lits {
+                        self.psolve.verify_mus_provability(*lit, &mus_cons);
+                    }
                 }
             }
 

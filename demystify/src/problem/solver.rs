@@ -1405,6 +1405,17 @@ impl PuzzleSolver {
             .collect())
     }
 
+    /// [`Self::minimise_core_for_lit`] with no conflict limit: always returns a MUS.
+    pub fn minimise_core_for_lit_no_limit(&self, lit: Lit, core: &[Lit]) -> Vec<Lit> {
+        let mut us = core.to_vec();
+        us.push(!lit);
+        self.get_satcore()
+            .minimise_us_no_limit(&self.knownlits, &us)
+            .into_iter()
+            .filter(|x| self.puzzleparse.constraints.lits().contains(x))
+            .collect()
+    }
+
     /// Bounded variant of [`Self::minimise_core_for_lit`].  Returns `Some(mus)`
     /// (constraint lits only) for a MUS using at most `max_cons` constraints, or
     /// `None` if greedy minimisation could not bring the core down to that size.

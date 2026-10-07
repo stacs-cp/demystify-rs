@@ -777,13 +777,19 @@ impl SatCore {
         self.fix_values(known);
         let t1 = Instant::now();
         PHASE_FIX_VALUES_NS.fetch_add((t1 - t0).as_nanos() as u64, Relaxed);
-        self.raw_assumption_solve_with_core_timed(lits, t1)
+        self.raw_assumption_solve_with_core_timed(lits, t1, 1.0)
     }
 
     /// Solves the CNF formula with the given assumptions and returns the unsatisfiable core.
     /// *Not memoryless*: Uses whatever set of values are already fixed in the solver.
-    fn raw_assumption_solve_with_core(&self, lits: &[Lit]) -> SearchResult<Option<Vec<Lit>>> {
-        self.raw_assumption_solve_with_core_timed(lits, Instant::now())
+    /// `work_mult` scales the conflict limit as in [`Self::assumption_solve`];
+    /// `0.0` means no limit.
+    fn raw_assumption_solve_with_core(
+        &self,
+        lits: &[Lit],
+        work_mult: f64,
+    ) -> SearchResult<Option<Vec<Lit>>> {
+        self.raw_assumption_solve_with_core_timed(lits, Instant::now(), work_mult)
     }
 
     /// Shared body of the core-returning solve.  Accepts an anchor `Instant`
@@ -793,10 +799,11 @@ impl SatCore {
         &self,
         lits: &[Lit],
         t_after_fix: Instant,
+        work_mult: f64,
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut solver = self.solver.lock().unwrap();
         let t2 = Instant::now();
-        let solve = self.do_solve_assumps(&mut solver, lits, 1.0);
+        let solve = self.do_solve_assumps(&mut solver, lits, work_mult);
         let t3 = Instant::now();
         let result = match solve {
             rustsat::solvers::SolverResult::Sat => Ok(None),
@@ -823,6 +830,7 @@ impl SatCore {
         &self,
         initial_core: Vec<Lit>,
         max_size: Option<i64>,
+        work_mult: f64,
     ) -> SearchResult<Option<Vec<Lit>>> {
         let mut core = initial_core;
 
@@ -844,7 +852,7 @@ impl SatCore {
                             },
                         )
                         .collect();
-                    let candidate = self.raw_assumption_solve_with_core(&remaining)?;
+                    let candidate = self.raw_assumption_solve_with_core(&remaining, work_mult)?;
                     if let Some(found) = candidate {
                         tracing::info!(target: "musdetail",
                             "bulk shrink: {} -> {} (group {}/{})",
@@ -869,7 +877,7 @@ impl SatCore {
             if let Some(location) = location {
                 let mut check_core = core.clone();
                 check_core.remove(location);
-                let candidate = self.raw_assumption_solve_with_core(&check_core)?;
+                let candidate = self.raw_assumption_solve_with_core(&check_core, work_mult)?;
                 if let Some(found) = candidate {
                     core = found;
                 } else {
@@ -879,7 +887,7 @@ impl SatCore {
                         && known_size == max_size
                     {
                         assert!(known_core.len() as i64 == max_size);
-                        let core = self.raw_assumption_solve_with_core(&known_core)?;
+                        let core = self.raw_assumption_solve_with_core(&known_core, work_mult)?;
                         if let Some(found) = core {
                             assert!(found.len() as i64 == known_size);
                             return Ok(Some(found));
@@ -922,9 +930,24 @@ impl SatCore {
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(known);
-        let initial = self.raw_assumption_solve_with_core(us)?;
+        let initial = self.raw_assumption_solve_with_core(us, 1.0)?;
         let core = initial.expect("minimise_us: input must be an unsatisfiable subset");
-        self.greedy_minimise(core, max_size)
+        self.greedy_minimise(core, max_size, 1.0)
+    }
+
+    /// [`Self::minimise_us`] with no conflict limit, so it cannot be
+    /// interrupted and always returns a MUS.
+    ///
+    /// Panics if `us` is satisfiable under `known`.
+    pub fn minimise_us_no_limit(&self, known: &[Lit], us: &[Lit]) -> Vec<Lit> {
+        self.fix_values(known);
+        let initial = self
+            .raw_assumption_solve_with_core(us, 0.0)
+            .expect("minimise_us_no_limit: unlimited solve was interrupted");
+        let core = initial.expect("minimise_us_no_limit: input must be an unsatisfiable subset");
+        self.greedy_minimise(core, None, 0.0)
+            .expect("minimise_us_no_limit: unlimited solve was interrupted")
+            .expect("minimise_us_no_limit: unbounded greedy_minimise must return a MUS")
     }
 
     /// Finds a minimal unsatisfiable subset (MUS) of literals given a set of known literals.
@@ -944,13 +967,13 @@ impl SatCore {
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
         self.fix_values(known);
-        let core = self.raw_assumption_solve_with_core(lits)?;
+        let core = self.raw_assumption_solve_with_core(lits, 1.0)?;
         match core {
             None => Ok(None),
             Some(core) => {
                 tracing::info!(target: "musdetail", "quick_mus: initial_core={} max_size={:?}",
                     core.len(), max_size);
-                Ok(self.greedy_minimise(core, max_size)?)
+                Ok(self.greedy_minimise(core, max_size, 1.0)?)
             }
         }
     }

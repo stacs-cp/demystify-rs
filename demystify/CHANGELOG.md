@@ -23,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on Miracle sudoku (default flags) this cuts solve time from ~650s to ~90s.
   Override with `DEMYSTIFY_REBUILD_CONFLICTS` / `DEMYSTIFY_REBUILD_RATIO`
   (0 disables either condition).
+- The per-deduction `verify_mus_provability` check now runs only in debug
+  builds. It built a fresh solver per deduced literal on the main thread, and
+  took ~25–45% of solve time on small puzzles such as sudoku.
+- When re-minimising a step's MUS (or, in `--greedy`, a raw core) hits the
+  conflict limit, the minimisation is retried without a limit, instead of
+  silently presenting a possibly non-minimal set as a MUS.
 - The SVG renderer now works in cell-unit coordinates with a cell-unit
   `viewBox` (the old 500×500 + `scale(400)` wrapper is gone), and all board
   colours/decoration live in a self-contained `board.css` embedded in every
