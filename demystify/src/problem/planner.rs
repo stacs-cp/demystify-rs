@@ -367,8 +367,15 @@ impl PuzzlePlanner {
             return dict;
         }
 
-        // Phase 4: full MUS search
-        self.all_smallish_muses()
+        // Phase 4: full MUS search, reusing the size-1 scan and cores above.
+        let full_result = self.psolve.get_many_vars_small_mus_quick_with_cores(
+            &varlits,
+            &self.config.mus_config,
+            Some(self.mus_cache.clone()),
+            cores,
+        );
+        self.update_mus_cache(&full_result);
+        Self::filter_musdict_to_lits(full_result, &varlits)
     }
 
     /// Returns a [`MusDict`] of all minimal unsatisfiable subsets (MUSes) of the puzzle which satisfy a filter.

@@ -1580,6 +1580,30 @@ impl PuzzleSolver {
         config: &MusConfig,
         musdict: Option<MusDict>,
     ) -> MusDict {
+        self.small_mus_search(lits, config, musdict, None)
+    }
+
+    /// As [`Self::get_many_vars_small_mus_quick`], for a caller that has
+    /// already run the size-1 scan over all of `lits` (finding nothing) and
+    /// computed `cores` with [`Self::get_all_cores`] under the current known
+    /// literals: both steps are skipped rather than repeated.
+    pub fn get_many_vars_small_mus_quick_with_cores(
+        &self,
+        lits: &BTreeSet<Lit>,
+        config: &MusConfig,
+        musdict: Option<MusDict>,
+        cores: Vec<(Lit, Vec<Lit>)>,
+    ) -> MusDict {
+        self.small_mus_search(lits, config, musdict, Some(cores))
+    }
+
+    fn small_mus_search(
+        &self,
+        lits: &BTreeSet<Lit>,
+        config: &MusConfig,
+        musdict: Option<MusDict>,
+        prescanned_cores: Option<Vec<(Lit, Vec<Lit>)>>,
+    ) -> MusDict {
         // Source of the size-bound for the parallel MUS pass.  Workers
         // normally re-read the live MusDict so each new MUS tightens the
         // bound for in-flight peers — that's a feedback loop on completion
@@ -1627,8 +1651,11 @@ impl PuzzleSolver {
 
         info!(target: "solve", "scanning for tiny muses");
 
-        // Tiny scan: search every lit for a size-1 MUS unless one is already cached.
-        let tiny_scan_lits: BTreeSet<Lit> = if config.find_bigger {
+        // Tiny scan: search every lit for a size-1 MUS unless one is already
+        // cached, or the caller has already scanned them all.
+        let tiny_scan_lits: BTreeSet<Lit> = if prescanned_cores.is_some() {
+            BTreeSet::new()
+        } else if config.find_bigger {
             lits.clone()
         } else {
             let g = md.lock().unwrap();
@@ -1668,7 +1695,7 @@ impl PuzzleSolver {
         // Core scan: get raw SAT cores for all lits. The minimum core size
         // is an upper bound on the minimum MUS size.
         let core_t0 = Instant::now();
-        let cores = self.get_all_cores(lits);
+        let cores = prescanned_cores.unwrap_or_else(|| self.get_all_cores(lits));
         let core_elapsed = core_t0.elapsed();
         let min_core = cores.iter().map(|(_, core)| core.len()).min();
         let max_core = cores.iter().map(|(_, core)| core.len()).max();

@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on Miracle sudoku (default flags) this cuts solve time from ~650s to ~90s.
   Override with `DEMYSTIFY_REBUILD_CONFLICTS` / `DEMYSTIFY_REBUILD_RATIO`
   (0 disables either condition).
+- When `core+mus` falls through to the full MUS search, that search no
+  longer repeats the size-1 scan and core scan `core+mus` has just done
+  (~27% fewer size-1 scans per step on Miracle).
 - SAT solvers now fix every variable that no query ever assumes or asks
   about and that occurs in only one polarity (`PuzzleParse::solver_units`):
   e.g. `$#CON` indicators for index combinations with no constraint, which
