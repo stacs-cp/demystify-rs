@@ -15,7 +15,6 @@ thiserror = "2"
 serde_json = "1"
 
 [dev-dependencies]
-demystify = { path = "../demystify", version = "0.4", features = ["deterministic"] }
 rustsat-batsat = "0.7"
 rand = "0.10"
 rand_chacha = "0.10"

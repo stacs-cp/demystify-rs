@@ -63,6 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `demystify-builder` no longer enables the `deterministic` feature through a
+  dev-dependency. Cargo unified it into any build that included the builder's
+  tests (e.g. `cargo test --workspace`, or `cargo build --all-targets`), so the
+  `demystify` binary from such a build silently rebuilt its SAT solver on every
+  call. The CLI now warns on stderr whenever it is built with `deterministic`,
+  and CI tests that feature explicitly.
 - `--log` silently dropped log events (e.g. every timed-out MUS search under
   `--log musdetail`). A `tracing::enabled!` check not followed by an event
   leaves stale per-layer filter state in tracing-subscriber, so the next event

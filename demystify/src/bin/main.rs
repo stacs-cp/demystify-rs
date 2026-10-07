@@ -187,6 +187,14 @@ struct Opt {
 fn main() -> anyhow::Result<()> {
     let opt = Opt::parse();
 
+    // Not silenced by --quiet: this build is far slower and must not be
+    // mistaken for a normal one (e.g. when timing runs).
+    #[cfg(feature = "deterministic")]
+    eprintln!(
+        "WARNING: demystify was built with the `deterministic` feature; every SAT call \
+         uses a fresh solver, which is much slower. Do not use this build for timings."
+    );
+
     // The --html and --greedy solve loops have their own MUS search and never
     // consult the configured method, so reject the combination rather than
     // silently run a different algorithm.
