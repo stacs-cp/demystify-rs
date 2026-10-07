@@ -618,7 +618,7 @@ impl PuzzlePlanner {
             }
             let _step_timer = crate::stats::PhaseTimer::solve_step();
 
-            let cores_enabled = tracing::enabled!(target: "cores", tracing::Level::INFO);
+            let cores_enabled = crate::diagnostics_enabled("cores");
 
             let (core_min, core_count_1) =
                 if cores_enabled && self.config.mus_method == MusMethod::Mus {

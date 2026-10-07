@@ -379,7 +379,7 @@ impl SatCore {
     /// As [`Self::new`], additionally asserting `units` (on every rebuild too).
     /// The units must not change the answer to any query made of this solver.
     pub fn new_with_units(cnf: Arc<Cnf>, units: Arc<Vec<Lit>>) -> anyhow::Result<SatCore> {
-        let timing_on = tracing::enabled!(target: "satcore_build", tracing::Level::INFO);
+        let timing_on = crate::diagnostics_enabled("satcore_build");
         let t_total = timing_on.then(Instant::now);
 
         let t_build = Instant::now();
@@ -439,7 +439,7 @@ impl SatCore {
     /// we discover that we need to fix less literals than the already fixed list
     /// (stored in fixed)
     fn fix_values(&self, lits: &[Lit]) {
-        let timing_on = tracing::enabled!(target: "satcore_build", tracing::Level::INFO);
+        let timing_on = crate::diagnostics_enabled("satcore_build");
         let t_total = timing_on.then(Instant::now);
         let mut fixed = self.fixed.borrow_mut();
         let fixed_before = fixed.len();

@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--log` silently dropped log events (e.g. every timed-out MUS search under
+  `--log musdetail`). A `tracing::enabled!` check not followed by an event
+  leaves stale per-layer filter state in tracing-subscriber, so the next event
+  on that thread was discarded; `fix_values` made such a check on every SAT
+  call. Diagnostic gating now uses `set_diagnostic_targets` /
+  `diagnostics_enabled`, set by the CLI from `--log` and `--trace`.
 - `demystify-makesvg` now honours `$#DEC` decorations (it previously ignored
   them by constructing `PuzzleDraw` without them).
 - `is_uniquely_solvable` no longer reports solvable `$#REVEAL` puzzles as

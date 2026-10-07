@@ -240,6 +240,11 @@ fn main() -> anyhow::Result<()> {
             log_targets.push("progress".to_string());
         }
 
+        demystify::set_diagnostic_targets(
+            opt.trace,
+            log_targets.iter().map(|t| t.trim().to_string()),
+        );
+
         let log_layer = if !log_targets.is_empty() {
             let filter_str = log_targets
                 .iter()

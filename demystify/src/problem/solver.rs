@@ -643,7 +643,7 @@ impl PuzzleSolver {
         // SAT call and warn on any that exceed RANDOM_SOLUTION_SLOW_SECS.
         // Gated so we pay no Instant::now overhead in the common case.
         const RANDOM_SOLUTION_SLOW_SECS: f64 = 2.0;
-        let timing_on = tracing::enabled!(target: "random_solution", tracing::Level::WARN);
+        let timing_on = crate::diagnostics_enabled("random_solution");
         let warn_if_slow = |t0: Option<Instant>, phase: &str, lit: Lit| {
             if let Some(t0) = t0 {
                 let elapsed = t0.elapsed();

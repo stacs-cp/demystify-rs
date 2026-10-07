@@ -131,3 +131,27 @@ pub mod stats;
 pub mod time;
 pub mod walkthrough;
 pub mod web;
+
+/// Log targets whose extra diagnostic work (timings, per-step core summaries)
+/// is switched on, and whether all are (`--trace`).
+static DIAGNOSTIC_TARGETS: std::sync::OnceLock<(bool, std::collections::BTreeSet<String>)> =
+    std::sync::OnceLock::new();
+
+/// Switch on the extra diagnostic work for `targets` (or for every target if
+/// `all`).  Call at most once, before solving.
+///
+/// We cannot ask tracing instead: with per-layer filters and more than one
+/// layer (as in the CLI), a `tracing::enabled!` check that is not followed by
+/// an event leaves stale filter state, and the next event on that thread is
+/// silently dropped (seen with tracing-subscriber 0.3.23).
+pub fn set_diagnostic_targets(all: bool, targets: impl IntoIterator<Item = String>) {
+    let set = DIAGNOSTIC_TARGETS.set((all, targets.into_iter().collect()));
+    assert!(set.is_ok(), "set_diagnostic_targets called twice");
+}
+
+/// Whether the extra diagnostic work for `target` is switched on.
+pub fn diagnostics_enabled(target: &str) -> bool {
+    DIAGNOSTIC_TARGETS
+        .get()
+        .is_some_and(|(all, targets)| *all || targets.contains(target))
+}
