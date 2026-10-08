@@ -18,12 +18,12 @@
 #   14-15. Row 5: stars at R5C6 and R5C8.
 #   16. Row 5 cleanup; finishes.
 #
-# Uses `star-battle-cellforbids.eprime` (per-cell adjacency atom) so the
+# Uses `star-battle.eprime` (per-cell adjacency atom) so the
 # region-based "single cell forbids many region cells" arguments produce
 # size-2 MUSes (one cellforbids atom + one blockup atom) rather than
-# 5-7 atoms under the default pairwise-adjacency model.
+# 5-7 atoms under `star-battle-pairwise.eprime`.
 
-model = "eprime/star-battle-cellforbids.eprime"
+model = "eprime/star-battle.eprime"
 param = "eprime/star-battle/rohanrao-blogspot-example.param"
 title = "starbattle — rohanrao — 14-step blogspot walkthrough"
 hide_untouched_candidates = true

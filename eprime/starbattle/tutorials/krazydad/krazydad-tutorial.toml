@@ -9,11 +9,11 @@
 # size-1 MUS deductions, captured here in a single deduce_trivial step
 # rather than spelled out one cell at a time.
 
-model = "eprime/star-battle-cellforbids.eprime"
+model = "eprime/star-battle.eprime"
 param = "eprime/star-battle/krazydad-tutorial.param"
 title = "starbattle — krazydad — 10x10 tutorial"
 # Uses the per-cell `cellforbids` adjacency model (one atom per cell)
-# rather than the default pairwise `adj` model.  Lines up with the page's
+# rather than the pairwise `adj` model (`star-battle-pairwise.eprime`).  Lines up with the page's
 # "a star here would touch every cell in this cage" reasoning, which
 # previously needed size-5/6 MUSes (one adj atom per touched neighbour).
 # See the model file's header for the trade-off.

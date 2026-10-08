@@ -26,7 +26,7 @@
 #   1=A   2=B   3=C   4=D   5=E   6=F   7=G   8=H   9=J
 # (the forum image skips letter 'I' to avoid confusion with '1').
 
-model = "eprime/star-battle-cellforbids.eprime"
+model = "eprime/star-battle.eprime"
 param = "eprime/star-battle/logicmastersindia-example.param"
 title = "starbattle — logicmasters — rakesh_rai's 6-panel solution steps"
 hide_untouched_candidates = true
