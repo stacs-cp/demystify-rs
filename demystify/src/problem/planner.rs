@@ -44,6 +44,14 @@ pub enum MusMethod {
     SingleDive,
 }
 
+static NO_MUS_CACHE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Ablation: never reuse MUSes found in earlier steps (no cross-step cache).
+/// Process-wide; for experiments measuring what the cache saves.
+pub fn set_no_mus_cache(v: bool) {
+    NO_MUS_CACHE.store(v, std::sync::atomic::Ordering::Relaxed);
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct PlannerConfig {
     pub mus_config: MusConfig,
@@ -243,7 +251,7 @@ impl PuzzlePlanner {
         let full_result = self.psolve.get_many_vars_small_mus_quick(
             &varlits,
             &self.config.mus_config,
-            Some(self.mus_cache.clone()),
+            self.cache_seed(),
         );
         self.update_mus_cache(&full_result);
         // Return only entries for the current varlits — the full_result may also contain
@@ -285,11 +293,9 @@ impl PuzzlePlanner {
         conf.find_one = false;
         conf.find_bigger = false;
         conf.keep_all_muses = false;
-        let dict = self.psolve.get_many_vars_small_mus_quick(
-            &varlits,
-            &conf,
-            Some(self.mus_cache.clone()),
-        );
+        let dict = self
+            .psolve
+            .get_many_vars_small_mus_quick(&varlits, &conf, self.cache_seed());
         self.update_mus_cache(&dict);
         let dict = Self::filter_musdict_to_lits(dict, &varlits);
         let muses = Self::smallest_muses_from_dict(&dict);
@@ -384,7 +390,7 @@ impl PuzzlePlanner {
         let full_result = self.psolve.get_many_vars_small_mus_quick_with_cores(
             &varlits,
             &self.config.mus_config,
-            Some(self.mus_cache.clone()),
+            self.cache_seed(),
             cores,
         );
         self.update_mus_cache(&full_result);
@@ -398,14 +404,23 @@ impl PuzzlePlanner {
         let full_result = self.psolve.get_many_vars_small_mus_quick(
             &varlits,
             &self.config.mus_config,
-            Some(self.mus_cache.clone()),
+            self.cache_seed(),
         );
         self.update_mus_cache(&full_result);
         Self::filter_musdict_to_lits(full_result, &varlits)
     }
 
+    /// The cross-step MUS cache, to seed a search with (`None` under the
+    /// `--no-mus-cache` ablation).
+    fn cache_seed(&self) -> Option<MusDict> {
+        (!NO_MUS_CACHE.load(std::sync::atomic::Ordering::Relaxed)).then(|| self.mus_cache.clone())
+    }
+
     /// Updates the MUS cache from a search result, skipping size-0 MUSes (trivial deductions).
     fn update_mus_cache(&mut self, result: &MusDict) {
+        if NO_MUS_CACHE.load(std::sync::atomic::Ordering::Relaxed) {
+            return;
+        }
         for (lit, mus_set) in result.muses() {
             for mc in mus_set {
                 if !mc.mus.is_empty() {

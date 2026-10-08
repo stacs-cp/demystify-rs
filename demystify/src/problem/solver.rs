@@ -38,6 +38,15 @@ pub enum Strategy {
     Dynamic,
 }
 
+static NO_SHARED_BOUND: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Ablation: bound each literal's MUS search only by the smallest raw core,
+/// not by the smallest MUS found so far for any literal.  Process-wide; for
+/// experiments measuring what the shared bound saves.
+pub fn set_no_shared_bound(v: bool) {
+    NO_SHARED_BOUND.store(v, std::sync::atomic::Ordering::Relaxed);
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize)]
 pub struct MusConfig {
     pub base_size_mus: i64,
@@ -1738,6 +1747,8 @@ impl PuzzleSolver {
             .for_each(|x| {
                 let mus_test_size = if config.find_bigger {
                     mus_size + 9
+                } else if NO_SHARED_BOUND.load(std::sync::atomic::Ordering::Relaxed) {
+                    mus_size
                 } else {
                     match bound_read.read(&md, lits) {
                         Some(found) => {

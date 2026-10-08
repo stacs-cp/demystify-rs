@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Ablation flags `--no-mus-cache` (never reuse MUSes found in earlier steps)
+  and `--no-shared-bound` (bound each literal's MUS search only by the
+  smallest raw core, not by the smallest MUS found so far for any literal),
+  for measuring what each mechanism saves. Both default off.
 - `--mus-method single-dive`: a baseline that, for every literal, takes one SAT
   core and makes one unbounded deletion pass over it, keeping the smallest
   resulting MUSes (no size bound, repeats or size-1 scan). Pair with

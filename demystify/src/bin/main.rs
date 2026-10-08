@@ -166,6 +166,18 @@ struct Opt {
 
     #[arg(
         long,
+        help = "Ablation: never reuse MUSes found in earlier steps (no cross-step MUS cache)"
+    )]
+    no_mus_cache: bool,
+
+    #[arg(
+        long,
+        help = "Ablation: bound each literal's MUS search only by the smallest raw core, not by the smallest MUS found so far for any literal"
+    )]
+    no_shared_bound: bool,
+
+    #[arg(
+        long,
         value_delimiter = ',',
         help = "Enable logging targets on stderr (comma-separated). Available: progress, cores, solver, planner, solve, parser"
     )]
@@ -346,6 +358,9 @@ fn main() -> anyhow::Result<()> {
         }
         cfg
     };
+
+    demystify::problem::planner::set_no_mus_cache(opt.no_mus_cache);
+    demystify::problem::solver::set_no_shared_bound(opt.no_shared_bound);
 
     let planner_config = PlannerConfig {
         mus_config,
