@@ -138,58 +138,65 @@ g.selected rect {
 g.con-preview .cell-bg { fill: var(--con-preview, #ffe066); }
 
 /* Per-constraint highlight colours (50 pastel shades). On the board these tint
- * candidate boxes (rect fill). */
-.highlight_con0  rect { fill: #d0ffff; }
-.highlight_con1  rect { fill: #ffd0ff; }
-.highlight_con2  rect { fill: #ffffd0; }
-.highlight_con3  rect { fill: #d0d0ff; }
-.highlight_con4  rect { fill: #d0ffd0; }
-.highlight_con5  rect { fill: #ffd0d0; }
-.highlight_con6  rect { fill: #ffe0c0; }
-.highlight_con7  rect { fill: #d0e8ff; }
-.highlight_con8  rect { fill: #e0d0ff; }
-.highlight_con9  rect { fill: #d0ffe0; }
-.highlight_con10 rect { fill: #f8d8e8; }
-.highlight_con11 rect { fill: #d8f8d8; }
-.highlight_con12 rect { fill: #e8e8ff; }
-.highlight_con13 rect { fill: #ffe8d8; }
-.highlight_con14 rect { fill: #d8ffe8; }
-.highlight_con15 rect { fill: #f0d8ff; }
-.highlight_con16 rect { fill: #e6f7ff; }
-.highlight_con17 rect { fill: #fff7d8; }
-.highlight_con18 rect { fill: #e6d8f7; }
-.highlight_con19 rect { fill: #ffd8e6; }
-.highlight_con20 rect { fill: #d8f7f7; }
-.highlight_con21 rect { fill: #f7f7d8; }
-.highlight_con22 rect { fill: #ecd8ff; }
-.highlight_con23 rect { fill: #d8ecff; }
-.highlight_con24 rect { fill: #ffece1; }
-.highlight_con25 rect { fill: #e1ffec; }
-.highlight_con26 rect { fill: #f0e1ff; }
-.highlight_con27 rect { fill: #ffe1f0; }
-.highlight_con28 rect { fill: #e1f0ff; }
-.highlight_con29 rect { fill: #f0ffe1; }
-.highlight_con30 rect { fill: #e8d8d8; }
-.highlight_con31 rect { fill: #d8e8d8; }
-.highlight_con32 rect { fill: #d8d8e8; }
-.highlight_con33 rect { fill: #f9e9d9; }
-.highlight_con34 rect { fill: #d9f9e9; }
-.highlight_con35 rect { fill: #e9d9f9; }
-.highlight_con36 rect { fill: #f9d9e9; }
-.highlight_con37 rect { fill: #d9e9f9; }
-.highlight_con38 rect { fill: #e9f9d9; }
-.highlight_con39 rect { fill: #f5e0f0; }
-.highlight_con40 rect { fill: #e0f5e0; }
-.highlight_con41 rect { fill: #e0e0f5; }
-.highlight_con42 rect { fill: #f5f0e0; }
-.highlight_con43 rect { fill: #e0f0f5; }
-.highlight_con44 rect { fill: #f0e0f5; }
-.highlight_con45 rect { fill: #f5e0e0; }
-.highlight_con46 rect { fill: #e0f5f0; }
-.highlight_con47 rect { fill: #f0f5e0; }
-.highlight_con48 rect { fill: #e8e0ec; }
-.highlight_con49 rect { fill: #ece8e0; }
-.highlight_con50 rect { fill: #e0ece8; }
+ * candidate boxes (rect fill). A box in several constraints instead gets one
+ * vertical .hl-stripe per constraint, drawn under a fill-less litbox; while
+ * selected the stripes hide so the selection styling above shows as usual. */
+.literal rect.hl-stripe { fill: none; stroke: none; pointer-events: none; }
+.literal rect.stripe-more { fill: #b8b8b8; }
+.literal:not(.selected) rect.litbox.striped { fill: none; }
+g.selected .hl-stripe { visibility: hidden; }
+
+.highlight_con0 rect, .literal rect.stripe_con0 { fill: #d0ffff; }
+.highlight_con1 rect, .literal rect.stripe_con1 { fill: #ffd0ff; }
+.highlight_con2 rect, .literal rect.stripe_con2 { fill: #ffffd0; }
+.highlight_con3 rect, .literal rect.stripe_con3 { fill: #d0d0ff; }
+.highlight_con4 rect, .literal rect.stripe_con4 { fill: #d0ffd0; }
+.highlight_con5 rect, .literal rect.stripe_con5 { fill: #ffd0d0; }
+.highlight_con6 rect, .literal rect.stripe_con6 { fill: #ffe0c0; }
+.highlight_con7 rect, .literal rect.stripe_con7 { fill: #d0e8ff; }
+.highlight_con8 rect, .literal rect.stripe_con8 { fill: #e0d0ff; }
+.highlight_con9 rect, .literal rect.stripe_con9 { fill: #d0ffe0; }
+.highlight_con10 rect, .literal rect.stripe_con10 { fill: #f8d8e8; }
+.highlight_con11 rect, .literal rect.stripe_con11 { fill: #d8f8d8; }
+.highlight_con12 rect, .literal rect.stripe_con12 { fill: #e8e8ff; }
+.highlight_con13 rect, .literal rect.stripe_con13 { fill: #ffe8d8; }
+.highlight_con14 rect, .literal rect.stripe_con14 { fill: #d8ffe8; }
+.highlight_con15 rect, .literal rect.stripe_con15 { fill: #f0d8ff; }
+.highlight_con16 rect, .literal rect.stripe_con16 { fill: #e6f7ff; }
+.highlight_con17 rect, .literal rect.stripe_con17 { fill: #fff7d8; }
+.highlight_con18 rect, .literal rect.stripe_con18 { fill: #e6d8f7; }
+.highlight_con19 rect, .literal rect.stripe_con19 { fill: #ffd8e6; }
+.highlight_con20 rect, .literal rect.stripe_con20 { fill: #d8f7f7; }
+.highlight_con21 rect, .literal rect.stripe_con21 { fill: #f7f7d8; }
+.highlight_con22 rect, .literal rect.stripe_con22 { fill: #ecd8ff; }
+.highlight_con23 rect, .literal rect.stripe_con23 { fill: #d8ecff; }
+.highlight_con24 rect, .literal rect.stripe_con24 { fill: #ffece1; }
+.highlight_con25 rect, .literal rect.stripe_con25 { fill: #e1ffec; }
+.highlight_con26 rect, .literal rect.stripe_con26 { fill: #f0e1ff; }
+.highlight_con27 rect, .literal rect.stripe_con27 { fill: #ffe1f0; }
+.highlight_con28 rect, .literal rect.stripe_con28 { fill: #e1f0ff; }
+.highlight_con29 rect, .literal rect.stripe_con29 { fill: #f0ffe1; }
+.highlight_con30 rect, .literal rect.stripe_con30 { fill: #e8d8d8; }
+.highlight_con31 rect, .literal rect.stripe_con31 { fill: #d8e8d8; }
+.highlight_con32 rect, .literal rect.stripe_con32 { fill: #d8d8e8; }
+.highlight_con33 rect, .literal rect.stripe_con33 { fill: #f9e9d9; }
+.highlight_con34 rect, .literal rect.stripe_con34 { fill: #d9f9e9; }
+.highlight_con35 rect, .literal rect.stripe_con35 { fill: #e9d9f9; }
+.highlight_con36 rect, .literal rect.stripe_con36 { fill: #f9d9e9; }
+.highlight_con37 rect, .literal rect.stripe_con37 { fill: #d9e9f9; }
+.highlight_con38 rect, .literal rect.stripe_con38 { fill: #e9f9d9; }
+.highlight_con39 rect, .literal rect.stripe_con39 { fill: #f5e0f0; }
+.highlight_con40 rect, .literal rect.stripe_con40 { fill: #e0f5e0; }
+.highlight_con41 rect, .literal rect.stripe_con41 { fill: #e0e0f5; }
+.highlight_con42 rect, .literal rect.stripe_con42 { fill: #f5f0e0; }
+.highlight_con43 rect, .literal rect.stripe_con43 { fill: #e0f0f5; }
+.highlight_con44 rect, .literal rect.stripe_con44 { fill: #f0e0f5; }
+.highlight_con45 rect, .literal rect.stripe_con45 { fill: #f5e0e0; }
+.highlight_con46 rect, .literal rect.stripe_con46 { fill: #e0f5f0; }
+.highlight_con47 rect, .literal rect.stripe_con47 { fill: #f0f5e0; }
+.highlight_con48 rect, .literal rect.stripe_con48 { fill: #e8e0ec; }
+.highlight_con49 rect, .literal rect.stripe_con49 { fill: #ece8e0; }
+.highlight_con50 rect, .literal rect.stripe_con50 { fill: #e0ece8; }
 
 /* ── Variable-specific styling ──────────────────────────────────────── */
 

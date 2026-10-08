@@ -367,7 +367,7 @@ body.he-root {
 /* ─── Solver page ─── */
 
 .he-solver {
-  max-width: 1200px;
+  max-width: 3200px;
   margin: 0 auto;
   padding: 2rem;
 }
@@ -427,7 +427,11 @@ body.he-root {
 
 .he-stage {
   display: grid;
-  grid-template-columns: minmax(300px, 520px) 1fr;
+  /* The board grows with the window, up to --board-max-w: the width at which
+   * the whole board (and its legend) fits on screen, measured by
+   * fitBoardToViewport() in demystify.js. 520px is the size before JS runs.
+   * Deductions keep a readable minimum. */
+  grid-template-columns: minmax(300px, var(--board-max-w, 520px)) minmax(320px, 1fr);
   gap: 1.5rem;
   align-items: start;
 }

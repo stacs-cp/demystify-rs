@@ -274,8 +274,35 @@
     });
   }
 
+  // ─── Board sizing: as large as fits below the board's top edge ───
+  // Header height varies by puzzle (info lines), so measure rather than guess:
+  // room = viewport minus everything above the board, the legend below it and
+  // whatever follows the board's grid (page padding), then convert that height
+  // to a column width via the board's aspect ratio.
+  function fitBoardToViewport() {
+    const svg = document.querySelector('.he-board svg');
+    if (!svg) return;
+    const vb = svg.viewBox.baseVal;
+    if (!vb || vb.width <= 0 || vb.height <= 0) {
+      throw new Error('board svg has no viewBox; cannot size it');
+    }
+    const grid = svg.closest('.he-solver-grid');
+    if (!grid) throw new Error('board svg is not inside .he-solver-grid');
+    const svgRect = svg.getBoundingClientRect();
+    const foot = svg.parentElement.querySelector('.he-board-foot');
+    const legend = foot ? foot.getBoundingClientRect().bottom - svgRect.bottom : 0;
+    const afterGrid = document.body.getBoundingClientRect().bottom - grid.getBoundingClientRect().bottom;
+    const below = legend + afterGrid;
+    const above = svgRect.top + window.scrollY;
+    const margin = 2; // absorbs sub-pixel rounding of the svg's height
+    const room = window.innerHeight - above - below - margin;
+    document.documentElement.style.setProperty(
+      '--board-max-w', `${Math.max(0, room) * vb.width / vb.height}px`);
+  }
+
   // ─── Re-init after htmx swaps ───
   function initAll() {
+    fitBoardToViewport();
     initDeductionHover();
     initHighlightFunctions();
     initConstraintPreview();
@@ -290,6 +317,8 @@
     initAll();
     initLoadingState();
   });
+
+  window.addEventListener('resize', fitBoardToViewport);
 
   document.body.addEventListener('htmx:afterSwap', () => {
     initAll();

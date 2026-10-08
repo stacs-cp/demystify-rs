@@ -116,6 +116,38 @@ impl Decorations {
     }
 }
 
+/// Most stripes drawn in one candidate box. A literal in more constraints than
+/// this shows the first `MAX_STRIPES - 1` plus a `stripe-more` marker, so the
+/// box never suggests it belongs to fewer constraints than it does.
+const MAX_STRIPES: usize = 4;
+
+/// Stripe classes for a literal lying in two or more MUS constraints, in
+/// constraint-number order. Empty when 0 or 1 constraints: a single
+/// constraint is shown by the plain `.highlight_conN rect` fill.
+fn constraint_stripes(state: &StateLit) -> Vec<String> {
+    let Some(classes) = &state.classes else {
+        return vec![];
+    };
+    let nums: Vec<usize> = classes
+        .iter()
+        .filter_map(|c| c.strip_prefix("highlight_con"))
+        .map(|n| n.parse().expect("malformed highlight_con class"))
+        .sorted()
+        .collect();
+    if nums.len() < 2 {
+        return vec![];
+    }
+    if nums.len() <= MAX_STRIPES {
+        nums.iter().map(|n| format!("stripe_con{n}")).collect()
+    } else {
+        nums.iter()
+            .take(MAX_STRIPES - 1)
+            .map(|n| format!("stripe_con{n}"))
+            .chain(std::iter::once("stripe-more".to_owned()))
+            .collect()
+    }
+}
+
 pub struct PuzzleDraw {
     base_width: f64,
     mid_width: f64,
@@ -446,11 +478,27 @@ impl PuzzleDraw {
                                 let mut bg_group = svg::node::element::Group::new();
                                 bg_group.assign("transform", transform.clone());
 
+                                let stripes = constraint_stripes(state);
+                                for (k, stripe_class) in stripes.iter().enumerate() {
+                                    let width = little_step / stripes.len() as f64;
+                                    let mut stripe = svg::node::element::Rectangle::new();
+                                    stripe.assign("x", k as f64 * width);
+                                    stripe.assign("y", -little_step);
+                                    stripe.assign("width", width);
+                                    stripe.assign("height", little_step);
+                                    stripe.assign("class", format!("hl-stripe {stripe_class}"));
+                                    bg_group.append(stripe);
+                                }
+
                                 let mut rect = svg::node::element::Rectangle::new();
                                 rect.assign("width", little_step);
                                 rect.assign("height", little_step);
                                 rect.assign("y", -little_step);
-                                rect.assign("class", "litbox");
+                                if stripes.is_empty() {
+                                    rect.assign("class", "litbox");
+                                } else {
+                                    rect.assign("class", "litbox striped");
+                                }
                                 bg_group.append(rect);
 
                                 bg_group.assign("id", id.clone());
@@ -1048,6 +1096,45 @@ mod tests {
     use test_log::test;
 
     use crate::{json::Problem, web::puzsvg::PuzzleDraw};
+
+    fn stripes_for(classes: &[&str]) -> Vec<String> {
+        let state = crate::json::StateLit {
+            val: 1,
+            classes: Some(classes.iter().map(|c| (*c).to_owned()).collect()),
+        };
+        super::constraint_stripes(&state)
+    }
+
+    /// One stripe per constraint, in numeric (not string) order; none for a
+    /// single constraint; past `MAX_STRIPES` the last stripe is `stripe-more`.
+    #[test]
+    fn test_constraint_stripes() {
+        assert!(stripes_for(&["literal", "litknown"]).is_empty());
+        assert!(stripes_for(&["highlight_con3", "js_highlighter"]).is_empty());
+        assert_eq!(
+            stripes_for(&["highlight_con10", "highlight_con2", "js_highlighter"]),
+            ["stripe_con2", "stripe_con10"]
+        );
+        assert_eq!(
+            stripes_for(&[
+                "highlight_con0",
+                "highlight_con1",
+                "highlight_con2",
+                "highlight_con3"
+            ]),
+            ["stripe_con0", "stripe_con1", "stripe_con2", "stripe_con3"]
+        );
+        assert_eq!(
+            stripes_for(&[
+                "highlight_con0",
+                "highlight_con1",
+                "highlight_con2",
+                "highlight_con3",
+                "highlight_con4"
+            ]),
+            ["stripe_con0", "stripe_con1", "stripe_con2", "stripe-more"]
+        );
+    }
 
     /// The cell-unit/layer refactor must keep a cell-unit viewBox (not the old
     /// 500×500 + scale(400) wrapper), emit the named layer stack, and preserve
