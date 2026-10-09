@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `PuzzlePlanner::all_muses_for_literal_with_repeats`: as
+  `all_muses_for_literal`, but with an explicit number of randomised MUS
+  searches instead of the planner's configured `repeats`.
 - Ablation flags `--no-mus-cache` (never reuse MUSes found in earlier steps)
   and `--no-shared-bound` (bound each literal's MUS search only by the
   smallest raw core, not by the smallest MUS found so far for any literal),

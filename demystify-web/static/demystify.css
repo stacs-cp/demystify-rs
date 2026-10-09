@@ -162,6 +162,60 @@ body.he-root {
   gap: 0.4rem;
 }
 
+/* Search-effort settings in the solver rail. */
+.he-search-effort {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.he-search-effort label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-mid);
+}
+
+.he-search-effort input {
+  width: 5em;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+/* Every explanation found for the clicked cell, smallest first; click to jump. */
+.he-explore-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: -0.25rem 0 0.75rem;
+}
+
+.he-explore-size {
+  font: inherit;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.2em;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.he-explore-size:hover { border-color: var(--warm); }
+
+.he-explore-size.current {
+  background: var(--warm);
+  border-color: var(--warm);
+  color: var(--paper);
+}
+
 /* ─── Chips ─── */
 
 .chips {

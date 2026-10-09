@@ -27,12 +27,28 @@ pub struct ExploreState {
     pub current_index: usize,
 }
 
+/// Randomised MUS searches per click in explore mode, until the user changes
+/// it. Explore exists to show alternative explanations, so it searches much
+/// harder than a solve step.
+pub const DEFAULT_EXPLORE_SEARCHES: i64 = 30;
+
+/// Upper limit on either search setting. Cost is roughly linear in searches
+/// (30 explore searches take up to ~1.2s per click on `miracle`), so this
+/// keeps a typo from tying up the server for minutes.
+pub const MAX_SEARCHES: i64 = 1000;
+
 pub struct SolverSession {
     pub planner: PuzzlePlanner,
     pub explore: Option<ExploreState>,
     pub explore_enabled: bool,
     pub history: Vec<PuzzlePlanner>,
     pub game: Option<GameState>,
+    /// Randomised MUS searches per literal on each solve step. Owned here, not
+    /// only by `planner`, because restoring a history snapshot replaces the
+    /// planner (and its config) wholesale.
+    step_searches: i64,
+    /// Randomised MUS searches per literal when explore mode explains a cell.
+    explore_searches: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -55,17 +71,43 @@ impl GameState {
 }
 
 impl SolverSession {
-    pub fn new(planner: PuzzlePlanner) -> Self {
+    pub fn new(mut planner: PuzzlePlanner) -> Self {
         let snapshot = planner
             .fork()
             .expect("Failed to fork initial planner state");
+        let step_searches = planner.config_mut().mus_config.repeats;
         Self {
             planner,
             explore: None,
             explore_enabled: false,
             history: vec![snapshot],
             game: None,
+            step_searches,
+            explore_searches: DEFAULT_EXPLORE_SEARCHES,
         }
+    }
+
+    pub fn step_searches(&self) -> i64 {
+        self.step_searches
+    }
+
+    pub fn explore_searches(&self) -> i64 {
+        self.explore_searches
+    }
+
+    /// Set how hard solve steps and explore clicks search for MUSes. Takes
+    /// effect from the next step or click; explanations already shown are kept.
+    pub fn set_searches(&mut self, step: i64, explore: i64) -> anyhow::Result<()> {
+        for (name, n) in [("step", step), ("explore", explore)] {
+            anyhow::ensure!(
+                (1..=MAX_SEARCHES).contains(&n),
+                "{name} searches must be between 1 and {MAX_SEARCHES}, got {n}"
+            );
+        }
+        self.step_searches = step;
+        self.explore_searches = explore;
+        self.planner.config_mut().mus_config.repeats = step;
+        Ok(())
     }
 
     pub fn snapshot(&mut self) {
@@ -76,6 +118,7 @@ impl SolverSession {
     pub fn goto_step(&mut self, step: usize) -> anyhow::Result<()> {
         anyhow::ensure!(step < self.history.len(), "Step {step} out of range");
         self.planner = self.history[step].fork()?;
+        self.planner.config_mut().mus_config.repeats = self.step_searches;
         self.history.truncate(step + 1);
         self.explore = None;
         self.explore_enabled = false;
@@ -167,15 +210,18 @@ pub fn import_snapshot_into_session(
     strategy_db: Arc<demystify::named_strategy::Database>,
 ) -> anyhow::Result<SolverSession> {
     let history = import_snapshot(snapshot, strategy_db)?;
-    let live = history
+    let mut live = history
         .last()
         .expect("import_snapshot returns at least one entry")
         .fork()?;
+    let step_searches = live.config_mut().mus_config.repeats;
     Ok(SolverSession {
         planner: live,
         explore: None,
         explore_enabled: false,
         history,
         game: None,
+        step_searches,
+        explore_searches: DEFAULT_EXPLORE_SEARCHES,
     })
 }

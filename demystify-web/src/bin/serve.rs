@@ -172,6 +172,7 @@ async fn main() {
         .route("/solver/advance", post(wrap::solver_advance))
         .route("/solver/reset", post(wrap::solver_reset))
         .route("/solver/goto", post(wrap::solver_goto))
+        .route("/solver/settings", post(wrap::solver_settings))
         .route("/solver/difficulties", post(wrap::solver_difficulties))
         .route("/solver/explain", post(wrap::solver_explain))
         // Explore mode

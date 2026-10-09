@@ -39,6 +39,16 @@
         </button>
       </div>
     </div>
+    <div class="he-explore-sizes" aria-label="All explanations by size">
+      {% for size in explore_sizes %}
+      <button class="he-explore-size{% if loop.index == explore_index %} current{% endif %}"
+              title="Explanation {{ loop.index }}: size {{ size }}"
+              hx-post="/solver/explore/navigate"
+              hx-target="#solver-stage"
+              hx-swap="outerHTML"
+              hx-headers='{"X-Explore-Index": "{{ loop.index0 }}"}'>{{ size }}</button>
+      {% endfor %}
+    </div>
     {% endif %}
     {% if legend_items | length > 0 %}
     <h3>Difficulty legend</h3>
@@ -122,6 +132,26 @@
           Export session
         </a>
       </div>
+    </div>
+
+    <div class="he-paper he-mini">
+      <h4>Search effort</h4>
+      <form class="he-search-effort"
+            hx-post="/solver/settings"
+            hx-target="#solver-stage"
+            hx-swap="outerHTML">
+        <label title="Randomised MUS searches per candidate on each solve step. More finds smaller explanations, slower.">
+          <span>Searches per step</span>
+          <input type="number" name="step_searches" min="1" max="{{ max_searches }}" step="1"
+                 value="{{ step_searches }}" required>
+        </label>
+        <label title="Randomised MUS searches when explore mode explains a clicked cell. More finds more alternatives, slower.">
+          <span>Searches per explore click</span>
+          <input type="number" name="explore_searches" min="1" max="{{ max_searches }}" step="1"
+                 value="{{ explore_searches }}" required>
+        </label>
+        <button class="he-btn" type="submit">Apply</button>
+      </form>
     </div>
 
     {% if history_len > 1 %}

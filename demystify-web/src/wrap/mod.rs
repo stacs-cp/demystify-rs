@@ -398,6 +398,9 @@ fn build_solver_stage_context(
     ctx.insert("history_len", &session.history.len());
 
     ctx.insert("explore_mode", &session.explore_enabled);
+    ctx.insert("step_searches", &session.step_searches());
+    ctx.insert("explore_searches", &session.explore_searches());
+    ctx.insert("max_searches", &util::MAX_SEARCHES);
     if let Some(ref explore) = session.explore {
         ctx.insert("explore_active", &true);
         ctx.insert("explore_index", &(explore.current_index + 1));
@@ -406,11 +409,14 @@ fn build_solver_stage_context(
             "explore_mus_size",
             &explore.all_muses[explore.current_index].mus_len(),
         );
+        let sizes: Vec<usize> = explore.all_muses.iter().map(|m| m.mus_len()).collect();
+        ctx.insert("explore_sizes", &sizes);
     } else {
         ctx.insert("explore_active", &false);
         ctx.insert("explore_index", &0u32);
         ctx.insert("explore_total", &0u32);
         ctx.insert("explore_mus_size", &0u32);
+        ctx.insert("explore_sizes", &Vec::<usize>::new());
     }
 
     ctx
@@ -513,6 +519,29 @@ pub async fn solver_reset(
 }
 
 #[derive(Deserialize)]
+pub struct SearchSettings {
+    step_searches: i64,
+    explore_searches: i64,
+}
+
+pub async fn solver_settings(
+    State(state): State<AppState>,
+    session: Session<SessionNullPool>,
+    form: axum::extract::Form<SearchSettings>,
+) -> Result<Html<String>, util::AppError> {
+    let solver = get_solver_global(&session)?;
+    let mut solver = solver.lock().unwrap();
+    let round: u32 = session.get("round").unwrap_or(0);
+
+    solver.set_searches(form.step_searches, form.explore_searches)?;
+
+    let (problem, _lits) = solver.planner.refresh_problem();
+    let ctx = build_solver_stage_context(&problem, round, &solver);
+    let html = state.tera.render("partials/solver_stage.html", &ctx)?;
+    Ok(Html(html))
+}
+
+#[derive(Deserialize)]
 pub struct StepParam {
     step: usize,
 }
@@ -603,7 +632,10 @@ fn render_explore_explain(
     round: u32,
     cell: Vec<i64>,
 ) -> Result<Html<String>, util::AppError> {
-    let all_muses = solver.planner.all_muses_for_literal(cell);
+    let searches = solver.explore_searches();
+    let all_muses = solver
+        .planner
+        .all_muses_for_literal_with_repeats(cell, searches);
     if all_muses.is_empty() {
         let (problem, _) = solver.planner.refresh_problem();
         let ctx = build_solver_stage_context(&problem, round, solver);
@@ -651,20 +683,37 @@ pub async fn solver_explore_navigate(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("next");
 
+    let jump_to = headers
+        .get("x-explore-index")
+        .map(|v| -> anyhow::Result<usize> { Ok(v.to_str()?.parse()?) })
+        .transpose()
+        .context("Bad X-Explore-Index header")?;
+
     let explore = solver
         .explore
         .as_mut()
         .context("No explore state — click a cell first")?;
 
-    match direction {
-        "prev" => {
-            if explore.current_index > 0 {
-                explore.current_index -= 1;
-            }
+    if let Some(idx) = jump_to {
+        if idx >= explore.all_muses.len() {
+            return Err(anyhow::anyhow!(
+                "X-Explore-Index {idx} out of range (have {} explanations)",
+                explore.all_muses.len()
+            )
+            .into());
         }
-        _ => {
-            if explore.current_index + 1 < explore.all_muses.len() {
-                explore.current_index += 1;
+        explore.current_index = idx;
+    } else {
+        match direction {
+            "prev" => {
+                if explore.current_index > 0 {
+                    explore.current_index -= 1;
+                }
+            }
+            _ => {
+                if explore.current_index + 1 < explore.all_muses.len() {
+                    explore.current_index += 1;
+                }
             }
         }
     }

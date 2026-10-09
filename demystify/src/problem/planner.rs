@@ -1386,6 +1386,19 @@ impl PuzzlePlanner {
 
     /// Compute all MUSes for a single literal, sorted smallest to largest.
     pub fn all_muses_for_literal(&mut self, lit_def: Vec<i64>) -> Vec<MusContext> {
+        let repeats = self.config.mus_config.repeats;
+        self.all_muses_for_literal_with_repeats(lit_def, repeats)
+    }
+
+    /// As [`Self::all_muses_for_literal`], but running `repeats` randomised
+    /// MUS searches per literal instead of the planner's configured number.
+    /// More repeats find more distinct alternatives, at proportional cost.
+    pub fn all_muses_for_literal_with_repeats(
+        &mut self,
+        lit_def: Vec<i64>,
+        repeats: i64,
+    ) -> Vec<MusContext> {
+        assert!(repeats > 0, "MUS repeats must be positive, got {repeats}");
         let varlits = self.psolve.get_provable_varlits().clone();
         let lit_def_clone = lit_def.clone();
         let varlits: BTreeSet<_> = varlits
@@ -1407,6 +1420,7 @@ impl PuzzlePlanner {
         conf.find_bigger = true;
         conf.find_one = false;
         conf.keep_all_muses = true;
+        conf.repeats = repeats;
 
         let result = self
             .psolve
