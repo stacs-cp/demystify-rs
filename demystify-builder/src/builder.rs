@@ -1032,6 +1032,34 @@ impl PuzzleBuilder {
         Ok(ConstraintHandle { lit })
     }
 
+    /// Post `(guard.atom() ∧ gates...) -> AND over parts of (sum(part) == k)`
+    /// as a single `$#CON`.  Use when one clue the player reads is a
+    /// conjunction of sums, so a deduction cites it once rather than once
+    /// per part — e.g. an unlabelled multiset of counts, written with an
+    /// auxiliary atom choosing which count belongs to which herb.
+    ///
+    /// Errors if `parts` is empty.
+    pub fn sum_eq_all(
+        &mut self,
+        guard: Guard,
+        parts: &[(&[Signed], i64)],
+    ) -> Result<ConstraintHandle, BuildError> {
+        if parts.is_empty() {
+            return Err(BuildError::Other(anyhow::anyhow!(
+                "sum_eq_all needs at least one part"
+            )));
+        }
+        let lit = guard.atom.lit;
+        let gates = Self::gates_for_encode(&guard);
+        let all: Vec<Signed> = parts.iter().flat_map(|(s, _)| s.iter().copied()).collect();
+        self.register_con_from_guard(guard, &all)?;
+        for (signed, k) in parts {
+            let raw_lits: Vec<Lit> = signed.iter().map(|s| s.as_lit()).collect();
+            encode_sum_eq(&mut self.sat, &raw_lits, *k, &gates)?;
+        }
+        Ok(ConstraintHandle { lit })
+    }
+
     /// Post `sum(signed) == k` unconditionally as plain CNF, with no
     /// `$#CON` entry.  Use for structural/setup constraints (one-hot
     /// encodings, fixed givens) that demystify shouldn't surface as

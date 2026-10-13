@@ -497,6 +497,45 @@ impl WasmBuilder {
         })
     }
 
+    /// Post `guard.atom -> AND over parts of (sum(part) == k)` as one
+    /// `$#CON` (consumes `guard`).  The parts are concatenated in `signed`;
+    /// `lengths[i]` is the length of part `i` and `ks[i]` its target.
+    #[wasm_bindgen(js_name = sumEqAll)]
+    pub fn sum_eq_all(
+        &self,
+        guard: WasmGuard,
+        signed: Vec<WasmSigned>,
+        lengths: Vec<u32>,
+        ks: Vec<i64>,
+    ) -> Result<(), JsError> {
+        if lengths.len() != ks.len() {
+            return Err(JsError::new(&format!(
+                "sumEqAll: {} lengths but {} targets",
+                lengths.len(),
+                ks.len()
+            )));
+        }
+        let total: usize = lengths.iter().map(|&n| n as usize).sum();
+        if total != signed.len() {
+            return Err(JsError::new(&format!(
+                "sumEqAll: lengths sum to {total} but {} literals were given",
+                signed.len()
+            )));
+        }
+        let signed: Vec<Signed> = signed.into_iter().map(|s| s.inner).collect();
+        let mut parts: Vec<(&[Signed], i64)> = Vec::with_capacity(ks.len());
+        let mut at = 0;
+        for (&n, &k) in lengths.iter().zip(&ks) {
+            parts.push((&signed[at..at + n as usize], k));
+            at += n as usize;
+        }
+        self.with_mut(|b| {
+            b.sum_eq_all(guard.inner, &parts)
+                .map(|_| ())
+                .map_err(|e| JsError::new(&e.to_string()))
+        })
+    }
+
     /// Post `sum(signed) == k` unconditionally; no `$#CON` entry produced.
     #[wasm_bindgen(js_name = sumEqUnguarded)]
     pub fn sum_eq_unguarded(&self, signed: Vec<WasmSigned>, k: i64) -> Result<(), JsError> {
