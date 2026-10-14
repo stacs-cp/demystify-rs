@@ -77,8 +77,35 @@ const SLOW_MODELS: &[(&str, &str)] = &[
     ("killersudoku.eprime", "killersudoku/killersudoku.param"),
 ];
 
+/// The web app's own copies of the models (`demystify-web/examples/eprime`),
+/// checked with the instance the web app ships.
+const WEB_MODELS: &[(&str, &str)] = &[
+    ("akari.eprime", "akari/akari-5x5.param"),
+    ("binairo.essence", "binairo/diiscu.param"),
+    ("futoshiki.eprime", "futoshiki/nfutoshiki-1.param"),
+    ("hexbinairo.eprime", "hexbinairo/hexbinairo-1.param"),
+    ("kakurasu.eprime", "kakurasu/kakurasu.param"),
+    ("minesweeper.eprime", "minesweeper/minesweeper-5x5.param"),
+    ("mosaic.eprime", "mosaic/mosaic-5x5.param"),
+    ("nonogram.eprime", "nonogram/duck-8x9.param"),
+    ("skyscrapers.eprime", "skyscrapers/skyscrapers-1.param"),
+    ("star-battle.eprime", "star-battle/FATAtalkexample.param"),
+    ("thermometer.eprime", "thermometer/thermometer-1.param"),
+];
+
+const SLOW_WEB_MODELS: &[(&str, &str)] = &[
+    ("killersudoku.eprime", "killersudoku/killersudoku.param"),
+    ("miracle.eprime", "miracle/original.param"),
+    ("sudoku.eprime", "sudoku/puzzlingexample.param"),
+    ("x-sums.eprime", "x-sums/easy-xsums.param"),
+];
+
 fn eprime_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../eprime")
+}
+
+fn web_eprime_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../demystify-web/examples/eprime")
 }
 
 /// Every problem with `desc`, given the `$#VAR` grid cells in its scope.
@@ -152,19 +179,30 @@ fn label_problems(desc: &str, cells: &BTreeSet<(i64, i64)>) -> Vec<String> {
 
 #[test]
 fn constraint_labels_match_their_scope() {
-    check_models(MODELS);
+    check_models(&eprime_dir(), MODELS);
 }
 
 #[test]
 #[ignore = "slow: run with --ignored"]
 fn constraint_labels_match_their_scope_slow_models() {
-    check_models(SLOW_MODELS);
+    check_models(&eprime_dir(), SLOW_MODELS);
 }
 
-fn check_models(models: &[(&str, &str)]) {
+#[test]
+fn web_constraint_labels_match_their_scope() {
+    check_models(&web_eprime_dir(), WEB_MODELS);
+}
+
+#[test]
+#[ignore = "slow: run with --ignored"]
+fn web_constraint_labels_match_their_scope_slow_models() {
+    check_models(&web_eprime_dir(), SLOW_WEB_MODELS);
+}
+
+fn check_models(dir: &std::path::Path, models: &[(&str, &str)]) {
     let mut failures = vec![];
     for (model, param) in models {
-        let puz = parse_essence(&eprime_dir().join(model), &eprime_dir().join(param))
+        let puz = parse_essence(&dir.join(model), &dir.join(param))
             .unwrap_or_else(|e| panic!("parsing {model} with {param}: {e:#}"));
         let grid_cell = |v: &demystify::problem::PuzVar| {
             (puz.eprime.vars.contains(v.name()) && v.indices().len() == 2)
