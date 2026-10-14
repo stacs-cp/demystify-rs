@@ -8,23 +8,23 @@
 # puzzle from the page's introductory section.
 #
 # Page techniques demonstrated:
-#   1. "Overflowing"  — when a row/column clue is smaller than a
-#                       thermometer's length in that row/column, the
+#   1. "Overflowing"  — when a column/row clue is smaller than a
+#                       thermometer's length in that column/row, the
 #                       cells far from the circle cannot be filled.
-#   2. "Backflow"     — when the row/column clue is large enough that
+#   2. "Backflow"     — when the column/row clue is large enough that
 #                       it forces some cells of a long thermometer to
 #                       be filled regardless of how the other
 #                       thermometers' fluid is distributed.
 #
-# Puzzle layout:
-#   row_sums = [1, 3, 4, 3, 4, 5]
-#   col_sums = [4, 1, 5, 5, 3, 2]
-#   Therm 0 (length 5, vertical in col 1, circle at (5,1), positions 1..5
-#     going up the column: (5,1) circle, (4,1), (3,1), (2,1), (1,1) far end).
-#   Therm 1 (length 4, horizontal in row 6, circle at (6,1) going right).
-# (Note: the param's `therms` matrix uses [col, row] indexing, opposite
-# to most other puzzle types in this codebase.  The cell at row R col C
-# is referenced as `grid[R, C]` in lits.)
+# Puzzle layout (matches the page since 2026-10-11; grid[R,C] = row R, column C):
+#   row_sums = [4, 1, 5, 5, 3, 2]
+#   col_sums = [1, 3, 4, 3, 4, 5]
+#   Therm 0 (length 5, horizontal in row 1, circle at (1,5), positions 1..5
+#     going left along the row: (1,5) circle, (1,4), (1,3), (1,2), (1,1) far end).
+#   Therm 1 (length 4, vertical in column 6, circle at (1,6) going down).
+# NB the page's own Overflowing example is the bottom row (clue 2, a
+# 4-cell thermometer); this walkthrough uses row 1 instead.  The paper
+# proposals in paper-catalogue/targets use the page's example.
 
 model = "eprime/thermometer.eprime"
 param = "eprime/thermometer/solving_techniques/innoludic/1-some-tips.param"
@@ -38,51 +38,51 @@ op = "heatmap"
 title = "Initial state"
 
 # =====================================================================
-# Overflowing — col clue 4 < therm 0 length 5 — far end of therm 0
+# Overflowing — row clue 4 < therm 0 length 5 — far end of therm 0
 # cannot be mercury.
 #
-# Col 1 contains all 5 cells of therm 0 (vertical) plus the circle of
-# therm 1 at (6,1).  Col clue is 4.  Filling (1,1) — therm 0's
+# Row 1 contains all 5 cells of therm 0 (horizontal) plus the circle of
+# therm 1 at (1,6).  Row clue is 4.  Filling (1,1) — therm 0's
 # furthest-from-circle cell (position 5) — would force every cell of
 # therm 0 to be filled (5 cells) plus possibly therm 1's circle, giving
-# at least 5 mercury in col 1, breaking the clue of 4.
-# MUS: `{fluid[0], coldown[1]}` — size 2.
+# at least 5 mercury in row 1, breaking the clue of 4.
+# MUS: `{fluid[0], rowdown[1]}` — size 2.
 # =====================================================================
 
 [[step]]
 op = "show_smallest_muses"
 lit = "grid[1,1]=0"
-title = "Overflowing: grid[1,1]=0 — col 1 clue 4 forbids filling the far end of therm 0 (length 5)"
+title = "Overflowing: grid[1,1]=0 — row 1 clue 4 forbids filling the far end of therm 0 (length 5)"
 
 [[step]]
 op = "deduce"
 lit = "grid[1,1]=0"
 
 # =====================================================================
-# Backflow — col clue 4 forces therm 0's circle to be filled even
+# Backflow — row clue 4 forces therm 0's circle to be filled even
 # without knowing whether therm 1's circle is filled.
 #
-# Col 1 holds all 5 cells of therm 0 plus the circle of therm 1 at
-# (6,1).  Col clue is 4.
-#   Case A: therm 1's circle is filled — col 1 needs 3 more cells from
+# Row 1 holds all 5 cells of therm 0 plus the circle of therm 1 at
+# (1,6).  Row clue is 4.
+#   Case A: therm 1's circle is filled — row 1 needs 3 more cells from
 #           therm 0, which fills positions 1..3 (the circle + 2 above).
-#   Case B: therm 1's circle is empty — col 1 needs all 4 from therm 0,
+#   Case B: therm 1's circle is empty — row 1 needs all 4 from therm 0,
 #           filling positions 1..4.
-# Either way, therm 0's circle at (5,1) must be filled.  Equivalently:
-# if (5,1) were empty, fluid[0] forces all of therm 0 empty (filled-far
+# Either way, therm 0's circle at (1,5) must be filled.  Equivalently:
+# if (1,5) were empty, fluid[0] forces all of therm 0 empty (filled-far
 # implies filled-close — contrapositive: empty-close forces empty-far),
-# leaving col 1 with at most 1 mercury (just therm 1's circle), short
-# of the clue.  MUS: `{fluid[0], colup[1]}` — size 2.
+# leaving row 1 with at most 1 mercury (just therm 1's circle), short
+# of the clue.  MUS: `{fluid[0], rowup[1]}` — size 2.
 # =====================================================================
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[5,1]=1"
-title = "Backflow: grid[5,1]=1 — col 1 clue 4 forces therm 0's circle even without committing on therm 1"
+lit = "grid[1,5]=1"
+title = "Backflow: grid[1,5]=1 — row 1 clue 4 forces therm 0's circle even without committing on therm 1"
 
 [[step]]
 op = "deduce"
-lit = "grid[5,1]=1"
+lit = "grid[1,5]=1"
 
 [[step]]
 op = "heatmap"

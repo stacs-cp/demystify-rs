@@ -1398,7 +1398,7 @@ source_id = "tectonic"
 paper_table_row = "tents-tectonic"
 status = "needs-multi-step"
 legacy_param = "eprime/tents/tectonic-1-2-3-4-5-6-7.param"
-paper_steps_in_this_file = 9
+paper_steps_in_this_file = 7  # page rules 1-7; rules 8 and 9 have their own params (9 in total)
 # TODO: identify per-step target deductions from source page
 
 [[tutorial]]

@@ -2,15 +2,15 @@
 # Local mirror: doc/tutorial-source-pages/tectonicpuzzel/_html/thermometer-sudoku-puzzle-solving-strategy.html
 #
 # Demonstrates Rule 5 ("Thermometers filled from circle") on the full
-# puzzle (all clues visible).  The setup deduces all 10 cells of column
+# puzzle (all clues visible).  The setup deduces all 10 cells of row
 # 5 — eight come out mercury and two come out empty — and once that
-# column is settled, Rule 5 propagates fluid into column 6.
+# row is settled, Rule 5 propagates fluid into row 6.
 #
-# Two cells in column 5 are empty:
-#   (7,5) — therm 14 pos 2; would force (7,6) to mercury, but row 7's
-#           clue 1 already gets its single mercury elsewhere in the row.
-#   (10,5) — therm 24 pos 6; would force all of therm 24 to mercury,
-#            putting 6 cells in row 10 against its clue of 4.
+# Two cells in row 5 are empty:
+#   (5,7) — therm 14 pos 2; would force (6,7) to mercury, but column 7's
+#           clue 1 already gets its single mercury elsewhere in the column.
+#   (5,10) — therm 24 pos 6; would force all of therm 24 to mercury,
+#            putting 6 cells in column 10 against its clue of 4.
 
 model = "eprime/thermometer.eprime"
 param = "eprime/thermometer/solving_techniques/tectonicpuzzel/all-techniques.eprime"
@@ -22,74 +22,74 @@ op = "heatmap"
 title = "Initial state"
 
 # =====================================================================
-# Setup: row 2 has clue 10, so the entire row is mercury.  Sweep all 10
-# row-2 cells via deduce_trivial — they all share the size-1 MUS
-# `{rowup[2]}` and aren't the focus of this walkthrough.
+# Setup: column 2 has clue 10, so the entire column is mercury.  Sweep all 10
+# column-2 cells via deduce_trivial — they all share the size-1 MUS
+# `{colup[2]}` and aren't the focus of this walkthrough.
 # =====================================================================
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[2,1]=1"
-title = "Setup (Rule 1): grid[2,1]=1 — row 2 clue 10 forces every cell mercury"
+lit = "grid[1,2]=1"
+title = "Setup (Rule 1): grid[1,2]=1 — column 2 clue 10 forces every cell mercury"
 
 [[step]]
 op = "deduce_trivial"
 max_mus_size = 1
-title = "Setup: sweep the rest of row 2"
-# Defer all 10 col-5 cells so the explicit show_smallest_muses steps
-# below have something left to demonstrate.  Without skip, the cleanup
-# sweeps several col-5 cells via chained size-1 propagations.
+title = "Setup: sweep the rest of column 2"
+# Defer all 10 row-5 cells so the explicit show_smallest_muses steps
+# below have something up to demonstrate.  Without skip, the cleanup
+# sweeps several row-5 cells via chained size-1 propagations.
 skip = [
-    "grid[1,5]=1",
-    "grid[2,5]=1",
-    "grid[3,5]=1",
-    "grid[4,5]=1",
+    "grid[5,1]=1",
+    "grid[5,2]=1",
+    "grid[5,3]=1",
+    "grid[5,4]=1",
     "grid[5,5]=1",
-    "grid[6,5]=1",
-    "grid[7,5]=0",
-    "grid[8,5]=1",
-    "grid[9,5]=1",
-    "grid[10,5]=0",
+    "grid[5,6]=1",
+    "grid[5,7]=0",
+    "grid[5,8]=1",
+    "grid[5,9]=1",
+    "grid[5,10]=0",
 ]
 
 # =====================================================================
-# Deduce all 10 cells of column 5, one at a time.  Eight come out
+# Deduce all 10 cells of row 5, one at a time.  Eight come out
 # mercury and two come out empty.  The MUSes are a mix of `fluid[11]`
-# (therm 11 vertical in col 5), `colup[5]` (col-5-sum=8 backflow),
-# `fluid[24]` and `rowdown[7]` (the empty cells).
+# (therm 11 horizontal in row 5), `rowup[5]` (row-5-sum=8 backflow),
+# `fluid[24]` and `coldown[7]` (the empty cells).
 # =====================================================================
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[1,5]=1"
-title = "Col 5.1: grid[1,5]=1"
+lit = "grid[5,1]=1"
+title = "Row 5.1: grid[5,1]=1"
 
 [[step]]
 op = "deduce"
-lit = "grid[1,5]=1"
+lit = "grid[5,1]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[3,5]=1"
-title = "Col 5.2: grid[3,5]=1"
+lit = "grid[5,3]=1"
+title = "Row 5.2: grid[5,3]=1"
 
 [[step]]
 op = "deduce"
-lit = "grid[3,5]=1"
+lit = "grid[5,3]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[10,5]=0"
-title = "Col 5.3: grid[10,5]=0 — therm 24 pos 6 too far for row 10's clue 4"
+lit = "grid[5,10]=0"
+title = "Row 5.3: grid[5,10]=0 — therm 24 pos 6 too far for column 10's clue 4"
 
 [[step]]
 op = "deduce"
-lit = "grid[10,5]=0"
+lit = "grid[5,10]=0"
 
 [[step]]
 op = "show_smallest_muses"
 lit = "grid[5,5]=1"
-title = "Col 5.4: grid[5,5]=1"
+title = "Row 5.4: grid[5,5]=1"
 
 [[step]]
 op = "deduce"
@@ -97,88 +97,88 @@ lit = "grid[5,5]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[4,5]=1"
-title = "Col 5.5: grid[4,5]=1 — therm 11 fills toward circle from (5,5)"
+lit = "grid[5,4]=1"
+title = "Row 5.5: grid[5,4]=1 — therm 11 fills toward circle from (5,5)"
 
 [[step]]
 op = "deduce"
-lit = "grid[4,5]=1"
+lit = "grid[5,4]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[2,5]=1"
-title = "Col 5.6: grid[2,5]=1"
+lit = "grid[5,2]=1"
+title = "Row 5.6: grid[5,2]=1"
 
 [[step]]
 op = "deduce"
-lit = "grid[2,5]=1"
+lit = "grid[5,2]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[7,5]=0"
-title = "Col 5.7: grid[7,5]=0 — row 7's clue 1 forbids more mercury in this row"
+lit = "grid[5,7]=0"
+title = "Row 5.7: grid[5,7]=0 — column 7's clue 1 forbids more mercury in this column"
 
 [[step]]
 op = "deduce"
-lit = "grid[7,5]=0"
+lit = "grid[5,7]=0"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[8,5]=1"
-title = "Col 5.8: grid[8,5]=1 — col 5 backflow (clue 8 — 8 cells must be mercury)"
+lit = "grid[5,8]=1"
+title = "Row 5.8: grid[5,8]=1 — row 5 backflow (clue 8 — 8 cells must be mercury)"
 
 [[step]]
 op = "deduce"
-lit = "grid[8,5]=1"
+lit = "grid[5,8]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[9,5]=1"
-title = "Col 5.9: grid[9,5]=1 — col 5 backflow"
+lit = "grid[5,9]=1"
+title = "Row 5.9: grid[5,9]=1 — row 5 backflow"
 
 [[step]]
 op = "deduce"
-lit = "grid[9,5]=1"
+lit = "grid[5,9]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[6,5]=1"
-title = "Col 5.10: grid[6,5]=1 — col 5 backflow"
+lit = "grid[5,6]=1"
+title = "Row 5.10: grid[5,6]=1 — row 5 backflow"
 
 [[step]]
 op = "deduce"
-lit = "grid[6,5]=1"
+lit = "grid[5,6]=1"
 
 [[step]]
 op = "heatmap"
-title = "Column 5 fully resolved (8 mercury, 2 empty)"
+title = "Row 5 fully resolved (8 mercury, 2 empty)"
 
 # =====================================================================
 # Rule 5 — "Thermometers filled from circle".  Once a non-circle cell
 # of a thermometer is known mercury, the thermometer's filled cells
-# extend toward the circle.  After col 5 is resolved, two thermometers
-# have a known-mercury non-circle cell that propagates into col 6:
-#   therm 15: (8,5) is pos 2, mercury → (8,6) (its circle) is mercury.
-#   therm 16: (9,5) is pos 2, mercury → (9,6) (its circle) is mercury.
+# extend toward the circle.  After row 5 is resolved, two thermometers
+# have a known-mercury non-circle cell that propagates into row 6:
+#   therm 15: (5,8) is pos 2, mercury → (6,8) (its circle) is mercury.
+#   therm 16: (5,9) is pos 2, mercury → (6,9) (its circle) is mercury.
 # =====================================================================
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[8,6]=1"
-title = "Rule 5: grid[8,6]=1 — fluid in therm 15 fills toward the circle, given (8,5) is mercury"
+lit = "grid[6,8]=1"
+title = "Rule 5: grid[6,8]=1 — fluid in therm 15 fills toward the circle, given (5,8) is mercury"
 
 [[step]]
 op = "deduce"
-lit = "grid[8,6]=1"
+lit = "grid[6,8]=1"
 
 [[step]]
 op = "show_smallest_muses"
-lit = "grid[9,6]=1"
-title = "Rule 5: grid[9,6]=1 — fluid in therm 16 fills toward the circle, given (9,5) is mercury"
+lit = "grid[6,9]=1"
+title = "Rule 5: grid[6,9]=1 — fluid in therm 16 fills toward the circle, given (5,9) is mercury"
 
 [[step]]
 op = "deduce"
-lit = "grid[9,6]=1"
+lit = "grid[6,9]=1"
 
 [[step]]
 op = "heatmap"
