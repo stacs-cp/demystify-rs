@@ -45,11 +45,21 @@ find      field  : matrix indexed by [RANGE, RANGE] of RANGE
 
 $ -------- Reified variables -----------------------------
 
-$#CON col_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same column"
-find col_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
-
+$ row_alldiff[i,j1,j2,d]: cells (i,j1),(i,j2) of row i are not both d.
 $#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"
 find row_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
+
+$ col_alldiff[j,i1,i2,d]: cells (i1,j),(i2,j) of column j are not both d.
+$#CON col_alldiff "cells ({{index[1]}},{{index[0]}}) and ({{index[2]}},{{index[0]}}) cannot both be {{index[3]}} as they are in the same column"
+find col_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
+
+$ As in the Sudoku models, AllDifferent is the pairwise constraints above
+$ plus "each value appears" constraints (paper, Section 4.3).
+$#CON row_contains "Row {{index[0]}} must contain a {{index[1]}}"
+find row_contains: matrix indexed by [RANGE,RANGE] of bool
+
+$#CON col_contains "Column {{index[0]}} must contain a {{index[1]}}"
+find col_contains: matrix indexed by [RANGE,RANGE] of bool
 
 
 $#CON clues_left_on "the count for {{['left','top','right','bottom'] | nth(n=(index[0]-1))}} {{index[1]}} is {{params['side_labels'][index[0]][index[1]]}}"
@@ -79,15 +89,18 @@ $ port over hints grid to final solution
         forAll col : RANGE .
 	 		((GRID[row,col] > 0) -> (field[row,col] = GRID[row,col])),
 
-$ all columns have to be different
+$ all cells in a row have to be different
 forAll i:RANGE.
     forAll j1,j2:RANGE. j1 < j2 ->
-        forAll d:RANGE. col_alldiff[i,j1,j2,d] -> !(field[i,j1] = d /\ field[i,j2]=d),
+        forAll d:RANGE. row_alldiff[i,j1,j2,d] -> !(field[i,j1] = d /\ field[i,j2]=d),
 
-$ all rows have to be different
+$ all cells in a column have to be different
 forAll j:RANGE.
     forAll i1,i2:RANGE. i1 < i2 ->
-        forAll d:RANGE. row_alldiff[j,i1,i2,d] -> !(field[i1,j] = d /\ field[i2,j]=d),
+        forAll d:RANGE. col_alldiff[j,i1,i2,d] -> !(field[i1,j] = d /\ field[i2,j]=d),
+
+forAll i, d : RANGE. row_contains[i,d] -> exists j : RANGE. field[i,j] = d,
+forAll j, d : RANGE. col_contains[j,d] -> exists i : RANGE. field[i,j] = d,
 
 forAll row, col: RANGE .
     variant_fields[1,row,col] = field[row,col] /\
