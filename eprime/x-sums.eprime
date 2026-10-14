@@ -60,11 +60,13 @@ find variant_fields : matrix indexed by [int(1..4),RANGE,RANGE] of RANGE
 $ all the reasoning
 $ -----------------
 
-$#CON col_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same column"
-find col_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
-
+$ row_alldiff[i,j1,j2,d]: cells (i,j1),(i,j2) of row i are not both d.
 $#CON row_alldiff "cells ({{index[0]}},{{index[1]}}) and ({{index[0]}},{{index[2]}}) cannot both be {{index[3]}} as they are in the same row"
 find row_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
+
+$ col_alldiff[j,i1,i2,d]: cells (i1,j),(i2,j) of column j are not both d.
+$#CON col_alldiff "cells ({{index[1]}},{{index[0]}}) and ({{index[2]}},{{index[0]}}) cannot both be {{index[3]}} as they are in the same column"
+find col_alldiff: matrix indexed by [RANGE,RANGE,RANGE,RANGE] of bool
 
 $#CON alldiff_box "box {{index[0]}} must have all different elements"
 find alldiff_box : matrix indexed by [int(1..9)] of bool
@@ -105,15 +107,15 @@ forAll i : int(1..4) .
 
 $$ Normal sudoku constraints
 
-$ columns
+$ rows
 forAll i:RANGE.
     forAll j1,j2:RANGE. j1 < j2 ->
-        forAll d:RANGE. col_alldiff[i,j1,j2,d] -> !(field[i,j1] = d /\ field[i,j2]=d),
+        forAll d:RANGE. row_alldiff[i,j1,j2,d] -> !(field[i,j1] = d /\ field[i,j2]=d),
 
-$ rows
+$ columns
 forAll j:RANGE.
     forAll i1,i2:RANGE. i1 < i2 ->
-        forAll d:RANGE. row_alldiff[j,i1,i2,d] -> !(field[i1,j] = d /\ field[i2,j]=d),
+        forAll d:RANGE. col_alldiff[j,i1,i2,d] -> !(field[i1,j] = d /\ field[i2,j]=d),
 
 $ 3x3 boxes
 forAll i,j: int(0..2) .
