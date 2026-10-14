@@ -836,7 +836,9 @@ impl PuzzlePlanner {
         if varlits.is_empty() {
             return vec![];
         }
-        let found = self.psolve.get_muses_up_to(&varlits, target);
+        let found = self
+            .psolve
+            .get_muses_up_to(&varlits, target, &self.config.mus_config);
         let muses: Vec<MusContext> = found
             .into_iter()
             .map(|(lit, mus)| MusContext::new(lit, mus.into_iter().collect()))

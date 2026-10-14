@@ -179,6 +179,26 @@ struct Opt {
     #[arg(
         long,
         value_delimiter = ',',
+        value_name = "START,ADD_BACK",
+        help = "Experimental: slice MUS search first drops fraction START of the constraints, then while the rest cannot prove the literal adds back fraction ADD_BACK of those dropped (e.g. 0.9,0.5)"
+    )]
+    slice_backoff: Option<Vec<f64>>,
+
+    #[arg(
+        long,
+        help = "Experimental: shuffle each core before greedy minimisation in slice MUS search"
+    )]
+    shuffle_core: bool,
+
+    #[arg(
+        long,
+        help = "Experimental: seed every slice/cake MUS search from this seed, the literal and the repeat index"
+    )]
+    mus_seed: Option<u64>,
+
+    #[arg(
+        long,
+        value_delimiter = ',',
         help = "Enable logging targets on stderr (comma-separated). Available: progress, cores, solver, planner, solve, parser"
     )]
     log: Vec<String>,
@@ -356,6 +376,15 @@ fn main() -> anyhow::Result<()> {
         if opt.all_muses {
             cfg.find_one = false;
         }
+        if let Some(b) = &opt.slice_backoff {
+            assert_eq!(b.len(), 2, "--slice-backoff takes START,ADD_BACK");
+            cfg.slice_backoff = Some(demystify::problem::solver::SliceBackoff {
+                start: b[0],
+                add_back: b[1],
+            });
+        }
+        cfg.shuffle_core = opt.shuffle_core;
+        cfg.seed = opt.mus_seed;
         cfg
     };
 

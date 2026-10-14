@@ -8,6 +8,8 @@
 /// usage is O(1) regardless of how many solves are performed in a process.
 use std::sync::Mutex;
 
+use serde::Serialize;
+
 use crate::time::{Duration, Instant};
 
 /// Which MUS-finding function was called.
@@ -518,6 +520,45 @@ pub fn reset_mus_stats() {
     if let Ok(mut stats) = MUS_STATS.lock() {
         *stats = MUS_STATS_ZERO.clone();
     }
+}
+
+/// Snapshot of MUS search outcome counts, summed over all functions:
+/// `(searches, found, not_found, timeout)`.
+pub fn mus_outcome_snapshot() -> (usize, usize, usize, usize) {
+    let stats = MUS_STATS.lock().unwrap();
+    stats.per_func.iter().fold((0, 0, 0, 0), |acc, f| {
+        (
+            acc.0 + f.total,
+            acc.1 + f.n_found,
+            acc.2 + f.n_notfound,
+            acc.3 + f.n_timeout,
+        )
+    })
+}
+
+/// One slice search run with [`crate::problem::solver::SliceBackoff`].
+#[derive(Debug, Clone, Serialize)]
+pub struct BackoffRecord {
+    /// Fraction of the constraints dropped by the search that ended the loop.
+    pub drop_fraction: f64,
+    /// SAT checks made by the back-off loop (excluding minimisation).
+    pub checks: u32,
+    /// The loop reached the ordinary slice drop and fell through to it.
+    pub fell_through: bool,
+    /// Size of the MUS returned, if any (`None` also covers a timeout).
+    pub found: Option<usize>,
+}
+
+static BACKOFF_RECORDS: Mutex<Vec<BackoffRecord>> = Mutex::new(Vec::new());
+
+/// Record a back-off slice search.
+pub fn record_backoff(record: BackoffRecord) {
+    BACKOFF_RECORDS.lock().unwrap().push(record);
+}
+
+/// Remove and return every recorded back-off search.
+pub fn take_backoff_records() -> Vec<BackoffRecord> {
+    std::mem::take(&mut *BACKOFF_RECORDS.lock().unwrap())
 }
 
 /// Print a summary of the current MUS stats to stderr.

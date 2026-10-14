@@ -848,7 +848,24 @@ impl SatCore {
         max_size: Option<i64>,
         work_mult: f64,
     ) -> SearchResult<Option<Vec<Lit>>> {
+        self.greedy_minimise_shuffled(initial_core, max_size, work_mult, None)
+    }
+
+    /// [`Self::greedy_minimise`], but if `shuffle` is given, every core is
+    /// shuffled before it is grouped or scanned, so neither the bulk-shrink
+    /// grouping nor the deletion order follows the solver's core order.
+    fn greedy_minimise_shuffled(
+        &self,
+        initial_core: Vec<Lit>,
+        max_size: Option<i64>,
+        work_mult: f64,
+        mut shuffle: Option<&mut dyn rand::Rng>,
+    ) -> SearchResult<Option<Vec<Lit>>> {
+        use rand::seq::SliceRandom;
         let mut core = initial_core;
+        if let Some(rng) = shuffle.as_deref_mut() {
+            core.shuffle(rng);
+        }
 
         // Bulk shrinking: partition the core into max_size+1 groups and
         // greedily drop the first group whose removal keeps UNSAT.
@@ -874,6 +891,9 @@ impl SatCore {
                             "bulk shrink: {} -> {} (group {}/{})",
                             core.len(), found.len(), i, num_groups);
                         core = found;
+                        if let Some(rng) = shuffle.as_deref_mut() {
+                            core.shuffle(rng);
+                        }
                         shrank = true;
                         break;
                     }
@@ -964,6 +984,21 @@ impl SatCore {
         self.greedy_minimise(core, None, 0.0)
             .expect("minimise_us_no_limit: unlimited solve was interrupted")
             .expect("minimise_us_no_limit: unbounded greedy_minimise must return a MUS")
+    }
+
+    /// Greedily minimise `core`, an unsatisfiable core already obtained (for
+    /// example from [`Self::assumption_solve_with_core`]) under `known`.  As
+    /// [`Self::quick_mus`] after its core call; `shuffle` as in
+    /// `greedy_minimise_shuffled`.
+    pub fn minimise_found_core(
+        &self,
+        known: &[Lit],
+        core: Vec<Lit>,
+        max_size: Option<i64>,
+        shuffle: Option<&mut dyn rand::Rng>,
+    ) -> SearchResult<Option<Vec<Lit>>> {
+        self.fix_values(known);
+        self.greedy_minimise_shuffled(core, max_size, 1.0, shuffle)
     }
 
     /// Finds a minimal unsatisfiable subset (MUS) of literals given a set of known literals.

@@ -60,6 +60,38 @@ pub struct MusConfig {
     /// alternative explanations of different sizes. Has no effect on search order.
     pub keep_all_muses: bool,
     pub strategy: Strategy,
+    /// Slice search: start by dropping a large fraction of the constraints and
+    /// add some back until the rest proves the literal.  `None` = fixed drop.
+    #[serde(default)]
+    pub slice_backoff: Option<SliceBackoff>,
+    /// Slice search: shuffle each core before greedy minimisation.
+    #[serde(default)]
+    pub shuffle_core: bool,
+    /// `find_bigger`: searches are bounded at the core-derived size plus this.
+    #[serde(default = "default_find_bigger_slack")]
+    pub find_bigger_slack: i64,
+    /// `find_bigger`: keep doubling the bound after the first pass.
+    #[serde(default = "default_true")]
+    pub find_bigger_grow: bool,
+    /// Seed each slice search from `(seed, lit, repeat)`.  `None` = thread RNG.
+    #[serde(default)]
+    pub seed: Option<u64>,
+}
+
+/// See [`MusConfig::slice_backoff`].  Drop `start` of the constraints; while
+/// the remainder cannot prove the literal, add back `add_back` of those dropped.
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SliceBackoff {
+    pub start: f64,
+    pub add_back: f64,
+}
+
+fn default_find_bigger_slack() -> i64 {
+    9
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for MusConfig {
@@ -73,6 +105,11 @@ impl Default for MusConfig {
             find_one: true,
             keep_all_muses: false,
             strategy: Strategy::default(),
+            slice_backoff: None,
+            shuffle_core: false,
+            find_bigger_slack: default_find_bigger_slack(),
+            find_bigger_grow: true,
+            seed: None,
         }
     }
 }
@@ -89,6 +126,11 @@ impl MusConfig {
             find_one: true,
             keep_all_muses: false,
             strategy: Strategy::default(),
+            slice_backoff: None,
+            shuffle_core: false,
+            find_bigger_slack: default_find_bigger_slack(),
+            find_bigger_grow: true,
+            seed: None,
         }
     }
 }
@@ -131,6 +173,13 @@ fn collect_assignment_leaves(
              got `{other}` at `{name}{indices:?}`"
         ),
     }
+}
+
+fn splitmix64(x: u64) -> u64 {
+    let mut z = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 /// Per-thread `SatCore` cache.  Wrapped so `PuzzleSolver` can derive
@@ -1245,6 +1294,18 @@ impl PuzzleSolver {
         lit: Lit,
         max_size: Option<i64>,
     ) -> SearchResult<Option<Vec<Lit>>> {
+        self.get_var_mus_slice_with(lit, max_size, &MusConfig::default(), &mut rand::rng())
+    }
+
+    /// Slice search honouring `config.slice_backoff` and `config.shuffle_core`,
+    /// drawing all randomness from `rng`.
+    pub fn get_var_mus_slice_with(
+        &self,
+        lit: Lit,
+        max_size: Option<i64>,
+        config: &MusConfig,
+        rng: &mut dyn rand::Rng,
+    ) -> SearchResult<Option<Vec<Lit>>> {
         // let _t = QuickTimer::new(format!("get_var_mus_quick {:?}", lit));
         assert!(self.puzzleparse.var_lits.positive().contains(&lit));
 
@@ -1258,7 +1319,7 @@ impl PuzzleSolver {
             .copied()
             .collect_vec();
 
-        conset.shuffle(&mut rand::rng());
+        conset.shuffle(rng);
 
         // This code tries to deduce how many elements we can drop from 'conset', such that
         // we will still have an 80% chance of leaving a MUS of size 'max_size'.
@@ -1281,12 +1342,36 @@ impl PuzzleSolver {
 
         info!(target: "solver", "trimming {} from {} because max_size = {:?}", trims, conset.len(), max_size);
 
+        if let Some(backoff) = config.slice_backoff {
+            return self.slice_backoff(
+                lit,
+                max_size,
+                config,
+                rng,
+                &conset,
+                trims as usize,
+                backoff,
+            );
+        }
+
         lits.extend(conset.into_iter().skip(trims as usize));
 
         lits.push(!lit);
-        let mus = self
-            .get_satcore()
-            .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1))?;
+        let mus = if config.shuffle_core {
+            let satcore = self.get_satcore();
+            match satcore.assumption_solve_with_core(&self.knownlits, &lits)? {
+                None => None,
+                Some(core) => satcore.minimise_found_core(
+                    &self.knownlits,
+                    core,
+                    max_size.map(|x| x + 1),
+                    Some(rng),
+                )?,
+            }
+        } else {
+            self.get_satcore()
+                .quick_mus(&self.knownlits, &lits, max_size.map(|x| x + 1))?
+        };
         Ok(mus.map(|m| {
             m.into_iter()
                 .filter(|x| self.puzzleparse.constraints.lits().contains(x))
@@ -1294,19 +1379,114 @@ impl PuzzleSolver {
         }))
     }
 
+    /// The back-off part of [`Self::get_var_mus_slice_with`].  `conset` is
+    /// already shuffled; dropping its first `d` elements is "drop `d`".  Starts
+    /// at `d = start·N` and, while the rest cannot prove `lit`, adds back
+    /// `add_back` of the dropped constraints, never going below `min_drop`
+    /// (the ordinary slice drop).  The first remainder that proves `lit` has
+    /// its core minimised exactly as the ordinary slice search would.
+    ///
+    /// The SAT check is an explicit core call, not `quick_mus`, which also
+    /// returns `None` when minimisation exceeds the bound.  A conflict-limit
+    /// interrupt in a check ends the search with `Err`, never counts as SAT.
+    #[allow(clippy::too_many_arguments)]
+    fn slice_backoff(
+        &self,
+        lit: Lit,
+        max_size: Option<i64>,
+        config: &MusConfig,
+        rng: &mut dyn rand::Rng,
+        conset: &[Lit],
+        min_drop: usize,
+        backoff: SliceBackoff,
+    ) -> SearchResult<Option<Vec<Lit>>> {
+        assert!(
+            backoff.start > 0.0 && backoff.start <= 1.0,
+            "slice_backoff start must be in (0, 1], got {}",
+            backoff.start
+        );
+        assert!(
+            backoff.add_back > 0.0 && backoff.add_back < 1.0,
+            "slice_backoff add_back must be in (0, 1), got {}",
+            backoff.add_back
+        );
+        let n = conset.len();
+        assert!(min_drop <= n);
+        let satcore = self.get_satcore();
+        let mut drop = ((backoff.start * n as f64) as usize).clamp(min_drop, n);
+        let mut checks = 0u32;
+        let record = |drop: usize, checks: u32, fell_through: bool, found: Option<usize>| {
+            crate::stats::record_backoff(crate::stats::BackoffRecord {
+                drop_fraction: if n == 0 { 0.0 } else { drop as f64 / n as f64 },
+                checks,
+                fell_through,
+                found,
+            });
+        };
+        loop {
+            let mut lits: Vec<Lit> = conset[drop..].to_vec();
+            lits.push(!lit);
+            checks += 1;
+            let core = match satcore.assumption_solve_with_core(&self.knownlits, &lits) {
+                Ok(c) => c,
+                Err(e) => {
+                    record(drop, checks, drop == min_drop, None);
+                    return Err(e);
+                }
+            };
+            match core {
+                Some(core) => {
+                    let shuffle: Option<&mut dyn rand::Rng> =
+                        if config.shuffle_core { Some(rng) } else { None };
+                    let mus = satcore.minimise_found_core(
+                        &self.knownlits,
+                        core,
+                        max_size.map(|x| x + 1),
+                        shuffle,
+                    );
+                    let mus: Option<Vec<Lit>> = match mus {
+                        Ok(m) => m.map(|m| {
+                            m.into_iter()
+                                .filter(|x| self.puzzleparse.constraints.lits().contains(x))
+                                .collect()
+                        }),
+                        Err(e) => {
+                            record(drop, checks, drop == min_drop, None);
+                            return Err(e);
+                        }
+                    };
+                    record(drop, checks, drop == min_drop, mus.as_ref().map(Vec::len));
+                    return Ok(mus);
+                }
+                None if drop == min_drop => {
+                    // The ordinary slice drop leaves too little to prove `lit`:
+                    // exactly what the ordinary search would have found.
+                    record(drop, checks, true, None);
+                    return Ok(None);
+                }
+                None => {
+                    let add = ((drop as f64 * backoff.add_back) as usize).max(1);
+                    drop = drop.saturating_sub(add).max(min_drop);
+                }
+            }
+        }
+    }
+
     fn search_one_mus(
         &self,
         lit: Lit,
         mus_test_size: i64,
         strategy: Strategy,
+        config: &MusConfig,
+        rng: &mut dyn rand::Rng,
     ) -> (SearchResult<Option<Vec<Lit>>>, crate::stats::MusFunction) {
         match strategy {
             Strategy::Slice => (
-                self.get_var_mus_slice(lit, Some(mus_test_size)),
+                self.get_var_mus_slice_with(lit, Some(mus_test_size), config, rng),
                 crate::stats::MusFunction::Slice,
             ),
             Strategy::Cake => (
-                self.get_var_mus_cake(lit, mus_test_size),
+                self.get_var_mus_cake_with(lit, mus_test_size, rng),
                 crate::stats::MusFunction::Cake,
             ),
             Strategy::Quick => (
@@ -1316,12 +1496,12 @@ impl PuzzleSolver {
             Strategy::Dynamic => {
                 if mus_test_size < 5 {
                     (
-                        self.get_var_mus_cake(lit, mus_test_size),
+                        self.get_var_mus_cake_with(lit, mus_test_size, rng),
                         crate::stats::MusFunction::Cake,
                     )
                 } else {
                     (
-                        self.get_var_mus_slice(lit, Some(mus_test_size)),
+                        self.get_var_mus_slice_with(lit, Some(mus_test_size), config, rng),
                         crate::stats::MusFunction::Slice,
                     )
                 }
@@ -1329,7 +1509,43 @@ impl PuzzleSolver {
         }
     }
 
+    /// Run `f` with the RNG for one MUS search: the thread RNG, or with
+    /// `config.seed` set, a generator seeded from `(seed, lit, phase, repeat)`
+    /// so results do not depend on rayon's scheduling.
+    fn with_search_rng<T>(
+        config: &MusConfig,
+        lit: Lit,
+        phase: u64,
+        repeat: u64,
+        f: impl FnOnce(&mut dyn rand::Rng) -> T,
+    ) -> T {
+        match config.seed {
+            None => f(&mut rand::rng()),
+            Some(seed) => {
+                let mut h = seed;
+                for v in [
+                    u64::from(lit.to_ipasir().unsigned_abs()),
+                    u64::from(lit.is_neg()),
+                    phase,
+                    repeat,
+                ] {
+                    h = splitmix64(h ^ v);
+                }
+                f(&mut ChaCha20Rng::seed_from_u64(h))
+            }
+        }
+    }
+
     pub fn get_var_mus_cake(&self, lit: Lit, max_size: i64) -> SearchResult<Option<Vec<Lit>>> {
+        self.get_var_mus_cake_with(lit, max_size, &mut rand::rng())
+    }
+
+    pub fn get_var_mus_cake_with(
+        &self,
+        lit: Lit,
+        max_size: i64,
+        rng: &mut dyn rand::Rng,
+    ) -> SearchResult<Option<Vec<Lit>>> {
         assert!(self.puzzleparse.var_lits.positive().contains(&lit));
 
         let mut conset = self
@@ -1340,7 +1556,7 @@ impl PuzzleSolver {
             .copied()
             .collect_vec();
 
-        conset.shuffle(&mut rand::rng());
+        conset.shuffle(rng);
 
         let num_groups = max_size as usize + 1;
         let conset_chunks: Vec<Vec<Lit>> = (0..num_groups)
@@ -1498,11 +1714,18 @@ impl PuzzleSolver {
     /// currently explain within the bound — so the caller can clear the whole
     /// backlog at the current size in one search instead of re-paying the tight
     /// smallest-MUS search per size.
-    pub fn get_muses_up_to(&self, lits: &BTreeSet<Lit>, target: i64) -> Vec<(Lit, Vec<Lit>)> {
+    pub fn get_muses_up_to(
+        &self,
+        lits: &BTreeSet<Lit>,
+        target: i64,
+        config: &MusConfig,
+    ) -> Vec<(Lit, Vec<Lit>)> {
         lits.par_iter()
             .filter_map(|&x| {
                 let t0 = Instant::now();
-                let (ret, func) = self.search_one_mus(x, target, Strategy::default());
+                let (ret, func) = Self::with_search_rng(config, x, 0, 0, |rng| {
+                    self.search_one_mus(x, target, Strategy::default(), config, rng)
+                });
                 let elapsed = t0.elapsed();
                 let outcome = match &ret {
                     Ok(Some(m)) => crate::stats::MusOutcome::Found(m.len()),
@@ -1742,11 +1965,11 @@ impl PuzzleSolver {
 
         let search_t0 = Instant::now();
         lits.iter()
-            .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
+            .flat_map(|&x| (0..config.repeats as u64).map(move |r| (x, r)))
             .par_bridge()
-            .for_each(|x| {
+            .for_each(|(x, repeat)| {
                 let mus_test_size = if config.find_bigger {
-                    mus_size + 9
+                    mus_size + config.find_bigger_slack
                 } else if NO_SHARED_BOUND.load(std::sync::atomic::Ordering::Relaxed) {
                     mus_size
                 } else {
@@ -1765,7 +1988,9 @@ impl PuzzleSolver {
                 }
 
                 let t0 = Instant::now();
-                let (ret, func) = self.search_one_mus(x, mus_test_size, config.strategy);
+                let (ret, func) = Self::with_search_rng(config, x, 1, repeat, |rng| {
+                    self.search_one_mus(x, mus_test_size, config.strategy, config, rng)
+                });
                 let elapsed = t0.elapsed();
                 let outcome = match &ret {
                     Ok(Some(mus)) => crate::stats::MusOutcome::Found(mus.len()),
@@ -1789,7 +2014,7 @@ impl PuzzleSolver {
             });
         info!(target: "musdetail", "main search done {:.1?}", search_t0.elapsed());
 
-        if config.find_bigger {
+        if config.find_bigger && config.find_bigger_grow {
             // find_bigger needs to keep growing beyond the initial core bound.
             let mus_min = md.lock().unwrap().min_filtered(lits);
             let met_target = mus_min.is_some_and(|m| (m as i64) * 3 + 3 <= mus_size);
@@ -1798,13 +2023,26 @@ impl PuzzleSolver {
                 while grow_size <= i64::from(i32::MAX) {
                     info!(target: "solver", "find_bigger: scanning at size {}", grow_size);
                     lits.iter()
-                        .flat_map(|&x| std::iter::repeat_n(x, config.repeats as usize))
+                        .flat_map(|&x| (0..config.repeats as u64).map(move |r| (x, r)))
                         .par_bridge()
-                        .for_each(|x| {
-                            let mus_test_size = grow_size + 9;
+                        .for_each(|(x, repeat)| {
+                            let mus_test_size = grow_size + config.find_bigger_slack;
                             let t0 = Instant::now();
-                            let (ret, func) =
-                                self.search_one_mus(x, mus_test_size, config.strategy);
+                            let (ret, func) = Self::with_search_rng(
+                                config,
+                                x,
+                                grow_size as u64 + 2,
+                                repeat,
+                                |rng| {
+                                    self.search_one_mus(
+                                        x,
+                                        mus_test_size,
+                                        config.strategy,
+                                        config,
+                                        rng,
+                                    )
+                                },
+                            );
                             let elapsed = t0.elapsed();
                             let outcome = match &ret {
                                 Ok(Some(mus)) => crate::stats::MusOutcome::Found(mus.len()),
@@ -1863,6 +2101,19 @@ mod tests {
 
     use rand::SeedableRng;
     use test_log::test;
+
+    #[test]
+    fn test_mus_config_reads_json_without_new_knobs() {
+        let old = r#"{"base_size_mus":2,"mus_add_step":1,"mus_mult_step":2,"repeats":2,
+            "find_bigger":false,"find_one":true,"keep_all_muses":false,"strategy":"Dynamic"}"#;
+        let c: MusConfig = serde_json::from_str(old).unwrap();
+        let d = MusConfig::default();
+        assert!(c.slice_backoff.is_none() && !c.shuffle_core && c.seed.is_none());
+        assert_eq!(c.find_bigger_slack, d.find_bigger_slack);
+        assert_eq!(c.find_bigger_grow, d.find_bigger_grow);
+        assert_eq!(d.find_bigger_slack, 9);
+        assert!(d.find_bigger_grow);
+    }
 
     /// Regression target for the `deterministic` feature: the same input must
     /// produce a byte-identical `MusDict` across runs. Disabled without the
