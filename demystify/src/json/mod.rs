@@ -243,7 +243,7 @@ pub struct Puzzle {
     pub region_tint: Option<Vec<Vec<Option<i64>>>>,
     /// Border labels on each side. Outer vec is layer depth (0 = furthest from grid for
     /// top/left, 0 = nearest grid for bottom/right). Inner vec runs along the side
-    /// (row index for top/bottom_labels, col index for left/right_labels). Depth-1 layer
+    /// (column index for top/bottom_labels, row index for left/right_labels). Depth-1 layer
     /// vectors cover the single-number case (Kakurasu, Skyscrapers). Multi-layer is used
     /// for Nonogram clue lists.
     pub top_labels: Option<Vec<Vec<String>>>,
@@ -407,7 +407,7 @@ impl Puzzle {
         let mut less_than = None;
         let mut cage_sums = None;
 
-        // Thermometer paths.  Decoder: therms_raw[col][row] = therm_id * step
+        // Thermometer paths.  Decoder: therms_raw[row][col] = therm_id * step
         // + position.  The directive carries both the therms matrix name
         // and the name of the scalar `step` integer.
         if let Some(d) = show
@@ -419,10 +419,10 @@ impl Puzzle {
             };
             let step = read_scalar_i64(problem, known, step_name)?;
             let therms_raw = read_2d_i64(problem, known, &d.var)?;
-            // therms_raw[col_0][row_0] (0-indexed), outer index = col, inner index = row.
+            // therms_raw[row_0][col_0] (0-indexed), like every other grid.
             let mut therm_paths: BTreeMap<i64, BTreeMap<i64, [i64; 2]>> = BTreeMap::new();
-            for (col_0, col_data) in therms_raw.iter().enumerate() {
-                for (row_0, &val) in col_data.iter().enumerate() {
+            for (row_0, row_data) in therms_raw.iter().enumerate() {
+                for (col_0, &val) in row_data.iter().enumerate() {
                     if val == 0 {
                         continue;
                     }

@@ -12,8 +12,8 @@
 # (NB: until 2026-10-11 the param was the page puzzle transposed; it
 # now matches the page, whose column 2 has the all-mercury clue 10.)
 #
-# The model indexes therms[X,Y] as [column, row], so each inner array
-# of the param's therms matrix is one column read top-to-bottom.  In
+# The model indexes therms and grid as [row, column], so each inner
+# array of the param's therms matrix is one row of the page.  In
 # `grid[R,C]` lits, R is the row, C the column, as on the page.
 #
 # Relevant therms for the demos below:

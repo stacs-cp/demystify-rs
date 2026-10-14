@@ -2849,8 +2849,8 @@ mod tests {
             .tempfile_in(".")
             .unwrap();
         writeln!(temp_file, "$#VAR grid").unwrap();
-        writeln!(temp_file, "$#SHOW row_clues edge top").unwrap();
-        writeln!(temp_file, "$#SHOW col_clues edge left").unwrap();
+        writeln!(temp_file, "$#SHOW col_clues edge top").unwrap();
+        writeln!(temp_file, "$#SHOW row_clues edge left").unwrap();
 
         let path = temp_file.path().to_path_buf();
         let parsed = super::parse_eprime_file(&path).expect("parse should succeed");

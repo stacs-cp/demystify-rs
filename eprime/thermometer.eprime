@@ -7,10 +7,12 @@ letting X be int(1..width)
 letting Y be int(1..height)
 
 $#SHOW therms thermometers step
-given therms: matrix indexed by [X,Y] of int(0..step*thermcount)
-$#SHOW row_sums edge top
+$ therms[r,c] = thermometer id * step + position along it (0 = no thermometer),
+$ indexed [row, column] like grid.
+given therms: matrix indexed by [Y,X] of int(0..step*thermcount)
+$#SHOW row_sums edge left
 given row_sums: matrix indexed by [Y] of int
-$#SHOW col_sums edge left
+$#SHOW col_sums edge top
 given col_sums: matrix indexed by [X] of int
 
 $#VAR grid
@@ -51,13 +53,13 @@ $ todo: This is a lot of pain for savile row
 forAll f:int(0..thermcount-1).
 fluid[f] ->
 (
-    forAll i1: X. forAll j1: Y.
+    forAll r1: Y. forAll c1: X.
     (
-        (therms[i1,j1]/step = f) ->
-        forAll i2: X. forAll j2: Y.
+        (therms[r1,c1]/step = f) ->
+        forAll r2: Y. forAll c2: X.
         (
-            (therms[i2,j2]/step = f /\ therms[i1,j1]+1=therms[i2,j2])
-            -> (grid[j2,i2] -> grid[j1,i1])
+            (therms[r2,c2]/step = f /\ therms[r1,c1]+1=therms[r2,c2])
+            -> (grid[r2,c2] -> grid[r1,c1])
         )
     )
 )

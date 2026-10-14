@@ -286,10 +286,11 @@ impl PuzzleDraw {
     /// box `(min_x, min_y, max_x, max_y)` of the grid *and* its labels, in cell
     /// units, so the caller can size the `viewBox`.
     ///
-    /// Label placement preserves the existing (transposed) side convention:
-    /// `top_labels` render to the left of the grid, `bottom_labels` to the
-    /// right, `left_labels` above and `right_labels` below — the puzzle pipeline
-    /// feeds them in that transposed order.
+    /// Each side's labels render on that side: `top_labels` above the grid
+    /// (one per column), `bottom_labels` below it, `left_labels` to its left
+    /// (one per row) and `right_labels` to its right.  Layers stack outwards
+    /// from the grid in index order on the bottom and right; on the top and
+    /// left, layer 0 is the furthest from the grid.
     fn fill_outside_labels(
         &self,
         geom: &dyn Geometry,
@@ -318,10 +319,10 @@ impl PuzzleDraw {
         // (total_layers L, layer index, along-side index i) → (row, col).
         let pos = |side: usize, l: i64, layer: i64, i: i64| -> (i64, i64) {
             match side {
-                0 => (i, -(l - layer)),     // top_labels
-                1 => (i, p.height + layer), // bottom_labels
-                2 => (-(l - layer), i),     // left_labels
-                _ => (p.width + layer, i),  // right_labels
+                0 => (-(l - layer), i),     // top_labels
+                1 => (p.height + layer, i), // bottom_labels
+                2 => (i, -(l - layer)),     // left_labels
+                _ => (i, p.width + layer),  // right_labels
             }
         };
 
@@ -1270,9 +1271,55 @@ mod tests {
         Ok(())
     }
 
+    /// Each side's labels sit on that side: `top_labels[0][j]` above column j,
+    /// `left_labels[0][i]` left of row i, and so on.
+    #[test]
+    fn test_svg_edge_labels_on_their_own_side() {
+        let one = |v: &[&str]| Some(vec![v.iter().map(|s| (*s).to_string()).collect()]);
+        let puzzle = crate::json::Puzzle {
+            kind: "Kakurasu".to_string(),
+            width: 3,
+            height: 2,
+            start_grid: None,
+            solution_grid: None,
+            cages: None,
+            region_tint: None,
+            top_labels: one(&["t1", "t2", "t3"]),
+            bottom_labels: one(&["b1", "b2", "b3"]),
+            left_labels: one(&["l1", "l2"]),
+            right_labels: one(&["r1", "r2"]),
+            thermometers: None,
+            less_than: None,
+            cage_sums: None,
+            info: None,
+            constraint_classes: None,
+            decorations: vec![],
+            present: None,
+        };
+        let svg = PuzzleDraw::new("Kakurasu")
+            .draw_puzzle(&Problem {
+                puzzle,
+                state: None,
+            })
+            .to_string();
+        // Cell groups are id="C_{row+1}_{col+1}", so the row above the grid is 0
+        // and the column left of it is 0.
+        for (label, row, col) in [("t2", 0, 2), ("b3", 3, 3), ("l1", 1, 0), ("r2", 2, 4)] {
+            let id = format!("id=\"C_{row}_{col}\"");
+            let start = svg
+                .find(&id)
+                .unwrap_or_else(|| panic!("no cell group {id} for label {label}"));
+            let group = &svg[start..start + svg[start..].find("</g>").unwrap()];
+            assert!(
+                group.contains(label),
+                "label {label} is not in cell group {id}: {group}"
+            );
+        }
+    }
+
     #[test]
     fn test_svg_multilayer_labels_nonogram_5x5() -> anyhow::Result<()> {
-        // 5x5 nonogram layered labels: row clues on top_labels, col clues on left_labels.
+        // 5x5 nonogram layered labels: row clues on left_labels, col clues on top_labels.
         // Each has depth 3. Verify the renderer emits every non-empty label string.
         let puzzle = crate::json::Puzzle {
             kind: "Nonogram".to_string(),
@@ -1283,15 +1330,15 @@ mod tests {
             cages: None,
             region_tint: None,
             top_labels: Some(vec![
-                vec!["".into(), "".into(), "".into(), "".into(), "1".into()],
-                vec!["".into(), "1".into(), "3".into(), "2".into(), "1".into()],
-                vec!["5".into(), "3".into(), "1".into(), "2".into(), "1".into()],
-            ]),
-            bottom_labels: None,
-            left_labels: Some(vec![
                 vec!["".into(), "".into(), "".into(), "".into(), "".into()],
                 vec!["".into(), "".into(), "".into(), "".into(), "".into()],
                 vec!["5".into(), "1".into(), "3".into(), "2".into(), "5".into()],
+            ]),
+            bottom_labels: None,
+            left_labels: Some(vec![
+                vec!["".into(), "".into(), "".into(), "".into(), "1".into()],
+                vec!["".into(), "1".into(), "3".into(), "2".into(), "1".into()],
+                vec!["5".into(), "3".into(), "1".into(), "2".into(), "1".into()],
             ]),
             right_labels: None,
             thermometers: None,
@@ -1310,7 +1357,7 @@ mod tests {
         let svg_str = svg.to_string();
 
         // The labels group should carry one <text> element per non-empty clue.
-        // top_labels: 1 + 4 + 5 = 10 non-empty; left_labels: 0 + 0 + 5 = 5 → 15 total.
+        // left_labels: 1 + 4 + 5 = 10 non-empty; top_labels: 0 + 0 + 5 = 5 → 15 total.
         let text_count = svg_str.matches("<text").count();
         assert_eq!(
             text_count, 15,
