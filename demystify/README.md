@@ -101,3 +101,20 @@ Contributions to `demystify` are welcome. Feel free to open issues and submit pu
 ## License
 
 `demystify` is licensed under the MPL 2.0 License. See the `LICENSE.txt` file for more details.
+
+## Increasing explanation-search effort
+
+Use `--mus-repeats N` to request more randomized MUS attempts per candidate
+literal. The default is 2; `--searches N` remains a compatibility alias. This
+setting changes explanation search, not the number of threads or whole-puzzle
+solves. More attempts can discover smaller explanations and reduce variation,
+but do not certify globally minimum explanations. Tiny/core passes can settle
+a deduction before repeated searches are needed. `single-dive` does not use
+this setting. For example:
+
+```sh
+demystify --load-parsed puzzle.json --only-assign --greedy --mus-repeats 1000
+```
+
+Keep the model, constraint grouping, backend and player move policy fixed when
+comparing effort levels. Record the count with difficulty measurements.

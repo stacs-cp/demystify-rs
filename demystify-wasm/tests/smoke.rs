@@ -384,6 +384,27 @@ fn only_assignments_option_is_accepted_and_solves() {
 }
 
 #[wasm_bindgen_test]
+fn mus_repeats_option_accepts_large_counts_and_rejects_invalid_values() {
+    let puzzle = load_puzzle(LITTLE1_JSON).expect("load_puzzle");
+    let opts = serde_wasm_bindgen::to_value(
+        &serde_json::json!({ "musRepeats": 1000, "onlyAssignments": true }),
+    )
+    .unwrap();
+    let planner = WasmPlanner::new(&puzzle, opts).expect("large repeat count");
+    planner.quick_solve().expect("solve with increased effort");
+    assert!(planner.is_solved());
+    for invalid in [
+        serde_json::json!(0),
+        serde_json::json!(-1),
+        serde_json::json!(1.5),
+    ] {
+        let opts =
+            serde_wasm_bindgen::to_value(&serde_json::json!({ "musRepeats": invalid })).unwrap();
+        assert!(WasmPlanner::new(&puzzle, opts).is_err());
+    }
+}
+
+#[wasm_bindgen_test]
 fn unknown_planner_option_is_rejected() {
     // deny_unknown_fields on WasmPlannerOptions catches typos at the
     // FFI boundary instead of silently ignoring them.

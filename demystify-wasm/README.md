@@ -284,3 +284,21 @@ omits that field. `bestStep()` and `quickSolve()` retain string constraints for
 compatibility and add `constraint_details` containing text, literals, family
 and optional metadata. Native callers can use `PuzzleParse::constraint_metadata`
 with the constraint activation literal returned in `ConstraintHandle`.
+
+## Planner effort options
+
+The second constructor argument accepts `onlyAssignments` and `musRepeats`:
+
+```js
+const planner = new WasmPlanner(puzzle, {
+  onlyAssignments: true,
+  musRepeats: 1000,
+});
+```
+
+`musRepeats` is a positive integer specifying randomized MUS attempts per
+candidate literal; omitting it preserves the core default of 2. It is not a
+thread limit or a count of whole-puzzle solves. Larger counts can find smaller
+explanations, but are not a minimum-cardinality certificate. Unknown options,
+zero, negative and fractional counts are rejected. This option is available in
+new builds; older vendored bindings reject it rather than silently ignoring it.

@@ -12,7 +12,7 @@ use wasm_bindgen::prelude::*;
 
 use demystify::problem::{
     PuzLit, PuzVar, VarValPair, format_puzlit, format_puzvar,
-    planner::PuzzlePlanner,
+    planner::{PlannerConfig, PuzzlePlanner},
     solver::{PuzzleSolver, SolverConfig},
 };
 
@@ -36,10 +36,13 @@ fn explanation_to_js<T: Serialize>(value: &T) -> Result<JsValue, serde_wasm_bind
 /// - `onlyAssignments`: mirrors the CLI's `--only-assign`.  When true, the
 ///   planner only targets positive value-assignment lits — `=v` puzlits —
 ///   and never tries individual `!=v` deductions.
+/// - `musRepeats`: positive randomized MUS attempts per candidate literal.
+///   Omit to keep the core default (2). This is not a thread or whole-solve count.
 #[derive(serde::Deserialize, Default)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 struct WasmPlannerOptions {
     only_assignments: bool,
+    mus_repeats: Option<u32>,
 }
 
 impl WasmPlannerOptions {
@@ -56,8 +59,12 @@ impl WasmPlannerOptions {
         // a clear error at the FFI boundary.
         let value: serde_json::Value = serde_wasm_bindgen::from_value(options)
             .map_err(|e| JsError::new(&format!("Invalid WasmPlanner options: {e}")))?;
-        serde_json::from_value(value)
-            .map_err(|e| JsError::new(&format!("Invalid WasmPlanner options: {e}")))
+        let options: Self = serde_json::from_value(value)
+            .map_err(|e| JsError::new(&format!("Invalid WasmPlanner options: {e}")))?;
+        if options.mus_repeats == Some(0) {
+            return Err(JsError::new("musRepeats must be positive"));
+        }
+        Ok(options)
     }
 }
 
@@ -261,7 +268,11 @@ impl WasmPlanner {
         };
         let solver = PuzzleSolver::new_with_config(puzzle.arc(), solver_config)
             .map_err(|e| JsError::new(&format!("Failed to create solver: {e}")))?;
-        let planner = PuzzlePlanner::new(solver);
+        let mut config = PlannerConfig::default();
+        if let Some(repeats) = opts.mus_repeats {
+            config.mus_config.repeats = i64::from(repeats);
+        }
+        let planner = PuzzlePlanner::new_with_config(solver, config);
         Ok(WasmPlanner {
             inner: Arc::new(Mutex::new(planner)),
         })

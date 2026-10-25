@@ -25,7 +25,7 @@ use tracing_subscriber::prelude::*;
                   Output:      --html, --json\n  \
                   MUS tuning:  --merge, --skip, --no-expand, --all-muses,\n               \
                               --mus-method, --max-steps\n  \
-                  Performance: --searches, --conflict-limit, --conjure\n  \
+                  Performance: --mus-repeats (alias --searches), --conflict-limit, --conjure\n  \
                   Persistence: --save-parsed, --load-parsed, --pin-assignment\n  \
                   Logging:     --trace, --log, --quiet, --verbose\n  \
                   Database:    --strategy-db\n\n\
@@ -88,9 +88,11 @@ struct Opt {
 
     #[arg(
         long,
-        help = "Cap parallel MUS searches per round (advanced; usually leave unset)"
+        visible_alias = "searches",
+        value_parser = clap::value_parser!(i64).range(1..),
+        help = "Randomized MUS search attempts per candidate literal (default 2). More attempts can find smaller explanations; this is not a thread limit or a count of whole solves. Not used by single-dive"
     )]
-    searches: Option<i64>,
+    mus_repeats: Option<i64>,
 
     #[arg(long, help = "Stop after this many solve steps")]
     max_steps: Option<usize>,
@@ -368,8 +370,8 @@ fn main() -> anyhow::Result<()> {
     }
 
     let mus_config: MusConfig = {
-        let mut cfg = if let Some(searches) = opt.searches {
-            MusConfig::new_with_repeats(searches)
+        let mut cfg = if let Some(repeats) = opt.mus_repeats {
+            MusConfig::new_with_repeats(repeats)
         } else {
             MusConfig::default()
         };
@@ -472,4 +474,44 @@ fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::Opt;
+    use clap::Parser;
+
+    #[test]
+    fn mus_repeats_accepts_large_counts_and_legacy_alias() {
+        for flag in ["--mus-repeats", "--searches"] {
+            let opts = Opt::try_parse_from([
+                "demystify",
+                "--model",
+                "m.eprime",
+                "--param",
+                "p.param",
+                flag,
+                "1000",
+            ])
+            .unwrap();
+            assert_eq!(opts.mus_repeats, Some(1000));
+            for invalid in ["0", "-1"] {
+                assert!(
+                    Opt::try_parse_from([
+                        "demystify",
+                        "--model",
+                        "m.eprime",
+                        "--param",
+                        "p.param",
+                        flag,
+                        invalid
+                    ])
+                    .is_err()
+                );
+            }
+        }
+        let opts = Opt::try_parse_from(["demystify", "--model", "m.eprime", "--param", "p.param"])
+            .unwrap();
+        assert_eq!(opts.mus_repeats, None);
+    }
 }
