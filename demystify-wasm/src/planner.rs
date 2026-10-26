@@ -570,8 +570,24 @@ impl WasmPlanner {
     /// Solve the whole puzzle, returning `Vec<Vec<UserMusPayload>>`.
     #[wasm_bindgen(js_name = quickSolve)]
     pub fn quick_solve(&self) -> Result<JsValue, JsError> {
+        self.solve_payload(false)
+    }
+
+    /// Measure peak MUS with the core's greedy solver. This batches deductions
+    /// below the current peak; histogram and plan length are not faithful.
+    /// Returns the same explanation payload shape as `quickSolve`.
+    #[wasm_bindgen(js_name = quickSolveGreedy)]
+    pub fn quick_solve_greedy(&self) -> Result<JsValue, JsError> {
+        self.solve_payload(true)
+    }
+
+    fn solve_payload(&self, greedy: bool) -> Result<JsValue, JsError> {
         let mut planner = self.inner.lock().unwrap();
-        let solve = planner.quick_solve();
+        let solve = if greedy {
+            planner.quick_solve_greedy()
+        } else {
+            planner.quick_solve()
+        };
         let payload: Vec<Vec<UserMusPayload>> = solve
             .into_iter()
             .map(|step| {

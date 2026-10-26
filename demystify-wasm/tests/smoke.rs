@@ -430,3 +430,47 @@ fn current_state_returns_a_table_keyed_by_variable_name() {
         "current_state should return an object, got {parsed:?}"
     );
 }
+
+#[wasm_bindgen_test]
+fn greedy_solve_preserves_peak_state_and_explanation_metadata() {
+    let mut outputs = Vec::new();
+    let mut states = Vec::new();
+    for greedy in [false, true] {
+        let puzzle = load_puzzle(LITTLE1_JSON).expect("fixture");
+        let opts = serde_wasm_bindgen::to_value(
+            &serde_json::json!({"musRepeats": 100, "onlyAssignments": true}),
+        )
+        .unwrap();
+        let planner = WasmPlanner::new(&puzzle, opts).unwrap();
+        let payload = if greedy {
+            planner.quick_solve_greedy()
+        } else {
+            planner.quick_solve()
+        }
+        .unwrap();
+        assert!(planner.is_solved());
+        let solve: serde_json::Value = from_value(payload).unwrap();
+        let mut peak = 0;
+        for step in solve
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|batch| batch.as_array().unwrap())
+        {
+            let constraints = step["constraints"].as_array().unwrap();
+            let details = step["constraint_details"].as_array().unwrap();
+            assert_eq!(constraints.len(), details.len());
+            for (text, detail) in constraints.iter().zip(details) {
+                assert_eq!(text, &detail["text"]);
+                assert!(detail["literals"].is_array());
+            }
+            assert!(!step["literals"].as_array().unwrap().is_empty());
+            peak = peak.max(constraints.len());
+        }
+        outputs.push(peak);
+        states.push(from_value::<serde_json::Value>(planner.current_state().unwrap()).unwrap());
+    }
+    assert!(outputs[0] > 0);
+    assert_eq!(outputs[0], outputs[1]);
+    assert_eq!(states[0], states[1]);
+}

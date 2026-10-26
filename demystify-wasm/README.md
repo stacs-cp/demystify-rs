@@ -302,3 +302,13 @@ thread limit or a count of whole-puzzle solves. Larger counts can find smaller
 explanations, but are not a minimum-cardinality certificate. Unknown options,
 zero, negative and fractional counts are rejected. This option is available in
 new builds; older vendored bindings reject it rather than silently ignoring it.
+
+
+For bulk peak-MUS measurement, `planner.quickSolveGreedy()` exposes the core's
+existing greedy solver (the CLI's `--greedy`). It uses the configured
+`musRepeats`, advances the planner, and returns the same explanation payload
+shape as `quickSolve()`. It batches deductions at or below the peak already
+found: use its maximum constraint count for difficulty, not its histogram or
+plan length as a faithful solve profile. Sampling still does not certify a
+global minimum. Keep the engine, constraint encoding, effort and move policy
+with audit results.
